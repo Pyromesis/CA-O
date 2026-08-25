@@ -1,0 +1,38 @@
+{
+  "keyboard-rate": {
+    "applied": false,
+    "updatedAt": "2026-08-19T16:44:27.799Z"
+  },
+  "flush-dns": {
+    "applied": false,
+    "updatedAt": "2026-08-21T03:45:53.724Z"
+  },
+  "disable-telemetry": {
+    "applied": true,
+    "updatedAt": "2026-08-21T03:45:40.770Z"
+  },
+  "disable-cortana": {
+    "applied": false,
+    "updatedAt": "2026-08-21T03:45:49.687Z"
+  },
+  "animations": {
+    "applied": false,
+    "updatedAt": "2026-08-21T03:45:50.368Z"
+  },
+  "transparency": {
+    "applied": false,
+    "updatedAt": "2026-08-21T03:45:51.094Z"
+  },
+  "mouse-acceleration": {
+    "applied": false,
+    "updatedAt": "2026-08-21T03:45:51.778Z"
+  },
+  "gaming-mode": {
+    "applied": false,
+    "updatedAt": "2026-08-21T03:45:52.431Z"
+  },
+  "power-plan": {
+    "applied": false,
+    "updatedAt": "2026-08-21T03:45:53.069Z"
+  }
+}

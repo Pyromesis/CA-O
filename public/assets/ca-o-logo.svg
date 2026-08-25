@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="title desc">
+  <title id="title">CA-O</title>
+  <desc id="desc">CA-O system optimizer mark</desc>
+  <defs>
+    <linearGradient id="bg" x1="24" y1="20" x2="232" y2="236" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1d2942"/>
+      <stop offset="1" stop-color="#0c1222"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="54" y1="48" x2="204" y2="210" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#67e8f9"/>
+      <stop offset="1" stop-color="#2563eb"/>
+    </linearGradient>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="8" stdDeviation="8" flood-color="#020617" flood-opacity=".45"/>
+    </filter>
+  </defs>
+  <rect x="8" y="8" width="240" height="240" rx="56" fill="url(#bg)"/>
+  <path d="M128 42 146 78l40 6-29 28 7 40-36-19-36 19 7-40-29-28 40-6 18-36Z" fill="none" stroke="url(#accent)" stroke-width="10" stroke-linejoin="round" filter="url(#shadow)"/>
+  <path d="m128 82 13 27 30 4-22 21 6 29-27-15-27 15 6-29-22-21 30-4 13-27Z" fill="url(#accent)"/>
+  <circle cx="128" cy="128" r="16" fill="#f8fafc"/>
+  <path d="M128 172v25M84 128H59M197 128h-25" stroke="#f8fafc" stroke-width="8" stroke-linecap="round" opacity=".9"/>
+</svg>
