@@ -28,6 +28,63 @@ public sealed class SystemBenchmarkRunner
     /// <summary>Below this delta the change is declared "no measurable improvement".</summary>
     public const double NoiseFloorPercent = 3.0;
 
+    /// <summary>
+    /// Scientific run (FASE 21): optional warmup pass (discarded), then N
+    /// trials; every metric reports the MEDIAN, so a single noisy trial
+    /// cannot manufacture an improvement.
+    /// </summary>
+    public async Task<SystemBenchmarkResult> RunTrialsAsync(
+        int trials = 3,
+        bool warmup = true,
+        string workloadId = "system-baseline",
+        CancellationToken ct = default)
+    {
+        if (warmup)
+        {
+            await RunAsync(workloadId + "-warmup", ct);
+        }
+
+        var results = new List<SystemBenchmarkResult>(trials);
+        for (var trial = 0; trial < trials; trial++)
+        {
+            ct.ThrowIfCancellationRequested();
+            results.Add(await RunAsync($"{workloadId}-t{trial + 1}", ct));
+        }
+
+        var median = MedianOf(results);
+        return new SystemBenchmarkResult(
+            median.Header with { WorkloadId = workloadId },
+            median.CpuScore, median.MemoryBandwidthGbs,
+            median.DiskReadMbs, median.DiskWriteMbs,
+            median.Elapsed);
+    }
+
+    /// <summary>Per-metric median across trials (spec 83).</summary>
+    public static SystemBenchmarkResult MedianOf(IEnumerable<SystemBenchmarkResult> results)
+    {
+        var list = results.ToList();
+        if (list.Count == 0)
+        {
+            throw new ArgumentException("Sin resultados.", nameof(results));
+        }
+
+        double Median(Func<SystemBenchmarkResult, double> selector)
+        {
+            var values = list.Select(selector).OrderBy(value => value).ToList();
+            var mid = values.Count / 2;
+            return values.Count % 2 == 1 ? values[mid] : (values[mid - 1] + values[mid]) / 2;
+        }
+
+        var head = list[0];
+        return head with
+        {
+            CpuScore = Median(result => result.CpuScore),
+            MemoryBandwidthGbs = Median(result => result.MemoryBandwidthGbs),
+            DiskReadMbs = Median(result => result.DiskReadMbs),
+            DiskWriteMbs = Median(result => result.DiskWriteMbs),
+        };
+    }
+
     public async Task<SystemBenchmarkResult> RunAsync(string workloadId = "system-baseline", CancellationToken ct = default)
     {
         var sw = Stopwatch.StartNew();

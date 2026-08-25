@@ -19,7 +19,7 @@ internal static class AppServices
 
     public static PrivilegedPipeClient Pipe { get; } = new();
 
-    public static Core.Services.RegistryAccessor Registry { get; } = new();
+    public static Infrastructure.Windows.SystemRegistry.RegistryAccessor Registry { get; } = new();
 
     /// <summary>Catalog instances used read-only by the UI for detection.</summary>
     public static IReadOnlyList<Core.Abstractions.IOptimization> Catalog { get; } =

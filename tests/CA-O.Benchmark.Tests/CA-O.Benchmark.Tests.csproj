@@ -16,6 +16,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\CA-O.Core\CA-O.Core.csproj" />
+    <ProjectReference Include="..\..\src\CA-O.Infrastructure\CA-O.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>

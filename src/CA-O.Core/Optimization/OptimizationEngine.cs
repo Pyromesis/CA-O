@@ -32,7 +32,9 @@ public sealed class OptimizationEngine
         IHistoryLogger history,
         IServiceManager? services = null,
         Core.Interfaces.IPrivilegedCommandExecutor? executor = null,
-        ISystemContextProvider? contextProvider = null)
+        ISystemContextProvider? contextProvider = null,
+        CAO.Core.Rollback.ITransactionJournal? journal = null,
+        Func<bool>? hasPendingRecovery = null)
     {
         _registry = registry;
         _restorePoints = restorePoints;
@@ -41,7 +43,12 @@ public sealed class OptimizationEngine
         _services = services;
         _executor = executor;
         _contextProvider = contextProvider;
+        _journal = journal;
+        _hasPendingRecovery = hasPendingRecovery;
     }
+
+    private readonly CAO.Core.Rollback.ITransactionJournal? _journal;
+    private readonly Func<bool>? _hasPendingRecovery;
 
     public static bool IsRunningAsAdmin()
     {
@@ -68,6 +75,14 @@ public sealed class OptimizationEngine
             return OperationResult.Fail("Se requieren permisos de administrador para aplicar cambios.", "not-admin");
         }
 
+        // FASE 12: no new dangerous mutations while a recovery is pending.
+        if (_hasPendingRecovery?.Invoke() == true)
+        {
+            return OperationResult.Fail(
+                "Se detectó una operación incompleta. El sistema está en modo recuperación.",
+                ErrorCodes.TxnRecoveryPending);
+        }
+
         // One restore point per session is enough; never block on failure.
         string? backupWarning = null;
         if (!_restorePointCreatedThisSession)
@@ -85,7 +100,7 @@ public sealed class OptimizationEngine
 
         var context = await GetContextAsync();
         var transaction = new OptimizationTransaction(
-            Resolve(optimizationId), _registry, context, _services, _executor, _snapshots, _history);
+            Resolve(optimizationId), _registry, context, _services, _executor, _snapshots, _history, _journal);
         var report = await transaction.RunAsync(ct);
 
         return report.Success

@@ -8,6 +8,7 @@ using CAO.Infrastructure.Logging;
 using CAO.Infrastructure.Persistence;
 using CAO.Infrastructure.Security;
 using CAO.Infrastructure.SystemInterop;
+using CAO.Infrastructure.Windows.SystemRegistry;
 using CAO.Core.Security;
 using CAO.Shared.Security;
 

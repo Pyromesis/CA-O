@@ -23,6 +23,7 @@ public sealed record TransactionReport
     /// <summary>True when a post-rollback re-detect confirmed the original state returned.</summary>
     public bool RollbackVerified { get; init; }
 
+
     /// <summary>Cancel was requested mid-flight; the transaction finished atomically anyway (FASE 6).</summary>
     public bool CancellationDeferred { get; init; }
 
@@ -47,6 +48,10 @@ public sealed class OptimizationTransaction
     private readonly Core.Interfaces.IPrivilegedCommandExecutor? _executor;
     private readonly ISnapshotStore? _snapshots;
     private readonly IHistoryLogger? _history;
+    private readonly ITransactionJournal? _journal;
+
+    /// <summary>Unique id persisted across every transition (FASE 5).</summary>
+    public Guid TransactionId { get; }
 
     public OptimizationTransaction(
         IOptimization optimization,
@@ -55,7 +60,8 @@ public sealed class OptimizationTransaction
         IServiceManager? services = null,
         Core.Interfaces.IPrivilegedCommandExecutor? executor = null,
         ISnapshotStore? snapshots = null,
-        IHistoryLogger? history = null)
+        IHistoryLogger? history = null,
+        ITransactionJournal? journal = null)
     {
         _optimization = optimization;
         _registry = registry;
@@ -64,6 +70,8 @@ public sealed class OptimizationTransaction
         _executor = executor;
         _snapshots = snapshots;
         _history = history;
+        _journal = journal;
+        TransactionId = Guid.NewGuid();
     }
 
     public async Task<TransactionReport> RunAsync(CancellationToken ct = default)
@@ -86,6 +94,7 @@ public sealed class OptimizationTransaction
 
         if (!precondition.Passed)
         {
+            Journal(TransactionPhase.Failed);
             Log(definition.Id, "precheck", false, null, error: precondition.ReasonEs, precondition: "failed");
             return new TransactionReport
             {
@@ -100,6 +109,7 @@ public sealed class OptimizationTransaction
         var compatibility = Rules.EvaluatePreconditions(definition, _context);
         if (!compatibility.Passed)
         {
+            Journal(TransactionPhase.Failed);
             Log(definition.Id, "compatibility", false, null, error: compatibility.ReasonEs, precondition: "failed");
             return new TransactionReport
             {
@@ -113,6 +123,7 @@ public sealed class OptimizationTransaction
         // ---- SNAPSHOT (persisted before any mutation; crash-safe) ----
         var snapshot = _optimization.Capture(_registry);
         _snapshots?.Save(definition.Id, snapshot);
+        Journal(TransactionPhase.Snapshot);
 
         // ---- Cancellation checkpoint #2 (FASE 6): last point where an
         // abort leaves zero mutations. After this line the token is ignored
@@ -158,6 +169,8 @@ public sealed class OptimizationTransaction
         {
             var rollbackVerified = await SafeRollbackAsync(context, snapshot, CancellationToken.None);
             var deferred = ct.IsCancellationRequested;
+            Journal(rollbackVerified ? TransactionPhase.RolledBack : TransactionPhase.Failed,
+                ErrorCodes.TxnApplyFailed);
             await lease.DisposeAsync();
             Log(definition.Id, "apply", false, rollbackVerified ? null : definition.Id,
                 error: apply.Error ?? apply.MessageEs,
@@ -195,6 +208,10 @@ public sealed class OptimizationTransaction
             {
                 var deferred = ct.IsCancellationRequested;
                 var rollbackVerified = await SafeRollbackAsync(context, snapshot, CancellationToken.None);
+                Journal(rollbackVerified ? TransactionPhase.RolledBack : TransactionPhase.Failed,
+                    verification.Status == VerificationStatus.Unknown
+                        ? ErrorCodes.VerifyUnknownState
+                        : ErrorCodes.VerifyFailed);
                 await lease.DisposeAsync();
                 var code = verification.Status == VerificationStatus.Unknown
                     ? ErrorCodes.VerifyUnknownState
@@ -221,6 +238,8 @@ public sealed class OptimizationTransaction
         }
 
         await lease.DisposeAsync(); // locks released only after commit/rollback decision
+
+        Journal(TransactionPhase.Commit);
 
         // ---- BENCHMARK (optional hook) ----
         BenchmarkResult? benchmark = null;
@@ -331,6 +350,10 @@ public sealed class OptimizationTransaction
             ? $"fps={benchmark.FrameTimes.AverageFps:0.0}; p99ft={benchmark.FrameTimes.P99FrameTimeMs:0.00}ms"
             : benchmark.Metric is null ? "run" : $"{benchmark.MetricName}={benchmark.Metric:0.##}{benchmark.MetricUnit}";
 
+    private void Journal(TransactionPhase phase, string? errorCode = null) =>
+        _journal?.Append(new TransactionEvent(TransactionId, _optimization.Definition.Id,
+            DateTime.UtcNow, phase, TransactionEvent.IsTerminal(phase), errorCode));
+
     private void Log(
         string optimizationId, string operation, bool success, string? snapshotId,
         string? error = null, string precondition = "passed",
@@ -376,9 +399,10 @@ public sealed class MultiOptimizationTransaction
         IServiceManager? services = null,
         Core.Interfaces.IPrivilegedCommandExecutor? executor = null,
         ISnapshotStore? snapshots = null,
+        ITransactionJournal? journal = null,
         IHistoryLogger? history = null)
         : this(optimizations, context, o => new OptimizationTransaction(
-            o, registry, context, services, executor, snapshots, history))
+            o, registry, context, services, executor, snapshots, history, journal))
     {
     }
 

@@ -76,10 +76,17 @@ public enum TransactionPhase
 {
     NotStarted,
     Precheck,
+    Compatibility,
     Snapshot,
     Apply,
     Verify,
+    Benchmarking,
     Commit,
     RolledBack,
     Failed,
+    CancelledBeforeApply,
+    CancellationDeferred,
+    RecoveryRequired,
+    RecoveryRunning,
+    RecoveryCompleted,
 }

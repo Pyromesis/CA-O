@@ -1,7 +1,7 @@
 using CAO.Core.Abstractions;
 using Microsoft.Win32;
 
-namespace CAO.Core.Services;
+namespace CAO.Infrastructure.Windows.SystemRegistry;
 
 /// <summary>
 /// Real-registry implementation of IRegistryAccessor with EXACT kind
