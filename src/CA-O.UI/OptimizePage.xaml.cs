@@ -80,6 +80,49 @@ public sealed partial class OptimizePage : Page
         RecommendationsList.ItemsSource = rows;
     }
 
+    private async void OnPreviewClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: string id }) return;
+
+        var match = AppServices.Catalog.FirstOrDefault(o =>
+            o.Definition.Id.Equals(id, StringComparison.OrdinalIgnoreCase));
+        if (match is null)
+        {
+            StatusText.Text = $"Optimización desconocida: {id}";
+            return;
+        }
+
+        try
+        {
+            var preview = await match.PreviewAsync(AppServices.Registry);
+            var lines = string.Join("\n", preview.Lines.Select(line =>
+                $"• [{line.Kind}] {line.Target}\n   antes : {line.Before}\n   después: {line.After}"));
+
+            var dialog = new ContentDialog
+            {
+                Title = $"Dry-run: {preview.OptimizationId}",
+                Content = new ScrollViewer
+                {
+                    MaxHeight = 380,
+                    Content = new TextBlock
+                    {
+                        Text = lines + $"\n\nRiesgo: {preview.Risk} · Seguridad: {preview.SecurityImpact}" +
+                               $"\nReversible: {(preview.Reversible ? "sí" : "NO")} · Reinicio: {(preview.RequiresReboot ? "sí" : "no")}",
+                        TextWrapping = TextWrapping.Wrap,
+                        IsTextSelectionEnabled = true,
+                    },
+                },
+                CloseButtonText = "Cerrar",
+                XamlRoot = Content.XamlRoot,
+            };
+            await dialog.ShowAsync();
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = $"El dry-run falló: {ex.Message}";
+        }
+    }
+
     private async void OnApplyClick(object sender, RoutedEventArgs e)
     {
         if (sender is not Button { Tag: string id }) return;

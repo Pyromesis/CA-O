@@ -35,6 +35,21 @@ public sealed partial class GamingPage : Page
 
             VanguardBar.IsOpen = context.VanguardDetected;
 
+            // Per-game profiles (FASE 22): advisory guidance only.
+            var games = context.GamesDetected
+                .Select(gameName => CAO.Core.Gaming.GameProfileCatalog.All.FirstOrDefault(profile =>
+                    profile.DisplayName.Equals(gameName, StringComparison.OrdinalIgnoreCase)))
+                .Where(profile => profile is not null)
+                .Cast<CAO.Shared.GameProfile>()
+                .ToList();
+
+            GameProfilesText.Text = games.Count == 0
+                ? "Sin juegos conocidos en ejecución/detección ahora mismo."
+                : string.Join("\n\n", games.Select(game =>
+                    $"▸ {game.DisplayName} ({game.Launcher})\n" +
+                    $"  Anti-cheat: {game.AntiCheatPolicy}\n" +
+                    string.Join("\n", game.GuidanceEs.Select(line => "  - " + line))));
+
             GpuText.Text =
                 $"GPU: {(string.IsNullOrWhiteSpace(context.GpuName) ? "desconocida" : context.GpuName)}\n" +
                 $"Driver: {(string.IsNullOrWhiteSpace(context.GpuDriverVersion) ? "desconocido" : context.GpuDriverVersion)}\n" +

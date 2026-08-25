@@ -47,6 +47,7 @@
                                 <TextBlock FontSize="12"><Run Text="Puntuación: " /><Run Text="{Binding ScoreLabel}" /></TextBlock>
                             </StackPanel>
                             <StackPanel Orientation="Horizontal" Spacing="8">
+                                <Button Content="Ver cambios" Tag="{Binding OptimizationId}" Click="OnPreviewClick" />
                                 <Button Content="Aplicar" Tag="{Binding OptimizationId}" Click="OnApplyClick" />
                                 <Button Content="Revertir" Tag="{Binding OptimizationId}" Click="OnRevertClick" />
                             </StackPanel>

@@ -101,6 +101,33 @@ public interface IOptimization
     /// resources such as PowerPlan:System or Boot:BCD.
     /// </summary>
     IReadOnlyList<ResourceKey> ResourceKeys => [ResourceKey.ForOptimization(Definition.Id)];
+
+    /// <summary>
+    /// DRY RUN (FASE 40/41): predicts the exact changes without mutating.
+    /// Default implementation reports only intent; registry-backed
+    /// optimizations override with per-value before→after lines.
+    /// </summary>
+    Task<OptimizationPreview> PreviewAsync(IRegistryAccessor registry, CancellationToken ct = default)
+    {
+        var definition = Definition;
+        return Task.FromResult(new OptimizationPreview
+        {
+            OptimizationId = definition.Id,
+            Lines =
+            [
+                new PreviewLine
+                {
+                    Kind = definition.Category.ToString(),
+                    Target = "(definido por la implementación)",
+                    Before = "estado actual",
+                    After = "estado objetivo",
+                },
+            ],
+            Risk = definition.Risk,
+            SecurityImpact = definition.SecurityImpact,
+            Flags = definition.Flags,
+        });
+    }
 }
 
 /// <summary>Runtime services handed to optimizations.</summary>

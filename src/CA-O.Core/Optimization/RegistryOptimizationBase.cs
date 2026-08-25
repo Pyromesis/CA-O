@@ -71,6 +71,50 @@ public abstract class RegistryOptimizationBase : IOptimization
         return Task.FromResult(OperationResult.Ok("Estado anterior restaurado desde el snapshot."));
     }
 
+    /// <summary>
+    /// DRY RUN (FASE 41): per-value diff lines for every registry target —
+    /// exact current value vs applied value, with the real kind name.
+    /// Reads only; never writes.
+    /// </summary>
+    public virtual Task<OptimizationPreview> PreviewAsync(IRegistryAccessor registry, CancellationToken ct = default)
+    {
+        var definition = Definition;
+        var lines = new List<PreviewLine>();
+
+        foreach (var target in Targets)
+        {
+            var raw = registry.GetValueRaw(target.Hive, target.KeyPath, target.ValueName, out var kind);
+            var before = new RegistrySnapshotEntry(
+                target.Hive.ToString(), target.KeyPath, target.ValueName, raw,
+                Existed: raw is not null) { Kind = kind }.FormatValue();
+
+            var afterValue = target.AppliedValue;
+            var after = afterValue switch
+            {
+                byte[] bytes => $"binary[{bytes.Length}]",
+                string[] multi => string.Join(" | ", multi),
+                _ => afterValue?.ToString() ?? string.Empty,
+            };
+
+            lines.Add(new PreviewLine
+            {
+                Kind = "Registry",
+                Target = $"{target.Hive}\\{target.KeyPath}\\{target.ValueName} ({kind.ToWire()})",
+                Before = before,
+                After = after,
+            });
+        }
+
+        return Task.FromResult(new OptimizationPreview
+        {
+            OptimizationId = definition.Id,
+            Lines = lines,
+            Risk = definition.Risk,
+            SecurityImpact = definition.SecurityImpact,
+            Flags = definition.Flags,
+        });
+    }
+
     /// <summary>Writes every target value. Called by typical ApplyAsync bodies.</summary>
     protected void WriteTargets(OptimizationContext context)
     {

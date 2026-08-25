@@ -20,14 +20,16 @@ $hash = (Get-FileHash $zip -Algorithm SHA256).Hash
 "$hash  $(Split-Path $zip -Leaf)" | Set-Content "$zip.sha256"
 Get-Content "$zip.sha256"
 
-# SBOM mínimo (spec 88): paquetes NuGet del grafo restaurado.
-$sbom = Join-Path "artifacts" "sbom.spdx.json"
-@{
-    spdxVersion   = "SPDX-2.3"
-    name          = "CA-O 2.0.0"
-    created       = (Get-Date).ToUniversalTime().ToString("o")
-    packages      = @(dotnet list CA-O.sln package --include-transitive |
-        Select-String -Pattern "^\s+>\s+(\S+)\s+(\S+)" |
-        ForEach-Object { @{ name = $_.Matches[0].Groups[1].Value; version = $_.Matches[0].Groups[2].Value } })
-} | ConvertTo-Json -Depth 4 | Set-Content $sbom
-Write-Host "SBOM generado en $sbom" -ForegroundColor Green
+# SBOM estándar (FASE 31): CycloneDX vía dotnet-CycloneDX si está instalada;
+# sin la herramienta, se advierte y el release NO debe publicarse sin SBOM.
+$sbomDir = Join-Path "artifacts" "sbom"
+$hasTool = (dotnet tool list --global | Select-String -Quiet "cyclonedx")
+if (-not $hasTool) {
+    Write-Warning "dotnet-cyclonedx no instalado. Instale con:"
+    Write-Warning "  dotnet tool install --global CycloneDX"
+    Write-Warning "y regenere el SBOM antes de publicar."
+} else {
+    dotnet CycloneDX CA-O.sln --output $sbomDir --filename bom.json
+    if ($LASTEXITCODE -ne 0) { throw "CycloneDX fallo" }
+    Write-Host "SBOM CycloneDX generado en $sbomDir\bom.json" -ForegroundColor Green
+}
