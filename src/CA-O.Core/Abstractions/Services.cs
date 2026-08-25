@@ -49,3 +49,12 @@ public interface ISystemInfoProvider
 {
     Task<SystemInfoReport> GetAsync(CancellationToken ct = default);
 }
+
+/// <summary>
+/// Produces the measured SystemContext consumed by preconditions,
+/// recommendation and profile engines (diagnostics-first pipeline).
+/// </summary>
+public interface ISystemContextProvider
+{
+    Task<SystemContext> GetAsync(CancellationToken ct = default);
+}

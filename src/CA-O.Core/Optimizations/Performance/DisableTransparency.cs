@@ -18,6 +18,11 @@ public sealed class DisableTransparency : RegistryOptimizationBase
         DescriptionEn = "Turns off system acrylic/transparency effects to save GPU composition work.",
         TooltipEs = "EnableTransparency=0. Nota: también apaga el estilo visual Fluent translúcido (preferencia estética).",
         Category = OptimizationCategory.Performance,
+        ExpectedImpact = PerformanceImpact.Tiny,
+        Evidence = EvidenceLevel.Empirical,
+        Risk = RiskLevel.Safe,
+        Compatibility = CompatibilityStatus.Compatible,
+        SecurityImpact = SecurityImpact.None,
         Impact = ImpactLevel.Low,
     };
 

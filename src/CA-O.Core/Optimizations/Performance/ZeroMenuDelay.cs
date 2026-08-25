@@ -16,8 +16,13 @@ public sealed class ZeroMenuDelay : RegistryOptimizationBase
         NameEn = "Instant menu open",
         DescriptionEs = "Elimina el retardo de 400 ms al abrir menús contextuales.",
         DescriptionEn = "Removes the 400 ms delay before context menus open.",
-        TooltipEs = "MenuShowDelay=0. Es una preferencia de respuesta de UI, no mejora FPS.",
+        TooltipEs = "MenuShowDelay=0. Es una preferencia de respuesta de UI, no mejora el rendimiento en juegos.",
         Category = OptimizationCategory.Performance,
+        ExpectedImpact = PerformanceImpact.Tiny,
+        Evidence = EvidenceLevel.Heuristic,
+        Risk = RiskLevel.Safe,
+        Compatibility = CompatibilityStatus.Compatible,
+        SecurityImpact = SecurityImpact.None,
         Impact = ImpactLevel.Low,
     };
 

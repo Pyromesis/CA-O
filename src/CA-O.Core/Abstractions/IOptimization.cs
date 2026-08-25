@@ -11,7 +11,14 @@ public sealed record OperationResult(bool Success, string MessageEs, string? Err
 }
 
 /// <summary>
-/// Contract implemented by every optimization in the catalog.
+/// Contract implemented by every optimization in the catalog (spec 8).
+///
+/// Transactional mapping used by the engine (spec 123):
+///   PRECHECK -> CheckPreconditionsAsync
+///   SNAPSHOT -> CaptureSnapshotAsync (Capture)
+///   APPLY    -> ApplyAsync
+///   VERIFY   -> VerifyAsync
+///   ROLLBACK -> RollbackAsync / RevertAsync
 /// Implementations MUST capture state into a snapshot before mutating and
 /// MUST verify after applying; Detect must never mutate anything.
 /// </summary>
@@ -30,6 +37,54 @@ public interface IOptimization
 
     /// <summary>Restores the exact state captured earlier.</summary>
     Task<OperationResult> RevertAsync(OptimizationContext context, OptimizationSnapshot snapshot, CancellationToken ct = default);
+
+    // ------------------------------------------------------------------
+    // Lifecycle extensions (v2). Default implementations keep the simple
+    // registry-backed catalog honest without forcing every optimization to
+    // re-implement boilerplate; overrides exist where real checks matter.
+    // ------------------------------------------------------------------
+
+    /// <summary>PRECHECK phase: refuses to run on incompatible builds/hardware.</summary>
+    Task<PreconditionResult> CheckPreconditionsAsync(SystemContext context, CancellationToken ct = default)
+    {
+        return Task.FromResult(Compatibility.Rules.EvaluatePreconditions(Definition, context));
+    }
+
+    /// <summary>VERIFY phase: re-detects live state and compares with intent.</summary>
+    Task<VerificationResult> VerifyAsync(OptimizationContext context, CancellationToken ct = default)
+    {
+        var observed = Detect(context.Registry);
+        return Task.FromResult(observed switch
+        {
+            OptimizationState.AppliedByCao =>
+                VerificationResult.Passed(observed, "El estado aplicado se ha verificado en el sistema."),
+            OptimizationState.PendingReboot =>
+                VerificationResult.Passed(observed, "El cambio requiere reinicio para completarse."),
+            OptimizationState.Unknown =>
+                VerificationResult.Passed(observed, "El cambio no es verificable por lectura directa; se acepta."),
+            _ => VerificationResult.Failed(observed, "El sistema no refleja el estado esperado tras aplicar."),
+        });
+    }
+
+    /// <summary>Benchmark hook; null means this change has no measurable path.</summary>
+    Task<BenchmarkResult?> BenchmarkAsync(CancellationToken ct = default) =>
+        Task.FromResult<BenchmarkResult?>(null);
+
+    /// <summary>ROLLBACK phase: revert against a freshly captured fallback snapshot.</summary>
+    async Task<RollbackResult> RollbackAsync(OptimizationContext context, OptimizationSnapshot snapshot, CancellationToken ct = default)
+    {
+        try
+        {
+            var result = await RevertAsync(context, snapshot, ct);
+            return result.Success
+                ? RollbackResult.Ok(result.MessageEs)
+                : RollbackResult.Fail(result.MessageEs, result.Error);
+        }
+        catch (Exception ex)
+        {
+            return RollbackResult.Fail("La reversión falló.", ex.Message);
+        }
+    }
 }
 
 /// <summary>Runtime services handed to optimizations.</summary>

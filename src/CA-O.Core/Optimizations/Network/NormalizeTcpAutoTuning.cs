@@ -17,6 +17,11 @@ public sealed class NormalizeTcpAutoTuning : IOptimization
         DescriptionEn = "Ensures TCP receive-window autotuning is 'normal' (the modern default).",
         TooltipEs = "Los tweaks antiguos ponían 'disabled' y EMPEORABAN el rendimiento hoy. Esta acción solo restaura el valor sano si algo lo cambió.",
         Category = OptimizationCategory.Network,
+        ExpectedImpact = PerformanceImpact.WorkloadDependent,
+        Evidence = EvidenceLevel.Official,
+        Risk = RiskLevel.Low,
+        Compatibility = CompatibilityStatus.Conditional,
+        SecurityImpact = SecurityImpact.None,
         Impact = ImpactLevel.Low,
     };
 

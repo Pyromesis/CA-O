@@ -10,14 +10,31 @@ using Microsoft.Extensions.Logging;
 
 namespace CAO.Privileged;
 
+/// <summary>
+/// Authenticated named-pipe host for privileged operations (spec 5-7):
+/// restrictive ACL, identity check, schema validation, operation allowlist,
+/// nonce replay protection, per-connection timeout and full audit logging.
+/// The service only executes strongly-typed operations from the catalog;
+/// arbitrary commands are impossible by construction.
+/// </summary>
 internal sealed class PrivilegedPipeService(
     ILogger<PrivilegedPipeService> logger,
     OptimizationEngine engine) : BackgroundService
 {
-    private const string PipeName = "CA-O.Privileged.v1";
     private static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(15);
     private readonly ConcurrentDictionary<Guid, byte> _requestIds = new();
     private readonly ConcurrentDictionary<string, byte> _nonces = new(StringComparer.Ordinal);
+
+    /// <summary>Operations this build is allowed to execute (allowlist).</summary>
+    private static readonly IReadOnlySet<PrivilegedOperation> AllowedOperations =
+        new HashSet<PrivilegedOperation>
+        {
+            PrivilegedOperation.ApplyOptimization,
+            PrivilegedOperation.RevertOptimization,
+            PrivilegedOperation.DetectOptimization,
+            PrivilegedOperation.CaptureSnapshot,
+            PrivilegedOperation.VerifyOptimization,
+        };
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -57,7 +74,7 @@ internal sealed class PrivilegedPipeService(
             AccessControlType.Allow));
 
         return NamedPipeServerStreamAcl.Create(
-            PipeName,
+            IpcConstants.PipeName,
             PipeDirection.InOut,
             1,
             PipeTransmissionMode.Byte,
@@ -72,22 +89,23 @@ internal sealed class PrivilegedPipeService(
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
         timeout.CancelAfter(RequestTimeout);
 
+        string? clientIdentity = null;
         try
         {
-            var clientIdentity = pipe.GetImpersonationUserName();
+            clientIdentity = pipe.GetImpersonationUserName();
             if (string.IsNullOrWhiteSpace(clientIdentity))
             {
-                await JsonSerializer.SerializeAsync(
-                    pipe,
-                    PrivilegedOperationResponse.Rejected("Identidad IPC no disponible."),
-                    cancellationToken: timeout.Token);
+                logger.LogWarning("Solicitud IPC sin identidad; rechazada.");
+                await WriteResponse(pipe, PrivilegedOperationResponse.Rejected("Identidad IPC no disponible."), stoppingToken);
                 return;
             }
 
-            logger.LogInformation("Solicitud IPC recibida de {ClientIdentity}.", clientIdentity);
             var request = await JsonSerializer.DeserializeAsync<PrivilegedOperationRequest>(pipe, cancellationToken: timeout.Token);
             var response = await ValidateAndDispatchAsync(request, timeout.Token);
-            await JsonSerializer.SerializeAsync(pipe, response, cancellationToken: timeout.Token);
+            logger.LogInformation(
+                "Auditoría IPC: identidad={Identity} operación={Operation} aceptado={Accepted} error={Error}",
+                clientIdentity, request?.Operation.ToString() ?? "desconocida", response.Accepted, response.Error ?? "-");
+            await WriteResponse(pipe, response, stoppingToken);
         }
         catch (OperationCanceledException) when (timeout.IsCancellationRequested)
         {
@@ -95,7 +113,11 @@ internal sealed class PrivilegedPipeService(
         }
         catch (JsonException)
         {
-            await JsonSerializer.SerializeAsync(pipe, PrivilegedOperationResponse.Rejected("JSON inválido."), cancellationToken: stoppingToken);
+            await WriteResponse(pipe, PrivilegedOperationResponse.Rejected("JSON inválido."), stoppingToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Fallo inesperado atendiendo la conexión IPC de {Client}.", clientIdentity ?? "?");
         }
     }
 
@@ -109,6 +131,12 @@ internal sealed class PrivilegedPipeService(
             return PrivilegedOperationResponse.Rejected(error);
         }
 
+        if (!AllowedOperations.Contains(request.Operation))
+        {
+            return PrivilegedOperationResponse.Rejected("Operación no permitida por la lista blanca del servicio.");
+        }
+
+        // Replay protection: each request id and nonce may be used exactly once.
         if (!_requestIds.TryAdd(request.RequestId, 0) || !_nonces.TryAdd(request.Nonce, 0))
         {
             return PrivilegedOperationResponse.Rejected("Solicitud repetida.");
@@ -120,6 +148,8 @@ internal sealed class PrivilegedPipeService(
             {
                 PrivilegedOperation.ApplyOptimization => FromResult(await engine.ApplyAsync(request.Parameters.OptimizationId!, ct)),
                 PrivilegedOperation.RevertOptimization => FromResult(await engine.RevertAsync(request.Parameters.OptimizationId!, ct)),
+                PrivilegedOperation.CaptureSnapshot => Describe(engine.CaptureSnapshot(request.Parameters.OptimizationId!)),
+                PrivilegedOperation.VerifyOptimization => await VerifyAsync(request.Parameters.OptimizationId!, ct),
                 PrivilegedOperation.DetectOptimization => new PrivilegedOperationResponse(
                     true,
                     null,
@@ -134,11 +164,33 @@ internal sealed class PrivilegedPipeService(
         }
     }
 
+    private async Task<PrivilegedOperationResponse> VerifyAsync(string optimizationId, CancellationToken ct)
+    {
+        var verification = await engine.VerifyAsync(optimizationId, ct);
+        return new PrivilegedOperationResponse(
+            verification.Verified,
+            verification.Verified ? null : verification.MessageEs,
+            $"Verificación: {verification.MessageEs} (estado observado: {verification.ObservedState})");
+    }
+
     private static PrivilegedOperationResponse FromResult(CAO.Core.Abstractions.OperationResult result) =>
         new(result.Success, result.Error, result.MessageEs);
-}
 
-internal sealed record PrivilegedOperationResponse(bool Accepted, string? Error, string? MessageEs = null)
-{
-    public static PrivilegedOperationResponse Rejected(string error) => new(false, error);
+    private static PrivilegedOperationResponse Describe(SnapshotDescriptor descriptor) =>
+        new(true, null, $"Snapshot capturado: {descriptor.SnapshotId} ({descriptor.EntryCount} entradas).");
+
+    private static async Task WriteResponse(
+        NamedPipeServerStream pipe,
+        PrivilegedOperationResponse response,
+        CancellationToken ct)
+    {
+        try
+        {
+            await JsonSerializer.SerializeAsync(pipe, response, cancellationToken: ct);
+        }
+        catch (IOException)
+        {
+            // Client disconnected before reading the answer; nothing to do.
+        }
+    }
 }

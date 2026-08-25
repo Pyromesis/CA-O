@@ -21,6 +21,11 @@ public sealed class DisableGameBarDvr : RegistryOptimizationBase
         DescriptionEn = "Turns off the game bar and the background recording that uses CPU/GPU.",
         TooltipEs = "GameDVR_Enabled=0 y AppCaptureEnabled=0. Pierdes Win+G y los clips automáticos; gana estabilidad de frametime.",
         Category = OptimizationCategory.Gaming,
+        ExpectedImpact = PerformanceImpact.WorkloadDependent,
+        Evidence = EvidenceLevel.Vendor,
+        Risk = RiskLevel.Low,
+        Compatibility = CompatibilityStatus.NoKnownConflict,
+        SecurityImpact = SecurityImpact.None,
         Impact = ImpactLevel.High,
     };
 

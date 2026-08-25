@@ -18,6 +18,11 @@ public sealed class DisableCopilot : RegistryOptimizationBase
         DescriptionEn = "Turns off Copilot using Microsoft's official policy.",
         TooltipEs = "Usa la clave de directivas documentada (TurnOffWindowsCopilot=1), no hacks no documentados.",
         Category = OptimizationCategory.PrivacySecurity,
+        ExpectedImpact = PerformanceImpact.None,
+        Evidence = EvidenceLevel.Vendor,
+        Risk = RiskLevel.Low,
+        Compatibility = CompatibilityStatus.NoKnownConflict,
+        SecurityImpact = SecurityImpact.PrivacyOnly,
         Impact = ImpactLevel.Low,
     };
 

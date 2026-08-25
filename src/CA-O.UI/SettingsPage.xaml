@@ -1,0 +1,35 @@
+<Page
+    x:Class="CAO.UI.Pages.SettingsPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <ScrollViewer Padding="28,20" VerticalScrollBarVisibility="Auto">
+        <StackPanel Spacing="18" MaxWidth="900" HorizontalAlignment="Left">
+            <TextBlock Text="Ajustes" FontSize="28" FontWeight="SemiBold" />
+
+            <ToggleSwitch x:Name="ExpertSwitch" OnContent="Activado" OffContent="Desactivado" Toggled="OnExpertToggled" />
+            <InfoBar x:Name="ExpertWarnBar" IsOpen="False" Severity="Warning"
+                     Title="Modo Expert"
+                     Message="Muestra cambios experimentales, sensibles a seguridad y heredados. Cada aplicación exige confirmación explícita y crea snapshot." />
+
+            <StackPanel Orientation="Horizontal" Spacing="12">
+                <TextBlock x:Name="ThemeLabel" VerticalAlignment="Center" />
+                <ComboBox x:Name="ThemeBox" SelectionChanged="OnThemeSelected">
+                    <ComboBoxItem Content="Sistema" Tag="system" />
+                    <ComboBoxItem Content="Claro" Tag="light" />
+                    <ComboBoxItem Content="Oscuro" Tag="dark" />
+                </ComboBox>
+            </StackPanel>
+
+            <StackPanel Orientation="Horizontal" Spacing="12">
+                <TextBlock x:Name="LanguageLabel" VerticalAlignment="Center" />
+                <ComboBox x:Name="LanguageBox" SelectionChanged="OnLanguageSelected" />
+            </StackPanel>
+
+            <StackPanel Orientation="Horizontal" Spacing="12">
+                <Button x:Name="ServiceButton" Click="OnServiceCheckClick" />
+                <ProgressRing x:Name="ServiceRing" IsActive="False" Width="24" Height="24" />
+                <TextBlock x:Name="ServiceStatusText" VerticalAlignment="Center" Opacity="0.85" />
+            </StackPanel>
+        </StackPanel>
+    </ScrollViewer>
+</Page>

@@ -1,0 +1,28 @@
+namespace CAO.Shared;
+
+/// <summary>Single source of truth for assembly/app versioning facts.</summary>
+public static class AppVersion
+{
+    public const string Major = "2";
+    public const string Minor = "0";
+    public const string Patch = "0";
+
+    public const string Semantic = $"{Major}.{Minor}.{Patch}";
+
+    /// <summary>Current IPC protocol version; bump on any wire-format change.</summary>
+    public const int ProtocolVersion = 1;
+}
+
+/// <summary>Application profiles offered by the profile engine (spec 104).</summary>
+public enum ProfileId
+{
+    Safe,
+    Balanced,
+    Gaming,
+    Competitive,
+    Privacy,
+    Security,
+    Maintenance,
+    Expert,
+    Custom,
+}

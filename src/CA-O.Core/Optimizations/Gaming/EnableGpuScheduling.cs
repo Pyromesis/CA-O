@@ -18,6 +18,11 @@ public sealed class EnableGpuScheduling : RegistryOptimizationBase
         DescriptionEn = "Enables HAGS. Required for DLSS Frame Generation; effect varies per title.",
         TooltipEs = "HwSchMode=2 + reinicio. En GPUs antiguas puede no estar soportado o no aportar; reversible.",
         Category = OptimizationCategory.Gaming,
+        ExpectedImpact = PerformanceImpact.WorkloadDependent,
+        Evidence = EvidenceLevel.Vendor,
+        Risk = RiskLevel.Moderate,
+        Compatibility = CompatibilityStatus.Conditional,
+        SecurityImpact = SecurityImpact.None,
         Impact = ImpactLevel.Medium,
         Flags = OptimizationFlags.RequiresReboot,
     };

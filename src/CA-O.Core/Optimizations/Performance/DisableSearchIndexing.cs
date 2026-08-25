@@ -19,6 +19,11 @@ public sealed class DisableSearchIndexing : IOptimization, IServiceAwareOptimiza
         DescriptionEn = "Stops and disables the Windows Search indexing service. SSD-only recommended.",
         TooltipEs = "En HDD suele convenir dejarlo activo. El tipo de inicio anterior se guarda en el snapshot para restaurarlo.",
         Category = OptimizationCategory.Performance,
+        ExpectedImpact = PerformanceImpact.WorkloadDependent,
+        Evidence = EvidenceLevel.Empirical,
+        Risk = RiskLevel.Moderate,
+        Compatibility = CompatibilityStatus.Conditional,
+        SecurityImpact = SecurityImpact.None,
         Impact = ImpactLevel.Medium,
         Flags = OptimizationFlags.RecommendedOnSsd,
     };

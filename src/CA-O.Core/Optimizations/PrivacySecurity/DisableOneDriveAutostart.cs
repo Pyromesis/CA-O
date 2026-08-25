@@ -23,6 +23,11 @@ public sealed class DisableOneDriveAutostart : IOptimization
         DescriptionEn = "Stops OneDrive from launching at logon. Does NOT uninstall the app.",
         TooltipEs = "Elimina la entrada Run de OneDrive (capturada para restaurarla). Si usas OneDrive, no actives esto.",
         Category = OptimizationCategory.PrivacySecurity,
+        ExpectedImpact = PerformanceImpact.Tiny,
+        Evidence = EvidenceLevel.Official,
+        Risk = RiskLevel.Low,
+        Compatibility = CompatibilityStatus.Conditional,
+        SecurityImpact = SecurityImpact.PrivacyOnly,
         Impact = ImpactLevel.Medium,
         Flags = OptimizationFlags.ExpertOnly,
     };

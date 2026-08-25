@@ -18,6 +18,11 @@ public sealed class DisableTelemetry : RegistryOptimizationBase
         DescriptionEn = "Sets the diagnostic-data policy to the minimum allowed by the Windows edition.",
         TooltipEs = "AllowTelemetry=0 vía directiva. En Home el mínimo efectivo es 'Requerido básico'. No toca servicios: eso sería una decisión aparte.",
         Category = OptimizationCategory.PrivacySecurity,
+        ExpectedImpact = PerformanceImpact.None,
+        Evidence = EvidenceLevel.Official,
+        Risk = RiskLevel.Low,
+        Compatibility = CompatibilityStatus.Compatible,
+        SecurityImpact = SecurityImpact.PrivacyOnly,
         Impact = ImpactLevel.Medium,
     };
 

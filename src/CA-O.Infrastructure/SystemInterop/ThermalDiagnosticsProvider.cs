@@ -19,7 +19,7 @@ public sealed class ThermalDiagnosticsProvider
                 {
                     ct.ThrowIfCancellationRequested();
                     var rawTemperature = zone["CurrentTemperature"];
-                    var temperature = rawTemperature is null ? null : Convert.ToDouble(rawTemperature) / 10d - 273.15d;
+                    var temperature = rawTemperature is null ? (double?)null : Convert.ToDouble(rawTemperature) / 10d - 273.15d;
                     zones.Add(new ThermalZoneDiagnostic(
                         zone["InstanceName"]?.ToString() ?? "ACPI thermal zone",
                         temperature,

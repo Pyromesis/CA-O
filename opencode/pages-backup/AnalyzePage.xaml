@@ -1,0 +1,29 @@
+<Page
+    x:Class="CAO.UI.Pages.AnalyzePage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <ScrollViewer Padding="28,20" VerticalScrollBarVisibility="Auto">
+        <StackPanel Spacing="14" MaxWidth="1100" HorizontalAlignment="Left">
+            <TextBlock Text="Analizar" FontSize="28" FontWeight="SemiBold" />
+            <StackPanel Orientation="Horizontal" Spacing="12">
+                <Button x:Name="RunButton" Click="OnRunClick" Style="{StaticResource AccentButtonStyle}" />
+                <ProgressRing x:Name="Ring" IsActive="False" Width="26" Height="26" />
+            </StackPanel>
+            <InfoBar x:Name="NoteBar" IsOpen="True" Severity="Informational"
+                     Title="Diagnósticos primero (spec 17)"
+                     Message="Cada área se mide antes de recomendar cualquier cambio. Nada aquí modifica el sistema." />
+            <TextBlock x:Name="NetworkHeader" Text="Red" FontSize="18" FontWeight="SemiBold" Margin="0,8,0,0" />
+            <TextBlock x:Name="NetworkText" TextWrapping="Wrap" IsTextSelectionEnabled="True" Opacity="0.9" />
+            <Button Content="Benchmark DNS" Click="OnDnsBenchClick" Margin="0,4,0,0" />
+            <TextBlock x:Name="SecurityHeader" Text="Seguridad" FontSize="18" FontWeight="SemiBold" Margin="0,8,0,0" />
+            <TextBlock x:Name="SecurityText" TextWrapping="Wrap" IsTextSelectionEnabled="True" Opacity="0.9" />
+            <TextBlock x:Name="StorageHeader" Text="Almacenamiento" FontSize="18" FontWeight="SemiBold" Margin="0,8,0,0" />
+            <TextBlock x:Name="StorageText" TextWrapping="Wrap" IsTextSelectionEnabled="True" Opacity="0.9" />
+            <TextBlock x:Name="DriversHeader" Text="Drivers" FontSize="18" FontWeight="SemiBold" Margin="0,8,0,0" />
+            <TextBlock x:Name="DriversText" TextWrapping="Wrap" IsTextSelectionEnabled="True" Opacity="0.9" />
+            <TextBlock x:Name="InterruptsHeader" Text="Latencia DPC/ISR" FontSize="18" FontWeight="SemiBold" Margin="0,8,0,0" />
+            <Button Content="Muestrear 5 s" Click="OnDpcSampleClick" Margin="0,4,0,0" />
+            <TextBlock x:Name="InterruptsText" TextWrapping="Wrap" IsTextSelectionEnabled="True" Opacity="0.9" />
+        </StackPanel>
+    </ScrollViewer>
+</Page>

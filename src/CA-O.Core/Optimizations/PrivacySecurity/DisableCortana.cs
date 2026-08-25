@@ -18,6 +18,11 @@ public sealed class DisableCortana : RegistryOptimizationBase
         DescriptionEn = "Disables the Cortana assistant via policy.",
         TooltipEs = "AllowCortana=0. En Windows 11 moderno Cortana ya está retirada; el valor no hace daño si no existe.",
         Category = OptimizationCategory.PrivacySecurity,
+        ExpectedImpact = PerformanceImpact.None,
+        Evidence = EvidenceLevel.Official,
+        Risk = RiskLevel.Low,
+        Compatibility = CompatibilityStatus.NoKnownConflict,
+        SecurityImpact = SecurityImpact.PrivacyOnly,
         Impact = ImpactLevel.Low,
     };
 

@@ -22,6 +22,11 @@ public sealed class DisableVbs : IOptimization
         DescriptionEn = "Turns off Virtualization-Based Security. Reduces kernel security; experts only.",
         TooltipEs = "REDUCCIÓN DE SEGURIDAD: pierdes HVCI/aislamiento de kernel y puede afectar a Vanguard/anti-cheats que exijan seguridad activa, además de romper WSL2/Docker/Sandbox. Requiere reinicio.",
         Category = OptimizationCategory.Performance,
+        ExpectedImpact = PerformanceImpact.WorkloadDependent,
+        Evidence = EvidenceLevel.Vendor,
+        Risk = RiskLevel.Critical,
+        Compatibility = CompatibilityStatus.PotentialConflict,
+        SecurityImpact = SecurityImpact.ReducedProtection,
         Impact = ImpactLevel.High,
         Flags = OptimizationFlags.ExpertOnly | OptimizationFlags.SecurityTradeoff | OptimizationFlags.RequiresReboot,
     };

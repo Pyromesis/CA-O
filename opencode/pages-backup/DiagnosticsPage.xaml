@@ -1,0 +1,20 @@
+<Page
+    x:Class="CAO.UI.Pages.DiagnosticsPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <ScrollViewer Padding="28,20" VerticalScrollBarVisibility="Auto">
+        <StackPanel Spacing="14" MaxWidth="1100" HorizontalAlignment="Left">
+            <TextBlock Text="Diagnóstico" FontSize="28" FontWeight="SemiBold" />
+            <StackPanel Orientation="Horizontal" Spacing="12">
+                <Button x:Name="RunButton" Click="OnRunClick" Style="{StaticResource AccentButtonStyle}" />
+                <ProgressRing x:Name="Ring" IsActive="False" Width="26" Height="26" />
+            </StackPanel>
+            <TextBlock x:Name="InputHeader" Text="Entrada" FontSize="18" FontWeight="SemiBold" Margin="0,8,0,0" />
+            <TextBlock x:Name="InputText" TextWrapping="Wrap" IsTextSelectionEnabled="True" Opacity="0.9" />
+            <TextBlock x:Name="ThermalHeader" Text="Térmico" FontSize="18" FontWeight="SemiBold" Margin="0,8,0,0" />
+            <TextBlock x:Name="ThermalText" TextWrapping="Wrap" IsTextSelectionEnabled="True" Opacity="0.9" />
+            <TextBlock x:Name="PerfHeader" Text="Rendimiento actual" FontSize="18" FontWeight="SemiBold" Margin="0,8,0,0" />
+            <TextBlock x:Name="PerfText" TextWrapping="Wrap" IsTextSelectionEnabled="True" Opacity="0.9" />
+        </StackPanel>
+    </ScrollViewer>
+</Page>

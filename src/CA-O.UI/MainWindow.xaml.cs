@@ -1,79 +1,102 @@
+using CAO.UI.Pages;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-using CAO.Infrastructure.Networking;
-using CAO.Infrastructure.Security;
-using CAO.Infrastructure.Storage;
-using CAO.Infrastructure.Input;
-using CAO.Infrastructure.SystemInterop;
+using Microsoft.UI.Xaml.Media;
 
 namespace CAO.UI;
 
+/// <summary>WinUI 3 shell (spec 76-78): NavigationView, Mica, page routing.</summary>
 public sealed partial class MainWindow : Window
 {
-    private readonly PrivilegedPipeClient _pipe = new();
+    /// <summary>Lets any page re-theme every window root.</summary>
+    public static Action<string>? ApplyThemeGlobally { get; private set; }
 
     public MainWindow()
     {
         InitializeComponent();
+        SystemBackdrop = new MicaBackdrop();
+        AppServices.State.LanguageChanged += (_, language) => ApplyLocalization();
+        ApplyLocalization();
+
+        ApplyThemeGlobally = theme =>
+        {
+            if (Content is FrameworkElement root)
+            {
+                root.RequestedTheme = theme switch
+                {
+                    "light" => ElementTheme.Light,
+                    "dark" => ElementTheme.Dark,
+                    _ => ElementTheme.Default,
+                };
+            }
+        };
+
+        Nav.SelectedItem = Nav.MenuItems[0];
     }
 
-    private async void AnalyzeCurrentState(object sender, RoutedEventArgs args)
+    private void ApplyLocalization()
     {
-        if (sender is Button button) button.IsEnabled = false;
-        ConnectionStatus.Text = "Service status: connecting...";
-        try
+        var navItems = new (string Tag, string Key)[]
         {
-            var system = await new WmiSystemInfoProvider().GetAsync();
-            SystemSummary.Text = $"System: {system.CpuName} | {system.CpuCores} cores / {system.CpuLogicalProcessors} threads | RAM {system.RamGb} GB | {system.Architecture} | build {system.WindowsBuild}";
+            ("dashboard", "nav.dashboard"),
+            ("analyze", "nav.analyze"),
+            ("optimize", "nav.optimize"),
+            ("gaming", "nav.gaming"),
+            ("diagnostics", "nav.diagnostics"),
+            ("benchmark", "nav.benchmark"),
+            ("restore", "nav.restore"),
+            ("history", "nav.history"),
+            ("settings", "nav.settings"),
+        };
 
-            var network = await new NetworkDiagnosticsProvider().MeasureAsync();
-            var measurements = network.Measurements
-                .Select(measurement => $"{measurement.Kind} {measurement.Endpoint}: " +
-                    (measurement.MedianLatencyMs is null ? "unreachable" : $"{measurement.MedianLatencyMs:0.0} ms, loss {measurement.Attempts - measurement.SuccessfulAttempts}/{measurement.Attempts}"));
-            NetworkSummary.Text = $"Network: {string.Join("; ", network.Interfaces)}\n{string.Join("\n", measurements)}";
-
-            var security = new SecurityDiagnosticsProvider().Measure();
-            var securityFeatures = security.Features.Select(feature =>
-                $"{feature.Name}: {(feature.Enabled is null ? "unknown" : feature.Enabled.Value ? "enabled" : "disabled")}");
-            SecuritySummary.Text = $"Security: {string.Join(", ", securityFeatures)} | Vanguard: {(security.VanguardDetected ? "detected" : "not detected")}";
-
-            var storage = new StorageDiagnosticsProvider().Measure();
-            StorageSummary.Text = "Storage: " + string.Join("; ", storage.Volumes.Select(volume =>
-                $"{volume.Name} {volume.FileSystem}, free {volume.FreeBytes / (1024d * 1024 * 1024):0.0} / {volume.TotalBytes / (1024d * 1024 * 1024):0.0} GB"));
-
-            var drivers = await new DriverDiagnosticsProvider().MeasureAsync();
-            var driverIssues = drivers.Drivers.Count(driver => driver.ProblemCode != 0 || driver.IsSigned == false);
-            DriverSummary.Text = $"Drivers: {drivers.Drivers.Count} detected, {driverIssues} with a problem code or unsigned state.";
-
-            var performance = await new PerformanceDiagnosticsProvider().MeasureAsync();
-            var processorSummary = string.Join("; ", performance.Processors.Select(processor =>
-                $"CPU {processor.LoadPercent?.ToString() ?? "unknown"}% @ {processor.CurrentClockMHz?.ToString() ?? "unknown"} MHz"));
-            var graphicsSummary = string.Join("; ", performance.GraphicsAdapters.Select(adapter =>
-                $"GPU {adapter.Name} ({adapter.DriverVersion})"));
-            PerformanceSummary.Text = $"Performance: {processorSummary}\n{graphicsSummary}\nThermals: sensor data not available in this read-only WMI pass.";
-
-            var input = await new InputDiagnosticsProvider().MeasureAsync();
-            InputSummary.Text = $"Input: mouse acceleration {(input.MouseAccelerationEnabled is null ? "unknown" : input.MouseAccelerationEnabled.Value ? "enabled" : "disabled")}; HID devices {input.HidDeviceCount}. No input content is captured.";
-
-            var thermals = await new ThermalDiagnosticsProvider().MeasureAsync();
-            ThermalSummary.Text = thermals.IsAvailable
-                ? $"Thermals: {string.Join(", ", thermals.Zones.Select(zone => $"{zone.Name} {zone.TemperatureCelsius:0.0} C"))} (ACPI zones; CPU/GPU sensors may require vendor APIs)."
-                : "Thermals: unknown; this system did not expose readable ACPI zones.";
-
-            var response = await _pipe.DetectAsync("disable-vbs");
-            ConnectionStatus.Text = "Service status: connected";
-            AnalysisResult.Text = response is { Accepted: true }
-                ? $"Disable VBS: {response.MessageEs}"
-                : $"No change executed: {response?.Error ?? "No response."}";
-        }
-        catch (Exception ex)
+        foreach (var item in EnumerateItems())
         {
-            ConnectionStatus.Text = "Service status: unavailable";
-            AnalysisResult.Text = $"The privileged service could not be reached: {ex.Message}";
+            if (item.Tag is string tag)
+            {
+                var match = Array.Find(navItems, entry => entry.Tag == tag);
+                if (match.Tag is not null)
+                {
+                    item.Content = Localizer.Get(match.Key);
+                }
+            }
         }
-        finally
+
+        Title = $"{Localizer.Get("app.title")} — {Localizer.Get("app.subtitle")}";
+    }
+
+    private System.Collections.Generic.IEnumerable<NavigationViewItemBase> EnumerateItems()
+    {
+        foreach (var item in Nav.MenuItems.OfType<NavigationViewItemBase>())
         {
-            if (sender is Button completedButton) completedButton.IsEnabled = true;
+            yield return item;
         }
+        foreach (var item in Nav.FooterMenuItems.OfType<NavigationViewItemBase>())
+        {
+            yield return item;
+        }
+    }
+
+    private void OnNavigationSelectionChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args)
+    {
+        if (args.SelectedItem is not NavigationViewItem item || item.Tag is not string tag)
+        {
+            return;
+        }
+
+        var pageType = tag switch
+        {
+            "dashboard" => typeof(DashboardPage),
+            "analyze" => typeof(AnalyzePage),
+            "optimize" => typeof(OptimizePage),
+            "gaming" => typeof(GamingPage),
+            "diagnostics" => typeof(DiagnosticsPage),
+            "benchmark" => typeof(BenchmarkPage),
+            "restore" => typeof(RestorePage),
+            "history" => typeof(HistoryPage),
+            "settings" => typeof(SettingsPage),
+            _ => typeof(DashboardPage),
+        };
+
+        ContentFrame.Navigate(pageType);
     }
 }

@@ -22,9 +22,7 @@ public sealed record OperationParameters
 
 public sealed record PrivilegedOperationRequest
 {
-    public const int CurrentProtocolVersion = 1;
-
-    public int ProtocolVersion { get; init; } = CurrentProtocolVersion;
+    public int ProtocolVersion { get; init; } = AppVersion.ProtocolVersion;
 
     public required Guid RequestId { get; init; }
 
@@ -35,13 +33,19 @@ public sealed record PrivilegedOperationRequest
     public required OperationParameters Parameters { get; init; }
 }
 
+/// <summary>Wire response shared by the privileged service and every client.</summary>
+public sealed record PrivilegedOperationResponse(bool Accepted, string? Error, string? MessageEs = null)
+{
+    public static PrivilegedOperationResponse Rejected(string error) => new(false, error);
+}
+
 public static class PrivilegedOperationValidator
 {
     private static readonly Regex SafeIdentifier = new("^[a-z0-9-]{1,80}$", RegexOptions.CultureInvariant);
 
     public static bool TryValidate(PrivilegedOperationRequest request, out string error)
     {
-        if (request.ProtocolVersion != PrivilegedOperationRequest.CurrentProtocolVersion)
+        if (request.ProtocolVersion != AppVersion.ProtocolVersion)
         {
             error = "Versión de protocolo no admitida.";
             return false;
@@ -84,9 +88,14 @@ public static class PrivilegedOperationValidator
             return false;
         }
 
-        if (request.Operation is PrivilegedOperation.ApplyOptimization or
+        var requiresOptimizationId = request.Operation is
+            PrivilegedOperation.ApplyOptimization or
             PrivilegedOperation.RevertOptimization or
-            PrivilegedOperation.DetectOptimization && string.IsNullOrWhiteSpace(parameters.OptimizationId))
+            PrivilegedOperation.DetectOptimization or
+            PrivilegedOperation.CaptureSnapshot or
+            PrivilegedOperation.VerifyOptimization;
+
+        if (requiresOptimizationId && string.IsNullOrWhiteSpace(parameters.OptimizationId))
         {
             error = "La operación requiere OptimizationId.";
             return false;

@@ -8,9 +8,10 @@ using CAO.Shared;
 namespace CAO.Core.Engine;
 
 /// <summary>
-/// Orchestrates the full lifecycle: detect -> restore point -> snapshot ->
-/// apply -> verify (Detect) -> persist snapshot -> log. Reverts load the
-/// persisted snapshot and restore the exact previous state.
+/// Orchestrates the optimization lifecycle through the transactional model
+/// (PRECHECK -> SNAPSHOT -> APPLY -> VERIFY -> COMMIT, rollback on failure).
+/// The UI never calls this directly: privileged operations arrive over an
+/// authenticated IPC channel to the isolated service.
 /// </summary>
 public sealed class OptimizationEngine
 {
@@ -20,6 +21,7 @@ public sealed class OptimizationEngine
     private readonly IHistoryLogger _history;
     private readonly IServiceManager? _services;
     private readonly IProcessRunner? _process;
+    private readonly ISystemContextProvider? _contextProvider;
     private bool _restorePointCreatedThisSession;
 
     public OptimizationEngine(
@@ -28,7 +30,8 @@ public sealed class OptimizationEngine
         ISnapshotStore snapshots,
         IHistoryLogger history,
         IServiceManager? services = null,
-        IProcessRunner? process = null)
+        IProcessRunner? process = null,
+        ISystemContextProvider? contextProvider = null)
     {
         _registry = registry;
         _restorePoints = restorePoints;
@@ -36,6 +39,7 @@ public sealed class OptimizationEngine
         _history = history;
         _services = services;
         _process = process;
+        _contextProvider = contextProvider;
     }
 
     public static bool IsRunningAsAdmin()
@@ -55,12 +59,9 @@ public sealed class OptimizationEngine
         return optimization.Detect(_registry);
     }
 
-    /// <summary>Applies one optimization with all safety rails.</summary>
+    /// <summary>Applies one optimization with all safety rails (transactional).</summary>
     public async Task<OperationResult> ApplyAsync(string optimizationId, CancellationToken ct = default)
     {
-        var optimization = Resolve(optimizationId);
-        PrepareServiceAwareOptimization(optimization);
-
         if (!IsRunningAsAdmin())
         {
             return OperationResult.Fail("Se requieren permisos de administrador para aplicar cambios.", "not-admin");
@@ -81,55 +82,25 @@ public sealed class OptimizationEngine
             }
         }
 
-        var snapshot = optimization.Capture(_registry);
-        var context = new OptimizationContext { Registry = _registry, Process = _process, Services = _services };
+        var context = await GetContextAsync();
+        var transaction = new OptimizationTransaction(
+            Resolve(optimizationId), _registry, context, _services, _process, _snapshots, _history);
+        var report = await transaction.RunAsync(ct);
 
-        OperationResult result;
-        try
-        {
-            result = await optimization.ApplyAsync(context, ct);
-        }
-        catch (Exception ex)
-        {
-            result = OperationResult.Fail($"Error inesperado aplicando '{optimizationId}'.", ex.Message);
-        }
-
-        // Verify: Detect must now report applied (except maintenance actions).
-        if (result.Success && optimization.Definition.Flags.HasFlag(OptimizationFlags.NotReversible))
-        {
-            // Maintenance actions have no post-state to verify.
-        }
-        else if (result.Success)
-        {
-            var after = optimization.Detect(_registry);
-            if (after is not (OptimizationState.AppliedByCao or OptimizationState.Unknown or OptimizationState.PendingReboot))
-            {
-                // Roll back immediately: verification failed.
-                await optimization.RevertAsync(context, snapshot, ct);
-                Log(optimizationId, "apply", false, snapshot, error: "Verificación fallida; se revirtió automáticamente.");
-                return OperationResult.Fail("La verificación posterior falló y el cambio se revirtió.", "verify-failed");
-            }
-        }
-
-        if (result.Success)
-        {
-            _snapshots.Save(optimizationId, snapshot);
-        }
-
-        Log(optimizationId, "apply", result.Success, snapshot, error: result.Error);
-        return backupWarning is not null && result.Success
-            ? new OperationResult(true, result.MessageEs + " (Aviso: " + backupWarning + ")", result.Error)
-            : result;
+        return report.Success
+            ? AppendWarning(new OperationResult(true, report.MessageEs), backupWarning)
+            : OperationResult.Fail(report.MessageEs, report.Error ?? report.FinalPhase.ToString());
     }
 
     public async Task<OperationResult> RevertAsync(string optimizationId, CancellationToken ct = default)
     {
-        var optimization = Resolve(optimizationId);
-
         if (!IsRunningAsAdmin())
         {
             return OperationResult.Fail("Se requieren permisos de administrador para revertir cambios.", "not-admin");
         }
+
+        var optimization = Resolve(optimizationId);
+        PrepareServiceAwareOptimization(optimization);
 
         if (!_snapshots.TryLoad(optimizationId, out var snapshot))
         {
@@ -151,9 +122,34 @@ public sealed class OptimizationEngine
         {
             _snapshots.Delete(optimizationId);
         }
-        Log(optimizationId, "revert", result.Success, snapshot, error: result.Error);
+
+        LogLegacy(optimizationId, "revert", result.Success, snapshot, error: result.Error);
         return result;
     }
+
+    /// <summary>Persists a fresh snapshot without changing anything.</summary>
+    public SnapshotDescriptor CaptureSnapshot(string optimizationId)
+    {
+        var optimization = Resolve(optimizationId);
+        PrepareServiceAwareOptimization(optimization);
+        var snapshot = optimization.Capture(_registry);
+        _snapshots.Save(optimizationId, snapshot);
+        return new SnapshotDescriptor(optimizationId, snapshot.TimestampUtc, snapshot.Registry.Count);
+    }
+
+    /// <summary>Runs the VERIFY phase against live system state.</summary>
+    public async Task<VerificationResult> VerifyAsync(string optimizationId, CancellationToken ct = default)
+    {
+        var optimization = Resolve(optimizationId);
+        PrepareServiceAwareOptimization(optimization);
+        var context = new OptimizationContext { Registry = _registry, Process = _process, Services = _services };
+        return await optimization.VerifyAsync(context, ct);
+    }
+
+    private async Task<SystemContext> GetContextAsync() =>
+        _contextProvider is not null
+            ? await _contextProvider.GetAsync()
+            : SystemContextFactory.Default();
 
     private IOptimization Resolve(string optimizationId, IOptimization? instance = null)
     {
@@ -171,14 +167,16 @@ public sealed class OptimizationEngine
         }
     }
 
-    private void Log(string id, string action, bool success, OptimizationSnapshot snapshot, string? error = null)
+    /// <summary>Legacy log shape used by non-transactional paths (detect/revert).</summary>
+    private void LogLegacy(string id, string operation, bool success, OptimizationSnapshot snapshot, string? error = null)
     {
         _history.Log(new HistoryEntry
         {
             TimestampUtc = DateTime.UtcNow,
+            AppVersion = AppVersion.Semantic,
             User = Environment.UserName,
             OptimizationId = id,
-            Action = action,
+            Operation = operation,
             Success = success,
             PreviousState = SnapshotSummary(snapshot),
             Error = error,
@@ -189,4 +187,7 @@ public sealed class OptimizationEngine
         snapshot.Registry.Count == 0 ? null :
         string.Join("; ", snapshot.Registry.Select(e =>
             $"{e.KeyPath}\\{e.ValueName}={(e.Existed ? e.Value?.ToString() ?? "(empty)" : "(absent)")}"));
+
+    private static OperationResult AppendWarning(OperationResult result, string? warning) =>
+        warning is null ? result : new OperationResult(result.Success, result.MessageEs + " (Aviso: " + warning + ")", result.Error);
 }

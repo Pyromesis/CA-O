@@ -16,6 +16,11 @@ public sealed class DisableHibernate : IOptimization
         DescriptionEn = "Removes hiberfil.sys and frees several GB of disk space.",
         TooltipEs = "Pierdes la hibernación (Inicio rápido usa parte de ella). El archivo se elimina al desactivar.",
         Category = OptimizationCategory.Storage,
+        ExpectedImpact = PerformanceImpact.None,
+        Evidence = EvidenceLevel.Official,
+        Risk = RiskLevel.Moderate,
+        Compatibility = CompatibilityStatus.NoKnownConflict,
+        SecurityImpact = SecurityImpact.None,
         Impact = ImpactLevel.Medium,
     };
 

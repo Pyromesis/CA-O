@@ -1,0 +1,26 @@
+<Page
+    x:Class="CAO.UI.Pages.GamingPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <ScrollViewer Padding="28,20" VerticalScrollBarVisibility="Auto">
+        <StackPanel Spacing="14" MaxWidth="1100" HorizontalAlignment="Left">
+            <TextBlock Text="Gaming" FontSize="28" FontWeight="SemiBold" />
+            <StackPanel Orientation="Horizontal" Spacing="12">
+                <Button x:Name="ScanButton" Click="OnScanClick" Style="{StaticResource AccentButtonStyle}" />
+                <ProgressRing x:Name="Ring" IsActive="False" Width="26" Height="26" />
+            </StackPanel>
+
+            <TextBlock Text="Anti-cheats detectados" FontSize="18" FontWeight="SemiBold" Margin="0,8,0,0" />
+            <InfoBar x:Name="VanguardBar" IsOpen="False" Severity="Warning"
+                     Title="Riot Vanguard presente"
+                     Message="Los cambios que reducen seguridad están bloqueados por defecto. Vanguard exige funciones de seguridad activas; CA-O no garantiza compatibilidad de terceros." />
+            <TextBlock x:Name="AntiCheatText" TextWrapping="Wrap" Opacity="0.9" />
+
+            <TextBlock Text="GPU y pantalla" FontSize="18" FontWeight="SemiBold" Margin="0,8,0,0" />
+            <TextBlock x:Name="GpuText" TextWrapping="Wrap" Opacity="0.9" />
+
+            <TextBlock Text="Tecnologías del fabricante" FontSize="18" FontWeight="SemiBold" Margin="0,8,0,0" />
+            <TextBlock x:Name="VendorText" TextWrapping="Wrap" Opacity="0.9" IsTextSelectionEnabled="True" />
+        </StackPanel>
+    </ScrollViewer>
+</Page>

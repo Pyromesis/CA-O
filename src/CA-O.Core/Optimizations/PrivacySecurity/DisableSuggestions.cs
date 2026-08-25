@@ -18,6 +18,11 @@ public sealed class DisableSuggestions : RegistryOptimizationBase
         DescriptionEn = "Turns off Windows suggested apps and promotional content.",
         TooltipEs = "SubscribedContent-338388Enabled=0 (sugerencias de aplicaciones en Configuración/Menú Inicio).",
         Category = OptimizationCategory.PrivacySecurity,
+        ExpectedImpact = PerformanceImpact.None,
+        Evidence = EvidenceLevel.Official,
+        Risk = RiskLevel.Low,
+        Compatibility = CompatibilityStatus.Compatible,
+        SecurityImpact = SecurityImpact.PrivacyOnly,
         Impact = ImpactLevel.Low,
     };
 

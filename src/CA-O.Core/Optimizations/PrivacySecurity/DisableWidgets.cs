@@ -18,6 +18,11 @@ public sealed class DisableWidgets : RegistryOptimizationBase
         DescriptionEn = "Turns off the Widgets panel and its background content.",
         TooltipEs = "Directiva Dsh\\AllowNewsAndInterests=0. Elimina procesos de feeds en segundo plano.",
         Category = OptimizationCategory.PrivacySecurity,
+        ExpectedImpact = PerformanceImpact.Tiny,
+        Evidence = EvidenceLevel.Official,
+        Risk = RiskLevel.Low,
+        Compatibility = CompatibilityStatus.NoKnownConflict,
+        SecurityImpact = SecurityImpact.PrivacyOnly,
         Impact = ImpactLevel.Low,
     };
 

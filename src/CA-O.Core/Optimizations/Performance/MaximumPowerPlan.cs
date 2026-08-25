@@ -19,6 +19,11 @@ public sealed class MaximumPowerPlan : IOptimization
         DescriptionEn = "Activates the high performance plan (creates hidden Ultimate Performance if missing).",
         TooltipEs = "Captura tu plan actual y lo restaura con la reversión. En portátiles con batería aumentará el consumo.",
         Category = OptimizationCategory.Performance,
+        ExpectedImpact = PerformanceImpact.Small,
+        Evidence = EvidenceLevel.Official,
+        Risk = RiskLevel.Low,
+        Compatibility = CompatibilityStatus.Compatible,
+        SecurityImpact = SecurityImpact.None,
         Impact = ImpactLevel.High,
     };
 

@@ -20,6 +20,11 @@ public sealed class DisableBackgroundApps : RegistryOptimizationBase
         DescriptionEn = "Prevents store apps from running in the background.",
         TooltipEs = "GlobalUserDisabled=1 para el usuario actual. Las notificaciones en vivo de apps UWP pueden dejar de actualizarse.",
         Category = OptimizationCategory.Performance,
+        ExpectedImpact = PerformanceImpact.Small,
+        Evidence = EvidenceLevel.Official,
+        Risk = RiskLevel.Low,
+        Compatibility = CompatibilityStatus.NoKnownConflict,
+        SecurityImpact = SecurityImpact.PrivacyOnly,
         Impact = ImpactLevel.Medium,
     };
 

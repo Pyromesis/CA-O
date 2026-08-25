@@ -19,6 +19,11 @@ public sealed class OptimizeSystemDrive : IOptimization
         DescriptionEn = "Defrags (HDD) or re-trims (SSD) the C: drive based on its actual media type.",
         TooltipEs = "Ejecuta Optimize-Volume con la opción correcta para tu disco. Acción de mantenimiento; puede tardar minutos.",
         Category = OptimizationCategory.Storage,
+        ExpectedImpact = PerformanceImpact.None,
+        Evidence = EvidenceLevel.Official,
+        Risk = RiskLevel.Low,
+        Compatibility = CompatibilityStatus.Compatible,
+        SecurityImpact = SecurityImpact.None,
         Impact = ImpactLevel.Medium,
         Flags = OptimizationFlags.NotReversible,
     };

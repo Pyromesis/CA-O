@@ -8,13 +8,28 @@
     <Platform>x64</Platform>
     <RootNamespace>CAO.UI</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <EnableDefaultApplicationDefinition>true</EnableDefaultApplicationDefinition>
-    <EnableDefaultXamlItems>true</EnableDefaultXamlItems>
+    <UseWinUI>true</UseWinUI>
     <WindowsPackageType>None</WindowsPackageType>
+    <EnableDefaultPageItems>false</EnableDefaultPageItems>
+    <EnableDefaultApplicationDefinition>true</EnableDefaultApplicationDefinition>
   </PropertyGroup>
 
   <ItemGroup>
+    <Page Include="MainWindow.xaml" />
+    <Page Include="DashboardPage.xaml" />
+    <Page Include="AnalyzePage.xaml" />
+    <Page Include="OptimizePage.xaml" />
+    <Page Include="GamingPage.xaml" />
+    <Page Include="DiagnosticsPage.xaml" />
+    <Page Include="BenchmarkPage.xaml" />
+    <Page Include="RestorePage.xaml" />
+    <Page Include="HistoryPage.xaml" />
+    <Page Include="SettingsPage.xaml" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.4.0" />
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
   </ItemGroup>
 
   <ItemGroup>
