@@ -60,3 +60,5 @@ server.log
 /artifacts/
 bin/
 obj/
+# temporales de herramientas
+/opencode/
