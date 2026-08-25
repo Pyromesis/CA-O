@@ -13,9 +13,11 @@ interface OptimizationEntry {
   applied: boolean;
   updatedAt: Date;
   snapshot?: string;
+  /** v2: structured provenance for the snapshot (build, fingerprint, etc.). */
+  meta?: Record<string, unknown>;
 }
 
-type StateMap = Record<string, { applied: boolean; updatedAt: string; snapshot?: string }>;
+type StateMap = Record<string, { applied: boolean; updatedAt: string; snapshot?: string; meta?: Record<string, unknown> }>;
 
 function getDbPath(): string {
   return process.env.CAO_STATE_PATH || path.join(process.cwd(), 'optimization-state.json');
@@ -32,9 +34,10 @@ function readDB(): StateMap {
     return Object.fromEntries(
       Object.entries(parsed).filter(([, value]) => {
         if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
-        const entry = value as { applied?: unknown; updatedAt?: unknown; snapshot?: unknown };
+        const entry = value as { applied?: unknown; updatedAt?: unknown; snapshot?: unknown; meta?: unknown };
         return typeof entry.applied === 'boolean' && typeof entry.updatedAt === 'string' &&
-          (entry.snapshot === undefined || typeof entry.snapshot === 'string');
+          (entry.snapshot === undefined || typeof entry.snapshot === 'string') &&
+          (entry.meta === undefined || (typeof entry.meta === 'object' && entry.meta !== null && !Array.isArray(entry.meta)));
       })
     ) as StateMap;
   };
@@ -92,7 +95,7 @@ export const db = {
       const data = readDB();
       const entry = data[where.id];
       if (!entry) return null;
-      return { id: where.id, applied: entry.applied, updatedAt: new Date(entry.updatedAt), snapshot: entry.snapshot };
+      return { id: where.id, applied: entry.applied, updatedAt: new Date(entry.updatedAt), snapshot: entry.snapshot, meta: entry.meta };
     },
 
     findMany: async (): Promise<OptimizationEntry[]> => {
@@ -102,21 +105,23 @@ export const db = {
         applied: state.applied,
         updatedAt: new Date(state.updatedAt),
         snapshot: state.snapshot,
+        meta: state.meta,
       }));
     },
 
     upsert: async ({ where, update, create }: {
       where: { id: string };
-      update: { applied: boolean; snapshot?: string };
-      create: { id: string; applied: boolean; snapshot?: string };
+      update: { applied: boolean; snapshot?: string; meta?: Record<string, unknown> };
+      create: { id: string; applied: boolean; snapshot?: string; meta?: Record<string, unknown> };
     }): Promise<OptimizationEntry> => {
       const data = readDB();
       const applied = update?.applied ?? create.applied;
       const now = new Date().toISOString();
       const snapshot = update?.snapshot ?? data[where.id]?.snapshot ?? create.snapshot;
-      data[where.id] = { applied, updatedAt: now, ...(snapshot !== undefined ? { snapshot } : {}) };
+      const meta = update?.meta ?? create?.meta;
+      data[where.id] = { applied, updatedAt: now, ...(snapshot !== undefined ? { snapshot } : {}), ...(meta !== undefined ? { meta } : {}) };
       writeDB(data);
-      return { id: where.id, applied, updatedAt: new Date(now), snapshot: data[where.id].snapshot };
+      return { id: where.id, applied, updatedAt: new Date(now), snapshot: data[where.id].snapshot, meta: data[where.id].meta };
     },
 
     updateMany: async ({ where, data: updateData }: {

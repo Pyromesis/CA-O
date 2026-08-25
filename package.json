@@ -16,7 +16,10 @@
     "test:auxiliary-integrity": "node tests/auxiliary-integrity.mjs",
     "test:api-security-contract": "node tests/api-security-contract.mjs",
     "test:persistence-recovery": "node tests/persistence-recovery.mjs",
-    "test:contracts": "npm run test:optimization-contract && npm run test:troubleshoot-contract && npm run test:auxiliary-integrity && npm run test:api-security-contract && npm run test:persistence-recovery",
+    "test:catalog-taxonomy": "node tests/catalog-taxonomy.mjs",
+    "test:session-security": "node tests/session-security-contract.mjs",
+    "test:contracts": "npm run test:optimization-contract && npm run test:troubleshoot-contract && npm run test:auxiliary-integrity && npm run test:api-security-contract && npm run test:persistence-recovery && npm run test:catalog-taxonomy && npm run test:session-security",
+    "sbom": "node scripts/generate-sbom.mjs",
     "electron:dev": "electron .",
     "electron:build": "electron-builder --win",
     "dist": "npm run build && node build-electron.js && electron-builder --win"

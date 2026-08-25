@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { realCommands, verificationCommands, originalStateCommands, sessionScopedOptimizationIds, isExecutableOptimizationId, irreversibleOptimizationIds } from "@/lib/optimization-commands";
 import { runPowerShell, createSystemRestorePoint } from "@/lib/powershell-runner";
+import { guardOrResponse } from "@/lib/api-security";
 import { db } from "@/lib/db";
 
 interface ApplyAllRequest {
@@ -33,6 +34,8 @@ function generateName(id: string): string {
 }
 
 export async function POST(request: NextRequest) {
+  const guard = guardOrResponse(request, true);
+  if (guard) return NextResponse.json(guard.json, { status: guard.status });
   const startTime = Date.now();
 
   try {

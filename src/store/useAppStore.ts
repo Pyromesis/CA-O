@@ -11,6 +11,8 @@ import {
 } from '@/types/optimization';
 import { predefinedProfiles } from '@/components/ca-o/ProfileSelector';
 import { isExecutableOptimizationId, sessionScopedOptimizationIds, realCommands, irreversibleOptimizationIds } from '@/lib/optimization-commands';
+import { getTaxonomy } from '@/lib/catalog/taxonomy';
+import { apiFetch } from '@/lib/session-client';
 
 // History entry type
 export interface HistoryEntry {
@@ -279,7 +281,7 @@ export const useAppStore = create<AppState>()(
 
         try {
           // Call API to apply optimization
-          const response = await fetch('/api/optimization/apply', {
+          const response = await apiFetch('/api/optimization/apply', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ optimizationId: id, createBackup, confirmDangerous })
@@ -330,7 +332,7 @@ export const useAppStore = create<AppState>()(
         }
 
         try {
-          const response = await fetch('/api/optimization/apply-all', {
+          const response = await apiFetch('/api/optimization/apply-all', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ ids: appliedIds, createBackup })
@@ -386,7 +388,7 @@ export const useAppStore = create<AppState>()(
         const optimization = state.optimizations.find(opt => opt.id === id);
 
         try {
-          const response = await fetch('/api/optimization/revert', {
+          const response = await apiFetch('/api/optimization/revert', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ optimizationId: id })
@@ -435,7 +437,7 @@ export const useAppStore = create<AppState>()(
         }
         
         try {
-          const response = await fetch('/api/optimization/revert-all', {
+          const response = await apiFetch('/api/optimization/revert-all', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ ids: appliedIds })
@@ -495,7 +497,7 @@ export const useAppStore = create<AppState>()(
         }
         
         try {
-          const response = await fetch('/api/optimization/revert-all', {
+          const response = await apiFetch('/api/optimization/revert-all', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ ids: appliedIds })
@@ -556,7 +558,7 @@ export const useAppStore = create<AppState>()(
         set({ isProcessing: true });
         
         try {
-          const response = await fetch('/api/troubleshoot/execute', {
+          const response = await apiFetch('/api/troubleshoot/execute', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ action })
@@ -602,7 +604,7 @@ export const useAppStore = create<AppState>()(
         set({ showOnboarding: false, onboardingCompleted: true });
         // Persist the flag server-side too: the packaged app may change its
         // local origin between launches, which would drop localStorage.
-        fetch('/api/app-state', {
+        apiFetch('/api/app-state', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ onboardingCompleted: true })
@@ -622,17 +624,45 @@ export const useAppStore = create<AppState>()(
         set({ isProcessing: true, selectedProfile: profileId });
 
         try {
-          const profileIds = profile.optimizationIds.filter((optId) =>
+          // v2 adaptive planning: resolve the profile against the live machine.
+          // Security trade-offs and non-applicable items are skipped server-side
+          // with a documented reason; profiles never bypass confirmations.
+          const planRes = await apiFetch('/api/profiles/plan', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ profileId })
+          }).catch(() => null);
+
+          let candidateIds = profile.optimizationIds.filter((optId) =>
             isExecutableOptimizationId(optId) &&
             !state.optimizations.find((opt) => opt.id === optId)?.isApplied
           );
 
-          if (profileIds.length === 0) return;
+          if (planRes?.ok) {
+            const planJson = await planRes.json().catch(() => null);
+            const planItems: Array<{ id: string; status: string }> = planJson?.data?.plan;
+            if (Array.isArray(planItems)) {
+              const applicableSet = new Set(
+                planItems.filter((item) => item.status === 'apply').map((item) => item.id)
+              );
+              candidateIds = candidateIds.filter((id) => applicableSet.has(id));
+            }
+          } else {
+            // Planner unavailable: conservative fallback that excludes
+            // security trade-offs and experimental items entirely.
+            candidateIds = candidateIds.filter((optId) => {
+              const entry = getTaxonomy(optId);
+              if (!entry) return false;
+              return entry.group !== 'security' && entry.group !== 'experimental' && entry.kind !== 'security-tradeoff';
+            });
+          }
+
+          if (candidateIds.length === 0) return;
 
           // 1) Punto de restauración único y acotado antes de tocar nada
-          if (onProgress) onProgress(0, profileIds.length, '__backup__');
+          if (onProgress) onProgress(0, candidateIds.length, '__backup__');
           try {
-            const rp = await fetch('/api/troubleshoot/execute', {
+            const rp = await apiFetch('/api/troubleshoot/execute', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ action: 'create-restore-point' })
@@ -640,17 +670,19 @@ export const useAppStore = create<AppState>()(
             if (!rp.ok) console.warn('Restore point failed; continuing without backup');
           } catch { /* sin backup, seguimos */ }
 
-          // 2) Aplicación una por una con progreso en vivo
+          // 2) Aplicación una por una con progreso en vivo. Sin confirmaciones
+          // en ciego: el plan adaptativo ya filtró lo no aplicable y los
+          // cambios de seguridad nunca se envían desde perfiles.
           let done = 0;
           const failed: string[] = [];
-          for (const optId of profileIds) {
+          for (const optId of candidateIds) {
             const optName = state.optimizations.find((opt) => opt.id === optId)?.nameKey || optId;
-            if (onProgress) onProgress(done, profileIds.length, optName);
+            if (onProgress) onProgress(done, candidateIds.length, optName);
             try {
-              const res = await fetch('/api/optimization/apply', {
+              const res = await apiFetch('/api/optimization/apply', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ optimizationId: optId, createBackup: false, confirmDangerous: true })
+                body: JSON.stringify({ optimizationId: optId, createBackup: false })
               });
               const json = await res.json().catch(() => ({}));
               if (res.ok && json.success) {
@@ -682,7 +714,7 @@ export const useAppStore = create<AppState>()(
               failed.push(optId);
             }
             done++;
-            if (onProgress) onProgress(done, profileIds.length, optName);
+            if (onProgress) onProgress(done, candidateIds.length, optName);
           }
 
           if (failed.length > 0) {
@@ -712,7 +744,7 @@ export const useAppStore = create<AppState>()(
         let serverOnboardingCompleted = false;
         try {
           try {
-            const appStateRes = await fetch('/api/app-state');
+            const appStateRes = await apiFetch('/api/app-state');
             if (appStateRes.ok) {
               const appStateJson = await appStateRes.json();
               serverOnboardingCompleted = appStateJson?.data?.onboardingCompleted === true;
@@ -725,7 +757,7 @@ export const useAppStore = create<AppState>()(
             // App-state endpoint unavailable; fall back to localStorage only.
           }
 
-          const res = await fetch('/api/optimization/state');
+          const res = await apiFetch('/api/optimization/state');
           if (!res.ok) return;
           const json = await res.json();
 
@@ -804,7 +836,7 @@ export const useAppStore = create<AppState>()(
       // Load optimizations from API on initialization
       loadOptimizations: async () => {
         try {
-          const res = await fetch('/api/optimization');
+          const res = await apiFetch('/api/optimization');
           if (!res.ok) return;
           const json = await res.json();
 
@@ -813,8 +845,11 @@ export const useAppStore = create<AppState>()(
               // Find matching local optimization by ID
               const localOpt = defaultOptimizations.find(o => o.id === opt.id);
               if (localOpt) {
+                // API wins over local defaults so v2 metadata (group/kind/
+                // evidence/score/applicable/blockers) reaches the UI.
                 return {
                   ...localOpt,
+                  ...opt,
                   isApplied: sessionScopedOptimizationIds.has(opt.id) ? false : opt.isApplied || false,
                   isEnabled: sessionScopedOptimizationIds.has(opt.id) ? false : opt.isApplied || false
                 };

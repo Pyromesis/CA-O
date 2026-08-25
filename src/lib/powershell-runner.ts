@@ -1,10 +1,20 @@
 import { spawn } from 'child_process';
+import path from 'path';
 
 export interface PowerShellResult {
   success: boolean;
   output: string;
   error?: string;
   exitCode?: number;
+}
+
+/**
+ * Resolve the Windows PowerShell executable at runtime instead of hardcoding
+ * an absolute path (hardcoded paths confuse Next.js output-file tracing).
+ */
+function resolvePowerShellPath(): string {
+  const windir = process.env.WINDIR || 'C:\\Windows';
+  return path.join(windir, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe');
 }
 
 /**
@@ -37,8 +47,7 @@ ${command}
 `;
 
     const encodedCommand = Buffer.from(enhancedCommand, 'utf16le').toString('base64');
-    const psPath = 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe';
-    const child = spawn(psPath, ['-NoProfile', '-NonInteractive', '-EncodedCommand', encodedCommand], {
+    const child = spawn(resolvePowerShellPath(), ['-NoProfile', '-NonInteractive', '-EncodedCommand', encodedCommand], {
       windowsHide: true,
     });
 

@@ -16,6 +16,9 @@ let serverProcess = null;
 let PORT = 3000;
 const HOST = '127.0.0.1';
 const launcherLog = path.join(app.getPath('temp'), 'ca-o-launcher.log');
+// The session secret generated inside startServer; kept module-level so
+// the main window can hand it to the renderer after the server is up.
+let serverEnv = {};
 
 function log(message) {
   const line = `[${new Date().toISOString()}] ${message}\n`;
@@ -96,10 +99,16 @@ function startServer() {
   // Build clean env without Electron vars that might confuse Next.js
   const cleanEnv = {};
   for (const [key, value] of Object.entries(process.env)) {
-    if (!key.startsWith('ELECTRON') && key !== 'ORIGINAL_XDG_CURRENT_DESKTOP') {
+    if (!key.startsWith('ELECTRON') && key !== 'ORIGINAL_XDG_CURRENT_DOCUMENT' && key !== 'ORIGINAL_XDG_CURRENT_DESKTOP') {
       cleanEnv[key] = value;
     }
   }
+
+  // Session secret: generated here, shared with the server via env and with
+  // the renderer via the URL hash. Single source of truth (#16).
+  cleanEnv.CAO_SESSION_SECRET = require('crypto').randomBytes(32).toString('hex');
+  cleanEnv.CAO_PACKAGED = app.isPackaged ? '1' : '0';
+  serverEnv = cleanEnv;
 
   log(`[launcher] Starting: ${nodeExe} ${serverJs} on ${HOST}:${PORT}`);
 
@@ -248,7 +257,22 @@ function createWindow() {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
+      sandbox: true,
+      webviewTag: false,
+      spellcheck: false,
     },
+  });
+
+  // Deny every permission request from the renderer (no camera, no
+  // notifications, no geolocation, ...). The app needs none of them.
+  mainWindow.webContents.session.setPermissionRequestHandler((_wc, permission, callback) => {
+    console.warn(`[security] Permission '${permission}' denied`);
+    callback(false);
+  });
+
+  // Deny webview attach attempts outright.
+  mainWindow.webContents.on('will-attach-webview', (event) => {
+    event.preventDefault();
   });
 
   mainWindow.once('ready-to-show', () => {
@@ -341,8 +365,18 @@ app.on('ready', async () => {
 
   // Create main window and load app
   createWindow();
-  mainWindow.loadURL(`http://${HOST}:${PORT}`);
+  // Hand the session token to the renderer exactly once via the URL hash.
+  // The hash never reaches the server; the app stores it in sessionStorage
+  // and sends it as X-CAO-Token on mutating requests.
+  const token = serverEnv.CAO_SESSION_SECRET;
+  mainWindow.loadURL(`http://${HOST}:${PORT}${token ? `/#tk=${token}` : ''}`);
 });
+
+/**
+ * Read the session secret written by the Next.js server next to the state
+ * file. Only used in packaged mode; dev servers skip token enforcement.
+ */
+
 
 // Handle second instance
 app.on('second-instance', () => {

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSystemRestorePoint, runPowerShell } from "@/lib/powershell-runner";
+import { guardOrResponse } from "@/lib/api-security";
 
 type TroubleshootActionType = "restore-audio" | "restore-bluetooth" | "restore-network" | "restore-windows-update" | "restore-display" | "create-restore-point" | "restore-all"
   | "repair-system-files" | "reset-store-cache" | "restart-explorer" | "flush-dns-cache" | "clean-temp-junk";
@@ -198,6 +199,8 @@ async function executeRealAction(action: TroubleshootActionType) {
 }
 
 export async function POST(request: NextRequest) {
+  const guard = guardOrResponse(request, true);
+  if (guard) return NextResponse.json(guard.json, { status: guard.status });
   const startedAt = Date.now();
   try {
     const body = await request.json() as { action?: string; options?: { backupFirst?: boolean; forceRestart?: boolean } };

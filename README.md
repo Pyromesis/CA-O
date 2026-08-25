@@ -11,7 +11,8 @@
 ## Índice
 
 1. [Estado del proyecto](#estado-del-proyecto)
-2. [Características](#características)
+2. [Arquitectura v2 y documentación técnica](#arquitectura-v2-y-documentación-técnica)
+3. [Características](#características)
 3. [Modelo de seguridad y verificación](#modelo-de-seguridad-y-verificación)
 4. [Categorías de optimización](#categorías-de-optimización)
 5. [Solución de problemas integrada](#solución-de-problemas-integrada)
@@ -47,6 +48,17 @@
 | Pruebas de contrato | 5 suites (`npm run test:contracts`) |
 
 El proyecto está en fase beta funcional. La versión web (modo desarrollo) y la versión de escritorio (instalador NSIS) comparten el mismo código de aplicación.
+
+## Arquitectura v2 y documentación técnica
+
+Tras una auditoría completa, el catálogo funciona con un modelo basado en evidencia: cada optimización declara impacto esperado, confianza, fuentes, condiciones de aplicabilidad y efectos adversos. Las acciones de reparación/mantenimiento/cosmética están separadas de las de rendimiento, los trade-offs de seguridad viven en su propia categoría con confirmación dedicada, y la API local exige token de sesión, origen 127.0.0.1, rate limiting y audit log.
+
+Documentación detallada:
+
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — capas, flujo de Apply, seguridad local, modelo de privilegios objetivo.
+- [docs/OPTIMIZATION-CATALOG.md](docs/OPTIMIZATION-CATALOG.md) — metodología de clasificación, reclasificaciones realizadas, matriz anti-cheat, scoring.
+
+Endpoints nuevos relevantes: `/api/system/context`, `/api/benchmark/dns`, `/api/benchmark/system`, `/api/profiles/plan`, `/api/maintenance/temp`.
 
 ---
 

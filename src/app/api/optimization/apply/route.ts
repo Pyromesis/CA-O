@@ -2,11 +2,19 @@ import { NextRequest, NextResponse } from "next/server";
 import { realCommands, verificationCommands, originalStateCommands, sessionScopedOptimizationIds, repeatableOptimizationIds, isExecutableOptimizationId, irreversibleOptimizationIds } from "@/lib/optimization-commands";
 import { runPowerShell, createSystemRestorePoint } from "@/lib/powershell-runner";
 import { db } from "@/lib/db";
+import { guardOrResponse } from "@/lib/api-security";
+import { evaluateApplicability } from "@/lib/catalog/applicability";
+import { getTaxonomy } from "@/lib/catalog/taxonomy";
+import { getSystemContext, getHardwareFingerprint } from "@/lib/system-context";
 
 interface ApplyOptimizationRequest {
   optimizationId: string;
   createBackup?: boolean;
   confirmDangerous?: boolean;
+  /** Required for security-tradeoff items (e.g. disable-memory-integrity). */
+  confirmSecurityChange?: boolean;
+  /** Required for experimental items (contested evidence). */
+  acknowledgeExperimental?: boolean;
 }
 
 interface AppliedOptimization {
@@ -34,6 +42,29 @@ interface ApiResponse<T = unknown> {
   executionTime?: number;
 }
 
+/**
+ * Behavioral verification (requirement #20): when possible, verify real
+ * behavior instead of only a registry value. Runs after the primary
+ * verification command for the listed IDs.
+ */
+const behavioralVerificationById: Record<string, { script: string; failureEs: string; failureEn: string }> = {
+  'disable-memory-integrity': {
+    script: "$dg = Get-CimInstance -ClassName Win32_DeviceGuard -Namespace root/Microsoft/Windows/DeviceGuard; if ($null -eq $dg) { exit 1 }; if ($dg.SecurityServicesRunning -contains 1) { exit 1 } else { exit 0 }",
+    failureEs: 'Windows sigue reportando HVCI en ejecución según DeviceGuard.',
+    failureEn: 'Windows still reports HVCI running according to DeviceGuard.',
+  },
+  'dns-optimization': {
+    script: "try { $r = Resolve-DnsName -Name www.microsoft.com -QuickTimeout -ErrorAction Stop; if ($null -eq $r) { exit 1 } else { exit 0 } } catch { exit 1 }",
+    failureEs: 'La resolución DNS no funciona tras el cambio (prueba de conectividad fallida).',
+    failureEn: 'DNS resolution is broken after the change (connectivity test failed).',
+  },
+  'disable-hibernation': {
+    script: "powercfg /a | Select-String 'Hibernation has been disabled' -Quiet",
+    failureEs: 'Windows aún reporta hibernación disponible.',
+    failureEn: 'Windows still reports hibernation available.',
+  },
+};
+
 // Generate display name from ID
 function generateName(id: string): string {
   // Convert from snake-case to title case
@@ -44,6 +75,9 @@ function generateName(id: string): string {
 
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
+
+  const guard = guardOrResponse(request, true);
+  if (guard) return NextResponse.json(guard.json, { status: guard.status });
 
   try {
     const body: unknown = await request.json();
@@ -70,6 +104,18 @@ export async function POST(request: NextRequest) {
     if (requestBody.confirmDangerous !== undefined && typeof requestBody.confirmDangerous !== 'boolean') {
       return NextResponse.json<ApiResponse>(
         { success: false, error: "confirmDangerous must be a boolean" },
+        { status: 400 }
+      );
+    }
+    if (requestBody.confirmSecurityChange !== undefined && typeof requestBody.confirmSecurityChange !== 'boolean') {
+      return NextResponse.json<ApiResponse>(
+        { success: false, error: "confirmSecurityChange must be a boolean" },
+        { status: 400 }
+      );
+    }
+    if (requestBody.acknowledgeExperimental !== undefined && typeof requestBody.acknowledgeExperimental !== 'boolean') {
+      return NextResponse.json<ApiResponse>(
+        { success: false, error: "acknowledgeExperimental must be a boolean" },
         { status: 400 }
       );
     }
@@ -104,6 +150,37 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // ---- v2 applicability gate (context + anti-cheat + experimentals) ----
+    const ctx = await getSystemContext();
+    const applicability = await evaluateApplicability(id, ctx, {
+      confirmSecurityChange: requestBody.confirmSecurityChange,
+      acknowledgeExperimental: requestBody.acknowledgeExperimental,
+    });
+    if (!applicability.applicable) {
+      return NextResponse.json<ApiResponse>(
+        {
+          success: false,
+          error: "This optimization cannot be applied on this machine right now.",
+          message: applicability.blockers.length
+            ? applicability.blockers.map((b) => `${b.es} / ${b.en}`).join(' | ')
+            : undefined,
+          data: {
+            blockers: applicability.blockers,
+            warnings: applicability.warnings,
+            systemContext: {
+              formFactor: ctx.hardware.formFactor,
+              powerSource: ctx.power.powerSource,
+              ramGB: ctx.hardware.ramGB,
+              secureBoot: ctx.security.secureBoot,
+              hvciEnabled: ctx.security.hvciEnabled,
+              antiCheats: ctx.antiCheats.map((c) => c.id),
+            },
+          },
+        },
+        { status: 422 }
+      );
+    }
+
     const cmdSet = realCommands[id];
 
     // Check existing state
@@ -134,6 +211,7 @@ export async function POST(request: NextRequest) {
 
     const changesMade: string[] = [];
     let originalSnapshot: string | undefined;
+    let snapshotMeta: Record<string, unknown> | undefined;
     let hasError = false;
     let errorMessage = "";
 
@@ -152,6 +230,15 @@ export async function POST(request: NextRequest) {
           throw new Error('Invalid original state snapshot');
         }
         originalSnapshot = JSON.stringify(parsedSnapshot);
+        // v2 structured provenance (#18)
+        const [fingerprint] = await Promise.all([getHardwareFingerprint()]);
+        snapshotMeta = {
+          capturedAt: new Date().toISOString(),
+          windowsBuild: ctx.os.build,
+          windowsEdition: ctx.os.edition,
+          hardwareFingerprint: fingerprint,
+          elevatedSession: ctx.security.elevatedSession,
+        };
       } catch {
         return NextResponse.json<ApiResponse>(
           { success: false, error: "Could not parse the original Windows state; no changes were applied." },
@@ -187,6 +274,16 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // v2 behavioral check on top of the registry/config verification.
+    if (!hasError && behavioralVerificationById[id]) {
+      const behavioral = await runPowerShell(behavioralVerificationById[id].script);
+      if (!behavioral.success) {
+        hasError = true;
+        errorMessage = `Behavioral verification failed: ${behavioral.error || behavioralVerificationById[id].failureEn}`;
+        changesMade.push(`⚠️ Behavioral verification: ${behavioralVerificationById[id].failureEs}`);
+      }
+    }
+
     const executionTime = Date.now() - startTime;
 
     if (!hasError) {
@@ -194,10 +291,12 @@ export async function POST(request: NextRequest) {
       if (!sessionScopedOptimizationIds.has(id)) {
         await db.optimizationState.upsert({
           where: { id: optimizationId },
-          update: { applied: true, snapshot: originalSnapshot },
-          create: { id: optimizationId, applied: true, snapshot: originalSnapshot }
+          update: { applied: true, snapshot: originalSnapshot, meta: snapshotMeta },
+          create: { id: optimizationId, applied: true, snapshot: originalSnapshot, meta: snapshotMeta }
         });
       }
+
+      const taxonomy = getTaxonomy(optimizationId);
 
       return NextResponse.json<ApiResponse>({
         success: true,
@@ -216,6 +315,10 @@ export async function POST(request: NextRequest) {
             riskLevel: irreversibleOptimizationIds.has(optimizationId) ? 'dangerous' : cmdSet.rebootRequired ? 'medium' : 'safe',
             appliedAt: new Date().toISOString()
           },
+          group: taxonomy?.group,
+          kind: taxonomy?.kind,
+          warnings: applicability.warnings,
+          snapshotMeta,
           changesMade,
           rebootRequired: cmdSet.rebootRequired,
           executionTime

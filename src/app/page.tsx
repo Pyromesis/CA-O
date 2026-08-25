@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, useSyncExternalStore } from 'react';
 import { AnimatePresence } from 'framer-motion';
+import { apiFetch, captureSessionToken } from '@/lib/session-client';
 import { useAppStore } from '@/store/useAppStore';
 import { SplashScreen } from '@/components/ca-o/SplashScreen';
 import { Header } from '@/components/ca-o/Header';
@@ -40,8 +41,10 @@ function AppContent() {
   });
 
   useEffect(() => {
+    // Capture the session token handed over by the Electron launcher (once).
+    captureSessionToken();
     let cancelled = false;
-    fetch('/api/app-state')
+    apiFetch('/api/app-state')
       .then((res) => (res.ok ? res.json() : null))
       .then((json) => {
         if (cancelled || json?.data?.splashSeen !== true) return;
@@ -104,7 +107,7 @@ function AppContent() {
     } catch {
       // Ignore storage failures.
     }
-    fetch('/api/app-state', {
+    apiFetch('/api/app-state', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ splashSeen: true })

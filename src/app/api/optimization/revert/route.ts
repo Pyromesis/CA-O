@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { revertCommands, revertVerificationCommands, irreversibleOptimizationIds, sessionScopedOptimizationIds, repeatableOptimizationIds, isExecutableOptimizationId } from "@/lib/optimization-commands";
 import { runPowerShell } from "@/lib/powershell-runner";
+import { guardOrResponse } from "@/lib/api-security";
 import { db } from "@/lib/db";
 
 interface RevertOptimizationRequest {
@@ -32,6 +33,8 @@ function generateName(id: string): string {
 }
 
 export async function POST(request: NextRequest) {
+  const guard = guardOrResponse(request, true);
+  if (guard) return NextResponse.json(guard.json, { status: guard.status });
   const startTime = Date.now();
 
   try {

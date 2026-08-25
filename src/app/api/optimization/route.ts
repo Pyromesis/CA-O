@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { isExecutableOptimizationId, nonExecutableOptimizationIds, nonExecutableReasonById, realCommands, verificationCommands, irreversibleOptimizationIds, securityImpactById, privacyBenefitById, antiCheatWarnings, sessionScopedOptimizationIds, performanceImpactById } from "@/lib/optimization-commands";
 import { verifyWithCache } from "@/lib/verify-cache";
 import { getOptimizationDetail } from "@/lib/optimization-details";
+import { getTaxonomy, taxonomyById } from "@/lib/catalog/taxonomy";
+import { getScoredOptimization } from "@/lib/catalog/evidence";
+import { evaluateApplicability } from "@/lib/catalog/applicability";
+import { getSystemContext } from "@/lib/system-context";
+import type { CatalogGroup, CatalogSubgroup, ActionKind, PerformanceImpact as EvidenceImpact, Confidence, EvidenceSource, AdverseEffect } from "@/lib/catalog/types";
 
 export type OptimizationCategory = 'system' | 'network' | 'input' | 'tweaks' | 'powerful' | 'privacy';
 
@@ -88,6 +93,23 @@ export interface OptimizationItem {
   registryPath?: string;
   registryValue?: string;
   command?: string;
+  // ---- v2 evidence-based metadata ----
+  group: CatalogGroup;
+  subgroup: CatalogSubgroup;
+  kind: ActionKind;
+  expectedImpact: EvidenceImpact;
+  confidence: Confidence;
+  sources: EvidenceSource[];
+  rationaleEs: string;
+  rationaleEn: string;
+  adverseEffects: AdverseEffect[];
+  scoreTotal: number;
+  scoreLabel: string;
+  sessionAction: boolean;
+  nonPersistent: boolean;
+  applicable: boolean;
+  blockers: Array<{ code: string; es: string; en: string }>;
+  warnings: Array<{ code: string; es: string; en: string }>;
 }
 
 // Map of optimization categories to their IDs
@@ -154,7 +176,34 @@ function generateOptimizations(): OptimizationItem[] {
           privacyBenefitEn: privacyBenefitById[id]?.en,
           antiCheatWarningEs: antiCheatWarnings[id]?.es,
           antiCheatWarningEn: antiCheatWarnings[id]?.en,
-          command: cmdSet.commands[0]?.script?.split('\n')[0]?.trim() || ''
+          command: cmdSet.commands[0]?.script?.split('\n')[0]?.trim() || '',
+          ...((): {
+            group: CatalogGroup; subgroup: CatalogSubgroup; kind: ActionKind;
+            expectedImpact: EvidenceImpact; confidence: Confidence; sources: EvidenceSource[];
+            rationaleEs: string; rationaleEn: string; adverseEffects: AdverseEffect[];
+            scoreTotal: number; scoreLabel: string; sessionAction: boolean; nonPersistent: boolean;
+          } => {
+            const taxonomy = getTaxonomy(id) ?? { group: 'system' as CatalogGroup, subgroup: 'windows-features' as CatalogSubgroup, kind: 'maintenance' as ActionKind };
+            const scored = getScoredOptimization(id);
+            return {
+              group: taxonomy.group,
+              subgroup: taxonomy.subgroup,
+              kind: taxonomy.kind,
+              expectedImpact: scored.expectedImpact,
+              confidence: scored.confidence,
+              sources: scored.sources,
+              rationaleEs: scored.rationaleEs,
+              rationaleEn: scored.rationaleEn,
+              adverseEffects: scored.adverseEffects,
+              scoreTotal: scored.score.total,
+              scoreLabel: (scored.score as { label?: string }).label ?? 'conditional',
+              sessionAction: taxonomy.sessionAction ?? false,
+              nonPersistent: taxonomy.nonPersistent ?? false,
+            };
+          })(),
+          applicable: true,
+          blockers: [],
+          warnings: []
         });
       }
     }
@@ -192,6 +241,41 @@ export async function GET(request: NextRequest) {
       ...opt,
       isApplied: opt.id in appliedStateMap || false
     }));
+
+    // v2: evaluate applicability against the live machine context.
+    let systemContextSummary: unknown = null;
+    try {
+      const ctx = await getSystemContext();
+      const evaluated = await Promise.all(
+        optimizations.map(async (opt) => ({
+          opt,
+          result: await evaluateApplicability(opt.id, ctx),
+        })),
+      );
+      optimizations = optimizations.map((opt) => {
+        const match = evaluated.find((entry) => entry.opt.id === opt.id)?.result;
+        if (!match) return opt;
+        return {
+          ...opt,
+          applicable: match.applicable,
+          blockers: match.blockers.map((b) => ({ code: b.code, es: b.es, en: b.en })),
+          warnings: match.warnings.map((w) => ({ code: w.code, es: w.es, en: w.en })),
+        };
+      });
+      systemContextSummary = {
+        osVersion: ctx.os.displayVersion || ctx.os.caption,
+        build: ctx.os.build,
+        formFactor: ctx.hardware.formFactor,
+        ramGB: ctx.hardware.ramGB,
+        powerSource: ctx.power.powerSource,
+        elevatedSession: ctx.security.elevatedSession,
+        secureBoot: ctx.security.secureBoot,
+        hvciEnabled: ctx.security.hvciEnabled,
+        antiCheats: ctx.antiCheats.map((c) => c.id),
+      };
+    } catch (contextError) {
+      console.warn('System context unavailable; applicability not evaluated:', contextError);
+    }
 
     // Filter by category if specified
     let filtered = optimizations;
@@ -238,7 +322,9 @@ export async function GET(request: NextRequest) {
         appliedState: Object.keys(appliedStateMap).map(id => ({
           id,
           appliedAt: appliedStateMap[id].appliedAt
-        }))
+        })),
+        systemContext: systemContextSummary,
+        taxonomyNote: 'group/subgroup/kind + evidence-based impact. kind=repair-action|maintenance|cosmetic items are not performance optimizations.'
       },
       timestamp: new Date().toISOString()
     });
