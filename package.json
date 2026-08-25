@@ -82,7 +82,7 @@
     "bun-types": "^1.3.4",
     "electron": "^43.4.0",
     "electron-builder": "^26.15.3",
-    "eslint": "^9",
+    "eslint": "^10",
     "eslint-config-next": "^16.1.1",
     "tailwindcss": "^4",
     "tw-animate-css": "^1.3.5",
