@@ -19,6 +19,14 @@
                 Title="Cuello de botella térmico detectado"
                 Message="No se recomiendan más cambios de rendimiento hasta resolver la refrigeración." />
 
+            <InfoBar
+                x:Name="RecoveryBar"
+                IsOpen="False"
+                Severity="Warning"
+                Title="Operaciones incompletas por un cierre inesperado"
+                Message="CA-O encontró snapshots sin cierre verificado. Revise Restaurar/Historial y revierta desde el servicio si procede."
+                IsClosable="True" />
+
             <TextBlock x:Name="HardwareHeader" Text="Hardware y sistema" FontSize="18" FontWeight="SemiBold" Margin="0,8,0,0" />
             <TextBlock x:Name="SystemSummary" TextWrapping="Wrap" IsTextSelectionEnabled="True" />
 
@@ -48,6 +56,7 @@
                 </Border>
             </Grid>
 
+            <TextBlock x:Name="HealthScoresText" TextWrapping="Wrap" IsTextSelectionEnabled="True" FontWeight="SemiBold" />
             <TextBlock x:Name="FindingsHeader" Text="Hallazgos" FontSize="18" FontWeight="SemiBold" Margin="0,8,0,0" />
             <ListView x:Name="FindingsList" SelectionMode="None" IsItemClickEnabled="False">
                 <ListView.ItemTemplate>

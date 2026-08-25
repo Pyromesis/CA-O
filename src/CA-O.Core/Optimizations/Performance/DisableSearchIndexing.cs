@@ -21,6 +21,8 @@ public sealed class DisableSearchIndexing : IOptimization, IServiceAwareOptimiza
         Category = OptimizationCategory.Performance,
         ExpectedImpact = PerformanceImpact.WorkloadDependent,
         Evidence = EvidenceLevel.Empirical,
+        Confidence = Confidence.Medium,
+        AntiCheatImpact = AntiCheatImpact.None,
         Risk = RiskLevel.Moderate,
         Compatibility = CompatibilityStatus.Conditional,
         SecurityImpact = SecurityImpact.None,

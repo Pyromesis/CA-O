@@ -15,6 +15,7 @@ public static class ProfileEngine
     public static IReadOnlyList<ProfileId> All { get; } = new[]
     {
         ProfileId.Safe, ProfileId.Balanced, ProfileId.Gaming, ProfileId.Competitive,
+        ProfileId.Productivity, ProfileId.PowerSaver,
         ProfileId.Privacy, ProfileId.Security, ProfileId.Maintenance,
         ProfileId.Expert, ProfileId.Custom,
     };
@@ -37,6 +38,8 @@ public static class ProfileEngine
             ProfileId.Balanced => EvaluateBalanced(definition),
             ProfileId.Gaming => EvaluateGaming(definition, context),
             ProfileId.Competitive => EvaluateCompetitive(definition, context),
+            ProfileId.Productivity => EvaluateProductivity(definition, context),
+            ProfileId.PowerSaver => EvaluatePowerSaver(definition, context),
             ProfileId.Privacy => EvaluatePrivacy(definition),
             ProfileId.Security => EvaluateSecurity(definition),
             ProfileId.Maintenance => EvaluateMaintenance(definition),
@@ -137,6 +140,47 @@ public static class ProfileEngine
         }
 
         return new(true, "Apto para el perfil Competitive.");
+    }
+
+    /// <summary>Productivity: Balanced scope without gaming-only changes; battery aware.</summary>
+    private static ProfileDecision EvaluateProductivity(OptimizationDefinition definition, SystemContext context)
+    {
+        var balanced = EvaluateBalanced(definition);
+        if (!balanced.Allowed)
+        {
+            return balanced;
+        }
+
+        if (context.OnBattery && definition.ExpectedImpact is PerformanceImpact.Moderate or PerformanceImpact.Large)
+        {
+            return new(false, "Con batería se conservan los valores de eficiencia.");
+        }
+
+        return new(true, "Apto para el perfil Productivity.");
+    }
+
+    /// <summary>Power Saver: only zero/low-impact efficiency-friendly work.</summary>
+    private static ProfileDecision EvaluatePowerSaver(OptimizationDefinition definition, SystemContext context)
+    {
+        if (definition.ExpectedImpact is PerformanceImpact.Moderate or PerformanceImpact.Large)
+        {
+            return new(false, "Power Saver no aplica cambios de impacto medio/alto.");
+        }
+
+        if (definition.Category is OptimizationCategory.Gaming)
+        {
+            return new(false, "Power Saver no ejecuta cambios orientados a gaming.");
+        }
+
+        if (context.ThermalState == ThermalState.Throttling)
+        {
+            return new(false, "Throttling térmico activo: resolver refrigeración primero.");
+        }
+
+        var balanced = EvaluateBalanced(definition);
+        return balanced.Allowed
+            ? new(true, "Apto para el perfil Power Saver.")
+            : balanced;
     }
 
     private static ProfileDecision EvaluatePrivacy(OptimizationDefinition definition) =>

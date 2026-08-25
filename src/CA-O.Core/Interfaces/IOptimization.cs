@@ -44,10 +44,14 @@ public interface IOptimization
     // re-implement boilerplate; overrides exist where real checks matter.
     // ------------------------------------------------------------------
 
-    /// <summary>PRECHECK phase: refuses to run on incompatible builds/hardware.</summary>
+    /// <summary>
+    /// PRECHECK phase: optimization-specific gates only (e.g. observed
+    /// service state). Context-level rules live in the COMPATIBILITY
+    /// transaction phase so they are always enforced, even for overrides.
+    /// </summary>
     Task<PreconditionResult> CheckPreconditionsAsync(SystemContext context, CancellationToken ct = default)
     {
-        return Task.FromResult(Compatibility.Rules.EvaluatePreconditions(Definition, context));
+        return Task.FromResult(PreconditionResult.Ok("Sin precondiciones específicas de esta optimización."));
     }
 
     /// <summary>VERIFY phase: re-detects live state and compares with intent.</summary>

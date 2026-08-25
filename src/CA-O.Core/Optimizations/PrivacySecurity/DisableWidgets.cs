@@ -20,6 +20,8 @@ public sealed class DisableWidgets : RegistryOptimizationBase
         Category = OptimizationCategory.PrivacySecurity,
         ExpectedImpact = PerformanceImpact.Tiny,
         Evidence = EvidenceLevel.Official,
+        Confidence = Confidence.High,
+        AntiCheatImpact = AntiCheatImpact.None,
         Risk = RiskLevel.Low,
         Compatibility = CompatibilityStatus.NoKnownConflict,
         SecurityImpact = SecurityImpact.PrivacyOnly,

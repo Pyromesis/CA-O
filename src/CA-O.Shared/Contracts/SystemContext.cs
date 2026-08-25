@@ -59,6 +59,9 @@ public sealed record SystemContext
 
     public bool VanguardDetected => AntiCheats.Any(a => a.Kind == AntiCheatKind.Vanguard);
 
+    // ---- Games (spec 93) ----
+    public IReadOnlyList<string> GamesDetected { get; init; } = Array.Empty<string>();
+
     // ---- Thermal ----
     public ThermalState ThermalState { get; init; } = ThermalState.Unknown;
 

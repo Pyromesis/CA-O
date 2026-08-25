@@ -1,7 +1,8 @@
 using CAO.Core.Abstractions;
+using CAO.Core.Compatibility;
 using CAO.Shared;
 
-namespace CAO.Core.Engine;
+namespace CAO.Core.Rollback;
 
 /// <summary>Result of running one optimization through the full transaction.</summary>
 public sealed record TransactionReport
@@ -18,14 +19,21 @@ public sealed record TransactionReport
     public string? Error { get; init; }
 
     public bool RolledBack { get; init; }
+
+    /// <summary>True when a post-rollback re-detect confirmed the original state returned.</summary>
+    public bool RollbackVerified { get; init; }
+
+    /// <summary>Benchmark outcome when the optimization defines one; null otherwise.</summary>
+    public BenchmarkResult? Benchmark { get; init; }
 }
 
 /// <summary>
-/// Single-optimization transaction (spec 123):
-/// PRECHECK -> SNAPSHOT -> APPLY -> VERIFY -> COMMIT, with automatic
-/// ROLLBACK whenever apply or verification fails. The snapshot is persisted
-/// BEFORE mutating so a crash mid-apply still leaves a recovery path
-/// (spec 122: never assume apply == success because the process died).
+/// Single-optimization transaction (spec 11/123):
+/// PRECHECK -> COMPATIBILITY -> SNAPSHOT -> APPLY -> VERIFY -> BENCHMARK ->
+/// COMMIT, with automatic ROLLBACK + ROLLBACK-VERIFY whenever apply or
+/// verification fails. The snapshot is persisted BEFORE mutating so a crash
+/// mid-apply still leaves a recovery path (spec 122: never assume apply ==
+/// success because the process died).
 /// </summary>
 public sealed class OptimizationTransaction
 {
@@ -59,7 +67,7 @@ public sealed class OptimizationTransaction
     {
         var definition = _optimization.Definition;
 
-        // ---- PRECHECK ----
+        // ---- PRECHECK (optimization-specific gates) ----
         PreconditionResult precondition;
         try
         {
@@ -79,6 +87,20 @@ public sealed class OptimizationTransaction
                 Success = false,
                 FinalPhase = TransactionPhase.Failed,
                 MessageEs = precondition.ReasonEs,
+            };
+        }
+
+        // ---- COMPATIBILITY (context-level rules; always enforced) ----
+        var compatibility = Rules.EvaluatePreconditions(definition, _context);
+        if (!compatibility.Passed)
+        {
+            Log(definition.Id, "compatibility", false, null, error: compatibility.ReasonEs, precondition: "failed");
+            return new TransactionReport
+            {
+                OptimizationId = definition.Id,
+                Success = false,
+                FinalPhase = TransactionPhase.Failed,
+                MessageEs = compatibility.ReasonEs,
             };
         }
 
@@ -105,8 +127,8 @@ public sealed class OptimizationTransaction
 
         if (!apply.Success)
         {
-            var rolledBack = await SafeRollbackAsync(context, snapshot, ct);
-            Log(definition.Id, "apply", false, rolledBack ? definition.Id : null,
+            var rollbackVerified = await SafeRollbackAsync(context, snapshot, ct);
+            Log(definition.Id, "apply", false, rollbackVerified ? null : definition.Id,
                 error: apply.Error ?? apply.MessageEs,
                 applyResult: "failed",
                 rollbackAvailable: false);
@@ -114,71 +136,82 @@ public sealed class OptimizationTransaction
             {
                 OptimizationId = definition.Id,
                 Success = false,
-                FinalPhase = rolledBack ? TransactionPhase.RolledBack : TransactionPhase.Failed,
-                MessageEs = apply.MessageEs + (rolledBack ? " Se revirtió el cambio." : " La reversión falló; revise el historial."),
+                FinalPhase = rollbackVerified ? TransactionPhase.RolledBack : TransactionPhase.Failed,
+                MessageEs = apply.MessageEs + (rollbackVerified
+                    ? " Se revirtió el cambio y se verificó la reversión."
+                    : " La reversión falló o no pudo verificarse; revise el historial."),
                 Error = apply.Error,
                 RolledBack = true,
+                RollbackVerified = rollbackVerified,
             };
         }
 
         // ---- VERIFY ----
-        if (definition.Flags.HasFlag(OptimizationFlags.NotReversible))
+        if (!definition.Flags.HasFlag(OptimizationFlags.NotReversible))
         {
-            Log(definition.Id, "apply", true, null,
-                applyResult: "success", verification: "skipped", rollbackAvailable: false);
-            return new TransactionReport
+            VerificationResult verification;
+            try
             {
-                OptimizationId = definition.Id,
-                Success = true,
-                FinalPhase = TransactionPhase.Commit,
-                MessageEs = apply.MessageEs,
-            };
+                verification = await _optimization.VerifyAsync(context, ct);
+            }
+            catch (Exception ex)
+            {
+                verification = VerificationResult.Failed(OptimizationState.Unknown, "Verificación interrumpida: " + ex.Message);
+            }
+
+            if (!verification.Verified)
+            {
+                var rollbackVerified = await SafeRollbackAsync(context, snapshot, ct);
+                Log(definition.Id, "verify", false, rollbackVerified ? null : definition.Id,
+                    error: "Verificación fallida; cambio revertido.",
+                    applyResult: "success",
+                    verification: "failed",
+                    rollbackAvailable: !rollbackVerified);
+                return new TransactionReport
+                {
+                    OptimizationId = definition.Id,
+                    Success = false,
+                    FinalPhase = rollbackVerified ? TransactionPhase.RolledBack : TransactionPhase.Failed,
+                    MessageEs = "La verificación falló y el cambio se revirtió.",
+                    Error = verification.MessageEs,
+                    RolledBack = true,
+                    RollbackVerified = rollbackVerified,
+                };
+            }
         }
 
-        VerificationResult verification;
+        // ---- BENCHMARK (optional hook) ----
+        BenchmarkResult? benchmark = null;
         try
         {
-            verification = await _optimization.VerifyAsync(context, ct);
+            benchmark = await _optimization.BenchmarkAsync(ct);
         }
-        catch (Exception ex)
+        catch
         {
-            verification = VerificationResult.Failed(OptimizationState.Unknown, "Verificación interrumpida: " + ex.Message);
-        }
-
-        if (!verification.Verified)
-        {
-            var rolledBack = await SafeRollbackAsync(context, snapshot, ct);
-            Log(definition.Id, "verify", false, rolledBack ? null : definition.Id,
-                error: "Verificación fallida; cambio revertido.",
-                applyResult: "success",
-                verification: "failed",
-                rollbackAvailable: !rolledBack);
-            return new TransactionReport
-            {
-                OptimizationId = definition.Id,
-                Success = false,
-                FinalPhase = rolledBack ? TransactionPhase.RolledBack : TransactionPhase.Failed,
-                MessageEs = "La verificación falló y el cambio se revirtió.",
-                Error = verification.MessageEs,
-                RolledBack = true,
-            };
+            benchmark = null; // benchmark failure never breaks the transaction
         }
 
         // ---- COMMIT ----
-        var pendingReboot = verification.ObservedState == OptimizationState.PendingReboot;
+        var pendingReboot = definition.Flags.HasFlag(OptimizationFlags.NotReversible)
+            ? false
+            : DetectAfterApply(context.Registry) is OptimizationState.PendingReboot;
+
         Log(definition.Id, "apply", true, definition.Id,
             applyResult: "success",
-            verification: pendingReboot ? "pending-reboot" : "passed",
-            rollbackAvailable: true);
+            verification: definition.Flags.HasFlag(OptimizationFlags.NotReversible)
+                ? "skipped"
+                : pendingReboot ? "pending-reboot" : "passed",
+            rollbackAvailable: true,
+            benchmarkSummary: DescribeBenchmark(benchmark));
 
         return new TransactionReport
         {
             OptimizationId = definition.Id,
             Success = true,
             FinalPhase = TransactionPhase.Commit,
-            MessageEs = pendingReboot
-                ? apply.MessageEs + " Requiere reinicio."
-                : apply.MessageEs,
+            MessageEs = pendingReboot ? apply.MessageEs + " Requiere reinicio." : apply.MessageEs,
+            RollbackVerified = true,
+            Benchmark = benchmark,
         };
     }
 
@@ -201,7 +234,7 @@ public sealed class OptimizationTransaction
             if (rollback.Success)
             {
                 _snapshots.Delete(id);
-                Log(id, "revert", true, null, applyResult: null, verification: null, rollbackAvailable: false);
+                Log(id, "revert", true, null, rollbackAvailable: false);
             }
             return rollback.Success;
         }
@@ -216,11 +249,20 @@ public sealed class OptimizationTransaction
         try
         {
             var rollback = await _optimization.RollbackAsync(context, snapshot, ct);
-            if (rollback.Success)
+            if (!rollback.Success)
             {
-                _snapshots?.Delete(_optimization.Definition.Id);
+                return false;
             }
-            return rollback.Success;
+
+            // VERIFY ROLLBACK: re-detect must NOT report the applied state.
+            var observed = _optimization.Detect(_registry);
+            if (observed == OptimizationState.AppliedByCao)
+            {
+                return false;
+            }
+
+            _snapshots?.Delete(_optimization.Definition.Id);
+            return true;
         }
         catch
         {
@@ -228,10 +270,29 @@ public sealed class OptimizationTransaction
         }
     }
 
+    private OptimizationState DetectAfterApply(IRegistryAccessor registry)
+    {
+        try
+        {
+            return _optimization.Detect(registry);
+        }
+        catch
+        {
+            return OptimizationState.Unknown;
+        }
+    }
+
+    private static string? DescribeBenchmark(BenchmarkResult? benchmark) =>
+        benchmark is null ? null :
+        benchmark.FrameTimes is not null
+            ? $"fps={benchmark.FrameTimes.AverageFps:0.0}; p99ft={benchmark.FrameTimes.P99FrameTimeMs:0.00}ms"
+            : benchmark.Metric is null ? "run" : $"{benchmark.MetricName}={benchmark.Metric:0.##}{benchmark.MetricUnit}";
+
     private void Log(
         string optimizationId, string operation, bool success, string? snapshotId,
         string? error = null, string precondition = "passed",
-        string? applyResult = null, string? verification = null, bool rollbackAvailable = false)
+        string? applyResult = null, string? verification = null,
+        bool rollbackAvailable = false, string? benchmarkSummary = null)
     {
         _history?.Log(new HistoryEntry
         {
@@ -247,6 +308,7 @@ public sealed class OptimizationTransaction
             ApplyResult = applyResult,
             Verification = verification,
             RollbackAvailable = rollbackAvailable,
+            BenchmarkSummary = benchmarkSummary,
             Error = error,
         });
     }

@@ -18,6 +18,8 @@ public sealed class DisableHibernate : IOptimization
         Category = OptimizationCategory.Storage,
         ExpectedImpact = PerformanceImpact.None,
         Evidence = EvidenceLevel.Official,
+        Confidence = Confidence.High,
+        AntiCheatImpact = AntiCheatImpact.None,
         Risk = RiskLevel.Moderate,
         Compatibility = CompatibilityStatus.NoKnownConflict,
         SecurityImpact = SecurityImpact.None,

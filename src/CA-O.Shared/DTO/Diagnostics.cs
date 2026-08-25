@@ -16,6 +16,8 @@ public enum HealthDimension
     Storage,
     Drivers,
     Thermals,
+    Input,
+    Stability,
     Startup,
 }
 

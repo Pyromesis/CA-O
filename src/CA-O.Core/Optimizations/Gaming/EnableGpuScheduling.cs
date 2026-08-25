@@ -20,6 +20,8 @@ public sealed class EnableGpuScheduling : RegistryOptimizationBase
         Category = OptimizationCategory.Gaming,
         ExpectedImpact = PerformanceImpact.WorkloadDependent,
         Evidence = EvidenceLevel.Vendor,
+        Confidence = Confidence.Medium,
+        AntiCheatImpact = AntiCheatImpact.NoKnownConflict,
         Risk = RiskLevel.Moderate,
         Compatibility = CompatibilityStatus.Conditional,
         SecurityImpact = SecurityImpact.None,

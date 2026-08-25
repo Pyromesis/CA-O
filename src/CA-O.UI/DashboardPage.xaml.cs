@@ -1,5 +1,6 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using CAO.Core.Diagnostics;
 using CAO.Core.Engine;
 using CAO.Shared;
 
@@ -73,33 +74,40 @@ public sealed partial class DashboardPage : Page
         AnalyzingRing.IsActive = true;
         try
         {
+            // Crash recovery first (spec 13): surface incomplete operations.
+            var candidates = AppServices.Recovery.Scan();
+            AppServices.State.RecoveryCandidates = candidates.Select(candidate => candidate.OptimizationId).ToList();
+            RecoveryBar.IsOpen = candidates.Count > 0;
+            if (candidates.Count > 0)
+            {
+                RecoveryBar.Message = "Operaciones incompletas: " + string.Join(", ", candidates.Select(c => c.OptimizationId)) +
+                    ". Revise Restaurar/Historial y revierta desde el servicio si procede.";
+            }
+
             var context = await AppServices.ContextProvider.GetAsync();
             AppServices.State.Context = context;
+
+            var network = await new CAO.Infrastructure.Networking.NetworkDiagnosticsProvider().MeasureAsync();
+            var storage = new CAO.Infrastructure.Storage.StorageDiagnosticsProvider().Measure();
+            var security = new CAO.Infrastructure.Security.SecurityDiagnosticsProvider().Measure();
 
             await Task.Run(() =>
             {
                 var recommendations = RecommendationEngine.BuildAll(AppServices.Catalog, AppServices.Registry, context);
                 AppServices.State.Recommendations = recommendations;
+
+                var report = HealthEngine.Evaluate(
+                    context: context,
+                    network: network,
+                    storage: storage,
+                    security: security);
+                FindingsList.ItemsSource = report.Findings
+                    .Select(finding => new FindingRow(finding.Severity.ToString(), finding.MessageEs))
+                    .ToList();
+                HealthScoresText.Text = DescribeScores(report);
             });
 
-            var report = Core.Engine.SystemHealthAnalyzer.Analyze(
-                new Core.Abstractions.SystemInfoReport(
-                    WindowsVersion: $"build {context.WindowsBuild}",
-                    WindowsEdition: context.WindowsEdition,
-                    RamGb: context.RamGb,
-                    CpuName: context.CpuName,
-                    HasSsd: context.HasSsd,
-                    IsElevated: false,
-                    IsLaptop: context.IsLaptop)
-                { WindowsBuild = context.WindowsBuild });
-
-            var rows = report.Findings.Select(finding => new FindingRow(finding.Severity.ToString(), finding.MessageEs)).ToList();
-            if (context.ThermalState == ThermalState.Throttling)
-            {
-                rows.Insert(0, new FindingRow("Critical", "Throttling térmico activo: priorice refrigeración antes de optimizar."));
-            }
-            FindingsList.ItemsSource = rows;
-
+            ThermalBar.IsOpen = context.ThermalState == ThermalState.Throttling;
             AppServices.State.LastAnalysisUtc = DateTime.UtcNow;
         }
         catch (Exception ex)
@@ -112,4 +120,9 @@ public sealed partial class DashboardPage : Page
             AnalyzeButton.IsEnabled = true;
         }
     }
+
+    private static string DescribeScores(SystemDiagnosticReport report) =>
+        string.Join("  ·  ", report.Scores
+            .Where(score => score.IsMeasured && score.Score is not null)
+            .Select(score => $"{score.Dimension}: {score.Score}/100"));
 }

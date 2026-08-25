@@ -22,6 +22,8 @@ public enum ProfileId
     Competitive,
     Privacy,
     Security,
+    Productivity,
+    PowerSaver,
     Maintenance,
     Expert,
     Custom,

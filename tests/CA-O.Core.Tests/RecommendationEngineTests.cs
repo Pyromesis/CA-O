@@ -1,5 +1,6 @@
 using CAO.Core.Abstractions;
 using CAO.Core.Engine;
+using CAO.Core.Rollback;
 using CAO.Shared;
 using Xunit;
 

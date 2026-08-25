@@ -33,6 +33,8 @@ public sealed class MemorySnapshotStore : ISnapshotStore
 
     public List<string> Deleted { get; } = [];
 
+    public IEnumerable<string> ListIds() => Saved.Keys;
+
     public void Save(string optimizationId, OptimizationSnapshot snapshot) => Saved[optimizationId] = snapshot;
 
     public bool TryLoad(string optimizationId, out OptimizationSnapshot snapshot)

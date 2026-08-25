@@ -23,6 +23,8 @@ public sealed class DisableGameBarDvr : RegistryOptimizationBase
         Category = OptimizationCategory.Gaming,
         ExpectedImpact = PerformanceImpact.WorkloadDependent,
         Evidence = EvidenceLevel.Vendor,
+        Confidence = Confidence.Medium,
+        AntiCheatImpact = AntiCheatImpact.NoKnownConflict,
         Risk = RiskLevel.Low,
         Compatibility = CompatibilityStatus.NoKnownConflict,
         SecurityImpact = SecurityImpact.None,

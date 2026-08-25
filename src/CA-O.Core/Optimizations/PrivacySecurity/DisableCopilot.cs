@@ -20,6 +20,8 @@ public sealed class DisableCopilot : RegistryOptimizationBase
         Category = OptimizationCategory.PrivacySecurity,
         ExpectedImpact = PerformanceImpact.None,
         Evidence = EvidenceLevel.Vendor,
+        Confidence = Confidence.High,
+        AntiCheatImpact = AntiCheatImpact.None,
         Risk = RiskLevel.Low,
         Compatibility = CompatibilityStatus.NoKnownConflict,
         SecurityImpact = SecurityImpact.PrivacyOnly,

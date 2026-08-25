@@ -8,8 +8,6 @@ public static class Localizer
 {
     public static IReadOnlyList<string> SupportedLanguages { get; } = ["es-ES", "en-US"];
 
-    private static Dictionary<string, string> Current { get; set; } = Spanish;
-
     private static readonly Dictionary<string, string> Spanish = new()
     {
         ["app.title"] = "CA-O",
@@ -91,6 +89,8 @@ public static class Localizer
         ["common.workloadDependent"] = "Workload dependent",
         ["common.noClaims"] = "No numeric promises: measurements only.",
     };
+
+    private static Dictionary<string, string> Current { get; set; } = Spanish;
 
     public static void SetLanguage(string language)
     {

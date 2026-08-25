@@ -83,20 +83,10 @@ public sealed partial class MainWindow : Window
             return;
         }
 
-        var pageType = tag switch
+        var pageType = Navigation.RouteTable.Resolve(tag);
+        if (pageType is not null)
         {
-            "dashboard" => typeof(DashboardPage),
-            "analyze" => typeof(AnalyzePage),
-            "optimize" => typeof(OptimizePage),
-            "gaming" => typeof(GamingPage),
-            "diagnostics" => typeof(DiagnosticsPage),
-            "benchmark" => typeof(BenchmarkPage),
-            "restore" => typeof(RestorePage),
-            "history" => typeof(HistoryPage),
-            "settings" => typeof(SettingsPage),
-            _ => typeof(DashboardPage),
-        };
-
-        ContentFrame.Navigate(pageType);
+            ContentFrame.Navigate(pageType);
+        }
     }
 }

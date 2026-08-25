@@ -20,6 +20,8 @@ public sealed class DisableTelemetry : RegistryOptimizationBase
         Category = OptimizationCategory.PrivacySecurity,
         ExpectedImpact = PerformanceImpact.None,
         Evidence = EvidenceLevel.Official,
+        Confidence = Confidence.High,
+        AntiCheatImpact = AntiCheatImpact.None,
         Risk = RiskLevel.Low,
         Compatibility = CompatibilityStatus.Compatible,
         SecurityImpact = SecurityImpact.PrivacyOnly,

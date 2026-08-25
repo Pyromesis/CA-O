@@ -26,11 +26,26 @@ No "¿qué tweaks tiene Internet?". Cada decisión de diseño sirve a los cuatro
 
 | Proyecto | Responsabilidad | Dependencias |
 |---|---|---|
-| `CA-O.Shared` | DTOs, contratos de ciclo de vida, enums de clasificación, constantes de rutas/IPC, versionado | — |
-| `CA-O.Core` | Catálogo de optimizaciones, motor transaccional, motor de recomendaciones, perfiles, scoring, guardas anti-cheat, reglas de compatibilidad | Shared |
-| `CA-O.Infrastructure` | Implementaciones Windows: WMI/CIM, contadores de rendimiento, sondas DNS/bufferbloat, DPC sampler, stores de snapshots/historial, benchmark in-process | Core, Shared |
+| `CA-O.Shared` | DTOs, contratos IPC, enums, constantes de rutas/IPC, versionado (`Contracts/`, `DTO/`, `IPC/`, `Enums/`, `Versioning/`) | — |
+| `CA-O.Core` | Catálogo y motor transaccional, motor de recomendaciones/scoring, perfiles, guardas anti-cheat, reglas de compatibilidad + known-issues matcher, health engine, crash recovery (`Optimization/`, `Diagnostics/`, `Benchmark/`, `Compatibility/`, `Gaming/`, `Profiles/`, `Rollback/`, `Scoring/`, `Interfaces/`) | Shared |
+| `CA-O.Infrastructure` | Implementaciones Windows: WMI/CIM, contadores, sondas DNS/bufferbloat, DPC sampler, detección de juegos y anti-cheats, stores de snapshots/historial/known-issues, benchmark in-process | Core, Shared |
 | `CA-O.Privileged` | Host de servicio + servidor Named Pipes + auditoría | Core, Infrastructure, Shared |
-| `CA-O.UI` | Shell WinUI 3, páginas, estado compartido, cliente IPC | Core, Infrastructure, Shared |
+| `CA-O.UI` | Shell WinUI 3 (NavigationView/Mica), páginas, ViewModels MVVM, navegación tipada (`Pages/`, `ViewModels/`, `Navigation/`, `Resources/`) | Core, Infrastructure, Shared |
+
+Las versiones de paquetes se centralizan en `Directory.Packages.props`.
+
+## Motores
+
+| Motor | Ubicación | Notas |
+|---|---|---|
+| Transaccional (PRECHECK→COMPATIBILITY→SNAPSHOT→APPLY→VERIFY→BENCHMARK→COMMIT) | `Core/Rollback/OptimizationTransaction.cs` | Rollback con verificación post-reversión |
+| Crash recovery | `Core/Rollback/CrashRecoveryService.cs` | Snapshot sin commit+verify = Incomplete; nunca asume éxito |
+| Health | `Core/Diagnostics/HealthEngine.cs` | Sólo dimensiones medidas se puntúan; el resto Score=null |
+| Recomendaciones + scoring | `Core/Scoring/` | Buckets analyze-first + score 0-100 |
+| Known-issues | `Core/Compatibility/KnownIssueMatcher.cs` + store JSON en Infrastructure | DB versionada con override drop-in en `%ProgramData%\CA-O\known-issues.json` |
+| Detección de juegos / anti-cheats | `Infrastructure/Gaming/` | Procesos conocidos; lectura de servicios/drivers |
+
+Desviaciones documentadas respecto al árbol literal del prompt: `Core/Services` conserva accesores reutilizados por el servicio; `Infrastructure/SystemInterop` agrupa proveedores WMI en lugar de dividirlos por carpeta Windows/*; ETW queda como limitación documentada (DPC/ISR por contador, atribución por driver futura vía trazas).
 
 ## Ciclo de vida de una optimización (spec transaccional)
 
@@ -47,6 +62,8 @@ ROLLBACK  RollbackAsync(snapshot) automático si APPLY o VERIFY fallan
 El lote multi-optimización aplica secuencialmente; ante un fallo se detiene y revierte lo ya aplicado cuyo riesgo sea Safe/Low (spec 124).
 
 ## Clasificación y recomendación
+
+El health score **nunca depende** de la cantidad de tweaks aplicados: cada dimensión se puntúa únicamente con mediciones reales y, sin datos, queda explícitamente como no medida (Score=null).
 
 1. `AntiCheatGuard.Evaluate` — motivos específicos: `blocked-anticheat` > `blocked-by-default` > caution.
 2. `Compatibility.Rules.EvaluatePreconditions` — contexto real (build, térmico, batería, SSD).

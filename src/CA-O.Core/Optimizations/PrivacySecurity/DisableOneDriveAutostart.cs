@@ -25,6 +25,8 @@ public sealed class DisableOneDriveAutostart : IOptimization
         Category = OptimizationCategory.PrivacySecurity,
         ExpectedImpact = PerformanceImpact.Tiny,
         Evidence = EvidenceLevel.Official,
+        Confidence = Confidence.High,
+        AntiCheatImpact = AntiCheatImpact.None,
         Risk = RiskLevel.Low,
         Compatibility = CompatibilityStatus.Conditional,
         SecurityImpact = SecurityImpact.PrivacyOnly,

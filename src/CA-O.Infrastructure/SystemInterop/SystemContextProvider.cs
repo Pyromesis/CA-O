@@ -18,17 +18,20 @@ public sealed class SystemContextProvider : ISystemContextProvider
     private readonly SecurityDiagnosticsProvider _security;
     private readonly AntiCheatScanProvider _antiCheats;
     private readonly ThermalDiagnosticsProvider _thermals;
+    private readonly GameDetectionProvider _games;
 
     public SystemContextProvider(
         WmiSystemInfoProvider? systemInfo = null,
         SecurityDiagnosticsProvider? security = null,
         AntiCheatScanProvider? antiCheats = null,
-        ThermalDiagnosticsProvider? thermals = null)
+        ThermalDiagnosticsProvider? thermals = null,
+        GameDetectionProvider? games = null)
     {
         _systemInfo = systemInfo ?? new WmiSystemInfoProvider();
         _security = security ?? new SecurityDiagnosticsProvider();
         _antiCheats = antiCheats ?? new AntiCheatScanProvider();
         _thermals = thermals ?? new ThermalDiagnosticsProvider();
+        _games = games ?? new GameDetectionProvider();
     }
 
     public async Task<SystemContext> GetAsync(CancellationToken ct = default)
@@ -40,6 +43,7 @@ public sealed class SystemContextProvider : ISystemContextProvider
 
         var gpu = QueryPrimaryGpu();
         var onBattery = QueryOnBattery();
+        var games = await _games.DetectAsync(ct);
 
         var secureBoot = securityReport.Features.FirstOrDefault(feature => feature.Name == "Secure Boot")?.Enabled;
         var vbs = securityReport.Features.FirstOrDefault(feature => feature.Name == "VBS")?.Enabled;
@@ -67,6 +71,7 @@ public sealed class SystemContextProvider : ISystemContextProvider
             VbsEnabled = vbs,
             HvciEnabled = hvci,
             AntiCheats = antiCheats,
+            GamesDetected = games.Select(game => game.Name).ToList(),
             ThermalState = MapThermal(thermal),
             MeasuredUtc = DateTime.UtcNow,
         };

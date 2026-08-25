@@ -40,6 +40,8 @@ public sealed class OptimizationCatalogContractTests
         Assert.False(string.IsNullOrWhiteSpace(definition.DescriptionEn), $"{id}: falta DescriptionEn");
         Assert.True(Enum.IsDefined(definition.Category), $"{id}: categoría inválida");
         Assert.NotEqual(EvidenceLevel.Unknown, definition.Evidence);
+        Assert.NotEqual(Confidence.Unknown, definition.Confidence);
+        Assert.NotEqual(AntiCheatImpact.Unknown, definition.AntiCheatImpact);
         Assert.True(Enum.IsDefined(definition.Risk), $"{id}: riesgo inválido");
         Assert.True(Enum.IsDefined(definition.SecurityImpact), $"{id}: impacto de seguridad no clasificado");
         Assert.True(Enum.IsDefined(definition.Compatibility) && definition.Compatibility != CompatibilityStatus.Unknown,

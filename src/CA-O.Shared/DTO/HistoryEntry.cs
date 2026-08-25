@@ -36,6 +36,9 @@ public sealed record HistoryEntry
     /// <summary>True when a stored snapshot allows reverting this change.</summary>
     public bool RollbackAvailable { get; init; }
 
+    /// <summary>Compact benchmark outcome when the optimization defines one (spec 74 "benchmark").</summary>
+    public string? BenchmarkSummary { get; init; }
+
     /// <summary>Legacy compatibility fields kept for the tabular log reader.</summary>
     public string? PreviousState { get; init; }
 

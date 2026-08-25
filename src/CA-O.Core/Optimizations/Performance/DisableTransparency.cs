@@ -20,6 +20,8 @@ public sealed class DisableTransparency : RegistryOptimizationBase
         Category = OptimizationCategory.Performance,
         ExpectedImpact = PerformanceImpact.Tiny,
         Evidence = EvidenceLevel.Empirical,
+        Confidence = Confidence.High,
+        AntiCheatImpact = AntiCheatImpact.None,
         Risk = RiskLevel.Safe,
         Compatibility = CompatibilityStatus.Compatible,
         SecurityImpact = SecurityImpact.None,

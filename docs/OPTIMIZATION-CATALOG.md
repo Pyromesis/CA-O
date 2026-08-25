@@ -2,28 +2,30 @@
 
 Calidad sobre cantidad (spec 131): cada entrada responde qué cambia, por qué, con qué evidencia, qué riesgo y seguridad afecta, si es reversible y cómo se verifica. Las clasificaciones alimentan el motor de recomendaciones; ninguna optimización queda sin clasificar (contrato automatizado en `OptimizationCatalogContractTests`).
 
-## Tabla maestra
+## Tabla maestra (informe final §102)
 
-| Id | Categoría | Impacto esperado | Evidencia | Riesgo | Compatibilidad | Seguridad | Reversible | Flags |
-|---|---|---|---|---|---|---|---|---|
-| disable-game-bar-dvr | Gaming | WorkloadDependent | Vendor | Low | NoKnownConflict | None | Sí | — |
-| enable-gpu-scheduling | Gaming | WorkloadDependent | Vendor | Moderate | Conditional | None | Sí | RequiresReboot |
-| normalize-tcp-autotuning | Network | WorkloadDependent | Official | Low | Conditional | None | Sí | — |
-| disable-background-apps | Performance | Small | Official | Low | NoKnownConflict | PrivacyOnly | Sí | — |
-| disable-search-indexing | Performance | WorkloadDependent | Empirical | Moderate | Conditional | None | Sí | RecommendedOnSsd |
-| disable-transparency | Performance | Tiny | Empirical | Safe | Compatible | None | Sí | — |
-| disable-vbs | Performance | WorkloadDependent | Vendor | Critical | PotentialConflict | ReducedProtection | Sí | ExpertOnly, SecurityTradeoff, RequiresReboot |
-| disable-visual-effects | Performance | Tiny | Empirical | Safe | Compatible | None | Sí | — |
-| maximum-power-plan | Performance | Small | Official | Low | Compatible | None | Sí | — |
-| zero-menu-delay | Performance | Tiny | Heuristic | Safe | Compatible | None | Sí | — |
-| disable-copilot | PrivacySecurity | None | Vendor | Low | NoKnownConflict | PrivacyOnly | Sí | — |
-| disable-cortana | PrivacySecurity | None | Official | Low | NoKnownConflict | PrivacyOnly | Sí | — |
-| disable-onedrive-autostart | PrivacySecurity | Tiny | Official | Low | Conditional | PrivacyOnly | Sí | ExpertOnly |
-| disable-suggestions | PrivacySecurity | None | Official | Low | Compatible | PrivacyOnly | Sí | — |
-| disable-telemetry | PrivacySecurity | None | Official | Low | Compatible | PrivacyOnly | Sí | — |
-| disable-widgets | PrivacySecurity | Tiny | Official | Low | NoKnownConflict | PrivacyOnly | Sí | — |
-| disable-hibernate | Storage | None | Official | Moderate | NoKnownConflict | None | Sí | — |
-| optimize-system-drive | Storage | None | Official | Low | Compatible | None | No (mantenimiento) | NotReversible |
+| Id | Categoría | Impacto esperado | Evidencia | Confidence | Riesgo | Compatibilidad | Seguridad | Anti-cheat | Reversible | Flags |
+|---|---|---|---|---|---|---|---|---|---|---|
+| disable-game-bar-dvr | Gaming | WorkloadDependent | Vendor | Medium | Low | NoKnownConflict | None | NoKnownConflict | Sí | — |
+| enable-gpu-scheduling | Gaming | WorkloadDependent | Vendor | Medium | Moderate | Conditional | None | NoKnownConflict | Sí | RequiresReboot |
+| normalize-tcp-autotuning | Network | WorkloadDependent | Official | High | Low | Conditional | None | None | Sí | — |
+| disable-background-apps | Performance | Small | Official | High | Low | NoKnownConflict | PrivacyOnly | NoKnownConflict | Sí | — |
+| disable-search-indexing | Performance | WorkloadDependent | Empirical | Medium | Moderate | Conditional | None | None | Sí | RecommendedOnSsd |
+| disable-transparency | Performance | Tiny | Empirical | High | Safe | Compatible | None | None | Sí | — |
+| disable-vbs | Performance | WorkloadDependent | Vendor | High | Critical | PotentialConflict | ReducedProtection | RequiredSecurityFeature | Sí | ExpertOnly, SecurityTradeoff, RequiresReboot |
+| disable-visual-effects | Performance | Tiny | Empirical | High | Safe | Compatible | None | None | Sí | — |
+| maximum-power-plan | Performance | Small | Official | High | Low | Compatible | None | None | Sí | — |
+| zero-menu-delay | Performance | Tiny | Heuristic | Low | Safe | Compatible | None | None | Sí | — |
+| disable-copilot | PrivacySecurity | None | Vendor | High | Low | NoKnownConflict | PrivacyOnly | None | Sí | — |
+| disable-cortana | PrivacySecurity | None | Official | High | Low | NoKnownConflict | PrivacyOnly | None | Sí | — |
+| disable-onedrive-autostart | PrivacySecurity | Tiny | Official | High | Low | Conditional | PrivacyOnly | None | Sí | ExpertOnly |
+| disable-suggestions | PrivacySecurity | None | Official | High | Low | Compatible | PrivacyOnly | None | Sí | — |
+| disable-telemetry | PrivacySecurity | None | Official | High | Low | Compatible | PrivacyOnly | None | Sí | — |
+| disable-widgets | PrivacySecurity | Tiny | Official | High | Low | NoKnownConflict | PrivacyOnly | None | Sí | — |
+| disable-hibernate | Storage | None | Official | High | Moderate | NoKnownConflict | None | None | Sí | — |
+| optimize-system-drive | Storage | None | Official | High | Low | Compatible | None | None | No (mantenimiento) | NotReversible |
+
+> Estado anterior→final por optimización: la columna "Comportamiento actual" del informe inferior refleja el estado vivo detectado en cada análisis; ninguna entrada se aplica sin pasar por el pipeline transaccional completo.
 
 ## Notas por optimización
 

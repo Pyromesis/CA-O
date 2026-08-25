@@ -21,6 +21,8 @@ public sealed class OptimizeSystemDrive : IOptimization
         Category = OptimizationCategory.Storage,
         ExpectedImpact = PerformanceImpact.None,
         Evidence = EvidenceLevel.Official,
+        Confidence = Confidence.High,
+        AntiCheatImpact = AntiCheatImpact.None,
         Risk = RiskLevel.Low,
         Compatibility = CompatibilityStatus.Compatible,
         SecurityImpact = SecurityImpact.None,

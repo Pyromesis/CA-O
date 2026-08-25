@@ -24,6 +24,8 @@ public sealed class DisableVbs : IOptimization
         Category = OptimizationCategory.Performance,
         ExpectedImpact = PerformanceImpact.WorkloadDependent,
         Evidence = EvidenceLevel.Vendor,
+        Confidence = Confidence.High,
+        AntiCheatImpact = AntiCheatImpact.RequiredSecurityFeature,
         Risk = RiskLevel.Critical,
         Compatibility = CompatibilityStatus.PotentialConflict,
         SecurityImpact = SecurityImpact.ReducedProtection,

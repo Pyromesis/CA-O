@@ -2,6 +2,7 @@ using System.Security;
 using System.Security.Principal;
 using CAO.Core.Abstractions;
 using CAO.Core.Catalog;
+using CAO.Core.Rollback;
 using CAO.Core.Optimizations.Performance;
 using CAO.Shared;
 
@@ -71,7 +72,7 @@ public sealed class OptimizationEngine
         string? backupWarning = null;
         if (!_restorePointCreatedThisSession)
         {
-            var (ok, reason) = await _restorePoints.CreateAsync("CA-O 2.0 — antes de optimizar", ct);
+            var (ok, reason) = await _restorePoints.CreateAsync("CA-O 2.0 ΓÇö antes de optimizar", ct);
             if (ok)
             {
                 _restorePointCreatedThisSession = true;
@@ -104,7 +105,7 @@ public sealed class OptimizationEngine
 
         if (!_snapshots.TryLoad(optimizationId, out var snapshot))
         {
-            return OperationResult.Fail("No hay snapshot guardado para esta optimización.", "no-snapshot");
+            return OperationResult.Fail("No hay snapshot guardado para esta optimizaci├│n.", "no-snapshot");
         }
 
         var context = new OptimizationContext { Registry = _registry, Process = _process, Services = _services };

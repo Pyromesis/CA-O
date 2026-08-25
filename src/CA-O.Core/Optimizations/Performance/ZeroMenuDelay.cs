@@ -20,6 +20,8 @@ public sealed class ZeroMenuDelay : RegistryOptimizationBase
         Category = OptimizationCategory.Performance,
         ExpectedImpact = PerformanceImpact.Tiny,
         Evidence = EvidenceLevel.Heuristic,
+        Confidence = Confidence.Low,
+        AntiCheatImpact = AntiCheatImpact.None,
         Risk = RiskLevel.Safe,
         Compatibility = CompatibilityStatus.Compatible,
         SecurityImpact = SecurityImpact.None,

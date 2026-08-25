@@ -22,6 +22,8 @@ public sealed class DisableBackgroundApps : RegistryOptimizationBase
         Category = OptimizationCategory.Performance,
         ExpectedImpact = PerformanceImpact.Small,
         Evidence = EvidenceLevel.Official,
+        Confidence = Confidence.High,
+        AntiCheatImpact = AntiCheatImpact.NoKnownConflict,
         Risk = RiskLevel.Low,
         Compatibility = CompatibilityStatus.NoKnownConflict,
         SecurityImpact = SecurityImpact.PrivacyOnly,

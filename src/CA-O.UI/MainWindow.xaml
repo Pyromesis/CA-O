@@ -18,7 +18,11 @@
                     <FontIcon Glyph="&#xE7FC;" />
                 </NavigationViewItem.Icon>
             </NavigationViewItem>
-            <NavigationViewItem Content="Diagnóstico" Tag="diagnostics" Icon="Diagnostic" />
+            <NavigationViewItem Content="Diagnóstico" Tag="diagnostics">
+                <NavigationViewItem.Icon>
+                    <FontIcon Glyph="&#xE90F;" />
+                </NavigationViewItem.Icon>
+            </NavigationViewItem>
             <NavigationViewItem Content="Benchmark" Tag="benchmark">
                 <NavigationViewItem.Icon>
                     <FontIcon Glyph="&#xE9D2;" />

@@ -32,6 +32,14 @@ public sealed class FileSnapshotStore : ISnapshotStore
         File.WriteAllText(Path.Combine(_directory, SafeId(optimizationId) + ".json"), json);
     }
 
+    public IEnumerable<string> ListIds() =>
+        Directory.Exists(_directory)
+            ? Directory.GetFiles(_directory, "*.json")
+                .Select(Path.GetFileNameWithoutExtension)
+                .Where(name => name is not null)
+                .Cast<string>()
+            : Enumerable.Empty<string>();
+
     public bool TryLoad(string optimizationId, out OptimizationSnapshot snapshot)
     {
         snapshot = new OptimizationSnapshot();
