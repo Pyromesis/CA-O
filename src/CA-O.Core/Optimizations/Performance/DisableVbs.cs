@@ -1,6 +1,7 @@
 using System.Text.RegularExpressions;
 using CAO.Core.Abstractions;
 using CAO.Shared;
+using CAO.Shared.Security;
 
 namespace CAO.Core.Optimizations.Performance;
 
@@ -54,23 +55,40 @@ public sealed class DisableVbs : IOptimization
 
     public async Task<OperationResult> ApplyAsync(OptimizationContext context, CancellationToken ct = default)
     {
-        if (context.Process is null) return OperationResult.Fail("Runner no disponible.", "IProcessRunner null");
-        var (code, output) = await context.Process.RunAsync("bcdedit", "/set {current} hypervisorlaunchtype off", ct);
-        return code == 0
+        if (context.Executor is null)
+        {
+            return OperationResult.Fail("Ejecutor no disponible.", "CAO-SEC-010");
+        }
+
+        var result = await context.Executor.ExecuteAsync(
+            SystemCommandKey.BcdEditHypervisorOff,
+            ["/set", "{current}", "hypervisorlaunchtype", "off"], ct);
+        return result.Success
             ? OperationResult.Ok("VBS desactivado. REINICIA para que aplique.")
-            : OperationResult.Fail("No se pudo modificar el BCD (¿permisos de administrador?).", output);
+            : OperationResult.Fail("No se pudo modificar el BCD (¿permisos de administrador?).", result.StdErr);
     }
 
     public async Task<OperationResult> RevertAsync(OptimizationContext context, OptimizationSnapshot snapshot, CancellationToken ct = default)
     {
-        if (context.Process is null) return OperationResult.Fail("Runner no disponible.", "IProcessRunner null");
+        if (context.Executor is null)
+        {
+            return OperationResult.Fail("Ejecutor no disponible.", "CAO-SEC-010");
+        }
         var note = snapshot.RawNotes.FirstOrDefault(n => n.StartsWith("hypervisorlaunchtype=", StringComparison.Ordinal));
         var previous = note?["hypervisorlaunchtype=".Length..] ?? "Auto";
-        if (string.Equals(previous, "Off", StringComparison.OrdinalIgnoreCase)) previous = "Auto";
+        // A captured Off means the hypervisor was already off: restoring to
+        // Auto is the safe canonical state (policy pins restore to Auto).
+        if (string.Equals(previous, "off", StringComparison.OrdinalIgnoreCase)) previous = "Auto";
+        if (!string.Equals(previous, "Auto", StringComparison.OrdinalIgnoreCase))
+        {
+            return OperationResult.Fail("Estado previo del hypervisor no restaurable por política.", "CAO-SEC-011");
+        }
 
-        var (code, output) = await context.Process.RunAsync("bcdedit", $"/set {{current}} hypervisorlaunchtype {previous}", ct);
-        return code == 0
-            ? OperationResult.Ok($"Hypervisor restaurado a '{previous}'. Reinicia.")
-            : OperationResult.Fail("No se pudo restaurar el hypervisor.", output);
+        var result = await context.Executor.ExecuteAsync(
+            SystemCommandKey.BcdEditHypervisorRestore,
+            ["/set", "{current}", "hypervisorlaunchtype", "Auto"], ct);
+        return result.Success
+            ? OperationResult.Ok("Hypervisor restaurado a 'Auto'. Reinicia.")
+            : OperationResult.Fail("No se pudo restaurar el hypervisor.", result.StdErr);
     }
 }

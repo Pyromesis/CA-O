@@ -21,7 +21,7 @@ public sealed class OptimizationEngine
     private readonly ISnapshotStore _snapshots;
     private readonly IHistoryLogger _history;
     private readonly IServiceManager? _services;
-    private readonly IProcessRunner? _process;
+    private readonly Core.Interfaces.IPrivilegedCommandExecutor? _executor;
     private readonly ISystemContextProvider? _contextProvider;
     private bool _restorePointCreatedThisSession;
 
@@ -31,7 +31,7 @@ public sealed class OptimizationEngine
         ISnapshotStore snapshots,
         IHistoryLogger history,
         IServiceManager? services = null,
-        IProcessRunner? process = null,
+        Core.Interfaces.IPrivilegedCommandExecutor? executor = null,
         ISystemContextProvider? contextProvider = null)
     {
         _registry = registry;
@@ -39,7 +39,7 @@ public sealed class OptimizationEngine
         _snapshots = snapshots;
         _history = history;
         _services = services;
-        _process = process;
+        _executor = executor;
         _contextProvider = contextProvider;
     }
 
@@ -85,7 +85,7 @@ public sealed class OptimizationEngine
 
         var context = await GetContextAsync();
         var transaction = new OptimizationTransaction(
-            Resolve(optimizationId), _registry, context, _services, _process, _snapshots, _history);
+            Resolve(optimizationId), _registry, context, _services, _executor, _snapshots, _history);
         var report = await transaction.RunAsync(ct);
 
         return report.Success
@@ -108,7 +108,7 @@ public sealed class OptimizationEngine
             return OperationResult.Fail("No hay snapshot guardado para esta optimizaci├│n.", "no-snapshot");
         }
 
-        var context = new OptimizationContext { Registry = _registry, Process = _process, Services = _services };
+        var context = new OptimizationContext { Registry = _registry, Executor = _executor, Services = _services };
         OperationResult result;
         try
         {
@@ -143,7 +143,7 @@ public sealed class OptimizationEngine
     {
         var optimization = Resolve(optimizationId);
         PrepareServiceAwareOptimization(optimization);
-        var context = new OptimizationContext { Registry = _registry, Process = _process, Services = _services };
+        var context = new OptimizationContext { Registry = _registry, Executor = _executor, Services = _services };
         return await optimization.VerifyAsync(context, ct);
     }
 

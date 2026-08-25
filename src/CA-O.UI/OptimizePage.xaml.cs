@@ -2,6 +2,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using CAO.Core.Engine;
 using CAO.Shared;
+using CAO.Shared.IPC;
 
 namespace CAO.UI.Pages;
 
@@ -88,13 +89,13 @@ public sealed partial class OptimizePage : Page
             return;
         }
 
-        await RunOperationAsync(PrivilegedOperation.ApplyOptimization, id);
+        await RunOperationAsync(PrivilegedOperationKind.ApplyOptimization, id);
     }
 
     private async void OnRevertClick(object sender, RoutedEventArgs e)
     {
         if (sender is not Button { Tag: string id }) return;
-        await RunOperationAsync(PrivilegedOperation.RevertOptimization, id);
+        await RunOperationAsync(PrivilegedOperationKind.RevertOptimization, id);
     }
 
     private bool CanOperate(string optimizationId) =>
@@ -102,7 +103,7 @@ public sealed partial class OptimizePage : Page
             recommendation.OptimizationId == optimizationId &&
             (recommendation.Bucket == RecommendationBucket.Recommended || AppServices.State.ExpertMode));
 
-    private async Task RunOperationAsync(PrivilegedOperation operation, string optimizationId)
+    private async Task RunOperationAsync(PrivilegedOperationKind operation, string optimizationId)
     {
         if (AppServices.State.ExpertMode)
         {
@@ -127,8 +128,8 @@ public sealed partial class OptimizePage : Page
             var response = await AppServices.Pipe.SendAsync(operation, optimizationId);
             AppServices.State.ServiceStatus = response is { Accepted: true } ? "connected" : "rejected";
             StatusText.Text = response is { Accepted: true }
-                ? $"OK: {response.MessageEs}"
-                : $"Rechazado: {response?.Error ?? "sin respuesta del servicio"}";
+                ? "OK: cambio ejecutado por el servicio."
+                : $"Rechazado [{response?.ErrorCode}]: {response?.SafeMessage ?? "sin respuesta del servicio"}";
 
             await RefreshRecommendationsAsync();
         }
@@ -162,10 +163,10 @@ public sealed partial class OptimizePage : Page
         {
             foreach (var id in recommended)
             {
-                var response = await AppServices.Pipe.SendAsync(PrivilegedOperation.ApplyOptimization, id);
+                var response = await AppServices.Pipe.SendAsync(PrivilegedOperationKind.ApplyOptimization, id);
                 if (response is not { Accepted: true })
                 {
-                    failures.Add($"{id}: {response?.Error ?? "sin respuesta"}");
+                    failures.Add($"{id}: [{response?.ErrorCode}] {response?.SafeMessage ?? "sin respuesta"}");
                     break; // stop the batch on first failure (spec 124)
                 }
             }

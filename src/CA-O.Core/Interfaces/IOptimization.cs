@@ -54,7 +54,11 @@ public interface IOptimization
         return Task.FromResult(PreconditionResult.Ok("Sin precondiciones específicas de esta optimización."));
     }
 
-    /// <summary>VERIFY phase: re-detects live state and compares with intent.</summary>
+    /// <summary>
+    /// VERIFY phase (FASE 10): strict. Unknown is reported as Unknown —
+    /// never as success. PendingReboot is the expected observable state for
+    /// reboot-gated changes and therefore passes with that annotation.
+    /// </summary>
     Task<VerificationResult> VerifyAsync(OptimizationContext context, CancellationToken ct = default)
     {
         var observed = Detect(context.Registry);
@@ -63,9 +67,9 @@ public interface IOptimization
             OptimizationState.AppliedByCao =>
                 VerificationResult.Passed(observed, "El estado aplicado se ha verificado en el sistema."),
             OptimizationState.PendingReboot =>
-                VerificationResult.Passed(observed, "El cambio requiere reinicio para completarse."),
+                VerificationResult.PendingReboot("El cambio requiere reinicio para completarse."),
             OptimizationState.Unknown =>
-                VerificationResult.Passed(observed, "El cambio no es verificable por lectura directa; se acepta."),
+                VerificationResult.Unknown(observed, "No se pudo determinar el estado; no se trata como éxito."),
             _ => VerificationResult.Failed(observed, "El sistema no refleja el estado esperado tras aplicar."),
         });
     }
@@ -96,17 +100,14 @@ public sealed class OptimizationContext
 {
     public required IRegistryAccessor Registry { get; init; }
 
-    /// <summary>Runs external tools (powercfg/netsh/bcdedit/Optimize-Volume). Null in unit tests.</summary>
-    public IProcessRunner? Process { get; init; }
+    /// <summary>
+    /// The single privileged execution funnel (FASE 4). Null in unit tests
+    /// that don't exercise system commands.
+    /// </summary>
+    public Interfaces.IPrivilegedCommandExecutor? Executor { get; init; }
 
     /// <summary>Windows services manager. Null in unit tests that don't touch services.</summary>
     public IServiceManager? Services { get; init; }
-}
-
-/// <summary>Elevated process execution abstraction (powercfg, netsh...).</summary>
-public interface IProcessRunner
-{
-    Task<(int ExitCode, string Output)> RunAsync(string fileName, string arguments, CancellationToken ct = default);
 }
 
 /// <summary>Windows service control abstraction.</summary>

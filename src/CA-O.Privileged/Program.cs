@@ -8,6 +8,8 @@ using CAO.Infrastructure.Logging;
 using CAO.Infrastructure.Persistence;
 using CAO.Infrastructure.Security;
 using CAO.Infrastructure.SystemInterop;
+using CAO.Core.Security;
+using CAO.Shared.Security;
 
 namespace CAO.Privileged;
 
@@ -26,8 +28,9 @@ internal static class Program
             new FileSnapshotStore(),
             new JsonHistoryLogger(),
             new ServiceManager(),
-            new ProcessRunner(),
+            new CAO.Infrastructure.Windows.Execution.SystemCommandGateway(),
             services.GetRequiredService<ISystemContextProvider>()));
+        builder.Services.AddSingleton<IPrivilegedCallerAuthorizer, AdministratorsOnlyAuthorizer>();
         builder.Services.AddHostedService<PrivilegedPipeService>();
         builder.Services.AddWindowsService(options => options.ServiceName = "CA-O Privileged Service");
         return builder.Build().RunAsync();

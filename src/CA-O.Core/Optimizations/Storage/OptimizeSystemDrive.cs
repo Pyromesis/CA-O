@@ -1,5 +1,6 @@
 using CAO.Core.Abstractions;
 using CAO.Shared;
+using CAO.Shared.Security;
 
 namespace CAO.Core.Optimizations.Storage;
 
@@ -41,13 +42,26 @@ public sealed class OptimizeSystemDrive : IOptimization
 
     public async Task<OperationResult> ApplyAsync(OptimizationContext context, CancellationToken ct = default)
     {
-        if (context.Process is null) return OperationResult.Fail("Runner no disponible.", "IProcessRunner null");
-        var option = string.Equals(SystemDiskMediaType, "HDD", StringComparison.OrdinalIgnoreCase) ? "-Defrag" : "-ReTrim";
-        var (code, output) = await context.Process.RunAsync(
-            "powershell", $"-NoProfile -NonInteractive -Command \"Optimize-Volume -DriveLetter C {option}\"", ct);
-        return code == 0
-            ? OperationResult.Ok($"Optimización ({option}) completada.")
-            : OperationResult.Fail("Optimize-Volume falló.", output);
+        if (context.Executor is null)
+        {
+            return OperationResult.Fail("Ejecutor no disponible.", "CAO-SEC-010");
+        }
+
+        var key = string.Equals(SystemDiskMediaType, "HDD", StringComparison.OrdinalIgnoreCase)
+            ? SystemCommandKey.OptimizeVolumeDefragC
+            : SystemCommandKey.OptimizeVolumeReTrimC;
+
+        var result = await context.Executor.ExecuteAsync(key,
+        [
+            "-NoProfile", "-NonInteractive", "-Command",
+            key == SystemCommandKey.OptimizeVolumeDefragC
+                ? "Optimize-Volume -DriveLetter C -Defrag"
+                : "Optimize-Volume -DriveLetter C -ReTrim",
+        ], ct);
+
+        return result.Success
+            ? OperationResult.Ok("Optimización de disco completada.")
+            : OperationResult.Fail("Optimize-Volume falló.", result.StdErr);
     }
 
     public Task<OperationResult> RevertAsync(OptimizationContext context, OptimizationSnapshot snapshot, CancellationToken ct = default) =>

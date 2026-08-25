@@ -61,8 +61,8 @@ public sealed partial class SettingsPage : Page
             var response = await AppServices.Pipe.DetectAsync("disable-transparency");
             AppServices.State.ServiceStatus = response is { Accepted: true } ? "conectado" : "rechazado";
             ServiceStatusText.Text = response is { Accepted: true }
-                ? $"Servicio privilegiado OK ({response.MessageEs})"
-                : $"Servicio respondió rechazo: {response?.Error}";
+                ? "Servicio privilegiado OK"
+                : $"Servicio respondió rechazo: {response?.ErrorCode ?? "?"}";
         }
         catch (Exception ex)
         {

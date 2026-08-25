@@ -4,37 +4,31 @@ using System.Security.AccessControl;
 using System.Security.Principal;
 using System.Text.Json;
 using CAO.Shared;
+using CAO.Shared.IPC;
+using CAO.Shared.Security;
 using CAO.Core.Engine;
+using CAO.Core.Security;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 namespace CAO.Privileged;
 
 /// <summary>
-/// Authenticated named-pipe host for privileged operations (spec 5-7):
-/// restrictive ACL, identity check, schema validation, operation allowlist,
-/// nonce replay protection, per-connection timeout and full audit logging.
-/// The service only executes strongly-typed operations from the catalog;
-/// arbitrary commands are impossible by construction.
+/// Privileged pipe host v2 (FASE 2/3): restrictive ACL, real Windows-token
+/// authorization after impersonation, versioned typed protocol with replay
+/// guard + expiration + size caps, operation allowlist, per-connection
+/// timeout and full audit (RequestedBy vs ExecutedBy).
 /// </summary>
 internal sealed class PrivilegedPipeService(
     ILogger<PrivilegedPipeService> logger,
-    OptimizationEngine engine) : BackgroundService
+    OptimizationEngine engine,
+    IPrivilegedCallerAuthorizer authorizer) : BackgroundService
 {
     private static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(15);
     private readonly ConcurrentDictionary<Guid, byte> _requestIds = new();
     private readonly ConcurrentDictionary<string, byte> _nonces = new(StringComparer.Ordinal);
 
-    /// <summary>Operations this build is allowed to execute (allowlist).</summary>
-    private static readonly IReadOnlySet<PrivilegedOperation> AllowedOperations =
-        new HashSet<PrivilegedOperation>
-        {
-            PrivilegedOperation.ApplyOptimization,
-            PrivilegedOperation.RevertOptimization,
-            PrivilegedOperation.DetectOptimization,
-            PrivilegedOperation.CaptureSnapshot,
-            PrivilegedOperation.VerifyOptimization,
-        };
+    private readonly IpcReplayGuard _replayGuard = new();
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -60,18 +54,18 @@ internal sealed class PrivilegedPipeService(
     private static NamedPipeServerStream CreateServer()
     {
         var security = new PipeSecurity();
+        // SYSTEM: full control. Administrators: read/write. Interactive:
+        // read+write so the UI can CONNECT; authorization of the caller's
+        // token happens per-request — connecting is not authorizing.
         security.AddAccessRule(new PipeAccessRule(
             new SecurityIdentifier(WellKnownSidType.BuiltinAdministratorsSid, null),
-            PipeAccessRights.ReadWrite,
-            AccessControlType.Allow));
+            PipeAccessRights.ReadWrite, AccessControlType.Allow));
         security.AddAccessRule(new PipeAccessRule(
             new SecurityIdentifier(WellKnownSidType.LocalSystemSid, null),
-            PipeAccessRights.FullControl,
-            AccessControlType.Allow));
+            PipeAccessRights.FullControl, AccessControlType.Allow));
         security.AddAccessRule(new PipeAccessRule(
             new SecurityIdentifier(WellKnownSidType.InteractiveSid, null),
-            PipeAccessRights.ReadWrite,
-            AccessControlType.Allow));
+            PipeAccessRights.ReadWrite, AccessControlType.Allow));
 
         return NamedPipeServerStreamAcl.Create(
             IpcConstants.PipeName,
@@ -79,9 +73,30 @@ internal sealed class PrivilegedPipeService(
             1,
             PipeTransmissionMode.Byte,
             PipeOptions.Asynchronous,
-            4096,
-            4096,
+            IpcProtocol.MaxRequestBytes,
+            IpcProtocol.MaxResponseBytes,
             security);
+    }
+
+    /// <summary>Extracts CallerIdentity from the client token via impersonation.</summary>
+    internal static CallerIdentity GetCallerIdentity(NamedPipeServerStream pipe)
+    {
+        CallerIdentity? captured = null;
+        pipe.RunAsClient(() =>
+        {
+            using var identity = WindowsIdentity.GetCurrent();
+            var principal = new WindowsPrincipal(identity);
+            var sid = identity.User?.Value ?? "S-0-0";
+            var isElevated = new WindowsPrincipal(WindowsIdentity.GetCurrent())
+                .IsInRole(WindowsBuiltInRole.Administrator);
+            captured = new CallerIdentity(
+                Sid: sid,
+                Name: identity.Name ?? string.Empty,
+                IsAdministrator: principal.IsInRole(new SecurityIdentifier(WellKnownSidType.BuiltinAdministratorsSid, null)),
+                IsElevated: isElevated,
+                SessionId: identity.AuthenticationType == null ? -1 : Environment.CurrentManagedThreadId);
+        });
+        return captured ?? new CallerIdentity("S-0-0", "?", false, false, -1);
     }
 
     private async Task HandleClientAsync(NamedPipeServerStream pipe, CancellationToken stoppingToken)
@@ -89,23 +104,20 @@ internal sealed class PrivilegedPipeService(
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
         timeout.CancelAfter(RequestTimeout);
 
-        string? clientIdentity = null;
         try
         {
-            clientIdentity = pipe.GetImpersonationUserName();
-            if (string.IsNullOrWhiteSpace(clientIdentity))
-            {
-                logger.LogWarning("Solicitud IPC sin identidad; rechazada.");
-                await WriteResponse(pipe, PrivilegedOperationResponse.Rejected("Identidad IPC no disponible."), stoppingToken);
-                return;
-            }
+            var caller = GetCallerIdentity(pipe);
+            logger.LogInformation("Conexión IPC de {Sid} ({Name}).", caller.Sid, caller.Name);
 
-            var request = await JsonSerializer.DeserializeAsync<PrivilegedOperationRequest>(pipe, cancellationToken: timeout.Token);
-            var response = await ValidateAndDispatchAsync(request, timeout.Token);
+            var request = await JsonSerializer.DeserializeAsync<IpcRequest>(
+                pipe, JsonOptions, timeout.Token);
+            var response = await ValidateAndDispatchAsync(request, caller, timeout.Token);
+
             logger.LogInformation(
-                "Auditoría IPC: identidad={Identity} operación={Operation} aceptado={Accepted} error={Error}",
-                clientIdentity, request?.Operation.ToString() ?? "desconocida", response.Accepted, response.Error ?? "-");
-            await WriteResponse(pipe, response, stoppingToken);
+                "Auditoría IPC: requestedBy={Sid}/{Name} executedBy=SYSTEM op={Op} accepted={Accepted} code={Code}",
+                caller.Sid, caller.Name, request?.Operation.ToString() ?? "?", response.Accepted, response.ErrorCode ?? "-");
+
+            await JsonSerializer.SerializeAsync(pipe, response, JsonOptions, timeout.Token);
         }
         catch (OperationCanceledException) when (timeout.IsCancellationRequested)
         {
@@ -113,84 +125,97 @@ internal sealed class PrivilegedPipeService(
         }
         catch (JsonException)
         {
-            await WriteResponse(pipe, PrivilegedOperationResponse.Rejected("JSON inválido."), stoppingToken);
+            await WriteResponse(pipe, IpcResponse.Rejected(ErrorCodes.IpcMalformedRequest, "JSON inválido."), stoppingToken);
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Fallo inesperado atendiendo la conexión IPC de {Client}.", clientIdentity ?? "?");
+            logger.LogError(ex, "Fallo inesperado atendiendo la conexión IPC.");
         }
     }
 
-    private async Task<PrivilegedOperationResponse> ValidateAndDispatchAsync(
-        PrivilegedOperationRequest? request,
-        CancellationToken ct)
+    private async Task<IpcResponse> ValidateAndDispatchAsync(IpcRequest? request, CallerIdentity caller, CancellationToken ct)
     {
-        var error = "Solicitud inválida.";
-        if (request is null || !PrivilegedOperationValidator.TryValidate(request, out error))
+        if (!IpcRequestValidator.TryValidate(request, out var errorCode, out var error))
         {
-            return PrivilegedOperationResponse.Rejected(error);
+            return IpcResponse.Rejected(errorCode, error);
         }
 
-        if (!AllowedOperations.Contains(request.Operation))
+        var authorization = authorizer.Authorize(caller);
+        if (!authorization.Allowed)
         {
-            return PrivilegedOperationResponse.Rejected("Operación no permitida por la lista blanca del servicio.");
+            return IpcResponse.Rejected(authorization.ReasonCode,
+                "El usuario actual no está autorizado para operaciones privilegiadas.");
         }
 
-        // Replay protection: each request id and nonce may be used exactly once.
-        if (!_requestIds.TryAdd(request.RequestId, 0) || !_nonces.TryAdd(request.Nonce, 0))
+        // Replay protection: request id and nonce are single-use.
+        if (!_replayGuard.TryAccept(request!.RequestId, request.Nonce))
         {
-            return PrivilegedOperationResponse.Rejected("Solicitud repetida.");
+            return IpcResponse.Rejected(ErrorCodes.IpcReplayDetected, "Solicitud repetida.");
         }
+
+        var optimizationId = ((OptimizationTargetPayload)request.Payload).OptimizationId;
 
         try
         {
             return request.Operation switch
             {
-                PrivilegedOperation.ApplyOptimization => FromResult(await engine.ApplyAsync(request.Parameters.OptimizationId!, ct)),
-                PrivilegedOperation.RevertOptimization => FromResult(await engine.RevertAsync(request.Parameters.OptimizationId!, ct)),
-                PrivilegedOperation.CaptureSnapshot => Describe(engine.CaptureSnapshot(request.Parameters.OptimizationId!)),
-                PrivilegedOperation.VerifyOptimization => await VerifyAsync(request.Parameters.OptimizationId!, ct),
-                PrivilegedOperation.DetectOptimization => new PrivilegedOperationResponse(
-                    true,
-                    null,
-                    engine.Detect(request.Parameters.OptimizationId!).ToString()),
-                _ => PrivilegedOperationResponse.Rejected("Operación no disponible en esta versión del servicio."),
+                PrivilegedOperationKind.ApplyOptimization => FromResult(await engine.ApplyAsync(optimizationId, ct)),
+                PrivilegedOperationKind.RevertOptimization => FromResult(await engine.RevertAsync(optimizationId, ct)),
+                PrivilegedOperationKind.CaptureSnapshot => Snapshot(engine.CaptureSnapshot(optimizationId)),
+                PrivilegedOperationKind.VerifyOptimization => await VerifyAsync(engine.VerifyAsync(optimizationId, ct)),
+                PrivilegedOperationKind.DetectOptimization => IpcResponse.Ok($"\"{engine.Detect(optimizationId)}\""),
+                _ => IpcResponse.Rejected(ErrorCodes.IpcPayloadSchemaInvalid, "Operación no disponible."),
             };
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Error ejecutando la operación IPC {Operation}.", request.Operation);
-            return PrivilegedOperationResponse.Rejected("La operación falló.");
+            return IpcResponse.Rejected(ErrorCodes.TxnApplyFailed, "La operación falló en el sistema.");
         }
     }
 
-    private async Task<PrivilegedOperationResponse> VerifyAsync(string optimizationId, CancellationToken ct)
+    private static async Task<IpcResponse> VerifyAsync(Task<VerificationResult> verificationTask)
     {
-        var verification = await engine.VerifyAsync(optimizationId, ct);
-        return new PrivilegedOperationResponse(
-            verification.Verified,
-            verification.Verified ? null : verification.MessageEs,
-            $"Verificación: {verification.MessageEs} (estado observado: {verification.ObservedState})");
+        var verification = await verificationTask;
+        var detail = JsonSerializer.Serialize(new
+        {
+            status = verification.Status.ToString(),
+            observed = verification.ObservedState.ToString(),
+        });
+        return verification.Status is VerificationStatus.Passed or VerificationStatus.NotApplicable
+            ? IpcResponse.Ok(detail)
+            : IpcResponse.Rejected(ErrorCodes.VerifyFailed, $"Verificación: {verification.MessageEs}");
     }
 
-    private static PrivilegedOperationResponse FromResult(CAO.Core.Abstractions.OperationResult result) =>
-        new(result.Success, result.Error, result.MessageEs);
+    private static IpcResponse FromResult(CAO.Core.Abstractions.OperationResult result) =>
+        result.Success ? IpcResponse.Ok() : IpcResponse.Rejected(ErrorCodes.TxnApplyFailed, result.MessageEs);
 
-    private static PrivilegedOperationResponse Describe(SnapshotDescriptor descriptor) =>
-        new(true, null, $"Snapshot capturado: {descriptor.SnapshotId} ({descriptor.EntryCount} entradas).");
+    private static IpcResponse Snapshot(SnapshotDescriptor descriptor) =>
+        IpcResponse.Ok($"Snapshot capturado: {descriptor.SnapshotId} ({descriptor.EntryCount} entradas).");
 
-    private static async Task WriteResponse(
-        NamedPipeServerStream pipe,
-        PrivilegedOperationResponse response,
-        CancellationToken ct)
+    private static async Task WriteResponse(NamedPipeServerStream pipe, IpcResponse response, CancellationToken ct)
     {
         try
         {
-            await JsonSerializer.SerializeAsync(pipe, response, cancellationToken: ct);
+            await JsonSerializer.SerializeAsync(pipe, response, JsonOptions, ct);
         }
         catch (IOException)
         {
-            // Client disconnected before reading the answer; nothing to do.
+            // Client gone before reading the answer.
         }
+    }
+
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+    };
+
+    private sealed class IpcReplayGuard : IIpcReplayGuard
+    {
+        private readonly ConcurrentDictionary<Guid, byte> _ids = new();
+        private readonly ConcurrentDictionary<string, byte> _nonces = new(StringComparer.Ordinal);
+
+        public bool TryAccept(Guid requestId, string nonce) =>
+            _ids.TryAdd(requestId, 0) && _nonces.TryAdd(nonce, 0);
     }
 }

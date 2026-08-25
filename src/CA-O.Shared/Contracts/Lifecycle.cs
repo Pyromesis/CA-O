@@ -16,17 +16,45 @@ public sealed record ApplyResult(bool Success, string MessageEs, string? Error =
     public static ApplyResult Fail(string messageEs, string? error = null) => new(false, messageEs, error);
 }
 
+/// <summary>Strict verification outcomes (FASE 10): Unknown is NEVER success.</summary>
+public enum VerificationStatus
+{
+    /// <summary>Live state semantically equals the expected post-state.</summary>
+    Passed,
+
+    /// <summary>Live state contradicts the expected post-state.</summary>
+    Failed,
+
+    /// <summary>State could not be determined. Reported as-is, never as pass.</summary>
+    Unknown,
+
+    /// <summary>Maintenance actions without observable post-state.</summary>
+    NotApplicable,
+}
+
 /// <summary>Outcome of a post-apply verification pass.</summary>
 public sealed record VerificationResult(
-    bool Verified,
+    VerificationStatus Status,
     OptimizationState ObservedState,
     string MessageEs)
 {
+    public bool Verified => Status is VerificationStatus.Passed;
+
     public static VerificationResult Passed(OptimizationState state, string messageEs) =>
-        new(true, state, messageEs);
+        new(VerificationStatus.Passed, state, messageEs);
+
+    public static VerificationResult PendingReboot(string messageEs) =>
+        new(VerificationStatus.Passed, OptimizationState.PendingReboot, messageEs);
+
+    public static VerificationResult Unknown(OptimizationState state, string messageEs) =>
+        new(VerificationStatus.Unknown, state, messageEs);
 
     public static VerificationResult Failed(OptimizationState state, string messageEs) =>
-        new(false, state, messageEs);
+        new(VerificationStatus.Failed, state, messageEs);
+
+    public static VerificationResult NotApplicable() =>
+        new(VerificationStatus.NotApplicable, OptimizationState.Unknown,
+            "Acción de mantenimiento sin estado posterior verificable.");
 }
 
 /// <summary>Outcome of a rollback attempt against a captured snapshot.</summary>

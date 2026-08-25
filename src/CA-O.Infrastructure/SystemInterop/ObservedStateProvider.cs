@@ -1,8 +1,10 @@
 using System.Text.RegularExpressions;
 using CAO.Core.Abstractions;
+using CAO.Core.Interfaces;
 using CAO.Core.Optimizations.Performance;
 using System.Management;
 using Catalog = CAO.Core.Catalog.OptimizationCatalog;
+using Gateway = CAO.Shared.Security.SystemCommandKey;
 
 namespace CAO.Infrastructure.SystemInterop;
 
@@ -13,38 +15,38 @@ namespace CAO.Infrastructure.SystemInterop;
 /// </summary>
 public sealed class ObservedStateProvider
 {
-    private readonly IProcessRunner _process;
+    private readonly IPrivilegedCommandExecutor _executor;
     private readonly IServiceManager _services;
 
-    public ObservedStateProvider(IProcessRunner process, IServiceManager services)
+    public ObservedStateProvider(IPrivilegedCommandExecutor executor, IServiceManager services)
     {
-        _process = process;
+        _executor = executor;
         _services = services;
     }
 
     public async Task WireAsync(CancellationToken ct = default)
     {
         // Power plan
-        var (_, schemeOut) = await _process.RunAsync("powercfg", "/getactivescheme", ct);
-        var guidMatch = Regex.Match(schemeOut, @"([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})");
+        var scheme = await _executor.ExecuteAsync(Gateway.PowerCfgQueryActiveScheme, ["/getactivescheme"], ct);
+        var guidMatch = Regex.Match(scheme.StdOut, @"([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})");
         Catalog.MaximumPowerPlan.ActiveSchemeGuid = guidMatch.Success ? guidMatch.Groups[1].Value : null;
 
         // Hypervisor launch type
-        var (_, bcdOut) = await _process.RunAsync("bcdedit", "/enum {current}", ct);
-        var launchMatch = Regex.Match(bcdOut, @"hypervisorlaunchtype\s+(\w+)");
+        var bcd = await _executor.ExecuteAsync(Gateway.BcdEditEnumCurrent, ["/enum", "{current}"], ct);
+        var launchMatch = Regex.Match(bcd.StdOut, @"hypervisorlaunchtype\s+(\w+)");
         Catalog.DisableVbs.CurrentLaunchType = launchMatch.Success ? launchMatch.Groups[1].Value : null;
 
         // TCP autotuning level
-        var (_, netshOut) = await _process.RunAsync("netsh", "int tcp show global", ct);
-        var tuningMatch = Regex.Match(netshOut, @"(?:Auto-Tuning Level|nivel de autoajuste de recepción)\s*:\s*(\w+)", RegexOptions.IgnoreCase);
+        var netsh = await _executor.ExecuteAsync(Gateway.NetShTcpShowGlobal, ["int", "tcp", "show", "global"], ct);
+        var tuningMatch = Regex.Match(netsh.StdOut, @"(?:Auto-Tuning Level|nivel de autoajuste de recepción)\s*:\s*(\w+)", RegexOptions.IgnoreCase);
         Catalog.NormalizeTcpAutoTuning.CurrentLevel = tuningMatch.Success ? tuningMatch.Groups[1].Value : "normal";
 
         // Hibernation availability
-        var (_, powerOut) = await _process.RunAsync("powercfg", "/a", ct);
+        var power = await _executor.ExecuteAsync(Gateway.PowerCfgQueryAvailable, ["/a"], ct);
         Catalog.DisableHibernate.HibernateAvailable =
-            powerOut.Contains("Hibernation", StringComparison.OrdinalIgnoreCase) ||
-            powerOut.Contains("Hibernación", StringComparison.OrdinalIgnoreCase) ||
-            powerOut.Contains("Hibernacion", StringComparison.OrdinalIgnoreCase);
+            power.StdOut.Contains("Hibernation", StringComparison.OrdinalIgnoreCase) ||
+            power.StdOut.Contains("Hibernación", StringComparison.OrdinalIgnoreCase) ||
+            power.StdOut.Contains("Hibernacion", StringComparison.OrdinalIgnoreCase);
 
         // System disk media type
         Catalog.OptimizeSystemDrive.SystemDiskMediaType = await GetSystemDiskMediaTypeAsync(ct);

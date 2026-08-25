@@ -23,6 +23,9 @@ public sealed record TransactionReport
     /// <summary>True when a post-rollback re-detect confirmed the original state returned.</summary>
     public bool RollbackVerified { get; init; }
 
+    /// <summary>Cancel was requested mid-flight; the transaction finished atomically anyway (FASE 6).</summary>
+    public bool CancellationDeferred { get; init; }
+
     /// <summary>Benchmark outcome when the optimization defines one; null otherwise.</summary>
     public BenchmarkResult? Benchmark { get; init; }
 }
@@ -41,7 +44,7 @@ public sealed class OptimizationTransaction
     private readonly IRegistryAccessor _registry;
     private readonly SystemContext _context;
     private readonly IServiceManager? _services;
-    private readonly IProcessRunner? _process;
+    private readonly Core.Interfaces.IPrivilegedCommandExecutor? _executor;
     private readonly ISnapshotStore? _snapshots;
     private readonly IHistoryLogger? _history;
 
@@ -50,7 +53,7 @@ public sealed class OptimizationTransaction
         IRegistryAccessor registry,
         SystemContext context,
         IServiceManager? services = null,
-        IProcessRunner? process = null,
+        Core.Interfaces.IPrivilegedCommandExecutor? executor = null,
         ISnapshotStore? snapshots = null,
         IHistoryLogger? history = null)
     {
@@ -58,7 +61,7 @@ public sealed class OptimizationTransaction
         _registry = registry;
         _context = context;
         _services = services;
-        _process = process;
+        _executor = executor;
         _snapshots = snapshots;
         _history = history;
     }
@@ -66,6 +69,9 @@ public sealed class OptimizationTransaction
     public async Task<TransactionReport> RunAsync(CancellationToken ct = default)
     {
         var definition = _optimization.Definition;
+
+        // ---- Cancellation checkpoint #1 (FASE 6): before any work ----
+        ct.ThrowIfCancellationRequested();
 
         // ---- PRECHECK (optimization-specific gates) ----
         PreconditionResult precondition;
@@ -108,13 +114,33 @@ public sealed class OptimizationTransaction
         var snapshot = _optimization.Capture(_registry);
         _snapshots?.Save(definition.Id, snapshot);
 
-        var context = new OptimizationContext { Registry = _registry, Process = _process, Services = _services };
+        // ---- Cancellation checkpoint #2 (FASE 6): last point where an
+        // abort leaves zero mutations. After this line the token is ignored
+        // until the mutation completes atomically; a pending cancellation is
+        // honoured by finishing apply→verify→(rollback|commit), never by
+        // tearing the change in half.
+        if (ct.IsCancellationRequested)
+        {
+            _snapshots?.Delete(definition.Id);
+            Log(definition.Id, "apply", false, null, error: "Cancelado antes de aplicar.",
+                precondition: "passed", applyResult: null);
+            return new TransactionReport
+            {
+                OptimizationId = definition.Id,
+                Success = false,
+                FinalPhase = TransactionPhase.Failed,
+                MessageEs = "Cancelado antes de aplicar ningún cambio.",
+                Error = ErrorCodes.TxnApplyFailed,
+            };
+        }
 
-        // ---- APPLY ----
+        var context = new OptimizationContext { Registry = _registry, Executor = _executor, Services = _services };
+
+        // ---- APPLY (atomic: runs with CancellationToken.None) ----
         OperationResult apply;
         try
         {
-            apply = await _optimization.ApplyAsync(context, ct);
+            apply = await _optimization.ApplyAsync(context, CancellationToken.None);
         }
         catch (OperationCanceledException)
         {
@@ -127,7 +153,8 @@ public sealed class OptimizationTransaction
 
         if (!apply.Success)
         {
-            var rollbackVerified = await SafeRollbackAsync(context, snapshot, ct);
+            var rollbackVerified = await SafeRollbackAsync(context, snapshot, CancellationToken.None);
+        var deferred = ct.IsCancellationRequested;
             Log(definition.Id, "apply", false, rollbackVerified ? null : definition.Id,
                 error: apply.Error ?? apply.MessageEs,
                 applyResult: "failed",
@@ -143,39 +170,47 @@ public sealed class OptimizationTransaction
                 Error = apply.Error,
                 RolledBack = true,
                 RollbackVerified = rollbackVerified,
+                CancellationDeferred = deferred,
             };
         }
 
-        // ---- VERIFY ----
+        // ---- VERIFY (strict; Unknown is never success) ----
         if (!definition.Flags.HasFlag(OptimizationFlags.NotReversible))
         {
             VerificationResult verification;
             try
             {
-                verification = await _optimization.VerifyAsync(context, ct);
+                verification = await _optimization.VerifyAsync(context, CancellationToken.None);
             }
             catch (Exception ex)
             {
-                verification = VerificationResult.Failed(OptimizationState.Unknown, "Verificación interrumpida: " + ex.Message);
+                verification = VerificationResult.Unknown(OptimizationState.Unknown, "Verificación interrumpida: " + ex.Message);
             }
 
-            if (!verification.Verified)
+            if (verification.Status != VerificationStatus.Passed)
             {
-                var rollbackVerified = await SafeRollbackAsync(context, snapshot, ct);
+                var rollbackVerified = await SafeRollbackAsync(context, snapshot, CancellationToken.None);
+        var deferred = ct.IsCancellationRequested;
+                var code = verification.Status == VerificationStatus.Unknown
+                    ? ErrorCodes.VerifyUnknownState
+                    : ErrorCodes.VerifyFailed;
                 Log(definition.Id, "verify", false, rollbackVerified ? null : definition.Id,
-                    error: "Verificación fallida; cambio revertido.",
+                    error: $"Verificación {verification.Status}; cambio revertido.",
                     applyResult: "success",
-                    verification: "failed",
+                    verification: verification.Status.ToString().ToLowerInvariant(),
                     rollbackAvailable: !rollbackVerified);
                 return new TransactionReport
                 {
                     OptimizationId = definition.Id,
                     Success = false,
                     FinalPhase = rollbackVerified ? TransactionPhase.RolledBack : TransactionPhase.Failed,
-                    MessageEs = "La verificación falló y el cambio se revirtió.",
-                    Error = verification.MessageEs,
+                    MessageEs = verification.Status == VerificationStatus.Unknown
+                        ? "La verificación no pudo determinarse y el cambio se revirtió por seguridad."
+                        : "La verificación falló y el cambio se revirtió.",
+                    Error = code + ": " + verification.MessageEs,
                     RolledBack = true,
                     RollbackVerified = rollbackVerified,
+                    CancellationDeferred = deferred,
                 };
             }
         }
@@ -184,7 +219,7 @@ public sealed class OptimizationTransaction
         BenchmarkResult? benchmark = null;
         try
         {
-            benchmark = await _optimization.BenchmarkAsync(ct);
+            benchmark = await _optimization.BenchmarkAsync(CancellationToken.None);
         }
         catch
         {
@@ -211,6 +246,7 @@ public sealed class OptimizationTransaction
             FinalPhase = TransactionPhase.Commit,
             MessageEs = pendingReboot ? apply.MessageEs + " Requiere reinicio." : apply.MessageEs,
             RollbackVerified = true,
+            CancellationDeferred = ct.IsCancellationRequested,
             Benchmark = benchmark,
         };
     }
@@ -227,7 +263,7 @@ public sealed class OptimizationTransaction
             return false;
         }
 
-        var context = new OptimizationContext { Registry = _registry, Process = _process, Services = _services };
+        var context = new OptimizationContext { Registry = _registry, Executor = _executor, Services = _services };
         try
         {
             var rollback = await _optimization.RollbackAsync(context, snapshot, ct);
@@ -331,11 +367,11 @@ public sealed class MultiOptimizationTransaction
         IRegistryAccessor registry,
         SystemContext context,
         IServiceManager? services = null,
-        IProcessRunner? process = null,
+        Core.Interfaces.IPrivilegedCommandExecutor? executor = null,
         ISnapshotStore? snapshots = null,
         IHistoryLogger? history = null)
         : this(optimizations, context, o => new OptimizationTransaction(
-            o, registry, context, services, process, snapshots, history))
+            o, registry, context, services, executor, snapshots, history))
     {
     }
 

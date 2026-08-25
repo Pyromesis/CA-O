@@ -1,0 +1,153 @@
+using System.Text.RegularExpressions;
+
+namespace CAO.Shared.Security;
+
+/// <summary>
+/// Whitelisted system commands the privileged layer may execute (FASE 4).
+/// Each key maps to ONE absolute-path executable and a strict argument
+/// shape; nothing else can ever be spawned through the gateway.
+/// </summary>
+public enum SystemCommandKey
+{
+    PowerCfgQueryActiveScheme,
+    PowerCfgQueryAvailable,
+    PowerCfgSetActiveScheme,
+    PowerCfgDuplicateScheme,
+    PowerCfgHibernateOff,
+    PowerCfgHibernateOn,
+    BcdEditEnumCurrent,
+    BcdEditHypervisorOff,
+    BcdEditHypervisorRestore,
+    NetShTcpShowGlobal,
+    NetShTcpAutotuningNormal,
+    OptimizeVolumeReTrimC,
+    OptimizeVolumeDefragC,
+}
+
+/// <summary>Normalized result captured by the gateway.</summary>
+public sealed record PrivilegedCommandResult(
+    int ExitCode,
+    string StdOut,
+    string StdErr,
+    bool TimedOut)
+{
+    public bool Success => ExitCode == 0 && !TimedOut;
+}
+
+/// <summary>
+/// Declarative policy for privileged execution (FASE 4). Paths are
+/// canonical %SystemRoot% absolutes, so PATH hijacking cannot redirect them;
+/// argument tokens are exact-match strings, so chaining/redirection/
+/// injection are rejected before any process is created.
+/// </summary>
+public static partial class CommandPolicy
+{
+    [GeneratedRegex(@"^[a-zA-Z0-9_\-./\\:=\{\}\s]+$", RegexOptions.CultureInvariant)]
+    private static partial Regex SafeArg();
+
+    /// <summary>
+    /// Resolves an exact (key, arguments) pair to the canonical executable
+    /// path. Returns null for ANY deviation: unknown keys, unexpected token
+    /// counts, or metacharacters (&amp; | ; &lt; &gt; " ' % ^ newlines).
+    /// </summary>
+    public static string? Resolve(SystemCommandKey key, IReadOnlyList<string> arguments)
+    {
+        if (arguments.Any(arg => string.IsNullOrWhiteSpace(arg) || !SafeArg().IsMatch(arg)))
+        {
+            return null;
+        }
+
+        var system32 = Environment.ExpandEnvironmentVariables(@"%SystemRoot%\System32");
+        var powershell = Path.Combine(system32, @"WindowsPowerShell\v1.0\powershell.exe");
+
+        return key switch
+        {
+            SystemCommandKey.PowerCfgQueryActiveScheme when Eq(arguments, "/getactivescheme") =>
+                Path.Combine(system32, "powercfg.exe"),
+
+            SystemCommandKey.PowerCfgQueryAvailable when Eq(arguments, "/a") =>
+                Path.Combine(system32, "powercfg.exe"),
+
+            SystemCommandKey.PowerCfgSetActiveScheme when arguments.Count == 2 &&
+                arguments[0] == "/setactive" &&
+                (arguments[1] is "SCHEME_MIN" or "SCHEME_MAX" or "SCHEME_BALANCED" ||
+                 IsPowerSchemeGuid(arguments[1])) =>
+                Path.Combine(system32, "powercfg.exe"),
+
+            SystemCommandKey.PowerCfgDuplicateScheme when arguments.Count == 2 &&
+                arguments[0] == "/duplicatescheme" && IsPowerSchemeGuid(arguments[1]) =>
+                Path.Combine(system32, "powercfg.exe"),
+
+            SystemCommandKey.PowerCfgHibernateOff when Eq(arguments, "/h", "off") =>
+                Path.Combine(system32, "powercfg.exe"),
+
+            SystemCommandKey.PowerCfgHibernateOn when Eq(arguments, "/h", "on") =>
+                Path.Combine(system32, "powercfg.exe"),
+
+            SystemCommandKey.BcdEditEnumCurrent when Eq(arguments, "/enum", "{current}") =>
+                Path.Combine(system32, "bcdedit.exe"),
+
+            SystemCommandKey.BcdEditHypervisorOff when Eq(arguments,
+                "/set", "{current}", "hypervisorlaunchtype", "off") =>
+                Path.Combine(system32, "bcdedit.exe"),
+
+            // Restore is pinned to Auto: callers map a captured "Off" to Auto
+            // upstream (captured Off meant hypervisor was already off).
+            SystemCommandKey.BcdEditHypervisorRestore when Eq(arguments,
+                "/set", "{current}", "hypervisorlaunchtype", "Auto") =>
+                Path.Combine(system32, "bcdedit.exe"),
+
+            SystemCommandKey.NetShTcpShowGlobal when Eq(arguments,
+                "int", "tcp", "show", "global") =>
+                Path.Combine(system32, "netsh.exe"),
+
+            SystemCommandKey.NetShTcpAutotuningNormal when arguments.Count == 5 &&
+                arguments[0] == "int" && arguments[1] == "tcp" &&
+                arguments[2] == "set" && arguments[3] == "global" &&
+                arguments[4].StartsWith("autotuninglevel=", StringComparison.Ordinal) &&
+                AutotuningLevels.Contains(arguments[4]["autotuninglevel=".Length..]) =>
+                Path.Combine(system32, "netsh.exe"),
+
+            // Static PowerShell fallback (spec §7): fixed -Command text with
+            // no interpolation of user-controlled data anywhere.
+            SystemCommandKey.OptimizeVolumeReTrimC when Eq(arguments,
+                "-NoProfile", "-NonInteractive", "-Command",
+                "Optimize-Volume -DriveLetter C -ReTrim") => powershell,
+
+            SystemCommandKey.OptimizeVolumeDefragC when Eq(arguments,
+                "-NoProfile", "-NonInteractive", "-Command",
+                "Optimize-Volume -DriveLetter C -Defrag") => powershell,
+
+            _ => null,
+        };
+    }
+
+    // Only the five documented autotuning levels are restorable.
+    private static readonly HashSet<string> AutotuningLevels = new(StringComparer.Ordinal)
+    {
+        "disabled", "highlyrestricted", "restricted", "normal", "experimental",
+    };
+
+    private static readonly Regex GuidShape = new(
+        @"^\{?[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\}?$",
+        RegexOptions.CultureInvariant);
+
+    private static bool IsPowerSchemeGuid(string token) => GuidShape.IsMatch(token);
+
+    private static bool Eq(IReadOnlyList<string> arguments, params ReadOnlySpan<string> expected)
+    {
+        if (arguments.Count != expected.Length)
+        {
+            return false;
+        }
+
+        for (var index = 0; index < expected.Length; index++)
+        {
+            if (!string.Equals(arguments[index], expected[index], StringComparison.Ordinal))
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+}

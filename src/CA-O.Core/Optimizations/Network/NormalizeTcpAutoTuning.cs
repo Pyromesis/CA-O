@@ -1,6 +1,7 @@
 using System.Text.RegularExpressions;
 using CAO.Core.Abstractions;
 using CAO.Shared;
+using CAO.Shared.Security;
 
 namespace CAO.Core.Optimizations.Network;
 
@@ -46,16 +47,24 @@ public sealed class NormalizeTcpAutoTuning : IOptimization
 
     public async Task<OperationResult> ApplyAsync(OptimizationContext context, CancellationToken ct = default)
     {
-        if (context.Process is null) return OperationResult.Fail("Runner no disponible.", "IProcessRunner null");
-        var (code, output) = await context.Process.RunAsync("netsh", "int tcp set global autotuninglevel=normal", ct);
-        return code == 0
+        if (context.Executor is null)
+        {
+            return OperationResult.Fail("Ejecutor no disponible.", "CAO-SEC-010");
+        }
+        var result = await context.Executor.ExecuteAsync(
+            SystemCommandKey.NetShTcpAutotuningNormal,
+            ["int", "tcp", "set", "global", "autotuninglevel=normal"], ct);
+        return result.Success
             ? OperationResult.Ok("Auto-ajuste TCP en 'normal'.")
-            : OperationResult.Fail("No se pudo cambiar el auto-ajuste TCP.", output);
+            : OperationResult.Fail("No se pudo cambiar el auto-ajuste TCP.", result.StdErr);
     }
 
     public async Task<OperationResult> RevertAsync(OptimizationContext context, OptimizationSnapshot snapshot, CancellationToken ct = default)
     {
-        if (context.Process is null) return OperationResult.Fail("Runner no disponible.", "IProcessRunner null");
+        if (context.Executor is null)
+        {
+            return OperationResult.Fail("Ejecutor no disponible.", "CAO-SEC-010");
+        }
         var note = snapshot.RawNotes.FirstOrDefault(n => n.StartsWith("autotuning=", StringComparison.Ordinal));
         var previous = note?["autotuning=".Length..]?.Trim();
         if (string.IsNullOrWhiteSpace(previous) || previous.Equals("normal", StringComparison.OrdinalIgnoreCase))
@@ -63,9 +72,13 @@ public sealed class NormalizeTcpAutoTuning : IOptimization
             return OperationResult.Ok("Ya estaba en normal antes; nada que restaurar.");
         }
 
-        var (code, output) = await context.Process.RunAsync("netsh", $"int tcp set global autotuninglevel={previous}", ct);
-        return code == 0
+        // The gateway only accepts the five documented levels, so an exotic
+        // captured value cannot be smuggled through.
+        var result = await context.Executor.ExecuteAsync(
+            SystemCommandKey.NetShTcpAutotuningNormal,
+            ["int", "tcp", "set", "global", $"autotuninglevel={previous}"], ct);
+        return result.Success
             ? OperationResult.Ok($"Nivel anterior '{previous}' restaurado.")
-            : OperationResult.Fail("No se pudo restaurar el nivel TCP.", output);
+            : OperationResult.Fail("No se pudo restaurar el nivel TCP.", result.StdErr);
     }
 }

@@ -1,6 +1,7 @@
 using System.Text.RegularExpressions;
 using CAO.Core.Abstractions;
 using CAO.Shared;
+using CAO.Shared.Security;
 
 namespace CAO.Core.Optimizations.Storage;
 
@@ -43,22 +44,28 @@ public sealed class DisableHibernate : IOptimization
 
     public async Task<OperationResult> ApplyAsync(OptimizationContext context, CancellationToken ct = default)
     {
-        if (context.Process is null) return OperationResult.Fail("Runner no disponible.", "IProcessRunner null");
-        var (code, output) = await context.Process.RunAsync("powercfg", "/h off", ct);
-        return code == 0
+        if (context.Executor is null)
+        {
+            return OperationResult.Fail("Ejecutor no disponible.", "CAO-SEC-010");
+        }
+        var result = await context.Executor.ExecuteAsync(SystemCommandKey.PowerCfgHibernateOff, ["/h", "off"], ct);
+        return result.Success
             ? OperationResult.Ok("Hibernación desactivada; hiberfil.sys liberado.")
-            : OperationResult.Fail("No se pudo desactivar la hibernación.", output);
+            : OperationResult.Fail("No se pudo desactivar la hibernación.", result.StdErr);
     }
 
     public async Task<OperationResult> RevertAsync(OptimizationContext context, OptimizationSnapshot snapshot, CancellationToken ct = default)
     {
-        if (context.Process is null) return OperationResult.Fail("Runner no disponible.", "IProcessRunner null");
+        if (context.Executor is null)
+        {
+            return OperationResult.Fail("Ejecutor no disponible.", "CAO-SEC-010");
+        }
         var note = snapshot.RawNotes.FirstOrDefault(n => n.StartsWith("hibernate=", StringComparison.Ordinal));
         if (note == "hibernate=off") return OperationResult.Ok("Ya estaba desactivada antes; nada que restaurar.");
 
-        var (code, output) = await context.Process.RunAsync("powercfg", "/h on", ct);
-        return code == 0
+        var result = await context.Executor.ExecuteAsync(SystemCommandKey.PowerCfgHibernateOn, ["/h", "on"], ct);
+        return result.Success
             ? OperationResult.Ok("Hibernación reactivada.")
-            : OperationResult.Fail("No se pudo reactivar la hibernación.", output);
+            : OperationResult.Fail("No se pudo reactivar la hibernación.", result.StdErr);
     }
 }
