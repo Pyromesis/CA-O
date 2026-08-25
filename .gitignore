@@ -57,3 +57,6 @@ server.log
 *.exe
 /dist/
 /dist-electron/
+/artifacts/
+bin/
+obj/
