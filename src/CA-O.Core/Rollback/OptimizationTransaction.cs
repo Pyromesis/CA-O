@@ -134,6 +134,9 @@ public sealed class OptimizationTransaction
             };
         }
 
+        // ---- RESOURCE LOCKS (FASE 15) ----
+        var lease = await ResourceLockManager.Shared.AcquireAsync(_optimization.ResourceKeys, ct);
+
         var context = new OptimizationContext { Registry = _registry, Executor = _executor, Services = _services };
 
         // ---- APPLY (atomic: runs with CancellationToken.None) ----
@@ -154,7 +157,8 @@ public sealed class OptimizationTransaction
         if (!apply.Success)
         {
             var rollbackVerified = await SafeRollbackAsync(context, snapshot, CancellationToken.None);
-        var deferred = ct.IsCancellationRequested;
+            var deferred = ct.IsCancellationRequested;
+            await lease.DisposeAsync();
             Log(definition.Id, "apply", false, rollbackVerified ? null : definition.Id,
                 error: apply.Error ?? apply.MessageEs,
                 applyResult: "failed",
@@ -189,8 +193,9 @@ public sealed class OptimizationTransaction
 
             if (verification.Status != VerificationStatus.Passed)
             {
+                var deferred = ct.IsCancellationRequested;
                 var rollbackVerified = await SafeRollbackAsync(context, snapshot, CancellationToken.None);
-        var deferred = ct.IsCancellationRequested;
+                await lease.DisposeAsync();
                 var code = verification.Status == VerificationStatus.Unknown
                     ? ErrorCodes.VerifyUnknownState
                     : ErrorCodes.VerifyFailed;
@@ -214,6 +219,8 @@ public sealed class OptimizationTransaction
                 };
             }
         }
+
+        await lease.DisposeAsync(); // locks released only after commit/rollback decision
 
         // ---- BENCHMARK (optional hook) ----
         BenchmarkResult? benchmark = null;

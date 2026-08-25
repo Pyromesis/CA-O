@@ -62,13 +62,22 @@ public sealed class HistoryAndSnapshotPersistenceTests : IDisposable
     {
         var path = Path.Combine(_tempDirectory, "history.jsonl");
         Directory.CreateDirectory(_tempDirectory);
-        File.WriteAllLines(path,
-        [
-            """{"TimestampUtc":"2026-08-25T12:00:00Z","OptimizationId":"a","Operation":"apply"}""",
-            "{not valid json",
-            """{"TimestampUtc":"2026-08-25T13:00:00Z","OptimizationId":"b","Operation":"revert"}""",
-        ]);
         var logger = new JsonHistoryLogger(path);
+        logger.Log(new HistoryEntry
+        {
+            TimestampUtc = DateTime.UtcNow,
+            OptimizationId = "a",
+            Operation = "apply",
+            Success = true,
+        });
+        File.AppendAllText(path, "{not valid json\n");
+        logger.Log(new HistoryEntry
+        {
+            TimestampUtc = DateTime.UtcNow,
+            OptimizationId = "b",
+            Operation = "revert",
+            Success = true,
+        });
 
         var entries = logger.ReadLast(int.MaxValue);
 

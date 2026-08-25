@@ -6,7 +6,7 @@ namespace CAO.Core.Tests;
 /// <summary>In-memory registry for deterministic transaction tests.</summary>
 public sealed class MemoryRegistry : IRegistryAccessor
 {
-    public Dictionary<string, (object? Value, bool Existed)> Store { get; } =
+    public Dictionary<string, (object? Value, bool Existed, RegistryValueKind2 Kind)> Store { get; } =
         new(StringComparer.OrdinalIgnoreCase);
 
     private static string Key(RegistryHive2 hive, string path, string name) =>
@@ -18,8 +18,22 @@ public sealed class MemoryRegistry : IRegistryAccessor
     public object? GetValue(RegistryHive2 hive, string keyPath, string valueName) =>
         Store.TryGetValue(Key(hive, keyPath, valueName), out var entry) && entry.Existed ? entry.Value : null;
 
+    public object? GetValueRaw(RegistryHive2 hive, string keyPath, string valueName, out RegistryValueKind2 kind)
+    {
+        if (Store.TryGetValue(Key(hive, keyPath, valueName), out var entry) && entry.Existed)
+        {
+            kind = entry.Kind;
+            return entry.Value;
+        }
+        kind = RegistryValueKind2.None;
+        return null;
+    }
+
     public void SetValue(RegistryHive2 hive, string keyPath, string valueName, object value, RegistryValueKind2 kind) =>
-        Store[Key(hive, keyPath, valueName)] = (value, true);
+        Store[Key(hive, keyPath, valueName)] = (value, true, kind);
+
+    public void SetValueRaw(RegistryHive2 hive, string keyPath, string valueName, object value, RegistryValueKind2 kind) =>
+        SetValue(hive, keyPath, valueName, value, kind);
 
     public bool DeleteValue(RegistryHive2 hive, string keyPath, string valueName) =>
         Store.Remove(Key(hive, keyPath, valueName));

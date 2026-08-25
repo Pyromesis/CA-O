@@ -40,9 +40,12 @@ public abstract class RegistryOptimizationBase : IOptimization
         var snapshot = new OptimizationSnapshot();
         foreach (var target in Targets)
         {
-            var existing = registry.GetValue(target.Hive, target.KeyPath, target.ValueName);
+            // Exact capture (FASE 8): real kind + unexpanded/uncoerced data.
+            var existing = registry.GetValueRaw(target.Hive, target.KeyPath, target.ValueName, out var kind);
             snapshot.Registry.Add(new RegistrySnapshotEntry(
-                target.Hive.ToString(), target.KeyPath, target.ValueName, existing, Existed: existing is not null));
+                target.Hive.ToString(), target.KeyPath, target.ValueName, existing,
+                Existed: existing is not null)
+            { Kind = existing is null ? RegistryValueKind2.None : kind });
         }
         return snapshot;
     }
@@ -56,8 +59,9 @@ public abstract class RegistryOptimizationBase : IOptimization
             var hive = Enum.Parse<RegistryHive2>(entry.Hive);
             if (entry.Existed && entry.Value is not null)
             {
-                var kind = entry.Value is int or uint or long ? RegistryValueKind2.DWord : RegistryValueKind2.String;
-                context.Registry.SetValue(hive, entry.KeyPath, entry.ValueName, entry.Value, kind);
+                // EXACT restore (FASE 8/9): declared kind, no inference.
+                context.Registry.SetValueRaw(hive, entry.KeyPath, entry.ValueName,
+                    entry.Value, entry.Kind);
             }
             else
             {

@@ -4,7 +4,7 @@ namespace CAO.Core.Interfaces;
 
 /// <summary>
 /// The single funnel for privileged process execution (FASE 4). External
-/// layers never call Process.Start directly; every spawn must resolve
+/// layers never launch processes directly; every spawn must resolve
 /// through <see cref="CommandPolicy.Resolve"/> to a canonical absolute path.
 /// </summary>
 public interface IPrivilegedCommandExecutor

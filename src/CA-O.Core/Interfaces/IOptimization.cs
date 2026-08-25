@@ -1,4 +1,5 @@
 using CAO.Shared;
+using CAO.Core.Rollback;
 
 namespace CAO.Core.Abstractions;
 
@@ -93,6 +94,13 @@ public interface IOptimization
             return RollbackResult.Fail("La reversión falló.", ex.Message);
         }
     }
+
+    /// <summary>
+    /// Logical resources locked while this optimization runs (FASE 15).
+    /// Default: the optimization's own id; override to declare shared
+    /// resources such as PowerPlan:System or Boot:BCD.
+    /// </summary>
+    IReadOnlyList<ResourceKey> ResourceKeys => [ResourceKey.ForOptimization(Definition.Id)];
 }
 
 /// <summary>Runtime services handed to optimizations.</summary>
