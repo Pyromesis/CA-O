@@ -1,4 +1,6 @@
-# CA-O — Catálogo y metodología de evidencia (v2)
+# CA-O — Catálogo y metodología de evidencia (v3, 2026)
+
+> Tabla completa de auditoría individual: [docs/OPTIMIZATION-AUDIT.md](OPTIMIZATION-AUDIT.md) (155 IDs, generada automáticamente).
 
 ## Cómo se clasifica una optimización
 

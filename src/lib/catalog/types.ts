@@ -22,13 +22,14 @@ export type EvidenceSource =
   | 'empirical'
   | 'heuristic';
 
-/** Top-level groups. Maintenance/repair/cosmetic are NEVER sold as performance. */
+/** Top-level groups. Maintenance/repair/diagnostics/cosmetics are NEVER sold as performance. */
 export type CatalogGroup =
   | 'performance'
-  | 'system'
+  | 'gaming'
+  | 'diagnostics'
   | 'security'
   | 'privacy'
-  | 'gaming'
+  | 'maintenance'
   | 'repair'
   | 'tweaks'
   | 'experimental';
@@ -36,20 +37,22 @@ export type CatalogGroup =
 export type CatalogSubgroup =
   // performance
   | 'cpu' | 'gpu' | 'memory' | 'storage' | 'network' | 'input'
-  // system
-  | 'services' | 'startup' | 'windows-features' | 'maintenance'
+  // gaming
+  | 'windows-gaming' | 'gpu-gaming' | 'input-gaming' | 'display-gaming' | 'per-game'
+  // diagnostics
+  | 'diag-cpu' | 'diag-gpu' | 'memory' | 'diag-network' | 'dpc-isr' | 'drivers' | 'thermals' | 'diag-storage'
   // security
   | 'hvci-vbs' | 'secure-boot-tpm' | 'firewall' | 'smb' | 'rdp-remote' | 'driver-security' | 'network-hardening' | 'attack-surface'
   // privacy
-  | 'telemetry' | 'advertising' | 'location' | 'personalization' | 'permissions'
-  // gaming
-  | 'windows-gaming' | 'gpu-gaming' | 'input-gaming' | 'display-gaming' | 'per-game'
+  | 'telemetry' | 'advertising' | 'location' | 'personalization' | 'permissions' | 'ai-features'
+  // maintenance
+  | 'cleanup' | 'startup' | 'services' | 'windows-features'
   // repair
   | 'network-repair' | 'system-repair' | 'update-repair' | 'troubleshooting'
   // tweaks
   | 'cosmetic' | 'explorer-ui' | 'taskbar' | 'sounds' | 'quality-of-life'
   // experimental
-  | 'contested' | 'diagnostics' | 'advanced-power' | 'hardware-experimental';
+  | 'legacy' | 'contested' | 'advanced-power' | 'hardware-experimental';
 
 /** What kind of action this is, independent of where it sits in the tree. */
 export type ActionKind =
@@ -150,6 +153,25 @@ export interface SnapshotMeta {
   elevated: boolean;
 }
 
+export type GpuVendor = 'nvidia' | 'amd' | 'intel' | 'other';
+
+export interface GpuInfo {
+  name: string;
+  vendor: GpuVendor;
+  driverVersion: string;
+  vramMB: number;
+}
+
+/** Vendor feature notes (#17 NVIDIA / #18 AMD). Detection is best-effort. */
+export interface GpuCapabilities {
+  vendor: GpuVendor;
+  /** Driver-level feature availability based on vendor + driver generation. */
+  reflexOrAntiLag: string;      // human note
+  variableRateSync: string;     // G-SYNC / FreeSync note
+  hagsSupported: boolean | 'unknown';
+  frameGenerationNote: string;
+}
+
 export interface SystemContext {
   collectedAt: string;
   os: {
@@ -161,9 +183,13 @@ export interface SystemContext {
   };
   hardware: {
     cpuName: string;
+    cpuVendor: 'intel' | 'amd' | 'other';
     cores: number;
+    threads: number;
     ramGB: number;
     gpuNames: string[];
+    gpus: GpuInfo[];
+    primaryGpuCapabilities: GpuCapabilities | null;
     formFactor: 'desktop' | 'laptop' | 'unknown';
     touchscreen: boolean;
   };

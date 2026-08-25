@@ -35,16 +35,20 @@ export interface ApplicabilityResult {
 
 /** Per-ID applicability rules. Absent = generally applicable. */
 const rulesById: Record<string, ApplicabilityRule> = {
-  // Advanced power tweaks only make sense on AC-powered desktops (#11)
+  // Advanced power tweaks only make sense on AC-powered desktops (#27)
   'disable-cpu-idle': {
     requires: { formFactor: ['desktop'], powerSource: ['ac'] },
-    prerequisiteNoteEs: 'Solo recomendado en PC de escritorio conectado a la corriente.',
-    prerequisiteNoteEn: 'Only recommended on AC-powered desktop PCs.',
+    requiresExperimentalAcknowledgement: true,
+    prerequisiteNoteEs: 'Ajuste avanzado solo para escritorio conectado a la corriente; mide temperaturas antes y después.',
+    prerequisiteNoteEn: 'Advanced tweak for AC-powered desktops only; measure temperatures before and after.',
   },
-  'enable-core-parking': {
+  // Renamed from enable-core-parking: the command sets CPMINCORES=100, which
+  // DISABLES parking. ID now matches behavior (#4).
+  'disable-core-parking': {
     requires: { formFactor: ['desktop'], powerSource: ['ac'] },
-    prerequisiteNoteEs: 'Ajuste avanzado para escritorio enchufado.',
-    prerequisiteNoteEn: 'Advanced tweak for powered desktops.',
+    requiresExperimentalAcknowledgement: true,
+    prerequisiteNoteEs: 'Ajuste avanzado para escritorio enchufado. El comando desactiva el aparcado de núcleos (CPMINCORES=100).',
+    prerequisiteNoteEn: 'Advanced tweak for powered desktops. The command disables core parking (CPMINCORES=100).',
   },
   'disable-power-throttling': {
     requires: { powerSource: ['ac'] },

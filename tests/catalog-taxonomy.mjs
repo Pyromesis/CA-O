@@ -30,6 +30,14 @@ const section = (text, start, end) => {
 const categorySection = section(apiRoute, 'const categoryOptimizations', '// Catálogo cacheado');
 const catalogIds = [...categorySection.matchAll(/'([a-z][a-z0-9-]*)'/g)].map((m) => m[1]);
 
+if (catalogIds.includes('disable-keyboard-filter')) {
+  console.error('catalog-taxonomy: disable-keyboard-filter was removed but is still referenced in the catalog');
+  process.exit(1);
+}
+if (catalogIds.includes('enable-core-parking')) {
+  console.error('catalog-taxonomy: enable-core-parking was renamed to disable-core-parking but still appears');
+  process.exit(1);
+}
 if (catalogIds.length < 150) {
   console.error(`catalog-taxonomy: expected >=150 catalog ids, found ${catalogIds.length}`);
   process.exit(1);
@@ -39,7 +47,7 @@ if (catalogIds.length < 150) {
 const entryMatches = [...taxonomySrc.matchAll(/'([a-z][a-z0-9-]*)':\s*\{\s*group:\s*'([a-z-]+)',\s*subgroup:\s*'([a-z-]+)',\s*kind:\s*'([a-z-]+)'/g)];
 const taxonomy = new Map(entryMatches.map((m) => [m[1], { group: m[2], subgroup: m[3], kind: m[4] }]));
 
-const VALID_GROUPS = new Set(['performance', 'system', 'security', 'privacy', 'gaming', 'repair', 'tweaks', 'experimental']);
+const VALID_GROUPS = new Set(['performance', 'gaming', 'diagnostics', 'security', 'privacy', 'maintenance', 'repair', 'tweaks', 'experimental']);
 const VALID_KINDS = new Set(['optimization', 'maintenance', 'repair-action', 'security-tradeoff', 'security-hardening', 'privacy-control', 'cosmetic', 'diagnostic', 'guidance']);
 
 const problems = {
@@ -70,7 +78,7 @@ const mustNotBeIn = (id, group) => {
 };
 
 const semantics = [
-  mustBeIn('memory-compression', 'experimental'),
+  mustBeIn('memory-compression', 'diagnostics', 'diagnostic'),
   mustBeIn('disable-superfetch', 'experimental'),
   mustBeIn('timer-resolution-0-5ms', 'experimental'),
   mustBeIn('disable-network-throttling', 'experimental'),
@@ -83,14 +91,19 @@ const semantics = [
   mustBeIn('flush-dns', 'repair', 'repair-action'),
   mustBeIn('reset-network', 'repair', 'repair-action'),
   mustBeIn('flush-arp-cache', 'repair', 'repair-action'),
-  mustBeIn('clear-temp-files', 'repair', 'maintenance'),
-  mustBeIn('registry-cleanup', 'repair'),
+  mustBeIn('clear-temp-files', 'maintenance', 'maintenance'),
+  mustBeIn('registry-cleanup', 'maintenance', 'maintenance'),
+  mustBeIn('disable-bits', 'maintenance', 'maintenance'),
+  mustBeIn('disable-delivery-optimization', 'maintenance', 'maintenance'),
+  mustBeIn('disable-automatic-maintenance', 'maintenance', 'maintenance'),
+  mustBeIn('disable-core-parking', 'performance'),
   mustBeIn('disable-fullscreen-optimizations', 'repair'),
   mustBeIn('disable-multiplane-overlay', 'repair'),
   mustBeIn('disable-smb1', 'security', 'security-hardening'),
   mustBeIn('disable-admin-shares', 'security'),
   mustBeIn('disable-remote-desktop', 'security'),
   mustNotBeIn('memory-compression', 'gaming'),
+  mustNotBeIn('disable-core-parking', 'experimental'),
   mustNotBeIn('static-pagefile', 'performance'),
   mustNotBeIn('winsock-reset', 'performance'),
 ].filter(Boolean);

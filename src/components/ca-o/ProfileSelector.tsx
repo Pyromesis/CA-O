@@ -81,8 +81,8 @@ const optimizationDetails: Record<string, { nameEs: string; nameEn: string; icon
 // Detailed benefits for each profile
 const profileDetailedInfo: Record<string, { benefitsEs: string[]; benefitsEn: string[]; bestForEs: string; bestForEn: string; warningEs?: string; warningEn?: string }> = {
   gaming: {
-    benefitsEs: ['Reduce ping hasta 30% en juegos online', 'Elimina microstutters', 'Ratón 1:1 sin aceleración', 'CPU/GPU dedicados al juego', 'Sin interrupciones de Game Bar'],
-    benefitsEn: ['Reduces ping up to 30% in online games', 'Eliminates microstutters', '1:1 mouse without acceleration', 'CPU/GPU dedicated to the game', 'No Game Bar interruptions'],
+    benefitsEs: ['Game Mode activa prioridad del juego en primer plano', 'Sin grabación de fondo (GameDVR off)', 'Ratón 1:1 sin aceleración', 'CPU/GPU dedicados al juego', 'Sin interrupciones de Game Bar'],
+    benefitsEn: ['Game Mode gives the game foreground priority', 'No background recording (GameDVR off)', '1:1 mouse without acceleration', 'CPU/GPU dedicated to the game', 'No Game Bar interruptions'],
     bestForEs: 'FPS, MOBA, Battle Royale y competitivos online',
     bestForEn: 'FPS, MOBA, Battle Royale and competitive online',
     warningEs: 'Requiere reinicio. Xbox Game Bar quedará desactivado.',

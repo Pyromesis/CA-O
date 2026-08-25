@@ -21,6 +21,29 @@ export interface OptimizationProfileDefinition {
 
 export const predefinedProfiles: OptimizationProfileDefinition[] = [
   {
+    // Safe Gaming (#55): only high-confidence, low-risk, context-safe items.
+    // Never touches HVCI/VBS, pagefile, memory compression, network stack,
+    // MPO or critical services. The planner additionally drops anything
+    // that fails context checks on this machine.
+    id: 'safe-gaming',
+    nameKey: 'profileSafeGamingName',
+    descriptionKey: 'profileSafeGamingDesc',
+    icon: 'ShieldCheck',
+    color: '#22c55e',
+    gradient: 'linear-gradient(135deg, #22c55e 0%, #15803d 100%)',
+    glowColor: 'rgba(34, 197, 94, 0.3)',
+    optimizationIds: [
+      'gaming-mode',
+      'mouse-acceleration',
+      'disable-game-dvr',
+      'disable-xbox-gamebar',
+      'windowed-games-optimization',
+      'max-system-responsiveness',
+      'disable-controller-gamebar-chord',
+    ],
+    category: 'gaming',
+  },
+  {
     id: 'valorant',
     nameKey: 'profileValorantName',
     descriptionKey: 'profileValorantDesc',
@@ -38,7 +61,7 @@ export const predefinedProfiles: OptimizationProfileDefinition[] = [
       'static-pagefile',
       'memory-compression',
       'disable-cpu-idle',
-      'enable-core-parking',
+      'disable-core-parking',
       'disable-power-throttling',
       'disable-superfetch',
       'disable-automatic-maintenance',
@@ -78,7 +101,7 @@ export const predefinedProfiles: OptimizationProfileDefinition[] = [
       'static-pagefile',
       'memory-compression',
       'disable-cpu-idle',
-      'enable-core-parking',
+      'disable-core-parking',
       'disable-power-throttling',
       'disable-superfetch',
       'disable-automatic-maintenance',

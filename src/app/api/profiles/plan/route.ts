@@ -14,6 +14,7 @@ function passesSafeMode(id: string): boolean {
     taxonomy.group === 'experimental' ||
     taxonomy.group === 'security' ||
     taxonomy.group === 'repair' ||
+    taxonomy.group === 'diagnostics' ||
     taxonomy.kind === 'security-tradeoff'
   ) {
     return false;

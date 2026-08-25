@@ -7,7 +7,55 @@
  */
 
 import { runPowerShell } from './powershell-runner';
-import type { SystemContext, DetectedAntiCheat } from './catalog/types';
+import type { SystemContext, DetectedAntiCheat, GpuInfo, GpuVendor, GpuCapabilities } from './catalog/types';
+
+export function detectGpuVendor(name: string): GpuVendor {
+  if (/nvidia|geforce|quadro|rtx|gtx/i.test(name)) return 'nvidia';
+  if (/amd|radeon|rx \d|vega|navi/i.test(name)) return 'amd';
+  if (/intel|iris|uhd graphics|hd graphics|arc/i.test(name)) return 'intel';
+  return 'other';
+}
+
+/**
+ * Vendor capability notes. These are DRIVER-LEVEL features; CA-O never
+ * tries to replicate them with registry hacks (#17/#18).
+ */
+export function describeGpuCapabilities(gpu: GpuInfo): GpuCapabilities {
+  if (gpu.vendor === 'nvidia') {
+    return {
+      vendor: 'nvidia',
+      reflexOrAntiLag: 'NVIDIA Reflex: se activa dentro de cada juego compatible (no existe ajuste global de Windows).',
+      variableRateSync: 'G-SYNC/VRR: configúralo en el Panel de control de NVIDIA y en el menú del monitor.',
+      hagsSupported: true,
+      frameGenerationNote: 'DLSS Frame Generation requiere HAGS activado y tarjetas RTX 40+.',
+    };
+  }
+  if (gpu.vendor === 'amd') {
+    return {
+      vendor: 'amd',
+      reflexOrAntiLag: 'AMD Anti-Lag / Anti-Lag 2: se habilita en Adrenalin o dentro del juego (AL2 requiere soporte del título).',
+      variableRateSync: 'FreeSync/Adaptive-Sync: actívalo en Adrenalin y en el monitor.',
+      hagsSupported: true,
+      frameGenerationNote: 'HYPR-RX agrupa Anti-Lag + Radeon Boost + RSR; se configura en Adrenalin.',
+    };
+  }
+  if (gpu.vendor === 'intel') {
+    return {
+      vendor: 'intel',
+      reflexOrAntiLag: 'Intel presenta XeLL/XeSS en Arc; sin equivalente Reflex global.',
+      variableRateSync: 'VRR depende del panel de Intel Graphics y del monitor.',
+      hagsSupported: true,
+      frameGenerationNote: 'XeSS funciona en Arc e iGPU recientes; Frame Generation solo en Arc.',
+    };
+  }
+  return {
+    vendor: 'other',
+    reflexOrAntiLag: 'Fabricante no reconocido.',
+    variableRateSync: 'VRR según el fabricante.',
+    hagsSupported: 'unknown',
+    frameGenerationNote: '',
+  };
+}
 
 const CACHE_TTL_MS = 5 * 60 * 1000;
 let cache: { context: SystemContext; at: number } | null = null;
@@ -81,10 +129,13 @@ $result.edition = $cv.EditionID
 $cpu = Get-CimInstance Win32_Processor | Select-Object -First 1
 $result.cpuName = $cpu.Name.Trim()
 $result.cores = $cpu.NumberOfCores
+$result.threads = $cpu.NumberOfLogicalProcessors
 $ramBytes = (Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory
 $result.ramGB = [math]::Round($ramBytes / 1GB, 1)
 
-$gpus = @(Get-CimInstance Win32_VideoController | ForEach-Object { $_.Name })
+$gpus = @(Get-CimInstance Win32_VideoController | ForEach-Object {
+  [ordered]@{ name = $_.Name; driver = [string]$_.DriverVersion; vramMB = [math]::Round($_.AdapterRAM / 1MB, 0) }
+})
 $result.gpus = $gpus
 
 $chassis = @(Get-CimInstance Win32_SystemEnclosure | ForEach-Object { $_.ChassisTypes } | Select-Object -First 1)
@@ -171,7 +222,11 @@ export async function getSystemContext(forceRefresh = false): Promise<SystemCont
   const empty: SystemContext = {
     collectedAt: new Date().toISOString(),
     os: { caption: '', build: '', displayVersion: '', edition: '', majorVersion: 10 },
-    hardware: { cpuName: '', cores: 0, ramGB: 0, gpuNames: [], formFactor: 'unknown', touchscreen: false },
+    hardware: {
+      cpuName: '', cpuVendor: 'other', cores: 0, threads: 0, ramGB: 0,
+      gpuNames: [], gpus: [], primaryGpuCapabilities: null,
+      formFactor: 'unknown', touchscreen: false,
+    },
     power: { powerSource: 'unknown', batteryPresent: false, activeScheme: '' },
     security: {
       elevatedSession: false, secureBoot: 'unknown', tpmPresent: 'unknown', tpmVersionMajor: null,
@@ -196,8 +251,21 @@ export async function getSystemContext(forceRefresh = false): Promise<SystemCont
 
   const osRaw = parsed as Record<string, unknown>;
   const majorFromBuild = parseInt(String(osRaw.osBuild ?? '10.0').split('.')[0] ?? '10', 10);
-  const gpuNames = Array.isArray(osRaw.gpus) ? osRaw.gpus.map(String) : [];
   const cheatIds = String(osRaw.antiCheats ?? '').split(',').filter(Boolean);
+
+  // GPU parsing + vendor classification (#17/#18)
+  const rawGpus = Array.isArray(osRaw.gpus) ? osRaw.gpus : [];
+  const gpus = rawGpus.map((raw): GpuInfo => {
+    const entry = (raw ?? {}) as Record<string, unknown>;
+    const name = String(entry.name ?? '');
+    return {
+      name,
+      vendor: detectGpuVendor(name),
+      driverVersion: String(entry.driver ?? ''),
+      vramMB: Number(entry.vramMB ?? 0) || 0,
+    };
+  }).filter((gpu) => gpu.name);
+  const gpuNames = gpus.map((g) => g.name);
 
   const context: SystemContext = {
     collectedAt: new Date().toISOString(),
@@ -210,9 +278,13 @@ export async function getSystemContext(forceRefresh = false): Promise<SystemCont
     },
     hardware: {
       cpuName: String(osRaw.cpuName ?? ''),
+      cpuVendor: /amd|ryzen/i.test(String(osRaw.cpuName ?? '')) ? 'amd' : /intel/i.test(String(osRaw.cpuName ?? '')) ? 'intel' : 'other',
       cores: Number(osRaw.cores ?? 0),
+      threads: Number(osRaw.LogicalProcessors ?? osRaw.cores ?? 0),
       ramGB: Number(osRaw.ramGB ?? 0),
       gpuNames,
+      gpus,
+      primaryGpuCapabilities: gpus.length ? describeGpuCapabilities(gpus[0]) : null,
       formFactor: (osRaw.formFactor as SystemContext['hardware']['formFactor']) ?? 'unknown',
       touchscreen: osRaw.touchscreen === true,
     },

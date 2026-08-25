@@ -53,12 +53,29 @@ El proyecto está en fase beta funcional. La versión web (modo desarrollo) y la
 
 Tras una auditoría completa, el catálogo funciona con un modelo basado en evidencia: cada optimización declara impacto esperado, confianza, fuentes, condiciones de aplicabilidad y efectos adversos. Las acciones de reparación/mantenimiento/cosmética están separadas de las de rendimiento, los trade-offs de seguridad viven en su propia categoría con confirmación dedicada, y la API local exige token de sesión, origen 127.0.0.1, rate limiting y audit log.
 
+### Qué NO promete CA-O
+
+- Milagros de FPS ni "+20 FPS" sin medición reproducible.
+- Reducciones universales de latencia o de ping.
+- Mejoras de red automáticas (Cloudflare no es "más rápido para juegos").
+- Garantías absolutas de compatibilidad con anti-cheats.
+
+### Qué SÍ ofrece CA-O
+
+- Diagnóstico primero: térmico, memoria, almacenamiento, red (con bufferbloat), drivers problemáticos, estado de seguridad.
+- Configuración consciente del contexto: cada tweak se evalúa contra TU equipo antes de poder aplicarse.
+- Optimización segura: gates de prerrequisitos/conflictos, snapshots estructurados, verificación conductual, reversión.
+- Benchmarking honesto: DNS benchmark, muestreo del sistema, bufferbloat; los datos de FPS/frame-time requieren el helper nativo futuro y no se inventan.
+- Health score basado en problemas medidos, no en número de tweaks aplicados.
+- Gestión de privacidad/seguridad separada del rendimiento.
+
 Documentación detallada:
 
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — capas, flujo de Apply, seguridad local, modelo de privilegios objetivo.
 - [docs/OPTIMIZATION-CATALOG.md](docs/OPTIMIZATION-CATALOG.md) — metodología de clasificación, reclasificaciones realizadas, matriz anti-cheat, scoring.
+- [docs/OPTIMIZATION-AUDIT.md](docs/OPTIMIZATION-AUDIT.md) — auditoría individual de los 155 IDs con disposición final (generada).
 
-Endpoints nuevos relevantes: `/api/system/context`, `/api/benchmark/dns`, `/api/benchmark/system`, `/api/profiles/plan`, `/api/maintenance/temp`.
+Endpoints nuevos relevantes: `/api/system/context`, `/api/diagnostics/{overview|thermal|input|network}`, `/api/benchmark/dns`, `/api/benchmark/system`, `/api/profiles/plan`, `/api/maintenance/temp`.
 
 ---
 

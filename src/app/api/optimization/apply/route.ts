@@ -291,8 +291,8 @@ export async function POST(request: NextRequest) {
       if (!sessionScopedOptimizationIds.has(id)) {
         await db.optimizationState.upsert({
           where: { id: optimizationId },
-          update: { applied: true, snapshot: originalSnapshot, meta: snapshotMeta },
-          create: { id: optimizationId, applied: true, snapshot: originalSnapshot, meta: snapshotMeta }
+          update: { applied: true, snapshot: originalSnapshot, meta: snapshotMeta, lastAppliedAt: new Date().toISOString(), verificationStatus: 'verified', lastError: undefined },
+          create: { id: optimizationId, applied: true, snapshot: originalSnapshot, meta: snapshotMeta, lastAppliedAt: new Date().toISOString(), verificationStatus: 'verified' }
         });
       }
 

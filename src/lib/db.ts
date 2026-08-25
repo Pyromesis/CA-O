@@ -15,9 +15,35 @@ interface OptimizationEntry {
   snapshot?: string;
   /** v2: structured provenance for the snapshot (build, fingerprint, etc.). */
   meta?: Record<string, unknown>;
+  /** v3 state model (#7): desired vs actual bookkeeping. */
+  lastAppliedAt?: string;
+  lastRevertedAt?: string;
+  lastVerifiedAt?: string;
+  verificationStatus?: 'verified' | 'drifted' | 'error' | 'unknown';
+  lastError?: string;
 }
 
-type StateMap = Record<string, { applied: boolean; updatedAt: string; snapshot?: string; meta?: Record<string, unknown> }>;
+export interface StateRowV3 {
+  applied: boolean;
+  updatedAt: string;
+  snapshot?: string;
+  meta?: Record<string, unknown>;
+  lastAppliedAt?: string;
+  lastRevertedAt?: string;
+  lastVerifiedAt?: string;
+  verificationStatus?: 'verified' | 'drifted' | 'error' | 'unknown';
+  lastError?: string;
+}
+
+type StateMap = Record<string, StateRowV3>;
+
+const OPTIONAL_STRING_FIELDS = [
+  'snapshot', 'lastAppliedAt', 'lastRevertedAt', 'lastVerifiedAt', 'verificationStatus', 'lastError',
+] as const;
+
+function isValidStatus(value: unknown): value is NonNullable<OptimizationEntry['verificationStatus']> {
+  return value === 'verified' || value === 'drifted' || value === 'error' || value === 'unknown';
+}
 
 function getDbPath(): string {
   return process.env.CAO_STATE_PATH || path.join(process.cwd(), 'optimization-state.json');
@@ -34,10 +60,15 @@ function readDB(): StateMap {
     return Object.fromEntries(
       Object.entries(parsed).filter(([, value]) => {
         if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
-        const entry = value as { applied?: unknown; updatedAt?: unknown; snapshot?: unknown; meta?: unknown };
-        return typeof entry.applied === 'boolean' && typeof entry.updatedAt === 'string' &&
-          (entry.snapshot === undefined || typeof entry.snapshot === 'string') &&
-          (entry.meta === undefined || (typeof entry.meta === 'object' && entry.meta !== null && !Array.isArray(entry.meta)));
+        const entry = value as Record<string, unknown>;
+        if (typeof entry.applied !== 'boolean' || typeof entry.updatedAt !== 'string') return false;
+        for (const field of OPTIONAL_STRING_FIELDS) {
+          const v = entry[field];
+          if (v !== undefined && typeof v !== 'string') return false;
+        }
+        if (entry.verificationStatus !== undefined && !isValidStatus(entry.verificationStatus)) return false;
+        if (entry.meta !== undefined && (typeof entry.meta !== 'object' || entry.meta === null || Array.isArray(entry.meta))) return false;
+        return true;
       })
     ) as StateMap;
   };
@@ -95,43 +126,49 @@ export const db = {
       const data = readDB();
       const entry = data[where.id];
       if (!entry) return null;
-      return { id: where.id, applied: entry.applied, updatedAt: new Date(entry.updatedAt), snapshot: entry.snapshot, meta: entry.meta };
+      return { id: where.id, ...entry, updatedAt: new Date(entry.updatedAt) };
     },
 
     findMany: async (): Promise<OptimizationEntry[]> => {
       const data = readDB();
-      return Object.entries(data).map(([id, state]) => ({
-        id,
-        applied: state.applied,
-        updatedAt: new Date(state.updatedAt),
-        snapshot: state.snapshot,
-        meta: state.meta,
-      }));
+      return Object.entries(data).map(([id, state]) => ({ id, ...state, updatedAt: new Date(state.updatedAt) }));
     },
 
     upsert: async ({ where, update, create }: {
       where: { id: string };
-      update: { applied: boolean; snapshot?: string; meta?: Record<string, unknown> };
-      create: { id: string; applied: boolean; snapshot?: string; meta?: Record<string, unknown> };
+      update: Partial<Omit<OptimizationEntry, 'id' | 'updatedAt'>>;
+      create: { id: string } & Partial<Omit<OptimizationEntry, 'id' | 'updatedAt'>>;
     }): Promise<OptimizationEntry> => {
       const data = readDB();
-      const applied = update?.applied ?? create.applied;
-      const now = new Date().toISOString();
-      const snapshot = update?.snapshot ?? data[where.id]?.snapshot ?? create.snapshot;
-      const meta = update?.meta ?? create?.meta;
-      data[where.id] = { applied, updatedAt: now, ...(snapshot !== undefined ? { snapshot } : {}), ...(meta !== undefined ? { meta } : {}) };
+      const previous = data[where.id];
+      const merged: StateRowV3 = {
+        applied: update?.applied ?? create.applied ?? previous?.applied ?? false,
+        updatedAt: new Date().toISOString(),
+        snapshot: update?.snapshot ?? previous?.snapshot ?? create.snapshot,
+        meta: update?.meta ?? previous?.meta ?? create.meta,
+        lastAppliedAt: update?.lastAppliedAt ?? previous?.lastAppliedAt ?? create.lastAppliedAt,
+        lastRevertedAt: update?.lastRevertedAt ?? previous?.lastRevertedAt ?? create.lastRevertedAt,
+        lastVerifiedAt: update?.lastVerifiedAt ?? previous?.lastVerifiedAt ?? create.lastVerifiedAt,
+        verificationStatus: update?.verificationStatus ?? previous?.verificationStatus ?? create.verificationStatus,
+        lastError: update?.lastError ?? previous?.lastError ?? create.lastError,
+      };
+      // Drop undefined optional keys to keep the file clean.
+      for (const key of Object.keys(merged) as Array<keyof StateRowV3>) {
+        if (merged[key] === undefined) delete merged[key];
+      }
+      data[where.id] = merged;
       writeDB(data);
-      return { id: where.id, applied, updatedAt: new Date(now), snapshot: data[where.id].snapshot, meta: data[where.id].meta };
+      return { id: where.id, ...data[where.id], updatedAt: new Date(data[where.id].updatedAt) };
     },
 
     updateMany: async ({ where, data: updateData }: {
       where: { id: string };
-      data: { applied: boolean };
+      data: Partial<Omit<OptimizationEntry, 'id' | 'updatedAt'>>;
     }): Promise<{ count: number }> => {
-      const data = readDB();
-      if (data[where.id]) {
-        data[where.id] = { ...data[where.id], applied: updateData.applied, updatedAt: new Date().toISOString() };
-        writeDB(data);
+      const stateData = readDB();
+      if (stateData[where.id]) {
+        stateData[where.id] = { ...stateData[where.id], ...updateData, updatedAt: new Date().toISOString() };
+        writeDB(stateData);
         return { count: 1 };
       }
       return { count: 0 };

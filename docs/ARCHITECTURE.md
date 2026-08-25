@@ -101,3 +101,18 @@ La migración requiere un binario auxiliar propio (también resolvería timer re
 ## 10. Compatibilidad Windows 11 / anti-cheat
 
 `/api/system/context` expone build, edición, forma factor, batería, Secure Boot, TPM (versión), VBS/HVCI, hipervisor, blocklist de drivers vulnerables y anti-cheats detectados (Vanguard, EAC, BattlEye, FACEIT, nProtect) con estado de compatibilidad honesto (`potential-conflict`, `no-known-conflict`). Nunca se afirma "anti-cheat safe".
+
+## 11. Motores de diagnóstico (2026)
+
+| Módulo | Qué mide | Endpoint |
+|---|---|---|
+| diagnostics/engines.ts (thermal/storage/input) | Temperaturas CPU/GPU (WMI + nvidia-smi), salud/espacio de discos, precisión del puntero, DPC agregado | /api/diagnostics/{thermal,storage,input} (input via engines) |
+| diagnostics/network.ts | Ping/jitter/pérdida a gateway e Internet, adaptadores, Wi-Fi señal/banda, bufferbloat (idle vs carga) | /api/diagnostics/network |
+| diagnostics/known-issues.ts | Drivers problemáticos conocidos (inpoutx64.sys, suites RGB kernel) | incluido en overview/contexto |
+| diagnostics/overview.ts | Health score real (#58): penaliza problemas medidos; cero peso para tweaks aplicados | /api/diagnostics/overview (?fast=1 omite red) |
+
+Limitaciones honestas: el DPC agregado no identifica el driver causante (requiere ETW/xperf); FPS/frame-time requieren helper nativo futuro; temperaturas no disponibles en todo el hardware.
+
+## 12. Modelo de estado por optimización (#7)
+
+Cada fila del archivo de estado puede contener: pplied, snapshot, meta, lastAppliedAt, lastRevertedAt, lastVerifiedAt, erificationStatus (erified|drifted|error|unknown) y lastError. /api/optimization/state re-verifica contra Windows y reconcilia el drift automáticamente.
