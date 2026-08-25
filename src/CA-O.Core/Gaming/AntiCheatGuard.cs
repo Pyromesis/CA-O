@@ -43,7 +43,7 @@ public static class AntiCheatGuard
 
     public static RecommendationReason Evaluate(OptimizationDefinition definition, SystemContext context)
     {
-        var antiCheatPresent = context.AntiCheats.Count > 0;
+        var antiCheatPresent = context.AntiCheats.Count > 0 || context.KernelProtectedGameRunning;
         var reducesSecurity = definition.SecurityImpact == SecurityImpact.ReducedProtection ||
                               definition.Flags.HasFlag(OptimizationFlags.SecurityTradeoff);
 

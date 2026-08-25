@@ -108,6 +108,14 @@ public sealed partial class DashboardPage : Page
             });
 
             ThermalBar.IsOpen = context.ThermalState == ThermalState.Throttling;
+            RecoveryBar.IsOpen = AppServices.State.RecoveryCandidates.Count > 0;
+            PendingRebootBar.IsOpen = context.PendingReboot;
+            if (context.PendingReboot)
+            {
+                PendingRebootBar.Message = "Reinicio pendiente por: " +
+                    string.Join(", ", context.PendingRebootReasons) + ".";
+            }
+
             AppServices.State.LastAnalysisUtc = DateTime.UtcNow;
         }
         catch (Exception ex)

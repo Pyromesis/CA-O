@@ -1,5 +1,6 @@
 using System.Management;
 using CAO.Core.Abstractions;
+using CAO.Core.Gaming;
 using CAO.Infrastructure.Gaming;
 using CAO.Infrastructure.Security;
 using CAO.Shared;
@@ -19,18 +20,21 @@ public sealed class SystemContextProvider : ISystemContextProvider
     private readonly AntiCheatScanProvider _antiCheats;
     private readonly ThermalDiagnosticsProvider _thermals;
     private readonly GameDetectionProvider _games;
+    private readonly PendingRebootProvider _pendingReboot;
 
     public SystemContextProvider(
         WmiSystemInfoProvider? systemInfo = null,
         SecurityDiagnosticsProvider? security = null,
         AntiCheatScanProvider? antiCheats = null,
         ThermalDiagnosticsProvider? thermals = null,
-        GameDetectionProvider? games = null)
+        GameDetectionProvider? games = null,
+        PendingRebootProvider? pendingReboot = null)
     {
         _systemInfo = systemInfo ?? new WmiSystemInfoProvider();
         _security = security ?? new SecurityDiagnosticsProvider();
         _antiCheats = antiCheats ?? new AntiCheatScanProvider();
         _thermals = thermals ?? new ThermalDiagnosticsProvider();
+        _pendingReboot = pendingReboot ?? new PendingRebootProvider();
         _games = games ?? new GameDetectionProvider();
     }
 
@@ -72,6 +76,11 @@ public sealed class SystemContextProvider : ISystemContextProvider
             HvciEnabled = hvci,
             AntiCheats = antiCheats,
             GamesDetected = games.Select(game => game.Name).ToList(),
+            KernelProtectedGameRunning = games.Any(detected =>
+                CAO.Core.Gaming.GameProfileCatalog.All.FirstOrDefault(profile =>
+                    profile.DisplayName == detected.Name) is { } gp && gp.IsKernelProtected()),
+            PendingReboot = _pendingReboot.Check().Pending,
+            PendingRebootReasons = _pendingReboot.Check().Reasons,
             ThermalState = MapThermal(thermal),
             MeasuredUtc = DateTime.UtcNow,
         };

@@ -2,7 +2,7 @@ using System.ServiceProcess;
 using Microsoft.Win32;
 using CAO.Core.Abstractions;
 
-namespace CAO.Core.Services;
+namespace CAO.Infrastructure.Windows.Services;
 
 /// <summary>
 /// Windows service manager. Start-type changes go through the SCM registry

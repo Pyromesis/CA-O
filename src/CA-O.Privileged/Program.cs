@@ -2,7 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using CAO.Core.Abstractions;
 using CAO.Core.Engine;
-using CAO.Core.Services;
+using CAO.Infrastructure.Windows.Services;
 using CAO.Infrastructure.Gaming;
 using CAO.Infrastructure.Logging;
 using CAO.Infrastructure.Persistence;

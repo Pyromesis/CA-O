@@ -20,6 +20,13 @@
                 Message="No se recomiendan más cambios de rendimiento hasta resolver la refrigeración." />
 
             <InfoBar
+                x:Name="PendingRebootBar"
+                IsOpen="False"
+                Severity="Informational"
+                Title="Reinicio pendiente"
+                Message="Hay un reinicio pendiente; algunos cambios no surtirán efecto hasta reiniciar." />
+
+            <InfoBar
                 x:Name="RecoveryBar"
                 IsOpen="False"
                 Severity="Warning"

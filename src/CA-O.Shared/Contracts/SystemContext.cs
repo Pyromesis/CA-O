@@ -62,6 +62,14 @@ public sealed record SystemContext
     // ---- Games (spec 93) ----
     public IReadOnlyList<string> GamesDetected { get; init; } = Array.Empty<string>();
 
+    /// <summary>A kernel-protected game is installed AND its anti-cheat running.</summary>
+    public bool KernelProtectedGameRunning { get; init; }
+
+    // ---- Pending reboot (spec 26) ----
+    public bool PendingReboot { get; init; }
+
+    public IReadOnlyList<string> PendingRebootReasons { get; init; } = Array.Empty<string>();
+
     // ---- Thermal ----
     public ThermalState ThermalState { get; init; } = ThermalState.Unknown;
 
