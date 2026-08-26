@@ -62,7 +62,7 @@ public sealed class OptimizationTransactionTests
 
         Assert.True(report.Success);
         Assert.Equal(TransactionPhase.Commit, report.FinalPhase);
-        Assert.True(snapshots.Saved.Values.Any(r => r.Manifest.OptimizationId == Definition().Id));
+        Assert.Contains(snapshots.Saved.Values, r => r.Manifest.OptimizationId == Definition().Id);
         // Apply wrote the value; verification observed it.
         Assert.Equal(OptimizationState.AppliedByCao, stub.Detect(registry));
     }

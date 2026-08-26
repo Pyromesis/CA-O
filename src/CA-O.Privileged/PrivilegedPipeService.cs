@@ -146,7 +146,7 @@ internal sealed class PrivilegedPipeService(
         }
 
         // Replay protection: request id and nonce are single-use.
-        if (!_replayGuard.TryAccept(request.RequestId, request.Nonce))
+        if (request is null || !_replayGuard.TryAccept(request.RequestId, request.Nonce))
         {
             return IpcResponse.Rejected(ErrorCodes.IpcReplayDetected, "Solicitud repetida.");
         }

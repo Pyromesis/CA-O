@@ -56,14 +56,14 @@ public sealed class MemorySnapshotStore : ISnapshotStore
 
     public void Save(TransactionSnapshotRecord record) => Saved[record.Manifest.TransactionId] = record;
 
-    public bool TryLoad(Guid transactionId, out TransactionSnapshotRecord? snapshot)
+    public bool TryLoad(Guid transactionId, out TransactionSnapshotRecord? record)
     {
         if (Saved.TryGetValue(transactionId, out var found))
         {
-            snapshot = found;
+            record = found;
             return true;
         }
-        snapshot = null;
+        record = null;
         return false;
     }
 
