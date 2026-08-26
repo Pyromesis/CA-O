@@ -76,23 +76,19 @@ internal sealed class PrivilegedPipeService(
             security);
     }
 
-    /// <summary>Extracts CallerIdentity from the client token via impersonation.</summary>
-    internal static CallerIdentity GetCallerIdentity(NamedPipeServerStream pipe)
+    /// <summary>
+    /// Extracts CallerIdentity from the client token via impersonation
+    /// (P1-8): real SID, name, session id and elevation — no derived values.
+    /// </summary>
+    internal static CallerIdentity GetCallerIdentity(
+        NamedPipeServerStream pipe,
+        CAO.Infrastructure.Windows.Security.WindowsCallerInspector inspector)
     {
         CallerIdentity? captured = null;
         pipe.RunAsClient(() =>
         {
-            using var identity = WindowsIdentity.GetCurrent();
-            var principal = new WindowsPrincipal(identity);
-            var sid = identity.User?.Value ?? "S-0-0";
-            var isElevated = new WindowsPrincipal(WindowsIdentity.GetCurrent())
-                .IsInRole(WindowsBuiltInRole.Administrator);
-            captured = new CallerIdentity(
-                Sid: sid,
-                Name: identity.Name ?? string.Empty,
-                IsAdministrator: principal.IsInRole(new SecurityIdentifier(WellKnownSidType.BuiltinAdministratorsSid, null)),
-                IsElevated: isElevated,
-                SessionId: identity.AuthenticationType == null ? -1 : Environment.CurrentManagedThreadId);
+            using var identity = System.Security.Principal.WindowsIdentity.GetCurrent();
+            captured = inspector.Inspect(identity);
         });
         return captured ?? new CallerIdentity("S-0-0", "?", false, false, -1);
     }
@@ -104,7 +100,7 @@ internal sealed class PrivilegedPipeService(
 
         try
         {
-            var caller = GetCallerIdentity(pipe);
+            var caller = GetCallerIdentity(pipe, new CAO.Infrastructure.Windows.Security.WindowsCallerInspector());
             logger.LogInformation("Conexión IPC de {Sid} ({Name}).", caller.Sid, caller.Name);
 
             var request = await JsonSerializer.DeserializeAsync<IpcRequest>(
