@@ -38,7 +38,15 @@ internal sealed class PrivilegedPipeClient
             Nonce: Convert.ToHexString(RandomNumberGenerator.GetBytes(16)),
             CreatedAtUtc: DateTime.UtcNow,
             Operation: operation,
-            Payload: new OptimizationTargetPayload(optimizationId));
+            Payload: operation switch
+            {
+                PrivilegedOperationKind.ApplyOptimization => new ApplyOptimizationPayload(optimizationId),
+                PrivilegedOperationKind.RevertOptimization => new RevertOptimizationPayload(optimizationId),
+                PrivilegedOperationKind.DetectOptimization => new DetectOptimizationPayload(optimizationId),
+                PrivilegedOperationKind.VerifyOptimization => new VerifyOptimizationPayload(optimizationId),
+                PrivilegedOperationKind.CaptureSnapshot => new CaptureSnapshotPayload(optimizationId),
+                _ => throw new ArgumentOutOfRangeException(nameof(operation)),
+            });
 
         await JsonSerializer.SerializeAsync(pipe, request, JsonOptions, timeout.Token);
         return await JsonSerializer.DeserializeAsync<IpcResponse>(pipe, JsonOptions, timeout.Token);

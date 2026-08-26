@@ -15,8 +15,8 @@ public interface ITransactionJournal
     IReadOnlyList<(Guid TransactionId, IReadOnlyList<TransactionEvent> Events)> LoadAll();
 }
 
-/// <summary>An unfinished transaction detected by scanning journals.</summary>
-public sealed record IncompleteTransaction(
+/// <summary>A transaction whose last journal event is not terminal.</summary>
+public sealed record UnfinishedTransaction(
     Guid TransactionId,
     string OptimizationId,
     TransactionPhase LastPhase,
@@ -24,12 +24,15 @@ public sealed record IncompleteTransaction(
 
 public static class TransactionJournalExtensions
 {
-    /// <summary>Transactions whose last event is not terminal (spec 122).</summary>
-    public static IReadOnlyList<IncompleteTransaction> Incomplete(this ITransactionJournal journal) =>
+    /// <summary>
+    /// Transactions whose last APPENDED event is not terminal (spec 122).
+    /// "Last" = last line in the journal file (append order), never wall-clock.
+    /// </summary>
+    public static IReadOnlyList<UnfinishedTransaction> Incomplete(this ITransactionJournal journal) =>
         journal.LoadAll()
-            .Select(group => (group.TransactionId, Last: group.Events.OrderBy(e => e.TimestampUtc).Last()))
+            .Select(group => (group.TransactionId, Last: group.Events[^1]))
             .Where(item => !TransactionEvent.IsTerminal(item.Last.Phase))
-            .Select(item => new IncompleteTransaction(
+            .Select(item => new UnfinishedTransaction(
                 item.TransactionId,
                 item.Last.OptimizationId,
                 item.Last.Phase,

@@ -25,10 +25,8 @@ internal sealed class PrivilegedPipeService(
     IPrivilegedCallerAuthorizer authorizer) : BackgroundService
 {
     private static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(15);
-    private readonly ConcurrentDictionary<Guid, byte> _requestIds = new();
-    private readonly ConcurrentDictionary<string, byte> _nonces = new(StringComparer.Ordinal);
+    private readonly Core.Security.IIpcReplayGuard _replayGuard = new Core.Security.ReplayCache();
 
-    private readonly IpcReplayGuard _replayGuard = new();
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -148,12 +146,12 @@ internal sealed class PrivilegedPipeService(
         }
 
         // Replay protection: request id and nonce are single-use.
-        if (!_replayGuard.TryAccept(request!.RequestId, request.Nonce))
+        if (!_replayGuard.TryAccept(request.RequestId, request.Nonce))
         {
             return IpcResponse.Rejected(ErrorCodes.IpcReplayDetected, "Solicitud repetida.");
         }
 
-        var optimizationId = ((OptimizationTargetPayload)request.Payload).OptimizationId;
+            var optimizationId = ((IOptimizationIdPayload)request.Payload).OptimizationId;
 
         try
         {
@@ -209,13 +207,4 @@ internal sealed class PrivilegedPipeService(
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
     };
-
-    private sealed class IpcReplayGuard : IIpcReplayGuard
-    {
-        private readonly ConcurrentDictionary<Guid, byte> _ids = new();
-        private readonly ConcurrentDictionary<string, byte> _nonces = new(StringComparer.Ordinal);
-
-        public bool TryAccept(Guid requestId, string nonce) =>
-            _ids.TryAdd(requestId, 0) && _nonces.TryAdd(nonce, 0);
-    }
 }

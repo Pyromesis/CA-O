@@ -21,7 +21,7 @@ public sealed class PrivilegedIpcSecurityTests
             Nonce: Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(16)),
             CreatedAtUtc: DateTime.UtcNow,
             Operation: PrivilegedOperationKind.DetectOptimization,
-            Payload: new OptimizationTargetPayload("disable-vbs"));
+            Payload: new DetectOptimizationPayload("disable-vbs"));
         return mutate?.Invoke(request) ?? request;
     }
 
@@ -42,7 +42,7 @@ public sealed class PrivilegedIpcSecurityTests
     {
         var request = ValidRequest(r => r with
         {
-            Payload = new OptimizationTargetPayload(optimizationId),
+            Payload = new DetectOptimizationPayload(optimizationId),
         });
 
         Assert.False(IpcRequestValidator.TryValidate(request, out _, out _));

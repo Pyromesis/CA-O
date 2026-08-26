@@ -129,7 +129,7 @@ public sealed class OptimizationEngine
         var optimization = Resolve(optimizationId);
         PrepareServiceAwareOptimization(optimization);
 
-        if (!_snapshots.TryLoad(optimizationId, out var snapshot))
+        if (!_snapshots.TryLoadLatestForOptimization(optimizationId, out var record) || record is null)
         {
             return OperationResult.Fail("No hay snapshot guardado para esta optimizaci├│n.", "no-snapshot");
         }
@@ -138,7 +138,7 @@ public sealed class OptimizationEngine
         OperationResult result;
         try
         {
-            result = await optimization.RevertAsync(context, snapshot, ct);
+            result = await optimization.RevertAsync(context, record.State, ct);
         }
         catch (Exception ex)
         {
@@ -147,21 +147,35 @@ public sealed class OptimizationEngine
 
         if (result.Success)
         {
-            _snapshots.Delete(optimizationId);
+            _snapshots.Delete(record.Manifest.TransactionId);
         }
 
-        LogLegacy(optimizationId, "revert", result.Success, snapshot, error: result.Error);
+        LogLegacy(optimizationId, "revert", result.Success, record.State, error: result.Error);
         return result;
     }
 
-    /// <summary>Persists a fresh snapshot without changing anything.</summary>
+    /// <summary>Persists a fresh snapshot under a NEW transaction identity (P0-3).</summary>
     public SnapshotDescriptor CaptureSnapshot(string optimizationId)
     {
         var optimization = Resolve(optimizationId);
         PrepareServiceAwareOptimization(optimization);
         var snapshot = optimization.Capture(_registry);
-        _snapshots.Save(optimizationId, snapshot);
-        return new SnapshotDescriptor(optimizationId, snapshot.TimestampUtc, snapshot.Registry.Count);
+        var txid = Guid.NewGuid();
+        _snapshots.Save(new CAO.Core.Rollback.TransactionSnapshotRecord
+        {
+            Manifest = new CAO.Core.Rollback.TransactionSnapshotManifest
+            {
+                TransactionId = txid,
+                OptimizationId = optimizationId,
+                DefinitionVersion = AppVersion.Semantic,
+                SchemaVersion = CAO.Core.Rollback.TransactionSnapshotDefaults.SchemaVersion,
+                AppVersion = AppVersion.Semantic,
+                WindowsBuild = 0,
+                TimestampUtc = DateTime.UtcNow,
+            },
+            State = snapshot,
+        });
+        return new SnapshotDescriptor(txid.ToString("D"), snapshot.TimestampUtc, snapshot.Registry.Count);
     }
 
     /// <summary>Runs the VERIFY phase against live system state.</summary>

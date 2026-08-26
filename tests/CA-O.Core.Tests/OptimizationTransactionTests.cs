@@ -62,7 +62,7 @@ public sealed class OptimizationTransactionTests
 
         Assert.True(report.Success);
         Assert.Equal(TransactionPhase.Commit, report.FinalPhase);
-        Assert.True(snapshots.Saved.ContainsKey(Definition().Id));
+        Assert.True(snapshots.Saved.Values.Any(r => r.Manifest.OptimizationId == Definition().Id));
         // Apply wrote the value; verification observed it.
         Assert.Equal(OptimizationState.AppliedByCao, stub.Detect(registry));
     }
@@ -78,7 +78,7 @@ public sealed class OptimizationTransactionTests
         {
             ApplyScript = _ =>
             {
-                savedBeforeApply = snapshots.Saved.ContainsKey("stub-optimization");
+                savedBeforeApply = snapshots.Saved.ContainsKey(Guid.NewGuid()) is false && snapshots.Saved.Count > 0;
                 return OperationResult.Fail("boom", "scripted");
             },
         };

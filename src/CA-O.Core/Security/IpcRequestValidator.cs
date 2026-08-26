@@ -56,19 +56,38 @@ public static class IpcRequestValidator
             return false;
         }
 
-        if (request.Payload is not OptimizationTargetPayload target)
+                if (request.Payload is not global::CAO.Shared.IPC.IOptimizationIdPayload target)
         {
             errorCode = ErrorCodes.IpcPayloadSchemaInvalid;
-            error = "Payload no coincide con el esquema de la operación.";
+            error = "Payload no coincide con el esquema de la operacion.";
+            return false;
+        }
+
+        // P1-12: Operation <-> PayloadType must agree exactly.
+        var expectedType = request.Operation switch
+        {
+            PrivilegedOperationKind.ApplyOptimization => typeof(global::CAO.Shared.IPC.ApplyOptimizationPayload),
+            PrivilegedOperationKind.RevertOptimization => typeof(global::CAO.Shared.IPC.RevertOptimizationPayload),
+            PrivilegedOperationKind.DetectOptimization => typeof(global::CAO.Shared.IPC.DetectOptimizationPayload),
+            PrivilegedOperationKind.VerifyOptimization => typeof(global::CAO.Shared.IPC.VerifyOptimizationPayload),
+            PrivilegedOperationKind.CaptureSnapshot => typeof(global::CAO.Shared.IPC.CaptureSnapshotPayload),
+            _ => null,
+        };
+
+        if (expectedType is null || request.Payload.GetType() != expectedType)
+        {
+            errorCode = ErrorCodes.IpcPayloadSchemaInvalid;
+            error = "El tipo de payload no corresponde a la operacion solicitada.";
             return false;
         }
 
         if (string.IsNullOrWhiteSpace(target.OptimizationId) ||
             !Regex.IsMatch(target.OptimizationId, "^[a-z0-9-]{1,80}$"))
         {
-            error = "OptimizationId no válido.";
+            error = "OptimizationId no valido.";
             return false;
         }
+
 
         error = string.Empty;
         return true;

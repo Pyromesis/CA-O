@@ -70,17 +70,25 @@ public static class RegistryKind2WireExtensions
         _ => throw new ArgumentOutOfRangeException(nameof(kind)),
     };
 
-    public static RegistryValueKind2 ParseWire(string wire) => wire switch
+    public static bool TryParseWire(string wire, out RegistryValueKind2 kind)
     {
-        "REG_NONE" => RegistryValueKind2.None,
-        "REG_SZ" => RegistryValueKind2.String,
-        "REG_EXPAND_SZ" => RegistryValueKind2.ExpandString,
-        "REG_BINARY" => RegistryValueKind2.Binary,
-        "REG_DWORD" => RegistryValueKind2.DWord,
-        "REG_MULTI_SZ" => RegistryValueKind2.MultiString,
-        "REG_QWORD" => RegistryValueKind2.QWord,
-        _ => throw new FormatException($"Unknown registry kind '{wire}'."),
-    };
+        switch (wire)
+        {
+            case "REG_NONE": kind = RegistryValueKind2.None; return true;
+            case "REG_SZ": kind = RegistryValueKind2.String; return true;
+            case "REG_EXPAND_SZ": kind = RegistryValueKind2.ExpandString; return true;
+            case "REG_BINARY": kind = RegistryValueKind2.Binary; return true;
+            case "REG_DWORD": kind = RegistryValueKind2.DWord; return true;
+            case "REG_MULTI_SZ": kind = RegistryValueKind2.MultiString; return true;
+            case "REG_QWORD": kind = RegistryValueKind2.QWord; return true;
+            default: kind = RegistryValueKind2.None; return false;
+        }
+    }
+
+    public static RegistryValueKind2 ParseWire(string wire) =>
+        TryParseWire(wire, out var kind)
+            ? kind
+            : throw new FormatException("Unknown registry kind '" + wire + "'.");
 }
 
 public static class RegistrySnapshotExtensions

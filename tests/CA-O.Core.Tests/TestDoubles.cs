@@ -1,4 +1,5 @@
 using CAO.Core.Abstractions;
+using CAO.Core.Rollback;
 using CAO.Shared;
 
 namespace CAO.Core.Tests;
@@ -43,30 +44,54 @@ public sealed class MemoryRegistry : IRegistryAccessor
 
 public sealed class MemorySnapshotStore : ISnapshotStore
 {
-    public Dictionary<string, OptimizationSnapshot> Saved { get; } = new(StringComparer.Ordinal);
+    private readonly object _gate = new();
+    public Dictionary<Guid, TransactionSnapshotRecord> Saved { get; } = new();
 
-    public List<string> Deleted { get; } = [];
+    public List<Guid> Deleted { get; } = [];
 
-    public IEnumerable<string> ListIds() => Saved.Keys;
+    public IEnumerable<Guid> ListIds() => Saved.Keys;
 
-    public void Save(string optimizationId, OptimizationSnapshot snapshot) => Saved[optimizationId] = snapshot;
+    public IReadOnlyList<TransactionSnapshotRecord> ListAll() =>
+        Saved.Values.OrderBy(r => r.Manifest.TimestampUtc).ToList();
 
-    public bool TryLoad(string optimizationId, out OptimizationSnapshot snapshot)
+    public void Save(TransactionSnapshotRecord record) => Saved[record.Manifest.TransactionId] = record;
+
+    public bool TryLoad(Guid transactionId, out TransactionSnapshotRecord? snapshot)
     {
-        if (Saved.TryGetValue(optimizationId, out var found))
+        if (Saved.TryGetValue(transactionId, out var found))
         {
             snapshot = found;
             return true;
         }
-        snapshot = new OptimizationSnapshot();
+        snapshot = null;
         return false;
     }
 
-    public void Delete(string optimizationId)
+    public bool TryLoadLatestForOptimization(string optimizationId, out TransactionSnapshotRecord? record)
     {
-        Deleted.Add(optimizationId);
-        Saved.Remove(optimizationId);
+        record = Saved.Values
+            .Where(r => r.Manifest.OptimizationId.Equals(optimizationId, StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(r => r.Manifest.TimestampUtc)
+            .FirstOrDefault();
+        return record is not null;
     }
+
+    public void Delete(Guid transactionId)
+    {
+        Deleted.Add(transactionId);
+        Saved.Remove(transactionId);
+    }
+
+    // legacy API not exercised by transaction tests
+    public bool TryLoadLegacy(string optimizationId, out OptimizationSnapshot? snapshot)
+    {
+        snapshot = null;
+        return false;
+    }
+
+    public void DeleteLegacy(string optimizationId) { }
+
+    public IReadOnlyList<string> ListLegacyIds() => Array.Empty<string>();
 }
 
 public sealed class MemoryHistory : IHistoryLogger

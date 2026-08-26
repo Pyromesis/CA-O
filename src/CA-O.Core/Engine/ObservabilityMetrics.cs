@@ -27,7 +27,7 @@ public sealed record ObservabilityMetrics
     {
         var transactions = groups
             .Where(group => group.Events.Count > 0)
-            .Select(group => group.Events.OrderBy(e => e.TimestampUtc).Last())
+            .Select(group => group.Events[^1])
             .ToList();
 
         int committed = 0, rolledBack = 0, failed = 0, rollbackNotVerified = 0;

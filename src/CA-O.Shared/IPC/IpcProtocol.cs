@@ -31,14 +31,31 @@ public enum PrivilegedOperationKind
 /// Marker for operation-specific payloads (FASE 3). Each request type
 /// carries only its own parameters — no grab-bag parameter bags.
 /// </summary>
+/// <summary>Payloads carrying a single optimization id.</summary>
+public interface IOptimizationIdPayload : ITypedPayload
+{
+    string OptimizationId { get; }
+}
+
 [JsonPolymorphic(TypeDiscriminatorPropertyName = "$payload")]
-[JsonDerivedType(typeof(OptimizationTargetPayload), "target")]
+[JsonDerivedType(typeof(ApplyOptimizationPayload), "apply")]
+[JsonDerivedType(typeof(RevertOptimizationPayload), "revert")]
+[JsonDerivedType(typeof(DetectOptimizationPayload), "detect")]
+[JsonDerivedType(typeof(VerifyOptimizationPayload), "verify")]
+[JsonDerivedType(typeof(CaptureSnapshotPayload), "snapshot")]
 public interface ITypedPayload
 {
 }
 
-/// <summary>Targeted payload shared by the five catalog operations.</summary>
-public sealed record OptimizationTargetPayload(string OptimizationId) : ITypedPayload;
+public sealed record ApplyOptimizationPayload(string OptimizationId) : IOptimizationIdPayload;
+
+public sealed record RevertOptimizationPayload(string OptimizationId) : IOptimizationIdPayload;
+
+public sealed record DetectOptimizationPayload(string OptimizationId) : IOptimizationIdPayload;
+
+public sealed record VerifyOptimizationPayload(string OptimizationId) : IOptimizationIdPayload;
+
+public sealed record CaptureSnapshotPayload(string OptimizationId) : IOptimizationIdPayload;
 
 /// <summary>
 /// Versioned request envelope. Every field is validated by the service

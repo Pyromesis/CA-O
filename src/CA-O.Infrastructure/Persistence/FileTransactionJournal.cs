@@ -85,5 +85,8 @@ public sealed class FileTransactionJournal : ITransactionJournal
         return result;
     }
 
+    public string DebugDirectory() => _directory;
+
     private string PathFor(Guid txid) => Path.Combine(_directory, txid.ToString("D") + ".jsonl");
+
 }

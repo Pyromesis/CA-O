@@ -3,98 +3,128 @@ using CAO.Shared;
 
 namespace CAO.Core.Rollback;
 
-/// <summary>A change left in an undetermined state by a crashed run (spec 13).</summary>
-public sealed record RecoveryCandidate(
+/// <summary>Recovery verdicts for an incomplete transaction (spec 12/FASE 12).</summary>
+public enum RecoveryDecision
+{
+    /// <summary>No mutation could have started (failed before SNAPSHOT).</summary>
+    SafeToIgnore,
+
+    /// <summary>Journal shows Commit; only cleanup of the snapshot remains.</summary>
+    AlreadyCommitted,
+
+    /// <summary>APPLY reached and live state differs from the pre-state.</summary>
+    RollbackRequired,
+
+    /// <summary>Cannot decide automatically; user must inspect.</summary>
+    RecoveryRequired,
+
+    /// <summary>Snapshot missing/unreadable though APPLY may have run.</summary>
+    Corrupted,
+
+    Unknown,
+}
+
+/// <summary>An unfinished transaction with its recovery verdict.</summary>
+public sealed record IncompleteTransaction(
+    Guid TransactionId,
     string OptimizationId,
-    DateTime SnapshotUtc,
+    TransactionPhase LastPhase,
+    DateTime LastTransitionUtc,
+    bool HasSnapshot,
     OptimizationState LiveState,
-    string ReasonEs);
+    RecoveryDecision Decision);
 
 /// <summary>
-/// Crash recovery engine (spec 13). A snapshot that exists on disk while the
-/// history shows no committed+verified apply for the same optimization means
-/// the process died mid-operation: state is Incomplete. The engine never
-/// assumes "apply == success"; it compares the live state and offers
-/// rollback through the caller (service/UI), then MarkRecovered closes it.
+/// Crash recovery driven EXCLUSIVELY by the transaction journal (P0-4):
+/// journal → group by TransactionId → non-terminal last event = incomplete →
+/// resolve snapshot by TransactionId → compare live state → decide. History
+/// is never used to determine completeness.
 /// </summary>
 public sealed class CrashRecoveryService
 {
-    private readonly ISnapshotStore _store;
-    private readonly IHistoryLogger _history;
+    private readonly ITransactionJournal _journal;
+    private readonly ISnapshotStore _snapshots;
     private readonly Func<string, OptimizationState> _detectLive;
 
     public CrashRecoveryService(
-        ISnapshotStore store,
-        IHistoryLogger history,
+        ITransactionJournal journal,
+        ISnapshotStore snapshots,
         Func<string, OptimizationState> detectLive)
     {
-        _store = store;
-        _history = history;
+        _journal = journal;
+        _snapshots = snapshots;
         _detectLive = detectLive;
     }
 
-    /// <summary>Scans persisted snapshots against history to find incomplete operations.</summary>
-    public IReadOnlyList<RecoveryCandidate> Scan()
+    public IReadOnlyList<IncompleteTransaction> Scan()
     {
-        var candidates = new List<RecoveryCandidate>();
-        var entriesByOptimization = _history.ReadLast(int.MaxValue)
-            .GroupBy(entry => entry.OptimizationId, StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(group => group.Key, group => group.ToList(), StringComparer.OrdinalIgnoreCase);
+        var result = new List<IncompleteTransaction>();
 
-        foreach (var snapshotId in _store.ListIds())
+        foreach (var incomplete in _journal.Incomplete())
         {
-            if (!_store.TryLoad(snapshotId, out var snapshot))
+            var hasSnapshot = _snapshots.TryLoad(incomplete.TransactionId, out var record);
+            var live = SafeDetect(incomplete.OptimizationId);
+            var phaseReachedApply = incomplete.LastPhase is TransactionPhase.Apply
+                or TransactionPhase.Verify
+                or TransactionPhase.BenchmarkStarted
+                or TransactionPhase.Commit;
+
+            RecoveryDecision decision;
+            if (!hasSnapshot || record is null)
             {
-                continue;
+                decision = phaseReachedApply ? RecoveryDecision.Corrupted : RecoveryDecision.SafeToIgnore;
+            }
+            else if (phaseReachedApply)
+            {
+                // Compare live registry state against the captured pre-state.
+                var liveMatchesPreState = LiveMatchesPreState(record.State, live);
+                decision = liveMatchesPreState ? RecoveryDecision.SafeToIgnore : RecoveryDecision.RollbackRequired;
+            }
+            else if (live == OptimizationState.Unknown)
+            {
+                decision = RecoveryDecision.Unknown;
+            }
+            else
+            {
+                decision = RecoveryDecision.SafeToIgnore;
             }
 
-            entriesByOptimization.TryGetValue(snapshotId, out var entries);
-            var last = entries?.OrderBy(entry => entry.TimestampUtc).LastOrDefault();
-
-            var committed = last is not null &&
-                            last.Operation is "apply" or "recovery" &&
-                            last.Success &&
-                            last.Verification is "passed" or "pending-reboot";
-
-            if (committed)
-            {
-                continue; // healthy: change applied, verified, snapshot kept for future rollback
-            }
-
-            candidates.Add(new RecoveryCandidate(
-                snapshotId,
-                snapshot.TimestampUtc,
-                SafeDetect(snapshotId),
-                ReasonFor(last)));
+            result.Add(new IncompleteTransaction(
+                incomplete.TransactionId,
+                incomplete.OptimizationId,
+                incomplete.LastPhase,
+                incomplete.LastTransitionUtc,
+                hasSnapshot,
+                live,
+                decision));
         }
 
-        return candidates;
+        return result;
     }
 
-    /// <summary>Closes a recovery after the caller performed the actual revert.</summary>
-    public void MarkRecovered(string optimizationId, bool revertSucceeded)
+    /// <summary>Closes an incomplete transaction after the caller performed recovery.</summary>
+    public void MarkRecovered(Guid transactionId, string optimizationId, bool recovered)
     {
-        _history.Log(new HistoryEntry
-        {
-            TimestampUtc = DateTime.UtcNow,
-            AppVersion = AppVersion.Semantic,
-            User = Environment.UserName,
-            OptimizationId = optimizationId,
-            Operation = "recovery",
-            Success = revertSucceeded,
-            Verification = revertSucceeded ? "passed" : "failed",
-            Error = revertSucceeded ? null : "La reversión de recuperación falló; revise el estado manualmente.",
-        });
-
-        if (revertSucceeded)
-        {
-            _store.Delete(optimizationId);
-        }
+        _journal.Append(new TransactionEvent(
+            transactionId, optimizationId, DateTime.UtcNow,
+            TransactionPhase.RecoveryCompleted, Terminal: true,
+            ErrorCode: recovered ? null : "CAO-ROLLBACK-001"));
     }
 
-    /// <summary>True when the live system no longer reflects the applied change.</summary>
-    public bool LiveStateMatchesSnapshotExpectation(RecoveryCandidate candidate) =>
-        candidate.LiveState is OptimizationState.NotApplied or OptimizationState.Unknown;
+    /// <summary>True when any pending recovery must block new mutations (FASE 12).</summary>
+    public bool HasPendingRecovery() =>
+        Scan().Any(candidate => candidate.Decision is RecoveryDecision.RollbackRequired
+                                                or RecoveryDecision.RecoveryRequired
+                                                or RecoveryDecision.Corrupted);
+
+    private bool LiveMatchesPreState(OptimizationSnapshot preState, OptimizationState live)
+    {
+        // A pre-state whose entries all read as NotApplied means nothing was
+        // applied yet: safe.
+        return live == OptimizationState.NotApplied || live == OptimizationState.Unknown
+            ? live != OptimizationState.AppliedByCao && live != OptimizationState.AppliedManually
+            : false;
+    }
 
     private OptimizationState SafeDetect(string optimizationId)
     {
@@ -107,12 +137,4 @@ public sealed class CrashRecoveryService
             return OptimizationState.Unknown;
         }
     }
-
-    private static string ReasonFor(HistoryEntry? last) => last switch
-    {
-        null => "Snapshot sin registro de operación: el proceso murió antes o durante APPLY.",
-        { Operation: "precheck" } => "El proceso murió después del PRECHECK y antes de APPLY.",
-        { Success: false } => $"Última operación '{last.Operation}' terminó en fallo sin cierre limpio.",
-        _ => "Última operación sin verificación registrada.",
-    };
 }

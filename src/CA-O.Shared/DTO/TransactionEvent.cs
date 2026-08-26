@@ -13,7 +13,9 @@ public sealed record TransactionEvent(
     [property: JsonPropertyName("utc")] DateTime TimestampUtc,
     [property: JsonPropertyName("phase")] TransactionPhase Phase,
     [property: JsonPropertyName("terminal")] bool Terminal,
-    [property: JsonPropertyName("code")] string? ErrorCode)
+    [property: JsonPropertyName("code")] string? ErrorCode,
+    [property: JsonPropertyName("bySid")] string? RequestedBySid = null,
+    [property: JsonPropertyName("byName")] string? RequestedByName = null)
 {
     /// <summary>Phases that close a transaction cleanly.</summary>
     public static bool IsTerminal(TransactionPhase phase) =>

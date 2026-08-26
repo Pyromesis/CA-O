@@ -59,10 +59,36 @@ public sealed class OptimizeSystemDrive : IOptimization
                 : "Optimize-Volume -DriveLetter C -ReTrim",
         ], ct);
 
+        _lastApplyExitCode = result.ExitCode;
+        LastOperationExecuted = key == SystemCommandKey.OptimizeVolumeDefragC ? "-Defrag" : "-ReTrim";
+
         return result.Success
             ? OperationResult.Ok("Optimización de disco completada.")
             : OperationResult.Fail("Optimize-Volume falló.", result.StdErr);
     }
+
+    /// <summary>
+    /// P0-5: irreversible != unverifiable. Verification is based on the
+    /// execution evidence captured during Apply (exit code + operation
+    /// performed against the expected volume), not on registry state.
+    /// </summary>
+    public Task<VerificationResult> VerifyAsync(OptimizationContext context, CancellationToken ct = default)
+    {
+        if (_lastApplyExitCode is null)
+        {
+            return Task.FromResult(VerificationResult.Unknown(OptimizationState.Unknown,
+                "No hay evidencia de ejecución de Optimize-Volume."));
+        }
+
+        return _lastApplyExitCode == 0
+            ? Task.FromResult(VerificationResult.Passed(OptimizationState.Unknown,
+                $"Optimize-Volume ({LastOperationExecuted}) ejecutado con exit=0."))
+            : Task.FromResult(VerificationResult.Failed(OptimizationState.Unknown,
+                $"Optimize-Volume terminó con exit={_lastApplyExitCode}."));
+    }
+
+    private int? _lastApplyExitCode;
+    private string? LastOperationExecuted;
 
     public Task<OperationResult> RevertAsync(OptimizationContext context, OptimizationSnapshot snapshot, CancellationToken ct = default) =>
         Task.FromResult(OperationResult.Ok("La optimización de disco no se revierte (mantenimiento)."));

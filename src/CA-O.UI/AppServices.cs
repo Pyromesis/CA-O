@@ -17,18 +17,12 @@ internal static class AppServices
 
     public static Infrastructure.Persistence.FileSnapshotStore Snapshots { get; } = new();
 
-    public static PrivilegedPipeClient Pipe { get; } = new();
+    public static Infrastructure.Persistence.FileTransactionJournal Journal { get; } = new();
 
-    public static Infrastructure.Windows.SystemRegistry.RegistryAccessor Registry { get; } = new();
-
-    /// <summary>Catalog instances used read-only by the UI for detection.</summary>
-    public static IReadOnlyList<Core.Abstractions.IOptimization> Catalog { get; } =
-        Core.Catalog.OptimizationCatalog.All;
-
-    /// <summary>Crash-recovery scanner over persisted snapshots + history (spec 13).</summary>
+    /// <summary>Crash-recovery scanner driven by the transaction journal (spec 12).</summary>
     public static Core.Rollback.CrashRecoveryService Recovery { get; } = new(
+        Journal,
         Snapshots,
-        History,
         id => DetectSafe(id));
 
     private static OptimizationState DetectSafe(string optimizationId)
@@ -44,4 +38,12 @@ internal static class AppServices
             return OptimizationState.Unknown;
         }
     }
+
+    public static PrivilegedPipeClient Pipe { get; } = new();
+
+    public static Infrastructure.Windows.SystemRegistry.RegistryAccessor Registry { get; } = new();
+
+    /// <summary>Catalog instances used read-only by the UI for detection.</summary>
+    public static IReadOnlyList<Core.Abstractions.IOptimization> Catalog { get; } =
+        Core.Catalog.OptimizationCatalog.All;
 }
