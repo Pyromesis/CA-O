@@ -50,7 +50,7 @@ public sealed class RegistryExactRoundTripTests
         if (entry.Existed)
         {
             registry.SetValueRaw(RegistryHive2.CurrentUser, entry.KeyPath, entry.ValueName,
-                entry.Value, entry.Kind);
+                entry.Value!, entry.Kind);
         }
         else
         {

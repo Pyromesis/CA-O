@@ -40,7 +40,7 @@ public sealed class ResourceLockTests
         {
             var current = Interlocked.Increment(ref _running);
             _maxRunning = Math.Max(_maxRunning, current);
-            await Task.Delay(80);
+            await Task.Delay(80, CancellationToken.None);
             Interlocked.Decrement(ref _running);
             return OperationResult.Ok("ok");
         }

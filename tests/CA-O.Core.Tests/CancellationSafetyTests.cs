@@ -50,7 +50,7 @@ public sealed class CancellationSafetyTests
         {
             // Atomic mutation: deliberately does NOT observe ct mid-flight.
             MutationStarted.TrySetResult();
-            await Task.Delay(delayMs);
+            await Task.Delay(delayMs, CancellationToken.None);
             context.Registry.SetValue(RegistryHive2.CurrentUser, @"SOFTWARE\CA-O\Cancel", "V",
                 1, RegistryValueKind2.DWord);
             MutationCompleted = true;

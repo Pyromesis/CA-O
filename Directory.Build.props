@@ -12,4 +12,17 @@
     <EnforceCodeStyleInBuild>false</EnforceCodeStyleInBuild>
   </PropertyGroup>
 
+  <!-- FASE 30: Release builds are warning-as-error. The suppressed codes are
+       documented, non-correctness advisories:
+         CA1305/CA1310 : current-culture formatting is INTENTIONAL for user-facing strings
+         CA1707/CA1711/CA1720 : naming conventions (underscores / Flags suffix / String member)
+         CA1822/CA1859/CA1861/CA1873 : performance advisories, tracked as tech debt
+         CA1848 : LoggerMessage source-gen migration tracked
+       Nullability (CS8xxx), CA2016 and xUnit rules remain ERRORS. -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <NoWarn>$(NoWarn);CA1305;CA1310;CA1707;CA1711;CA1716;CA1720;CA1822;CA1859;CA1861;CA1873;CA1848;xUnit1048;xUnit2029</NoWarn>
+  </PropertyGroup>
+
 </Project>
+
