@@ -202,6 +202,7 @@ public sealed class OptimizationTransaction
             {
                 // No automatic rollback exists for irreversible changes:
                 // report honestly and leave evidence for recovery/manual fix.
+                await lease.DisposeAsync();
                 Journal(TransactionPhase.Failed, verifyCode);
                 Log(definition.Id, "verify", false, definition.Id,
                     error: $"Verificación {verification.Status} en cambio irreversible.",

@@ -25,8 +25,8 @@ public sealed record SystemBenchmarkComparison(double CpuDeltaPercent, double Me
 /// </summary>
 public sealed class SystemBenchmarkRunner
 {
-    /// <summary>Below this delta the change is declared "no measurable improvement".</summary>
-    public const double NoiseFloorPercent = 3.0;
+    /// <summary>Below this delta the change is declared "no measurable improvement" (single source: BenchmarkPolicy).</summary>
+    public const double NoiseFloorPercent = Core.Benchmark.BenchmarkPolicy.MinimumEffectPercent;
 
     /// <summary>
     /// Scientific run (FASE 21): optional warmup pass (discarded), then N
@@ -39,9 +39,9 @@ public sealed class SystemBenchmarkRunner
         string workloadId = "system-baseline",
         CancellationToken ct = default)
     {
-        if (warmup)
+        for (var warm = 0; warm < Core.Benchmark.BenchmarkPolicy.WarmupRuns; warm++)
         {
-            await RunAsync(workloadId + "-warmup", ct);
+            await RunAsync(workloadId + "-warmup" + (warm + 1), ct);
         }
 
         var results = new List<SystemBenchmarkResult>(trials);
