@@ -11,7 +11,7 @@ namespace CAO.Infrastructure.SystemInterop;
 /// Aggregates measured diagnostics into the SystemContext consumed by
 /// preconditions, recommendation buckets and profile gating. Everything here
 /// is read-only observation; unknown facts stay null/false rather than being
-/// invented.
+/// invented. Implements responsible caching (Fase 48) with TTL/invalidation.
 /// </summary>
 public sealed class SystemContextProvider : ISystemContextProvider
 {
@@ -21,6 +21,7 @@ public sealed class SystemContextProvider : ISystemContextProvider
     private readonly ThermalDiagnosticsProvider _thermals;
     private readonly GameDetectionProvider _games;
     private readonly PendingRebootProvider _pendingReboot;
+    private readonly SystemContextCache _cache = new();
 
     public SystemContextProvider(
         WmiSystemInfoProvider? systemInfo = null,
@@ -38,8 +39,15 @@ public sealed class SystemContextProvider : ISystemContextProvider
         _games = games ?? new GameDetectionProvider();
     }
 
+    public void InvalidateCache() => _cache.Invalidate();
+
     public async Task<SystemContext> GetAsync(CancellationToken ct = default)
     {
+        if (_cache.TryGet(out var cached) && cached is not null)
+        {
+            return cached;
+        }
+
         var info = await _systemInfo.GetAsync(ct);
         var securityReport = _security.Measure();
         var antiCheats = _antiCheats.Scan();
@@ -53,7 +61,7 @@ public sealed class SystemContextProvider : ISystemContextProvider
         var vbs = securityReport.Features.FirstOrDefault(feature => feature.Name == "VBS")?.Enabled;
         var hvci = securityReport.Features.FirstOrDefault(feature => feature.Name == "HVCI")?.Enabled;
 
-        return new SystemContext
+        var context = new SystemContext
         {
             WindowsBuild = info.WindowsBuild,
             WindowsEdition = info.WindowsEdition,
@@ -84,6 +92,8 @@ public sealed class SystemContextProvider : ISystemContextProvider
             ThermalState = MapThermal(thermal),
             MeasuredUtc = DateTime.UtcNow,
         };
+        _cache.Set(context);
+        return context;
     }
 
     private static (string Name, string DriverVersion, int RefreshHz)? QueryPrimaryGpu()
@@ -137,8 +147,6 @@ public sealed class SystemContextProvider : ISystemContextProvider
             using var searcher = new ManagementObjectSearcher("SELECT BatteryStatus FROM Win32_Battery");
             foreach (var battery in searcher.Get())
             {
-                // BatteryStatus 1 == "Other"/discharging on AC-less laptops; 2 == "Unknown";
-                // values 1-5 generally indicate not charging from AC.
                 var status = Convert.ToInt32(battery["BatteryStatus"] ?? 2);
                 return status is 1 or 3 or 4 or 5;
             }
@@ -171,7 +179,6 @@ public sealed class SystemContextProvider : ISystemContextProvider
         }
 
         var max = report.Zones.Select(zone => zone.TemperatureCelsius ?? 0).DefaultIfEmpty(0).Max();
-        // Heuristic thresholds until vendor sensor APIs are wired; documented.
         return max switch
         {
             >= 95 => ThermalState.Throttling,

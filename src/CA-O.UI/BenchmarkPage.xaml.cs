@@ -34,6 +34,7 @@ public sealed partial class BenchmarkPage : Page
         var previous = button.Content;
         button.IsEnabled = false;
         Ring.IsActive = true;
+        if (BenchStatusText is not null) BenchStatusText.Text = "Midiendo…";
         try
         {
             Directory.CreateDirectory(CaOPaths.BenchmarksDirectory);
@@ -75,13 +76,16 @@ public sealed partial class BenchmarkPage : Page
         }
         catch (Exception ex)
         {
-            ComparisonText.Text = $"El benchmark falló: {ex.Message}";
+            ComparisonText.Text = $"{ErrorCodes.UiBenchmarkFailed}: El benchmark no pudo completarse. Cierre cargas pesadas y reintente. [Técnico: {ex.GetType().Name}]";
+            if (BenchStatusText is not null) BenchStatusText.Text = $"{ErrorCodes.UiBenchmarkFailed}: benchmark fallido";
+            App.WriteCrashLog(ex);
         }
         finally
         {
             Ring.IsActive = false;
             button.Content = previous;
             button.IsEnabled = true;
+            if (BenchStatusText is not null && BenchStatusText.Text == "Midiendo…") BenchStatusText.Text = "";
         }
     }
 

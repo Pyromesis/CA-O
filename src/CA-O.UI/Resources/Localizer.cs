@@ -3,6 +3,7 @@ namespace CAO.UI;
 /// <summary>
 /// Typed UI strings (spec 84): es-ES and en-US are first-class. No raw text
 /// scattered through pages; adding a language means adding one dictionary.
+/// All strings flow through Localizer.Get(key); technical identifiers are never translated.
 /// </summary>
 public static class Localizer
 {
@@ -32,10 +33,14 @@ public static class Localizer
         ["dashboard.notApplicable"] = "No aplicables",
         ["dashboard.health"] = "Salud del sistema",
         ["dashboard.findings"] = "Hallazgos",
+        ["dashboard.noClaims"] = "Sin promesas numéricas: solo mediciones.",
         ["analyze.run"] = "Ejecutar diagnósticos",
+        ["analyze.diagnosticsFirst"] = "Diagnósticos primero",
+        ["analyze.diagnosticsFirstMessage"] = "Cada área se mide antes de recomendar cualquier cambio. Nada aquí modifica el sistema.",
         ["optimize.applyRecommended"] = "Aplicar recomendados",
         ["optimize.apply"] = "Aplicar",
         ["optimize.revert"] = "Revertir",
+        ["optimize.preview"] = "Ver cambios",
         ["optimize.expertWarning"] = "Modo Expert activo: los cambios experimentales y sensibles a seguridad quedan visibles pero siguen requiriendo confirmación.",
         ["benchmark.baseline"] = "Medir línea base",
         ["benchmark.after"] = "Medir tras cambio",
@@ -46,7 +51,15 @@ public static class Localizer
         ["settings.language"] = "Idioma",
         ["settings.serviceCheck"] = "Comprobar servicio privilegiado",
         ["common.workloadDependent"] = "Depende de la carga de trabajo",
-        ["common.noClaims"] = "Sin promesas numéricas: sólo mediciones.",
+        ["common.noClaims"] = "Sin promesas numéricas: solo mediciones.",
+        ["common.connected"] = "Conectado",
+        ["common.disconnected"] = "No disponible",
+        ["common.healthy"] = "Correcto",
+        ["common.warning"] = "Atención",
+        ["common.attention"] = "Requiere atención",
+        ["common.systemStatus"] = "Estado del sistema",
+        ["common.serviceStatus"] = "Servicio",
+        ["common.lastScan"] = "Último análisis",
     };
 
     private static readonly Dictionary<string, string> English = new()
@@ -73,10 +86,14 @@ public static class Localizer
         ["dashboard.notApplicable"] = "Not applicable",
         ["dashboard.health"] = "System health",
         ["dashboard.findings"] = "Findings",
+        ["dashboard.noClaims"] = "No numeric promises: measurements only.",
         ["analyze.run"] = "Run diagnostics",
+        ["analyze.diagnosticsFirst"] = "Diagnostics first",
+        ["analyze.diagnosticsFirstMessage"] = "Each area is measured before any change is recommended. Nothing here modifies the system.",
         ["optimize.applyRecommended"] = "Apply recommended",
         ["optimize.apply"] = "Apply",
         ["optimize.revert"] = "Revert",
+        ["optimize.preview"] = "Preview changes",
         ["optimize.expertWarning"] = "Expert mode active: experimental and security-sensitive changes become visible but still require confirmation.",
         ["benchmark.baseline"] = "Measure baseline",
         ["benchmark.after"] = "Measure after change",
@@ -88,6 +105,14 @@ public static class Localizer
         ["settings.serviceCheck"] = "Check privileged service",
         ["common.workloadDependent"] = "Workload dependent",
         ["common.noClaims"] = "No numeric promises: measurements only.",
+        ["common.connected"] = "Connected",
+        ["common.disconnected"] = "Unavailable",
+        ["common.healthy"] = "Healthy",
+        ["common.warning"] = "Warning",
+        ["common.attention"] = "Attention required",
+        ["common.systemStatus"] = "System status",
+        ["common.serviceStatus"] = "Service",
+        ["common.lastScan"] = "Last scan",
     };
 
     private static Dictionary<string, string> Current { get; set; } = Spanish;

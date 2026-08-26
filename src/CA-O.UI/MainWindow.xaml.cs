@@ -2,10 +2,11 @@ using CAO.UI.Pages;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
+using CAO.Shared;
 
 namespace CAO.UI;
 
-/// <summary>WinUI 3 shell (spec 76-78): NavigationView, Mica, page routing.</summary>
+/// <summary>WinUI 3 shell (spec 76-78): NavigationView, Mica, page routing, TopBar + sidebar context.</summary>
 public sealed partial class MainWindow : Window
 {
     /// <summary>Lets any page re-theme every window root.</summary>
@@ -16,7 +17,13 @@ public sealed partial class MainWindow : Window
         InitializeComponent();
         SystemBackdrop = new MicaBackdrop();
         AppServices.State.LanguageChanged += (_, language) => ApplyLocalization();
+        AppServices.State.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName is null or nameof(ViewModels.UiState.ServiceStatus) or nameof(ViewModels.UiState.Context) or nameof(ViewModels.UiState.LastAnalysisUtc) or nameof(ViewModels.UiState.Recommendations))
+                DispatcherQueue.TryEnqueue(() => RefreshChrome());
+        };
         ApplyLocalization();
+        RefreshChrome();
 
         ApplyThemeGlobally = theme =>
         {
@@ -32,10 +39,14 @@ public sealed partial class MainWindow : Window
         };
 
         Nav.SelectedItem = Nav.MenuItems[0];
+        // Kick off background service probe without blocking first frame (Fase 25).
+        _ = ProbeServiceAsync();
     }
 
     private void ApplyLocalization()
     {
+        // Ensure dictionary matches selected language before any Get()
+        Localizer.SetLanguage(AppServices.State.Language);
         var navItems = new (string Tag, string Key)[]
         {
             ("dashboard", "nav.dashboard"),
@@ -61,7 +72,70 @@ public sealed partial class MainWindow : Window
             }
         }
 
+        TopBarTitle.Text = Localizer.Get("app.title");
+        TopBarSubtitle.Text = Localizer.Get("app.subtitle");
         Title = $"{Localizer.Get("app.title")} — {Localizer.Get("app.subtitle")}";
+        RefreshChrome();
+    }
+
+    private void RefreshChrome()
+    {
+        var state = AppServices.State;
+        var ctx = state.Context;
+
+        // Sidebar bottom context (Fase 3 spec)
+        SidebarBuildText.Text = ctx is null ? "Windows: —" : $"Windows build {ctx.WindowsBuild} · {ctx.WindowsEdition}";
+        SidebarLastScan.Text = state.LastAnalysisUtc is null ? $"{Localizer.Get("common.lastScan")}: {Localizer.Get("dashboard.never")}" : $"{Localizer.Get("common.lastScan")}: {state.LastAnalysisUtc.Value.ToLocalTime():g}";
+        LastScanTopText.Text = SidebarLastScan.Text;
+
+        // Service status top + sidebar
+        var svc = state.ServiceStatus ?? "unknown";
+        var svcLabel = svc switch
+        {
+            "connected" or "conectado" => Localizer.Get("common.connected"),
+            "unavailable" or "no disponible" or "unknown" => Localizer.Get("common.disconnected"),
+            _ => svc
+        };
+        ServiceTopText.Text = $"{Localizer.Get("common.serviceStatus")}: {(svcLabel == "unknown" ? Localizer.Get("common.disconnected") : svcLabel)}";
+        SidebarServiceStatus.Text = ServiceTopText.Text;
+        ServiceDot.Fill = (svc is "connected" or "conectado")
+            ? (Brush)Application.Current.Resources["SystemFillColorSuccessBrush"]
+            : (svc is "rejected" ? (Brush)Application.Current.Resources["SystemFillColorCautionBrush"] : (Brush)Application.Current.Resources["SystemFillColorCriticalBrush"]);
+
+        // System health summary
+        if (ctx is null)
+        {
+            SystemTopText.Text = $"{Localizer.Get("common.systemStatus")}: —";
+            SidebarSystemStatus.Text = SystemTopText.Text;
+        }
+        else
+        {
+            var thermal = ctx.ThermalState == ThermalState.Throttling ? Localizer.Get("common.warning") : Localizer.Get("common.healthy");
+            var reboot = ctx.PendingReboot ? $" · {Localizer.Get("common.warning")}: reinicio pendiente" : "";
+            SystemTopText.Text = $"{Localizer.Get("common.systemStatus")}: {thermal}{reboot}";
+            SidebarSystemStatus.Text = SystemTopText.Text;
+        }
+
+        // Operation indicator (Phase 13) — driven by OptimizePage via AppServices.State if needed.
+        if (state.Recommendations.Count > 0 && state.LastAnalysisUtc is not null)
+        {
+            var rec = state.Recommendations.Count(r => r.Bucket == RecommendationBucket.Recommended);
+            OperationTopText.Text = rec > 0 ? $"{rec} recomendadas" : "";
+        }
+    }
+
+    private async Task ProbeServiceAsync()
+    {
+        try
+        {
+            var resp = await AppServices.Pipe.DetectAsync("disable-transparency");
+            AppServices.State.ServiceStatus = resp is { Accepted: true } ? "connected" : "rejected";
+        }
+        catch
+        {
+            AppServices.State.ServiceStatus = "unavailable";
+        }
+        DispatcherQueue.TryEnqueue(RefreshChrome);
     }
 
     private System.Collections.Generic.IEnumerable<NavigationViewItemBase> EnumerateItems()

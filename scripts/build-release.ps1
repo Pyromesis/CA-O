@@ -24,11 +24,11 @@ dotnet test $solution --configuration Release --no-build
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 Write-Host '== publish UI ==' -ForegroundColor Cyan
-dotnet publish (Join-Path $repository 'src\CA-O.UI\CA-O.UI.csproj') --configuration Release --runtime win-x64 --self-contained false --output $uiOutput --no-build
+dotnet publish (Join-Path $repository 'src\CA-O.UI\CA-O.UI.csproj') --configuration Release --runtime win-x64 --self-contained false --output $uiOutput
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 Write-Host '== publish privileged service ==' -ForegroundColor Cyan
-dotnet publish (Join-Path $repository 'src\CA-O.Privileged\CA-O.Privileged.csproj') --configuration Release --runtime win-x64 --self-contained false --output $serviceOutput --no-build
+dotnet publish (Join-Path $repository 'src\CA-O.Privileged\CA-O.Privileged.csproj') --configuration Release --runtime win-x64 --self-contained false --output $serviceOutput
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 Write-Host '== signing ==' -ForegroundColor Cyan

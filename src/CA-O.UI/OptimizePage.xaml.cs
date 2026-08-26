@@ -78,6 +78,8 @@ public sealed partial class OptimizePage : Page
             .ToList();
 
         RecommendationsList.ItemsSource = rows;
+        EmptyStateCard.Visibility = rows.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        RecommendationsList.Visibility = rows.Count == 0 ? Visibility.Collapsed : Visibility.Visible;
     }
 
     private async void OnPreviewClick(object sender, RoutedEventArgs e)
@@ -95,27 +97,53 @@ public sealed partial class OptimizePage : Page
         try
         {
             var preview = await match.PreviewAsync(AppServices.Registry);
-            var lines = string.Join("\n", preview.Lines.Select(line =>
-                $"• [{line.Kind}] {line.Target}\n   antes : {line.Before}\n   después: {line.After}"));
+            // Real diff view (Fase 12): Before/After per target, not generic text.
+            var diffPanel = new StackPanel { Spacing = 10 };
+            foreach (var line in preview.Lines)
+            {
+                var card = new Border
+                {
+                    Background = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["CardBackgroundFillColorSecondaryBrush"],
+                    CornerRadius = new CornerRadius(8),
+                    Padding = new Thickness(12),
+                    Margin = new Thickness(0, 4, 0, 0),
+                };
+                var inner = new StackPanel { Spacing = 4 };
+                inner.Children.Add(new TextBlock { Text = $"{line.Kind}  ·  {line.Target}", FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, FontSize = 12 });
+                var grid = new Grid { ColumnSpacing = 8 };
+                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                var beforeBox = new Border { Background = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["CardBackgroundFillColorDefaultBrush"], CornerRadius = new CornerRadius(6), Padding = new Thickness(8) };
+                beforeBox.Child = new StackPanel { Children = { new TextBlock { Text = "ANTES", FontSize = 10, Opacity = 0.6 }, new TextBlock { Text = line.Before, TextWrapping = TextWrapping.Wrap, FontFamily = new Microsoft.UI.Xaml.Media.FontFamily("Consolas"), FontSize = 11, IsTextSelectionEnabled = true } } };
+                var afterBox = new Border { Background = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["SystemFillColorSuccessBrush"], Opacity = 0.15 };
+                afterBox.CornerRadius = new CornerRadius(6); afterBox.Padding = new Thickness(8);
+                afterBox.Child = new StackPanel { Children = { new TextBlock { Text = "DESPUÉS", FontSize = 10, Opacity = 0.8 }, new TextBlock { Text = line.After, TextWrapping = TextWrapping.Wrap, FontFamily = new Microsoft.UI.Xaml.Media.FontFamily("Consolas"), FontSize = 11, IsTextSelectionEnabled = true } } };
+                Grid.SetColumn(beforeBox, 0); Grid.SetColumn(afterBox, 1);
+                grid.Children.Add(beforeBox); grid.Children.Add(afterBox);
+                inner.Children.Add(grid);
+                card.Child = inner;
+                diffPanel.Children.Add(card);
+            }
+            diffPanel.Children.Add(new TextBlock
+            {
+                Text = $"Riesgo: {preview.Risk} · Seguridad: {preview.SecurityImpact} · Reversible: {(preview.Reversible ? "sí" : "NO — irreversible aun con snapshot")} · Reinicio: {(preview.RequiresReboot ? "sí" : "no")}",
+                FontSize = 11, Opacity = 0.7, Margin = new Thickness(0, 8, 0, 0), TextWrapping = TextWrapping.Wrap
+            });
 
             var dialog = new ContentDialog
             {
-                Title = $"Dry-run: {preview.OptimizationId}",
-                Content = new ScrollViewer
-                {
-                    MaxHeight = 380,
-                    Content = new TextBlock
-                    {
-                        Text = lines + $"\n\nRiesgo: {preview.Risk} · Seguridad: {preview.SecurityImpact}" +
-                               $"\nReversible: {(preview.Reversible ? "sí" : "NO")} · Reinicio: {(preview.RequiresReboot ? "sí" : "no")}",
-                        TextWrapping = TextWrapping.Wrap,
-                        IsTextSelectionEnabled = true,
-                    },
-                },
+                Title = $"Vista previa — {preview.OptimizationId}",
+                Content = new ScrollViewer { MaxHeight = 460, Content = diffPanel },
                 CloseButtonText = "Cerrar",
+                PrimaryButtonText = "Aplicar este cambio",
+                DefaultButton = ContentDialogButton.Close,
                 XamlRoot = Content.XamlRoot,
             };
-            await dialog.ShowAsync();
+            var result = await dialog.ShowAsync();
+            if (result == ContentDialogResult.Primary)
+            {
+                await RunOperationAsync(PrivilegedOperationKind.ApplyOptimization, id);
+            }
         }
         catch (Exception ex)
         {
@@ -148,12 +176,12 @@ public sealed partial class OptimizePage : Page
 
     private async Task RunOperationAsync(PrivilegedOperationKind operation, string optimizationId)
     {
-        if (AppServices.State.ExpertMode)
+        if (AppServices.State.ExpertMode || operation == PrivilegedOperationKind.ApplyOptimization)
         {
             var dialog = new ContentDialog
             {
                 Title = "Confirmar operación",
-                Content = $"Se ejecutará '{operation}' sobre '{optimizationId}'. Se creará un snapshot previo.",
+                Content = $"Se ejecutará '{operation}' sobre '{optimizationId}'. Se creará un snapshot previo por TransactionId, se verificará exactamente y quedará reversible.",
                 PrimaryButtonText = "Continuar",
                 CloseButtonText = "Cancelar",
                 DefaultButton = ContentDialogButton.Close,
@@ -166,23 +194,35 @@ public sealed partial class OptimizePage : Page
         }
 
         BusyRing.IsActive = true;
+        TransactionProgressCard.Visibility = Visibility.Visible;
+        TxText.Text = operation == PrivilegedOperationKind.ApplyOptimization ? "Aplicando cambio transaccional…" : "Revirtiendo…";
         try
         {
             var response = await AppServices.Pipe.SendAsync(operation, optimizationId);
             AppServices.State.ServiceStatus = response is { Accepted: true } ? "connected" : "rejected";
-            StatusText.Text = response is { Accepted: true }
-                ? "OK: cambio ejecutado por el servicio."
-                : $"Rechazado [{response?.ErrorCode}]: {response?.SafeMessage ?? "sin respuesta del servicio"}";
+            if (response is { Accepted: true })
+            {
+                StatusText.Text = operation == PrivilegedOperationKind.ApplyOptimization ? "✓ Aplicado y verificado. Snapshot disponible para reversión." : "✓ Revertido y verificado.";
+                TxText.Text = "Verificado ✓ — Commit OK";
+            }
+            else
+            {
+                StatusText.Text = $"Rechazado [{response?.ErrorCode}]: {response?.SafeMessage ?? "sin respuesta del servicio"}";
+                TxText.Text = "Rechazado — transacción no comprometida";
+            }
 
             await RefreshRecommendationsAsync();
         }
         catch (Exception ex)
         {
-            StatusText.Text = $"Servicio no disponible: {ex.Message}";
+            StatusText.Text = $"Servicio no disponible: {ex.Message} (CAO-IPC-004 — verifique que CA-O Service esté instalado)";
+            TxText.Text = "Servicio no disponible";
         }
         finally
         {
             BusyRing.IsActive = false;
+            await Task.Delay(1200);
+            TransactionProgressCard.Visibility = Visibility.Collapsed;
         }
     }
 

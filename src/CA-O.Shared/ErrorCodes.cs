@@ -30,4 +30,11 @@ public static class ErrorCodes
     public const string VerifyFailed = "CAO-VERIFY-001";
     public const string VerifyUnknownState = "CAO-VERIFY-002";
     public const string RollbackFailed = "CAO-ROLLBACK-001";
+
+    // ---- UI / diagnostics (Fase 50) ----
+    public const string UiAnalyzeFailed = "CAO-UI-001";
+    public const string UiDiagnosticsFailed = "CAO-UI-002";
+    public const string UiBenchmarkFailed = "CAO-UI-003";
+    public const string UiGamingScanFailed = "CAO-UI-004";
+    public const string UiServiceUnavailable = "CAO-UI-005";
 }

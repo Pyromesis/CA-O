@@ -23,12 +23,29 @@ Copy-Item "$repo\artifacts\install\ui\*" "$target\ui\" -Recurse -Force
 Copy-Item "$repo\artifacts\install\service\*" "$target\service\" -Recurse -Force
 
 Write-Host '== 3/5 register privileged service (recovery policy) ==' -ForegroundColor Cyan
+$svcName = 'CAO Privileged Service'
 $svcExe = Join-Path $target 'service\CA-O.Privileged.exe'
-& sc.exe create "CAO Privileged Service" binPath= "$svcExe" start= demand obj= LocalSystem DisplayName= "CA-O Privileged Service"
+# Idempotent: handle Upgrade/Repair — remove existing service first
+$existing = sc.exe query $svcName 2>$null
+if ($LASTEXITCODE -eq 0) {
+    Write-Host "Servicio existente detectado — realizando upgrade (stop/delete)..." -ForegroundColor Yellow
+    & sc.exe stop $svcName | Out-Null
+    Start-Sleep -Seconds 1
+    & sc.exe delete $svcName | Out-Null
+    Start-Sleep -Seconds 1
+}
+& sc.exe create $svcName binPath= "`"$svcExe`"" start= demand obj= LocalSystem DisplayName= "CA-O Privileged Service"
 if ($LASTEXITCODE -ne 0) { throw "sc create fallo ($LASTEXITCODE)" }
-# Recovery: restart on first two crashes, then reboot after a day of failures.
-& sc.exe failure "CAO Privileged Service" reset= 86400 actions= restart/5000/restart/10000/reboot/60000
+# Recovery: restart/5000, restart/10000, reboot/60000, reset=86400 (FASE 29)
+& sc.exe failure $svcName reset= 86400 actions= restart/5000/restart/10000/reboot/60000
 if ($LASTEXITCODE -ne 0) { throw "sc failure fallo ($LASTEXITCODE)" }
+# Verification (FASE 29): sc qc + qfailure
+Write-Host '== 3b/5 verificar servicio ==' -ForegroundColor Cyan
+$qc = sc.exe qc $svcName 2>&1 | Out-String
+$qfail = sc.exe qfailure $svcName 2>&1 | Out-String
+if ($qc -notmatch 'DEMAND_START' -or $qc -notmatch [regex]::Escape($svcExe)) { throw "sc qc verificación falló: $qc" }
+if ($qfail -notmatch 'RESTART.*5000' -or $qfail -notmatch '86400') { throw "sc qfailure verificación falló: $qfail" }
+Write-Host 'Servicio verificado: demanda + recovery policy OK' -ForegroundColor Green
 
 Write-Host '== 4/5 harden data ACLs ==' -ForegroundColor Cyan
 & (Join-Path $PSScriptRoot 'harden-data-acls.ps1')

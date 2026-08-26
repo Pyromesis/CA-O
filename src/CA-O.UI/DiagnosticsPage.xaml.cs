@@ -2,6 +2,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using CAO.Infrastructure.Input;
 using CAO.Infrastructure.SystemInterop;
+using CAO.Shared;
 
 namespace CAO.UI.Pages;
 
@@ -16,12 +17,14 @@ public sealed partial class DiagnosticsPage : Page
     {
         InitializeComponent();
         RunButton.Content = Localizer.Get("analyze.run");
+        if (StatusText is not null) StatusText.Text = "";
     }
 
     private async void OnRunClick(object sender, RoutedEventArgs e)
     {
         RunButton.IsEnabled = false;
         Ring.IsActive = true;
+        if (StatusText is not null) StatusText.Text = "Midiendo…";
         try
         {
             var input = await new InputDiagnosticsProvider().MeasureAsync();
@@ -46,12 +49,15 @@ public sealed partial class DiagnosticsPage : Page
         }
         catch (Exception ex)
         {
-            InputText.Text = $"El diagnóstico falló: {ex.Message}";
+            InputText.Text = $"{ErrorCodes.UiDiagnosticsFailed}: No fue posible completar el diagnóstico. Reintente tras cerrar otras herramientas de monitorización. [Técnico: {ex.GetType().Name}]";
+            if (StatusText is not null) StatusText.Text = $"{ErrorCodes.UiDiagnosticsFailed}: diagnóstico no completado";
+            App.WriteCrashLog(ex);
         }
         finally
         {
             Ring.IsActive = false;
             RunButton.IsEnabled = true;
+            if (StatusText is not null && StatusText.Text == "Midiendo…") StatusText.Text = "Diagnóstico completo.";
         }
     }
 }

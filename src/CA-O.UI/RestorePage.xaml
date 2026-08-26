@@ -2,17 +2,63 @@
     x:Class="CAO.UI.Pages.RestorePage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-    <ScrollViewer Padding="28,20" VerticalScrollBarVisibility="Auto">
-        <StackPanel Spacing="14" MaxWidth="1100" HorizontalAlignment="Left">
-            <TextBlock Text="Restaurar" FontSize="28" FontWeight="SemiBold" />
-            <InfoBar x:Name="NoteBar" IsOpen="True" Severity="Informational" Message="" />
-            <TextBlock Text="Snapshots de CA-O" FontSize="18" FontWeight="SemiBold" Margin="0,8,0,0" />
-            <Button Content="Actualizar lista" Click="OnRefreshClick" />
+    <ScrollViewer Padding="{StaticResource CaoPagePadding}" VerticalScrollBarVisibility="Auto">
+        <StackPanel Spacing="16" MaxWidth="1100" HorizontalAlignment="Stretch">
+            <TextBlock Text="Restaurar" Style="{StaticResource CaoPageTitleStyle}"/>
+            <TextBlock Text="Centro de restauración — snapshots por TransactionId, no por OptimizationId. Cada reversión se verifica exactamente." FontSize="12" Opacity="0.6" TextWrapping="Wrap"/>
+            <InfoBar x:Name="NoteBar" IsOpen="True" Severity="Informational" IsClosable="False"
+                     Title="Reversibilidad garantizada"
+                     Message="CA-O crea snapshots propios antes de cada cambio; el punto de restauración de Windows se solicita una vez por sesión cuando el sistema lo permite. Irreversibles se marcan explícitamente."/>
+            <StackPanel Orientation="Horizontal" Spacing="12">
+                <Button Content="Actualizar lista" Click="OnRefreshClick"/>
+                <Button x:Name="OpenHistoryButton" Content="Ver historial" Click="OnGoHistoryClick" Opacity="0.9"/>
+            </StackPanel>
+
+            <Grid ColumnSpacing="12">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                <Border Style="{StaticResource CaoCardStyle}">
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="Últimas operaciones" FontWeight="SemiBold" FontSize="13"/>
+                        <TextBlock Text="Cada transacción muestra TransactionId, riesgo, estado y reversión." FontSize="11" Opacity="0.6"/>
+                    </StackPanel>
+                </Border>
+                <Border Grid.Column="1" Style="{StaticResource CaoCardStyle}" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}">
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="Recuperación tras cierre inesperado" FontWeight="SemiBold" FontSize="12"/>
+                        <TextBlock x:Name="RecoveryHintText" FontSize="11" Opacity="0.7" TextWrapping="Wrap" Text="Sin recuperaciones pendientes."/>
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <Border x:Name="EmptySnapshotsCard" Style="{StaticResource CaoCardStyle}" Visibility="Collapsed">
+                <StackPanel Spacing="6" HorizontalAlignment="Center" Padding="12">
+                    <FontIcon Glyph="&#xE777;" FontSize="22" Opacity="0.35" HorizontalAlignment="Center"/>
+                    <TextBlock Text="Sin snapshots aún" Style="{StaticResource CaoEmptyStateTitleStyle}"/>
+                    <TextBlock Text="Los snapshots aparecen aquí tras aplicar un cambio. Se guardan en %ProgramData%\CA-O\snapshots\{TX}\." FontSize="12" Opacity="0.6" TextAlignment="Center"/>
+                </StackPanel>
+            </Border>
+
             <ListView x:Name="SnapshotsList" SelectionMode="None">
+                <ListView.ItemContainerStyle>
+                    <Style TargetType="ListViewItem">
+                        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                        <Setter Property="Margin" Value="0,4"/>
+                    </Style>
+                </ListView.ItemContainerStyle>
                 <ListView.ItemTemplate>
                     <DataTemplate>
-                        <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="12,8" Margin="0,2">
-                            <TextBlock Text="{Binding}" />
+                        <Border Style="{StaticResource CaoCardStyle}" Padding="12,10">
+                            <Grid ColumnSpacing="10">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                <StackPanel Spacing="3">
+                                    <TextBlock Text="{Binding}" FontSize="12" TextWrapping="Wrap" IsTextSelectionEnabled="True"/>
+                                    <TextBlock Text="TransactionId como identidad primaria — nunca se sobrescribe un snapshot." FontSize="10" Opacity="0.5"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                    <Button Content="Inspeccionar" Tag="{Binding}" Click="OnInspectClick" FontSize="11"/>
+                                    <Button Content="Restaurar" Tag="{Binding}" Click="OnRestoreClick" FontSize="11" Style="{StaticResource AccentButtonStyle}"/>
+                                </StackPanel>
+                            </Grid>
                         </Border>
                     </DataTemplate>
                 </ListView.ItemTemplate>

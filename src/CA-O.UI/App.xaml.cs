@@ -33,12 +33,16 @@ public partial class App : Application
         WriteCrashLog(e.Exception);
     }
 
-    /// <summary>Startup/crash diagnostics written next to the executable.</summary>
+    /// <summary>Startup/crash diagnostics written to %LocalAppData%\CA-O\logs (Fase 26). Never under Program Files.</summary>
     internal static void WriteCrashLog(Exception ex)
     {
         try
         {
-            var path = Path.Combine(AppContext.BaseDirectory, "cao-ui-crash.log");
+            var logDir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "CA-O", "logs");
+            Directory.CreateDirectory(logDir);
+            var path = Path.Combine(logDir, "cao-ui-crash.log");
             var text = new StringBuilder()
                 .AppendLine("---- " + DateTime.UtcNow.ToString("o") + " ----")
                 .AppendLine(ex.GetType().FullName)
@@ -49,7 +53,17 @@ public partial class App : Application
         }
         catch
         {
-            // Never crash because of the crash logger.
+            // Never crash because of the crash logger. Fallback to ProgramData if LocalAppData unavailable.
+            try
+            {
+                var fallback = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+                    "CA-O", "logs", "cao-ui-crash.log");
+                Directory.CreateDirectory(Path.GetDirectoryName(fallback)!);
+                var text = DateTime.UtcNow.ToString("o") + " " + ex.GetType().Name + ": " + ex.Message + Environment.NewLine;
+                File.AppendAllText(fallback, text, Encoding.UTF8);
+            }
+            catch { }
         }
     }
 }

@@ -22,6 +22,7 @@ public sealed partial class GamingPage : Page
     {
         ScanButton.IsEnabled = false;
         Ring.IsActive = true;
+        if (GamingStatusText is not null) GamingStatusText.Text = "Escaneando…";
         try
         {
             var context = AppServices.State.Context ?? await AppServices.ContextProvider.GetAsync();
@@ -69,12 +70,15 @@ public sealed partial class GamingPage : Page
         }
         catch (Exception ex)
         {
-            AntiCheatText.Text = $"El escaneo falló: {ex.Message}";
+            AntiCheatText.Text = $"{ErrorCodes.UiGamingScanFailed}: El escaneo gaming no pudo completarse. Verifique permisos de lectura de servicios/drivers. [Técnico: {ex.GetType().Name}]";
+            if (GamingStatusText is not null) GamingStatusText.Text = $"{ErrorCodes.UiGamingScanFailed}: escaneo fallido";
+            App.WriteCrashLog(ex);
         }
         finally
         {
             Ring.IsActive = false;
             ScanButton.IsEnabled = true;
+            if (GamingStatusText is not null && GamingStatusText.Text == "Escaneando…") GamingStatusText.Text = "Escaneo completo.";
         }
     }
 }

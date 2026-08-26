@@ -2,28 +2,104 @@
     x:Class="CAO.UI.Pages.AnalyzePage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-    <ScrollViewer Padding="28,20" VerticalScrollBarVisibility="Auto">
-        <StackPanel Spacing="14" MaxWidth="1100" HorizontalAlignment="Left">
-            <TextBlock Text="Analizar" FontSize="28" FontWeight="SemiBold" />
+    <ScrollViewer Padding="{StaticResource CaoPagePadding}" VerticalScrollBarVisibility="Auto">
+        <StackPanel Spacing="16" MaxWidth="1100" HorizontalAlignment="Stretch">
+            <TextBlock Text="Analizar sistema" Style="{StaticResource CaoPageTitleStyle}"/>
+            <TextBlock Text="Cada categoría mide estado real. Nada aquí modifica el sistema." FontSize="13" Opacity="0.6"/>
+
             <StackPanel Orientation="Horizontal" Spacing="12">
-                <Button x:Name="RunButton" Click="OnRunClick" Style="{StaticResource AccentButtonStyle}" />
-                <ProgressRing x:Name="Ring" IsActive="False" Width="26" Height="26" />
+                <Button x:Name="RunButton" Content="Ejecutar análisis completo" Click="OnRunClick" Style="{StaticResource AccentButtonStyle}"
+                        AutomationProperties.Name="Ejecutar análisis completo"/>
+                <ProgressRing x:Name="Ring" IsActive="False" Width="22" Height="22"/>
+                <TextBlock x:Name="StatusText" FontSize="12" Opacity="0.6" VerticalAlignment="Center"/>
             </StackPanel>
+
             <InfoBar x:Name="NoteBar" IsOpen="True" Severity="Informational"
                      Title="Diagnósticos primero"
-                     Message="Cada área se mide antes de recomendar cualquier cambio. Nada aquí modifica el sistema." />
-            <TextBlock Text="Red" FontSize="18" FontWeight="SemiBold" Margin="0,8,0,0" />
-            <TextBlock x:Name="NetworkText" TextWrapping="Wrap" IsTextSelectionEnabled="True" Opacity="0.9" />
-            <Button Content="Benchmark DNS" Click="OnDnsBenchClick" Margin="0,4,0,0" />
-            <TextBlock Text="Seguridad" FontSize="18" FontWeight="SemiBold" Margin="0,8,0,0" />
-            <TextBlock x:Name="SecurityText" TextWrapping="Wrap" IsTextSelectionEnabled="True" Opacity="0.9" />
-            <TextBlock Text="Almacenamiento" FontSize="18" FontWeight="SemiBold" Margin="0,8,0,0" />
-            <TextBlock x:Name="StorageText" TextWrapping="Wrap" IsTextSelectionEnabled="True" Opacity="0.9" />
-            <TextBlock Text="Drivers" FontSize="18" FontWeight="SemiBold" Margin="0,8,0,0" />
-            <TextBlock x:Name="DriversText" TextWrapping="Wrap" IsTextSelectionEnabled="True" Opacity="0.9" />
-            <TextBlock Text="Latencia DPC/ISR" FontSize="18" FontWeight="SemiBold" Margin="0,8,0,0" />
-            <Button Content="Muestrear 5 s" Click="OnDpcSampleClick" Margin="0,4,0,0" />
-            <TextBlock x:Name="InterruptsText" TextWrapping="Wrap" IsTextSelectionEnabled="True" Opacity="0.9" />
+                     Message="Cada área se mide antes de recomendar cualquier cambio. Nada aquí modifica el sistema."
+                     IsClosable="False"/>
+
+            <!-- Progress tracker (Fase 57) -->
+            <Border x:Name="ProgressCard" Style="{StaticResource CaoCardStyle}" Visibility="Collapsed">
+                <StackPanel Spacing="8">
+                    <TextBlock Text="Progreso del análisis" FontWeight="SemiBold" FontSize="13"/>
+                    <Grid ColumnSpacing="8" RowSpacing="6">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="120"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/>
+                        </Grid.RowDefinitions>
+                        <TextBlock Text="CPU" Grid.Row="0" Grid.Column="0" FontSize="12"/><ProgressRing x:Name="CpuRing" Grid.Row="0" Grid.Column="2" Width="14" Height="14"/>
+                        <TextBlock Text="GPU" Grid.Row="1" Grid.Column="0" FontSize="12"/><ProgressRing x:Name="GpuRing" Grid.Row="1" Grid.Column="2" Width="14" Height="14"/>
+                        <TextBlock Text="Memoria" Grid.Row="2" Grid.Column="0" FontSize="12"/><ProgressRing x:Name="MemRing" Grid.Row="2" Grid.Column="2" Width="14" Height="14"/>
+                        <TextBlock Text="Almacenamiento" Grid.Row="3" Grid.Column="0" FontSize="12"/><ProgressRing x:Name="StorRing" Grid.Row="3" Grid.Column="2" Width="14" Height="14"/>
+                        <TextBlock Text="Red" Grid.Row="4" Grid.Column="0" FontSize="12"/><ProgressRing x:Name="NetRing" Grid.Row="4" Grid.Column="2" Width="14" Height="14"/>
+                        <TextBlock Text="Seguridad" Grid.Row="5" Grid.Column="0" FontSize="12"/><ProgressRing x:Name="SecRing" Grid.Row="5" Grid.Column="2" Width="14" Height="14"/>
+                        <TextBlock Text="Drivers" Grid.Row="6" Grid.Column="0" FontSize="12"/><ProgressRing x:Name="DrvRing" Grid.Row="6" Grid.Column="2" Width="14" Height="14"/>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <Grid ColumnSpacing="12" RowSpacing="12">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                <Border Style="{StaticResource CaoCardStyle}">
+                    <StackPanel Spacing="8">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <FontIcon Glyph="&#xE774;" FontSize="14"/>
+                            <TextBlock Text="Red" FontWeight="SemiBold"/>
+                            <Border x:Name="NetStatusBadge" Style="{StaticResource CaoBadgeStyle}" Visibility="Collapsed"><TextBlock x:Name="NetStatusText" FontSize="11"/></Border>
+                        </StackPanel>
+                        <TextBlock x:Name="NetworkText" TextWrapping="Wrap" IsTextSelectionEnabled="True" FontSize="12" Opacity="0.9"/>
+                        <Button Content="Benchmark DNS" Click="OnDnsBenchClick" FontSize="12"/>
+                    </StackPanel>
+                </Border>
+                <Border Grid.Column="1" Style="{StaticResource CaoCardStyle}">
+                    <StackPanel Spacing="8">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <FontIcon Glyph="&#xE72E;" FontSize="14"/>
+                            <TextBlock Text="Seguridad" FontWeight="SemiBold"/>
+                            <Border x:Name="SecStatusBadge" Style="{StaticResource CaoBadgeStyle}" Visibility="Collapsed"><TextBlock x:Name="SecStatusText" FontSize="11"/></Border>
+                        </StackPanel>
+                        <TextBlock x:Name="SecurityText" TextWrapping="Wrap" IsTextSelectionEnabled="True" FontSize="12" Opacity="0.9"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <Grid ColumnSpacing="12" RowSpacing="12">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                <Border Style="{StaticResource CaoCardStyle}">
+                    <StackPanel Spacing="8">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <FontIcon Glyph="&#xEDA2;" FontSize="14"/>
+                            <TextBlock Text="Almacenamiento" FontWeight="SemiBold"/>
+                        </StackPanel>
+                        <TextBlock x:Name="StorageText" TextWrapping="Wrap" IsTextSelectionEnabled="True" FontSize="12" Opacity="0.9"/>
+                    </StackPanel>
+                </Border>
+                <Border Grid.Column="1" Style="{StaticResource CaoCardStyle}">
+                    <StackPanel Spacing="8">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <FontIcon Glyph="&#xE964;" FontSize="14"/>
+                            <TextBlock Text="Drivers" FontWeight="SemiBold"/>
+                        </StackPanel>
+                        <TextBlock x:Name="DriversText" TextWrapping="Wrap" IsTextSelectionEnabled="True" FontSize="12" Opacity="0.9"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <Border Style="{StaticResource CaoCardStyle}">
+                <StackPanel Spacing="8">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <FontIcon Glyph="&#xE9D2;" FontSize="14"/>
+                        <TextBlock Text="Latencia DPC/ISR" FontWeight="SemiBold"/>
+                        <TextBlock Text="La atribución por driver requiere trazas ETW; esta medida indica severidad y magnitud." FontSize="11" Opacity="0.55" TextWrapping="Wrap"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button Content="Muestrear 5 s" Click="OnDpcSampleClick" FontSize="12"/>
+                        <ProgressRing x:Name="DpcRing" Width="16" Height="16" IsActive="False"/>
+                    </StackPanel>
+                    <TextBlock x:Name="InterruptsText" TextWrapping="Wrap" IsTextSelectionEnabled="True" FontSize="12" Opacity="0.9"/>
+                </StackPanel>
+            </Border>
         </StackPanel>
     </ScrollViewer>
 </Page>

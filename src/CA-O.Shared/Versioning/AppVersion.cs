@@ -9,8 +9,8 @@ public static class AppVersion
 
     public const string Semantic = $"{Major}.{Minor}.{Patch}";
 
-    /// <summary>Current IPC protocol version; bump on any wire-format change.</summary>
-    public const int ProtocolVersion = 1;
+    /// <summary>Current IPC protocol version; bump on any wire-format change. Aligned with IpcProtocol.Version.</summary>
+    public const int ProtocolVersion = 2;
 }
 
 /// <summary>Application profiles offered by the profile engine (spec 104).</summary>

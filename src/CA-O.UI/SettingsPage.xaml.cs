@@ -28,6 +28,7 @@ public sealed partial class SettingsPage : Page
         Select(LanguageBox, state.Language);
 
         ServiceStatusText.Text = $"Servicio: {state.ServiceStatus}";
+        VersionsText.Text = $"CA-O UI {CAO.Shared.AppVersion.Semantic} · Protocolo v{CAO.Shared.IPC.IpcProtocol.Version} · Settings: {CAO.Shared.CaOPaths.SettingsFile}";
     }
 
     private void OnExpertToggled(object sender, RoutedEventArgs e)

@@ -3,41 +3,111 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     Title="CA-O">
-    <NavigationView
-        x:Name="Nav"
-        IsBackButtonVisible="Collapsed"
-        PaneDisplayMode="Left"
-        OpenPaneLength="220"
-        SelectionChanged="OnNavigationSelectionChanged">
-        <NavigationView.MenuItems>
-            <NavigationViewItem Content="Panel" Tag="dashboard" Icon="Home" />
-            <NavigationViewItem Content="Analizar" Tag="analyze" Icon="Zoom" />
-            <NavigationViewItem Content="Optimizar" Tag="optimize" Icon="Repair" />
-            <NavigationViewItem Content="Gaming" Tag="gaming">
-                <NavigationViewItem.Icon>
-                    <FontIcon Glyph="&#xE7FC;" />
-                </NavigationViewItem.Icon>
-            </NavigationViewItem>
-            <NavigationViewItem Content="Diagnóstico" Tag="diagnostics">
-                <NavigationViewItem.Icon>
-                    <FontIcon Glyph="&#xE90F;" />
-                </NavigationViewItem.Icon>
-            </NavigationViewItem>
-            <NavigationViewItem Content="Benchmark" Tag="benchmark">
-                <NavigationViewItem.Icon>
-                    <FontIcon Glyph="&#xE9D2;" />
-                </NavigationViewItem.Icon>
-            </NavigationViewItem>
-            <NavigationViewItem Content="Restaurar" Tag="restore" Icon="Undo" />
-            <NavigationViewItem Content="Historial" Tag="history">
-                <NavigationViewItem.Icon>
-                    <FontIcon Glyph="&#xE81C;" />
-                </NavigationViewItem.Icon>
-            </NavigationViewItem>
-        </NavigationView.MenuItems>
-        <NavigationView.FooterMenuItems>
-            <NavigationViewItem Content="Ajustes" Tag="settings" Icon="Setting" />
-        </NavigationView.FooterMenuItems>
-        <Frame x:Name="ContentFrame" />
-    </NavigationView>
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Top contextual bar (Fase 4): service + system status + last scan + window controls bridge -->
+        <Border x:Name="TopBar" Grid.Row="0" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="0,0,0,1"
+                Padding="16,8">
+            <Grid ColumnSpacing="16">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                    <Border Width="28" Height="28" CornerRadius="6" Background="{ThemeResource AccentFillColorDefaultBrush}">
+                        <TextBlock Text="CA" FontWeight="Bold" FontSize="13" Foreground="White"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <StackPanel>
+                        <TextBlock x:Name="TopBarTitle" Text="CA-O" FontWeight="SemiBold" FontSize="13"/>
+                        <TextBlock x:Name="TopBarSubtitle" Text="Performance &amp; System Intelligence" FontSize="11" Opacity="0.65"/>
+                    </StackPanel>
+                </StackPanel>
+
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="16" VerticalAlignment="Center" HorizontalAlignment="Center">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <Ellipse x:Name="ServiceDot" Width="8" Height="8" Fill="{ThemeResource SystemFillColorCautionBrush}"/>
+                        <TextBlock x:Name="ServiceTopText" FontSize="12" Opacity="0.8" VerticalAlignment="Center" Text="Servicio: comprobando…"/>
+                    </StackPanel>
+                    <Border Width="1" Height="14" Background="{ThemeResource DividerStrokeColorDefaultBrush}" VerticalAlignment="Center"/>
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <FontIcon Glyph="&#xEC02;" FontSize="12" Opacity="0.7"/>
+                        <TextBlock x:Name="SystemTopText" FontSize="12" Opacity="0.8" VerticalAlignment="Center" Text="Sistema: —"/>
+                    </StackPanel>
+                    <Border Width="1" Height="14" Background="{ThemeResource DividerStrokeColorDefaultBrush}" VerticalAlignment="Center"/>
+                    <TextBlock x:Name="LastScanTopText" FontSize="12" Opacity="0.65" VerticalAlignment="Center" Text="Último análisis: nunca"/>
+                </StackPanel>
+
+                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                    <TextBlock x:Name="OperationTopText" FontSize="11" Opacity="0.6" VerticalAlignment="Center" Visibility="Collapsed"/>
+                    <ProgressRing x:Name="OperationTopRing" Width="14" Height="14" IsActive="False" Visibility="Collapsed"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <NavigationView
+            x:Name="Nav"
+            Grid.Row="1"
+            IsBackButtonVisible="Collapsed"
+            PaneDisplayMode="Left"
+            OpenPaneLength="248"
+            CompactPaneLength="48"
+            IsPaneToggleButtonVisible="True"
+            SelectionChanged="OnNavigationSelectionChanged"
+            IsSettingsVisible="False">
+            <NavigationView.PaneHeader>
+                <StackPanel Margin="12,12,12,8" Spacing="2">
+                    <TextBlock Text="CA-O" FontWeight="Bold" FontSize="12" Opacity="0.85" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                    <TextBlock Text="Performance &amp; System Intelligence" FontSize="10" Opacity="0.55" TextWrapping="Wrap"/>
+                </StackPanel>
+            </NavigationView.PaneHeader>
+            <NavigationView.MenuItems>
+                <NavigationViewItem Content="Panel" Tag="dashboard" Icon="Home" ToolTipService.ToolTip="Panel — estado general"/>
+                <NavigationViewItem Content="Analizar" Tag="analyze" Icon="Zoom" ToolTipService.ToolTip="Analizar — diagnósticos por área"/>
+                <NavigationViewItem Content="Optimizar" Tag="optimize" Icon="Repair" ToolTipService.ToolTip="Optimizar — recomendaciones y cambios transaccionales"/>
+                <NavigationViewItem Content="Gaming" Tag="gaming" ToolTipService.ToolTip="Gaming — perfiles por juego y anti-cheat">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE7FC;" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem Content="Diagnóstico" Tag="diagnostics" ToolTipService.ToolTip="Diagnóstico — CPU, GPU, memoria, red, drivers">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE90F;" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem Content="Benchmark" Tag="benchmark" ToolTipService.ToolTip="Benchmark — A/B honesto con suelo de ruido">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE9D2;" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem Content="Restaurar" Tag="restore" Icon="Undo" ToolTipService.ToolTip="Restaurar — snapshots y recuperación"/>
+                <NavigationViewItem Content="Historial" Tag="history" ToolTipService.ToolTip="Historial — timeline auditable">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE81C;" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+            </NavigationView.MenuItems>
+            <NavigationView.FooterMenuItems>
+                <NavigationViewItem Content="Ajustes" Tag="settings" Icon="Setting" ToolTipService.ToolTip="Ajustes — tema, idioma, modo Expert"/>
+            </NavigationView.FooterMenuItems>
+            <NavigationView.PaneFooter>
+                <StackPanel Margin="12,8,12,12" Spacing="6">
+                    <Border Height="1" Background="{ThemeResource DividerStrokeColorDefaultBrush}" Opacity="0.6"/>
+                    <StackPanel Spacing="3">
+                        <TextBlock x:Name="SidebarSystemStatus" Text="Estado: —" FontSize="11" Opacity="0.7"/>
+                        <TextBlock x:Name="SidebarServiceStatus" Text="Servicio: comprobando" FontSize="11" Opacity="0.6"/>
+                        <TextBlock x:Name="SidebarBuildText" FontSize="10" Opacity="0.45" IsTextSelectionEnabled="True"/>
+                        <TextBlock x:Name="SidebarLastScan" FontSize="10" Opacity="0.45"/>
+                    </StackPanel>
+                </StackPanel>
+            </NavigationView.PaneFooter>
+            <Frame x:Name="ContentFrame" />
+        </NavigationView>
+    </Grid>
 </Window>
