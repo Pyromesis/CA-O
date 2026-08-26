@@ -112,6 +112,23 @@ public sealed class JsonHistoryLogger : IHistoryLogger
 
             if (chained is null || chained.Entry is null)
             {
+                // FASE 44 migration: plain HistoryEntry lines from schema v1
+                // are accepted as read-only legacy entries; the hash chain
+                // resumes from the synthesized link.
+                var legacyEntry = chained?.Entry
+                    ?? JsonSerializer.Deserialize<HistoryEntry>(line, ChainOptions);
+                if (legacyEntry is not null)
+                {
+                    warnings.Add(new HistoryIntegrityWarning(lineNumber,
+                        "Formato heredado v1 (sin cadena de hash); aceptado como solo-lectura."));
+                    chained = new ChainedEntry(expectedSeq + 1, expectedPrevHash,
+                        ComputeHash(expectedSeq + 1, expectedPrevHash, legacyEntry), legacyEntry);
+                    result.Add((chained.Seq, chained.Hash, legacyEntry));
+                    expectedSeq = chained.Seq;
+                    expectedPrevHash = chained.Hash;
+                    continue;
+                }
+
                 warnings.Add(new HistoryIntegrityWarning(lineNumber, "Línea sin entrada válida."));
                 continue;
             }

@@ -34,7 +34,8 @@ public sealed class OptimizationEngine
         Core.Interfaces.IPrivilegedCommandExecutor? executor = null,
         ISystemContextProvider? contextProvider = null,
         CAO.Core.Rollback.ITransactionJournal? journal = null,
-        Func<bool>? hasPendingRecovery = null)
+        Func<bool>? hasPendingRecovery = null,
+        ISettingsStore? settings = null)
     {
         _registry = registry;
         _restorePoints = restorePoints;
@@ -45,10 +46,12 @@ public sealed class OptimizationEngine
         _contextProvider = contextProvider;
         _journal = journal;
         _hasPendingRecovery = hasPendingRecovery;
+        _settings = settings;
     }
 
     private readonly CAO.Core.Rollback.ITransactionJournal? _journal;
     private readonly Func<bool>? _hasPendingRecovery;
+    private readonly ISettingsStore? _settings;
 
     public static bool IsRunningAsAdmin()
     {
@@ -81,6 +84,14 @@ public sealed class OptimizationEngine
             return OperationResult.Fail(
                 "Se detectó una operación incompleta. El sistema está en modo recuperación.",
                 ErrorCodes.TxnRecoveryPending);
+        }
+
+        // FASE 39: SAFE MODE refuses mutations everywhere (service included).
+        if (_settings?.Load().Ui.ReadOnlyMode == true)
+        {
+            return OperationResult.Fail(
+                "Modo de solo lectura activo: diagnóstico y benchmark disponibles, mutaciones deshabilitadas.",
+                ErrorCodes.SecReadOnlyMode);
         }
 
         // One restore point per session is enough; never block on failure.

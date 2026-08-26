@@ -26,6 +26,13 @@ public sealed class UiSettings
 
     [JsonPropertyName("expert_mode")]
     public bool ExpertMode { get; set; }
+
+    /// <summary>
+    /// SAFE MODE (FASE 39): diagnóstico/benchmark/preview sí; mutaciones NO.
+    /// El servicio la respeta también, no solo la UI.
+    /// </summary>
+    [JsonPropertyName("read_only_mode")]
+    public bool ReadOnlyMode { get; set; }
 }
 
 /// <summary>Cached system information from the last scan.</summary>

@@ -16,6 +16,7 @@ public static class ErrorCodes
     public const string IpcReplayDetected = "CAO-IPC-004";
     public const string IpcPayloadSchemaInvalid = "CAO-IPC-005";
     public const string IpcRequestTooLarge = "CAO-IPC-006";
+    public const string SecReadOnlyMode = "CAO-SEC-020";
 
     // ---- Transactions ----
     public const string TxnPrecheckFailed = "CAO-TXN-001";

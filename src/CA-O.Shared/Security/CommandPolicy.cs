@@ -22,6 +22,9 @@ public enum SystemCommandKey
     NetShTcpAutotuningNormal,
     OptimizeVolumeReTrimC,
     OptimizeVolumeDefragC,
+    WprStartCpuFileMode,
+    WprStopToDefaultFile,
+    LogmanDeleteSession,
 }
 
 /// <summary>Normalized result captured by the gateway.</summary>
@@ -117,6 +120,20 @@ public static partial class CommandPolicy
             SystemCommandKey.OptimizeVolumeDefragC when Eq(arguments,
                 "-NoProfile", "-NonInteractive", "-Command",
                 "Optimize-Volume -DriveLetter C -Defrag") => powershell,
+
+            // FASE 20: kernel trace lifecycle (DPC/ISR). Fixed profile and
+            // fixed output location; cleanup is guaranteed by the collector.
+            SystemCommandKey.WprStartCpuFileMode when Eq(arguments,
+                "-start", "CPU", "-filemode") =>
+                Path.Combine(system32, "wpr.exe"),
+
+            SystemCommandKey.WprStopToDefaultFile when arguments.Count == 3 &&
+                arguments[0] == "-stop" && arguments[2] == "-overwrite" =>
+                Path.Combine(system32, "wpr.exe"),
+
+            SystemCommandKey.LogmanDeleteSession when Eq(arguments,
+                "delete", "CAO-DPC", "-ets") =>
+                Path.Combine(system32, "logman.exe"),
 
             _ => null,
         };
