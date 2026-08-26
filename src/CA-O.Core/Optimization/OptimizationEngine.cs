@@ -71,7 +71,7 @@ public sealed class OptimizationEngine
     }
 
     /// <summary>Applies one optimization with all safety rails (transactional).</summary>
-    public async Task<OperationResult> ApplyAsync(string optimizationId, CancellationToken ct = default, Shared.Security.CallerIdentity? caller = null)
+    public async Task<OperationResult> ApplyAsync(string optimizationId, Shared.Security.CallerIdentity? caller = null, CancellationToken ct = default)
     {
         if (!IsRunningAsAdmin())
         {
