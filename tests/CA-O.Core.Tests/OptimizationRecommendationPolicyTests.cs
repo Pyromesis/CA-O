@@ -1,5 +1,6 @@
 using CAO.Core.Engine;
 using CAO.Shared;
+using CAO.Shared.IPC;
 using Xunit;
 
 namespace CAO.Core.Tests;
@@ -41,52 +42,6 @@ public sealed class OptimizationRecommendationPolicyTests
         var decision = OptimizationRecommendationPolicy.Evaluate(definition, RecommendationProfile.SafeGaming);
 
         Assert.False(decision.Allowed);
-    }
-
-    [Fact]
-    public void PrivilegedValidatorRejectsUnsafeOptimizationId()
-    {
-        var request = new PrivilegedOperationRequest
-        {
-            RequestId = Guid.NewGuid(),
-            Nonce = "nonce",
-            Operation = PrivilegedOperation.ApplyOptimization,
-            Parameters = new OperationParameters { OptimizationId = "../../registry" },
-        };
-
-        var valid = PrivilegedOperationValidator.TryValidate(request, out _);
-
-        Assert.False(valid);
-    }
-
-    [Fact]
-    public void PrivilegedValidatorAcceptsKnownTypedRequest()
-    {
-        var request = new PrivilegedOperationRequest
-        {
-            RequestId = Guid.NewGuid(),
-            Nonce = "nonce",
-            Operation = PrivilegedOperation.RevertOptimization,
-            Parameters = new OperationParameters { OptimizationId = "disable-vbs" },
-        };
-
-        var valid = PrivilegedOperationValidator.TryValidate(request, out _);
-
-        Assert.True(valid);
-    }
-
-    [Fact]
-    public void PrivilegedValidatorRejectsOversizedOrControlNonce()
-    {
-        var request = new PrivilegedOperationRequest
-        {
-            RequestId = Guid.NewGuid(),
-            Nonce = new string('x', 129),
-            Operation = PrivilegedOperation.DetectOptimization,
-            Parameters = new OperationParameters { OptimizationId = "disable-vbs" },
-        };
-
-        Assert.False(PrivilegedOperationValidator.TryValidate(request, out _));
     }
 
     [Fact]

@@ -54,6 +54,7 @@ public sealed class OptimizationTransaction
     private readonly ISnapshotStore? _snapshots;
     private readonly IHistoryLogger? _history;
     private readonly ITransactionJournal? _journal;
+    private readonly CallerIdentity? _caller;
 
     /// <summary>Unique id persisted across transitions and used as snapshot identity (P0-3).</summary>
     public Guid TransactionId { get; }
@@ -66,7 +67,8 @@ public sealed class OptimizationTransaction
         Core.Interfaces.IPrivilegedCommandExecutor? executor = null,
         ISnapshotStore? snapshots = null,
         IHistoryLogger? history = null,
-        ITransactionJournal? journal = null)
+        ITransactionJournal? journal = null,
+        CallerIdentity? caller = null)
     {
         _optimization = optimization;
         _registry = registry;
@@ -76,6 +78,7 @@ public sealed class OptimizationTransaction
         _snapshots = snapshots;
         _history = history;
         _journal = journal;
+        _caller = caller;
         TransactionId = Guid.NewGuid();
     }
 
@@ -389,7 +392,8 @@ public sealed class OptimizationTransaction
 
     private void Journal(TransactionPhase phase, string? errorCode = null) =>
         _journal?.Append(new TransactionEvent(TransactionId, _optimization.Definition.Id,
-            DateTime.UtcNow, phase, TransactionEvent.IsTerminal(phase), errorCode));
+            DateTime.UtcNow, phase, TransactionEvent.IsTerminal(phase), errorCode,
+            RequestedBySid: _caller?.Sid, RequestedByName: _caller?.Name));
 
     private void Log(
         string optimizationId, string operation, bool success, string? snapshotId,
@@ -402,7 +406,7 @@ public sealed class OptimizationTransaction
             TimestampUtc = DateTime.UtcNow,
             AppVersion = AppVersion.Semantic,
             WindowsBuild = _context.WindowsBuild,
-            User = Environment.UserName,
+            User = _caller is null ? Environment.UserName : (_caller.Name + " [" + _caller.Sid + "]"),
             OptimizationId = optimizationId,
             Operation = operation,
             Success = success,
@@ -436,7 +440,8 @@ public sealed class MultiOptimizationTransaction
         Core.Interfaces.IPrivilegedCommandExecutor? executor = null,
         ISnapshotStore? snapshots = null,
         IHistoryLogger? history = null,
-        ITransactionJournal? journal = null)
+        ITransactionJournal? journal = null,
+        CallerIdentity? caller = null)
         : this(optimizations, context, o => new OptimizationTransaction(
             o, registry, context, services, executor, snapshots, history, journal))
     {

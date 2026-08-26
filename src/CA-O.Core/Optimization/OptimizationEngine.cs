@@ -71,7 +71,7 @@ public sealed class OptimizationEngine
     }
 
     /// <summary>Applies one optimization with all safety rails (transactional).</summary>
-    public async Task<OperationResult> ApplyAsync(string optimizationId, CancellationToken ct = default)
+    public async Task<OperationResult> ApplyAsync(string optimizationId, CancellationToken ct = default, Shared.Security.CallerIdentity? caller = null)
     {
         if (!IsRunningAsAdmin())
         {
@@ -111,7 +111,7 @@ public sealed class OptimizationEngine
 
         var context = await GetContextAsync();
         var transaction = new OptimizationTransaction(
-            Resolve(optimizationId), _registry, context, _services, _executor, _snapshots, _history, _journal);
+            Resolve(optimizationId), _registry, context, _services, _executor, _snapshots, _history, _journal, caller);
         var report = await transaction.RunAsync(ct);
 
         return report.Success
@@ -119,7 +119,7 @@ public sealed class OptimizationEngine
             : OperationResult.Fail(report.MessageEs, report.Error ?? report.FinalPhase.ToString());
     }
 
-    public async Task<OperationResult> RevertAsync(string optimizationId, CancellationToken ct = default)
+    public async Task<OperationResult> RevertAsync(string optimizationId, Shared.Security.CallerIdentity? caller = null, CancellationToken ct = default)
     {
         if (!IsRunningAsAdmin())
         {
@@ -150,7 +150,7 @@ public sealed class OptimizationEngine
             _snapshots.Delete(record.Manifest.TransactionId);
         }
 
-        LogLegacy(optimizationId, "revert", result.Success, record.State, error: result.Error);
+        LogLegacy(optimizationId, "revert", result.Success, record.State, error: result.Error, caller: caller);
         return result;
     }
 
@@ -209,13 +209,13 @@ public sealed class OptimizationEngine
     }
 
     /// <summary>Legacy log shape used by non-transactional paths (detect/revert).</summary>
-    private void LogLegacy(string id, string operation, bool success, OptimizationSnapshot snapshot, string? error = null)
+    private void LogLegacy(string id, string operation, bool success, OptimizationSnapshot snapshot, string? error = null, Shared.Security.CallerIdentity? caller = null)
     {
         _history.Log(new HistoryEntry
         {
             TimestampUtc = DateTime.UtcNow,
             AppVersion = AppVersion.Semantic,
-            User = Environment.UserName,
+            User = "(sin auditar)",
             OptimizationId = id,
             Operation = operation,
             Success = success,
