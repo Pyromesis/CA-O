@@ -1,17 +1,44 @@
 using System.Diagnostics;
 
+// Log a %TEMP% para que el usuario vea por qué se cerró
+var logFile = Path.Combine(Path.GetTempPath(), "CA-O-Setup.log");
+try { File.AppendAllText(logFile, $"\n[{DateTime.Now:O}] Setup iniciado\n"); } catch { }
+void Log(string msg) { Console.WriteLine(msg); try { File.AppendAllText(logFile, msg + "\n"); } catch { } }
+
 Console.WriteLine("CA-O 2.0 Setup — Instalador con UAC (requireAdministrator)");
 Console.WriteLine("==========================================================");
+Log($"Log: {logFile}");
 
 // Verificar admin (manifest ya exige, pero doble check)
 if (!IsAdmin())
 {
     Console.ForegroundColor = ConsoleColor.Red;
-    Console.WriteLine("ERROR: Debe ejecutar como Administrador. El .exe debe pedir UAC automáticamente.");
-    Console.WriteLine("Si no vio el prompt UAC, clic derecho > Ejecutar como administrador.");
+    var msg = "ERROR: Debe ejecutar como Administrador. El .exe debe pedir UAC automáticamente.\nSi no vio el prompt UAC, clic derecho > Ejecutar como administrador.";
+    Console.WriteLine(msg);
+    Log(msg);
     Console.ResetColor();
+    ShowMessage(msg, "CA-O Setup — Error", isError: true);
+    Console.WriteLine("Presione cualquier tecla para salir...");
     Console.ReadKey();
     return 1;
+}
+
+static void ShowMessage(string text, string title, bool isError = false)
+{
+    try
+    {
+        // Intenta MessageBox via WScript.Shell Popup (no requiere WinForms)
+        var shell = Type.GetTypeFromProgID("WScript.Shell");
+        if (shell != null)
+        {
+            dynamic wsh = Activator.CreateInstance(shell)!;
+            wsh.Popup(text, 0, title, isError ? 0x10 : 0x40);
+            return;
+        }
+    }
+    catch { }
+    // Fallback: PowerShell popup
+    try { System.Diagnostics.Process.Start(new ProcessStartInfo("powershell", $"-Command \"Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.MessageBox]::Show('{text.Replace("'", "''")}', '{title}')\"") { UseShellExecute = false, CreateNoWindow = true }); } catch { }
 }
 
 var installDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "CA-O");
@@ -33,9 +60,9 @@ if (!File.Exists(payloadService))
     if (File.Exists(dev2)) payloadService = dev2;
 }
 
-Console.WriteLine($"Origen UI: {payloadUi} {(File.Exists(payloadUi) ? "OK" : "NO ENCONTRADO")}");
-Console.WriteLine($"Origen Service: {payloadService} {(File.Exists(payloadService) ? "OK" : "NO ENCONTRADO")}");
-Console.WriteLine($"Destino: {installDir}");
+Log($"Origen UI: {payloadUi} {(File.Exists(payloadUi) ? "OK" : "NO ENCONTRADO")}");
+Log($"Origen Service: {payloadService} {(File.Exists(payloadService) ? "OK" : "NO ENCONTRADO")}");
+Log($"Destino (donde se instala la app): {installDir}");
 
 if (!File.Exists(payloadUi) || !File.Exists(payloadService))
 {
@@ -95,16 +122,18 @@ if (!File.Exists(payloadUi) || !File.Exists(payloadService))
 
 try
 {
-    Console.WriteLine("\n[1/5] Creando directorio de instalación...");
+    Log("\n[1/5] Creando directorio de instalación...");
+    Log($"  Carpeta de instalación: {installDir}");
     Directory.CreateDirectory(installDir);
     var destUi = Path.Combine(installDir, "ui");
     var destSvc = Path.Combine(installDir, "service");
     CopyDirectory(Path.GetDirectoryName(payloadUi)!, destUi);
     CopyDirectory(Path.GetDirectoryName(payloadService)!, destSvc);
     var installedExe = Path.Combine(destUi, "CA-O.UI.exe");
-    Console.WriteLine($"  Instalado en {installedExe} ({new FileInfo(installedExe).Length / 1024 / 1024} MB)");
+    Log($"  Instalado en {installedExe} ({new FileInfo(installedExe).Length / 1024 / 1024} MB)");
+    Log($"  La app se ha descargado/instalado en: {installDir}");
 
-    Console.WriteLine("[2/5] Registrando servicio privilegiado...");
+    Log("[2/5] Registrando servicio privilegiado...");
     Run("sc.exe", $"stop {serviceName}", ignoreError: true);
     Thread.Sleep(800);
     Run("sc.exe", $"delete {serviceName}", ignoreError: true);
@@ -114,10 +143,19 @@ try
     Run("sc.exe", $"failure {serviceName} reset= 86400 actions= restart/5000/restart/10000/reboot/60000");
     Run("sc.exe", $"description {serviceName} \"CA-O 2.0 servicio privilegiado — IPC Named Pipe con ACL + replay guard\"");
 
-    Console.WriteLine("[3/5] Creando accesos directos...");
-    CreateShortcut(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonStartMenu), "Programs", "CA-O.lnk"), installedExe, "CA-O 2.0 — Optimizador Windows 11", Path.GetDirectoryName(installedExe)!);
-    var desktop = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonDesktopDirectory), "CA-O.lnk");
-    try { CreateShortcut(desktop, installedExe, "CA-O 2.0", Path.GetDirectoryName(installedExe)!); } catch { }
+    Log("[3/5] Creando accesos directos...");
+    var startMenu = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonStartMenu), "Programs", "CA-O.lnk");
+    CreateShortcut(startMenu, installedExe, "CA-O 2.0 — Optimizador Windows 11", Path.GetDirectoryName(installedExe)!);
+    // Escritorio: intentar Common Desktop y como fallback User Desktop
+    var commonDesktop = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonDesktopDirectory), "CA-O.lnk");
+    var userDesktop = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "CA-O.lnk");
+    bool desktopOk = false;
+    foreach (var desktop in new[] { commonDesktop, userDesktop })
+    {
+        try { CreateShortcut(desktop, installedExe, "CA-O 2.0", Path.GetDirectoryName(installedExe)!); Log($"  Atajo creado en escritorio: {desktop}"); desktopOk = true; }
+        catch (Exception ex) { Log($"  No se pudo crear atajo en {desktop}: {ex.Message}"); }
+    }
+    if (!desktopOk) Log("  ADVERTENCIA: No se pudo crear atajo en ningún escritorio.");
 
     Console.WriteLine("[4/5] Iniciando servicio...");
     Run("sc.exe", $"start {serviceName}", ignoreError: true);
@@ -127,21 +165,31 @@ try
     if (!qc.Contains("CA-O.Privileged.exe")) Console.WriteLine("  WARN: sc qc no contiene exe esperado: " + qc);
 
     Console.ForegroundColor = ConsoleColor.Green;
-    Console.WriteLine("\n✓ CA-O 2.0 instalado correctamente.");
-    Console.WriteLine($"  Ejecutable: {installedExe}");
-    Console.WriteLine($"  Servicio: {serviceName} (demand start)");
-    Console.WriteLine($"  Para desinstalar: sc.exe stop {serviceName} && sc.exe delete {serviceName} && rmdir /s \"{installDir}\"");
+    var successMsg = $"✓ CA-O 2.0 instalado correctamente.\n\nCarpeta: {installDir}\nEjecutable: {installedExe}\nAtajos: Escritorio y Menú Inicio > CA-O\nServicio: {serviceName} (demand start)\n\nPara desinstalar: sc.exe stop {serviceName} && sc.exe delete {serviceName} && rmdir /s \"{installDir}\"";
+    Console.WriteLine("\n" + successMsg);
+    Log(successMsg);
     Console.ResetColor();
+    ShowMessage(successMsg, "CA-O 2.0 — Instalación completada");
+    Log("Presione cualquier tecla para lanzar CA-O...");
     Console.WriteLine("\nPresione cualquier tecla para lanzar CA-O...");
-    Console.ReadKey();
-    try { Process.Start(new ProcessStartInfo(installedExe) { UseShellExecute = true }); } catch { }
+    Console.WriteLine($"Log guardado en: {logFile}");
+    // Esperar 3 seg y lanzar
+    Thread.Sleep(1200);
+    try { Process.Start(new ProcessStartInfo(installedExe) { UseShellExecute = true }); } catch (Exception ex) { Log($"No se pudo lanzar CA-O: {ex.Message}"); }
+    Console.WriteLine("Instalador permanecerá abierto 10 segundos...");
+    Thread.Sleep(10000);
     return 0;
 }
 catch (Exception ex)
 {
     Console.ForegroundColor = ConsoleColor.Red;
-    Console.WriteLine($"ERROR instalando: {ex.Message}\n{ex.StackTrace}");
+    var err = $"ERROR instalando: {ex.Message}\n{ex.StackTrace}\nLog: {logFile}";
+    Console.WriteLine(err);
+    Log(err);
     Console.ResetColor();
+    ShowMessage(err, "CA-O Setup — Error", isError: true);
+    Console.WriteLine("Presione cualquier tecla para salir...");
+    Console.ReadKey();
     return 1;
 }
 
