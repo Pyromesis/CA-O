@@ -180,9 +180,10 @@ public sealed class SystemBenchmarkRunner
             var buffer = new byte[bufferSize];
             Random.Shared.NextBytes(buffer);
 
-            using (var stream = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.None, bufferSize, FileOptions.SequentialScan))
+            double writeMbs, readMbs;
+            var sw = Stopwatch.StartNew();
+            using (var stream = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.Read, bufferSize, FileOptions.SequentialScan))
             {
-                var sw = Stopwatch.StartNew();
                 for (var block = 0; block < blocks; block++)
                 {
                     ct.ThrowIfCancellationRequested();
@@ -190,23 +191,21 @@ public sealed class SystemBenchmarkRunner
                 }
                 stream.Flush(true);
                 sw.Stop();
-                var writeMbs = blocks / sw.Elapsed.TotalSeconds;
-
-                using var verifyStream = File.OpenHandle(path, FileMode.Open, FileAccess.Read, FileShare.Read, FileOptions.SequentialScan);
-                sw.Restart();
-                long totalRead = 0;
-                while (totalRead < (long)blocks * bufferSize)
-                {
-                    ct.ThrowIfCancellationRequested();
-                    totalRead += RandomAccess.Read(verifyStream, buffer, totalRead);
-                }
-                sw.Stop();
-
-                var readMbs = (totalRead / (1024d * 1024)) / sw.Elapsed.TotalSeconds;
-                GC.KeepAlive(buffer);
-                _ = verifyStream;
-                return (readMbs, writeMbs);
+                writeMbs = blocks / sw.Elapsed.TotalSeconds;
             }
+            using var verifyStream = File.OpenHandle(path, FileMode.Open, FileAccess.Read, FileShare.Read, FileOptions.SequentialScan);
+            sw.Restart();
+            long totalRead = 0;
+            while (totalRead < (long)blocks * bufferSize)
+            {
+                ct.ThrowIfCancellationRequested();
+                totalRead += RandomAccess.Read(verifyStream, buffer, totalRead);
+            }
+            sw.Stop();
+
+            readMbs = (totalRead / (1024d * 1024)) / sw.Elapsed.TotalSeconds;
+            GC.KeepAlive(buffer);
+            return (readMbs, writeMbs);
         }
         finally
         {
