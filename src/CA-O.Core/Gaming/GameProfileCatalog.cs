@@ -86,6 +86,50 @@ public static class GameProfileCatalog
                 "Sin conflicto conocido con optimizaciones Safe.",
             ],
         },
+        new GameProfile
+        {
+            GameId = "league-of-legends",
+            DisplayName = "League of Legends",
+            Executables = ["league of legends.exe"],
+            Launcher = "Riot Client",
+            ReflexAvailable = false,
+            AntiLagAvailable = false,
+            AntiCheatPolicy = GameAntiCheatPolicy.UserMode,
+            GuidanceEs = ["Anti-cheat Vanguard presente en modo kernel: no toque VBS/HVCI."],
+        },
+        new GameProfile
+        {
+            GameId = "rainbow-six",
+            DisplayName = "Rainbow Six Siege",
+            Executables = ["rainbowsix.exe"],
+            Launcher = "Ubisoft Connect",
+            ReflexAvailable = false,
+            AntiLagAvailable = false,
+            AntiCheatPolicy = GameAntiCheatPolicy.KernelLevel,
+            GuidanceEs = ["BattlEye kernel: VBS/HVCI bloqueados."],
+        },
+        new GameProfile
+        {
+            GameId = "call-of-duty",
+            DisplayName = "Call of Duty",
+            Executables = ["cod.exe"],
+            Launcher = "Battle.net",
+            ReflexAvailable = true,
+            AntiLagAvailable = false,
+            AntiCheatPolicy = GameAntiCheatPolicy.KernelLevel,
+            GuidanceEs = ["Ricochet kernel: no desactive seguridad."],
+        },
+        new GameProfile
+        {
+            GameId = "destiny-2",
+            DisplayName = "Destiny 2",
+            Executables = ["destiny2.exe"],
+            Launcher = "Steam",
+            ReflexAvailable = false,
+            AntiLagAvailable = false,
+            AntiCheatPolicy = GameAntiCheatPolicy.UserMode,
+            GuidanceEs = ["BattlEye: VBS/HVCI bloqueados en modo protegido."],
+        },
     ];
 
     /// <summary>Matches a detected executable name against the catalog.</summary>

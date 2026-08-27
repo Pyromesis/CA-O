@@ -110,6 +110,13 @@ public sealed class OptimizationEngine
         }
 
         var context = await GetContextAsync();
+        // Gaming bloque real §26: si Vanguard/anti-cheat y optimización sensible => CAO-GAME-001
+        var gaming = Gaming.GameCompatibilityPolicy.Evaluate(optimizationId, context);
+        if (gaming.Compatibility == Gaming.GameCompatibility.Blocked)
+        {
+            return OperationResult.Fail($"CAO-GAME-001: {gaming.ReasonEs}", "CAO-GAME-001");
+        }
+
         var transaction = new OptimizationTransaction(
             Resolve(optimizationId), _registry, context, _services, _executor, _snapshots, _history, _journal, caller);
         var report = await transaction.RunAsync(ct);

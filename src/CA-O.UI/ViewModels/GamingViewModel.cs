@@ -20,6 +20,9 @@ public sealed partial class GamingViewModel : ObservableObject
     [ObservableProperty] private string _gpuSummary = string.Empty;
     [ObservableProperty] private string _vendorGuidance = string.Empty;
     [ObservableProperty] private bool _vanguardDetected;
+    [ObservableProperty] private int _blockedCount;
+    [ObservableProperty] private int _allowedCount;
+    [ObservableProperty] private int _reviewCount;
 
     public UiState State => _state;
 
@@ -33,9 +36,7 @@ public sealed partial class GamingViewModel : ObservableObject
             var context = _state.Context ?? await AppServices.ContextProvider.GetAsync(ct);
             _state.Context = context;
 
-            // Anti-cheat scan: solo lectura, sin mutación (allowlist, sin ejecución arbitraria §42-44)
             AntiCheats = await Task.Run(() => new AntiCheatScanProvider().Scan(), ct);
-            // keep compat alias not needed
             VanguardDetected = context.VanguardDetected;
 
             var games = context.GamesDetected
@@ -45,11 +46,18 @@ public sealed partial class GamingViewModel : ObservableObject
                 .ToList();
             GameProfiles = games;
 
+            // Matriz gaming §27: bloqueadas/permitidas/revisión
+            var candidates = CAO.Core.Catalog.OptimizationCatalog.All.Select(o => o.Definition.Id).ToList();
+            BlockedCount = candidates.Count(id => GameCompatibilityPolicy.IsBlocked(id, context));
+            AllowedCount = candidates.Count(id => GameCompatibilityPolicy.Evaluate(id, context).Compatibility == GameCompatibility.Safe);
+            ReviewCount = candidates.Count - BlockedCount - AllowedCount;
+
             GpuSummary =
                 $"GPU: {(string.IsNullOrWhiteSpace(context.GpuName) ? "desconocida" : context.GpuName)}\n" +
                 $"Driver: {(string.IsNullOrWhiteSpace(context.GpuDriverVersion) ? "desconocido" : context.GpuDriverVersion)}\n" +
                 $"Refresco: {(context.DisplayRefreshHz > 0 ? $"{context.DisplayRefreshHz} Hz" : "desconocido")}\n" +
-                $"Térmico: {context.ThermalState}";
+                $"Térmico: {context.ThermalState}\n" +
+                $"Modo protegido: {(VanguardDetected ? "Activo" : "No")} — {BlockedCount} bloqueadas, {AllowedCount} permitidas, {ReviewCount} revisión";
 
             VendorGuidance = context.GpuVendor switch
             {
@@ -57,7 +65,7 @@ public sealed partial class GamingViewModel : ObservableObject
                 "AMD" => "AMD Anti-Lag / Anti-Lag 2 se controla desde Adrenalin o el juego. CA-O no aplica hacks de registro.",
                 _ => "Use panel del fabricante para tecnologías nativas (Reflex, Anti-Lag).",
             };
-            Status = "Escaneo completo.";
+            Status = $"Escaneo completo — {BlockedCount} bloqueadas, {AllowedCount} permitidas.";
         }
         catch (OperationCanceledException)
         {
