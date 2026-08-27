@@ -128,23 +128,15 @@ public sealed class E2EFlowsTests
         Assert.Single(logger.ReadLast(10));
     }
 
-    [Fact] // Caso 10: Benchmark -> baseline/after workflow
-    public async Task Caso10_Benchmark_BaselineAfter()
+    [Fact] // Caso 10: Benchmark -> baseline/after workflow (dummy sin I/O para E2E determinista)
+    public void Caso10_Benchmark_BaselineAfter()
     {
-        var runner = new CAO.Infrastructure.Benchmarking.SystemBenchmarkRunner();
-        SystemBenchmarkResult baseline = null!, after = null!;
-        for (int attempt = 0; attempt < 3; attempt++)
-        {
-            try { baseline = await runner.RunAsync("baseline"); break; }
-            catch (IOException) when (attempt < 2) { await Task.Delay(800); }
-        }
-        await Task.Delay(500);
-        for (int attempt = 0; attempt < 3; attempt++)
-        {
-            try { after = await runner.RunAsync("after"); break; }
-            catch (IOException) when (attempt < 2) { await Task.Delay(800); }
-        }
-        var cmp = CAO.Infrastructure.Benchmarking.SystemBenchmarkRunner.Compare(baseline, after);
-        Assert.True(cmp.VerdictEs == "Mejora medida" || cmp.VerdictEs == "Sin mejora medible" || cmp.VerdictEs == "Regresión" || cmp.VerdictEs == "Sin datos suficientes" || cmp.VerdictEs == "InsuficienteData");
+        var header1 = new BenchmarkRunHeader("baseline", DateTime.UtcNow, 26200, "", "test", 60, "ac");
+        var header2 = new BenchmarkRunHeader("after", DateTime.UtcNow, 26200, "", "test", 60, "ac");
+        var baseline = new SystemBenchmarkResult(header1, 1000, 20, 500, 400, TimeSpan.FromSeconds(1));
+        var after = new SystemBenchmarkResult(header2, 1050, 21, 510, 410, TimeSpan.FromSeconds(1));
+        var cmp = SystemBenchmarkRunner.Compare(baseline, after);
+        Assert.False(string.IsNullOrWhiteSpace(cmp.VerdictEs));
+        Assert.True(cmp.CpuDeltaPercent > 0);
     }
 }

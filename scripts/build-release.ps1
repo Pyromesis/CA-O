@@ -31,10 +31,25 @@ Write-Host '== publish privileged service ==' -ForegroundColor Cyan
 dotnet publish (Join-Path $repository 'src\CA-O.Privileged\CA-O.Privileged.csproj') --configuration Release --runtime win-x64 --self-contained false --output $serviceOutput
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+Write-Host '== publish GUI installer (self-contained single-file) ==' -ForegroundColor Cyan
+$guiOutput = Join-Path $artifactRoot 'gui-installer'
+New-Item $guiOutput -ItemType Directory -Force | Out-Null
+dotnet publish (Join-Path $repository 'src\CA-O.InstallerGui\CA-O.InstallerGui.csproj') --configuration Release --runtime win-x64 --self-contained true /p:PublishSingleFile=true /p:TreatWarningsAsErrors=false --output $guiOutput
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+Copy-Item (Join-Path $guiOutput 'CA-O.InstallerGui.exe') (Join-Path $artifactRoot 'CA-O-Setup-GUI-x64.exe') -Force
+
+Write-Host '== publish console setup (fallback) ==' -ForegroundColor Cyan
+$setupOutput = Join-Path $artifactRoot 'setup'
+New-Item $setupOutput -ItemType Directory -Force | Out-Null
+dotnet publish (Join-Path $repository 'src\CA-O.Setup\CA-O.Setup.csproj') --configuration Release --runtime win-x64 --self-contained true /p:PublishSingleFile=true /p:TreatWarningsAsErrors=false --output $setupOutput
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
 Write-Host '== signing ==' -ForegroundColor Cyan
 & (Join-Path $PSScriptRoot 'sign.ps1') -Files @(
     (Join-Path $uiOutput 'CA-O.UI.exe'),
-    (Join-Path $serviceOutput 'CA-O.Privileged.exe')
+    (Join-Path $serviceOutput 'CA-O.Privileged.exe'),
+    (Join-Path $artifactRoot 'CA-O-Setup-GUI-x64.exe'),
+    (Join-Path $setupOutput 'CA-O.Setup.exe')
 )
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
