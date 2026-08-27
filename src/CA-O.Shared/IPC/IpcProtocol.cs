@@ -17,7 +17,7 @@ public static class IpcProtocol
     public static readonly TimeSpan MaxAge = TimeSpan.FromSeconds(30);
 }
 
-/// <summary>The five privileged operations; each carries exactly one typed payload.</summary>
+/// <summary>The seven privileged operations; each carries exactly one typed payload.</summary>
 public enum PrivilegedOperationKind
 {
     ApplyOptimization,
@@ -25,6 +25,8 @@ public enum PrivilegedOperationKind
     VerifyOptimization,
     DetectOptimization,
     CaptureSnapshot,
+    Ping,
+    GetServiceStatus,
 }
 
 /// <summary>
@@ -43,6 +45,8 @@ public interface IOptimizationIdPayload : ITypedPayload
 [JsonDerivedType(typeof(DetectOptimizationPayload), "detect")]
 [JsonDerivedType(typeof(VerifyOptimizationPayload), "verify")]
 [JsonDerivedType(typeof(CaptureSnapshotPayload), "snapshot")]
+[JsonDerivedType(typeof(PingPayload), "ping")]
+[JsonDerivedType(typeof(GetServiceStatusPayload), "status")]
 public interface ITypedPayload
 {
 }
@@ -56,6 +60,13 @@ public sealed record DetectOptimizationPayload(string OptimizationId) : IOptimiz
 public sealed record VerifyOptimizationPayload(string OptimizationId) : IOptimizationIdPayload;
 
 public sealed record CaptureSnapshotPayload(string OptimizationId) : IOptimizationIdPayload;
+
+public sealed record PingPayload() : ITypedPayload;
+
+public sealed record GetServiceStatusPayload() : ITypedPayload;
+
+public sealed record PingResponse(string ServiceVersion, int ProtocolVersion, int ProcessId, bool IsSystem, string Status);
+public sealed record ServiceStatusResponse(string ServiceVersion, int ProtocolVersion, int ProcessId, bool IsSystem, string Status, IReadOnlyList<string> Capabilities);
 
 /// <summary>
 /// Versioned request envelope. Every field is validated by the service

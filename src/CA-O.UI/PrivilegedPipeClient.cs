@@ -45,6 +45,8 @@ public sealed class PrivilegedPipeClient
                 PrivilegedOperationKind.DetectOptimization => new DetectOptimizationPayload(optimizationId),
                 PrivilegedOperationKind.VerifyOptimization => new VerifyOptimizationPayload(optimizationId),
                 PrivilegedOperationKind.CaptureSnapshot => new CaptureSnapshotPayload(optimizationId),
+                PrivilegedOperationKind.Ping => new PingPayload(),
+                PrivilegedOperationKind.GetServiceStatus => new GetServiceStatusPayload(),
                 _ => throw new ArgumentOutOfRangeException(nameof(operation)),
             });
 
@@ -66,6 +68,12 @@ public sealed class PrivilegedPipeClient
 
     public async Task<IpcResponse?> RevertAsync(string optimizationId, CancellationToken ct = default) =>
         Map(await SendAsync(PrivilegedOperationKind.RevertOptimization, optimizationId, ct));
+
+    public Task<IpcResponse?> PingAsync(CancellationToken ct = default) =>
+        SendAsync(PrivilegedOperationKind.Ping, string.Empty, ct);
+
+    public Task<IpcResponse?> GetServiceStatusAsync(CancellationToken ct = default) =>
+        SendAsync(PrivilegedOperationKind.GetServiceStatus, string.Empty, ct);
 
     /// <summary>Legacy response shape used by pages; maps v2 codes through.</summary>
     private static IpcResponse? Map(IpcResponse? response) => response;

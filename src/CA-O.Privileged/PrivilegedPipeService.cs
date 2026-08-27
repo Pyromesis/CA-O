@@ -147,6 +147,18 @@ internal sealed class PrivilegedPipeService(
             return IpcResponse.Rejected(ErrorCodes.IpcReplayDetected, "Solicitud repetida.");
         }
 
+        // Ping / GetServiceStatus no requieren OptimizationId (§10)
+        if (request.Operation is PrivilegedOperationKind.Ping)
+        {
+            var ping = new PingResponse(CAO.Shared.AppVersion.Semantic, IpcProtocol.Version, Environment.ProcessId, true, "running");
+            return IpcResponse.Ok(JsonSerializer.Serialize(ping, JsonOptions));
+        }
+        if (request.Operation is PrivilegedOperationKind.GetServiceStatus)
+        {
+            var status = new ServiceStatusResponse(CAO.Shared.AppVersion.Semantic, IpcProtocol.Version, Environment.ProcessId, true, "running", new[] { "ApplyOptimization", "RevertOptimization", "Ping" });
+            return IpcResponse.Ok(JsonSerializer.Serialize(status, JsonOptions));
+        }
+
             var optimizationId = ((IOptimizationIdPayload)request.Payload).OptimizationId;
 
         try

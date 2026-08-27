@@ -39,6 +39,8 @@ internal static class AppHost
         services.AddSingleton<JsonHistoryLogger>();
         services.AddSingleton<FileSnapshotStore>();
         services.AddSingleton<FileTransactionJournal>();
+        services.AddSingleton<AnalysisStateStore>();
+        services.AddSingleton<Infrastructure.Services.SystemAnalysisService>();
         services.AddSingleton<Infrastructure.Windows.SystemRegistry.RegistryAccessor>();
         services.AddSingleton<Infrastructure.Logging.StructuredLogger>();
 

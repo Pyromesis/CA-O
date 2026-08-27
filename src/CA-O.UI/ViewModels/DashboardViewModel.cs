@@ -8,8 +8,17 @@ namespace CAO.UI.ViewModels;
 public sealed partial class DashboardViewModel : ObservableObject
 {
     private readonly UiState _state;
+    private readonly Infrastructure.Services.SystemAnalysisService _analysisService;
+    private readonly Infrastructure.Persistence.AnalysisStateStore _store;
+    private readonly Infrastructure.Logging.StructuredLogger _logger;
 
-    public DashboardViewModel(UiState state) => _state = state;
+    public DashboardViewModel(UiState state, Infrastructure.Services.SystemAnalysisService analysisService, Infrastructure.Persistence.AnalysisStateStore store, Infrastructure.Logging.StructuredLogger logger)
+    {
+        _state = state;
+        _analysisService = analysisService;
+        _store = store;
+        _logger = logger;
+    }
 
     [ObservableProperty] private bool _isLoading;
     [ObservableProperty] private string _serviceStatus = "unknown";
@@ -27,11 +36,25 @@ public sealed partial class DashboardViewModel : ObservableObject
         try
         {
             var correlation = CAO.Shared.Correlation.New();
-            try { AppHost.Resolve<Infrastructure.Logging.StructuredLogger>().Info("Dashboard", $"LoadAsync correlation={correlation}", correlation); } catch { }
-            var context = _state.Context ?? await AppServices.ContextProvider.GetAsync(ct);
-            _state.Context = context;
-            Health = Core.Diagnostics.HealthEngine.Evaluate(context);
-            Recommendations = _state.Recommendations;
+            try { _logger.Info("Dashboard", $"LoadAsync correlation={correlation}", correlation); } catch { }
+            // Cargar análisis persistido si existe (§4)
+            var persisted = _store.LoadLatestAnalysis();
+            if (persisted?.Context != null)
+            {
+                _state.Context = persisted.Context;
+                _state.Recommendations = persisted.Recommendations ?? Array.Empty<Recommendation>();
+                _state.LastAnalysisUtc = persisted.TimestampUtc;
+                Health = persisted.Health ?? Core.Diagnostics.HealthEngine.Evaluate(persisted.Context);
+                Recommendations = _state.Recommendations;
+                StatusMessage = _store.GetStatusLabel(persisted);
+            }
+            else
+            {
+                var context = _state.Context ?? await AppServices.ContextProvider.GetAsync(ct);
+                _state.Context = context;
+                Health = Core.Diagnostics.HealthEngine.Evaluate(context);
+                Recommendations = _state.Recommendations;
+            }
             ServiceStatus = _state.ServiceStatus;
         }
         catch (OperationCanceledException) { StatusMessage = "Carga cancelada."; }
@@ -46,33 +69,20 @@ public sealed partial class DashboardViewModel : ObservableObject
         try
         {
             var correlation = CAO.Shared.Correlation.New();
-            try { AppHost.Resolve<Infrastructure.Logging.StructuredLogger>().Info("Dashboard", $"Analyze correlation={correlation}", correlation); } catch { }
-
+            try { _logger.Info("Dashboard", $"Analyze correlation={correlation}", correlation); } catch { }
             var candidates = AppServices.Recovery.Scan();
             _state.RecoveryCandidates = candidates.Select(c => c.OptimizationId).ToList();
 
-            var context = await AppServices.ContextProvider.GetAsync(ct);
-            _state.Context = context;
-
-            // Diagnósticos en paralelo con cancellation (§8, §87 startup no bloqueante)
-            var networkTask = new Infrastructure.Networking.NetworkDiagnosticsProvider().MeasureAsync(ct);
-            var storageTask = Task.Run(() => new Infrastructure.Storage.StorageDiagnosticsProvider().Measure(), ct);
-            var securityTask = Task.Run(() => new Infrastructure.Security.SecurityDiagnosticsProvider().Measure(), ct);
-
-            await Task.WhenAll(networkTask, storageTask);
-
-            var network = await networkTask;
-            var storage = await storageTask;
-            var security = await securityTask;
-
-            var recommendations = await Task.Run(() => Core.Engine.RecommendationEngine.BuildAll(AppServices.Catalog, AppServices.Registry, context), ct);
-            _state.Recommendations = recommendations;
-            Recommendations = recommendations;
-
-            var report = Core.Diagnostics.HealthEngine.Evaluate(context, network, storage, null, security);
-            Health = report;
+            var result = await _analysisService.RunAsync(ct);
+            if (result.Context != null) _state.Context = result.Context;
+            _state.Recommendations = result.Recommendations;
+            Recommendations = result.Recommendations;
+            Health = result.Health;
             _state.LastAnalysisUtc = DateTime.UtcNow;
-            StatusMessage = "Análisis completo.";
+            StatusMessage = result.AnalysisState == "Completed" ? "Análisis completo."
+                : result.AnalysisState == "CompletedWithWarnings" ? $"Completado con advertencias ({result.Warnings.Count})"
+                : result.AnalysisState == "Cancelled" ? "Análisis cancelado."
+                : "Análisis fallido";
         }
         catch (OperationCanceledException) { StatusMessage = "Análisis cancelado."; }
         catch (Exception ex)

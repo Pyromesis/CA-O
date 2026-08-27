@@ -35,7 +35,17 @@ public sealed record AnalysisModuleResult(
 
 public sealed partial class AnalyzeViewModel : ObservableObject
 {
+    private readonly Infrastructure.Services.SystemAnalysisService _analysisService;
+    private readonly UiState _uiState;
+    private readonly Infrastructure.Logging.StructuredLogger _logger;
     private CancellationTokenSource? _cts;
+
+    public AnalyzeViewModel(Infrastructure.Services.SystemAnalysisService analysisService, UiState uiState, Infrastructure.Logging.StructuredLogger logger)
+    {
+        _analysisService = analysisService;
+        _uiState = uiState;
+        _logger = logger;
+    }
 
     [ObservableProperty] private bool _isRunning;
     [ObservableProperty] private string _overallStatus = "Inactivo";
@@ -58,68 +68,33 @@ public sealed partial class AnalyzeViewModel : ObservableObject
     }
 
     /// <summary>
-    /// Ejecuta todos los módulos independientes en paralelo ( §8 ).
-    /// Respeta límites de recursos (máx 6 tareas concurrentes) y nunca deja tareas huérfanas.
+    /// Delega al SystemAnalysisService unificado (§5) — elimina duplicación Dashboard/Analyze.
+    /// Mantiene estado por módulo para UI pero la verdad proviene del servicio.
     /// </summary>
     public async Task<IReadOnlyList<AnalysisModuleResult>> RunAsync(CancellationToken ct = default)
     {
         if (IsRunning) return Array.Empty<AnalysisModuleResult>();
-        var correlationId = CAO.Shared.Correlation.New(); // §159 conecta UI logs
+        var correlationId = CAO.Shared.Correlation.New();
         _cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         IsRunning = true;
         OverallStatus = "Midiendo…";
         ResetResults();
-        try { AppHost.Resolve<Infrastructure.Logging.StructuredLogger>().Info("Analyze", $"Run started correlation={correlationId}", correlationId); } catch { }
-
-        var token = _cts.Token;
-        var results = new List<AnalysisModuleResult>();
-        var sw = Stopwatch.StartNew();
+        try { _logger.Info("Analyze", $"Run started correlation={correlationId}", correlationId); } catch { }
 
         try
         {
-            // Módulos independientes → WhenAll con manejo individual de errores ( §10 )
-            var tasks = new List<Task<AnalysisModuleResult>>
-            {
-                MeasureModuleAsync("Network", token, async t =>
-                {
-                    var provider = new NetworkDiagnosticsProvider();
-                    var data = await provider.MeasureAsync(t);
-                    var summary = $"{data.Interfaces.Count} interfaces, {data.Measurements.Count} mediciones";
-                    return summary;
-                }),
-                MeasureModuleAsync("Security", token, t =>
-                {
-                    var data = new SecurityDiagnosticsProvider().Measure();
-                    return Task.FromResult(string.Join(", ", data.Features.Select(f => $"{f.Name}:{(f.Enabled == true ? "on" : f.Enabled == false ? "off" : "?")}")));
-                }),
-                MeasureModuleAsync("Storage", token, t =>
-                {
-                    var data = new StorageDiagnosticsProvider().Measure();
-                    return Task.FromResult($"{data.Volumes.Count} volúmenes");
-                }),
-                MeasureModuleAsync("Drivers", token, async t =>
-                {
-                    var data = await new DriverDiagnosticsProvider().MeasureAsync(t);
-                    return $"{data.Drivers.Count} drivers";
-                }),
-                MeasureModuleAsync("System", token, async t =>
-                {
-                    var provider = new WmiSystemInfoProvider();
-                    var data = await provider.GetAsync(t);
-                    return $"{data.CpuName} / {data.RamGb}GB";
-                }),
-                MeasureModuleAsync("Thermal", token, async t =>
-                {
-                    var data = await new ThermalDiagnosticsProvider().MeasureAsync(t);
-                    return $"{data.Zones.Count} zonas ({(data.IsAvailable ? "datos" : "sin datos")})";
-                }),
-            };
+            var result = await _analysisService.RunAsync(_cts.Token);
+            // Mapear ModuleResult del servicio a AnalysisModuleResult de la UI
+            var mapped = result.Modules.Select(m => new AnalysisModuleResult(
+                m.Module,
+                m.Success ? AnalysisModuleStatus.Completed : m.ErrorCode == "CAO-CANCELLED" ? AnalysisModuleStatus.Cancelled : AnalysisModuleStatus.Failed,
+                m.Duration,
+                m.Value,
+                m.ErrorCode,
+                m.Warning,
+                Array.Empty<string>())).ToList();
 
-            var completed = await Task.WhenAll(tasks);
-            results.AddRange(completed);
-
-            // Asignar a props observables
-            foreach (var r in completed)
+            foreach (var r in mapped)
             {
                 switch (r.Module)
                 {
@@ -132,27 +107,33 @@ public sealed partial class AnalyzeViewModel : ObservableObject
                 }
             }
 
-            var failed = completed.Count(r => r.Status == AnalysisModuleStatus.Failed);
-            var cancelled = completed.Count(r => r.Status == AnalysisModuleStatus.Cancelled);
-            OverallStatus = cancelled > 0 ? $"Cancelado ({completed.Length - cancelled}/{completed.Length} completados)"
+            // Actualizar UiState global desde el servicio (§4 persistencia ya hecha en el servicio)
+            if (result.Context != null) _uiState.Context = result.Context;
+            if (result.Recommendations.Count > 0) _uiState.Recommendations = result.Recommendations;
+            _uiState.LastAnalysisUtc = DateTime.UtcNow;
+
+            var failed = mapped.Count(r => r.Status == AnalysisModuleStatus.Failed);
+            var cancelled = mapped.Count(r => r.Status == AnalysisModuleStatus.Cancelled);
+            OverallStatus = result.AnalysisState == "Cancelled" ? $"Cancelado ({mapped.Count - cancelled}/{mapped.Count} completados)"
                 : failed == 0 ? "Análisis completo — ningún cambio aplicado."
-                : failed < completed.Length ? $"Análisis completado con advertencias ({failed} módulos con fallo)"
+                : failed < mapped.Count ? $"Análisis completado con advertencias ({failed} módulos con fallo)"
                 : "Análisis fallido";
+
+            try { _logger.Info("Analyze", $"Run finished {OverallStatus} correlation={result.CorrelationId}", result.CorrelationId); } catch { }
+            return mapped;
         }
         catch (OperationCanceledException)
         {
             OverallStatus = "Análisis cancelado.";
+            return Array.Empty<AnalysisModuleResult>();
         }
         finally
         {
-            sw.Stop();
             IsRunning = false;
             _cts?.Dispose();
             _cts = null;
             CancelCommand.NotifyCanExecuteChanged();
         }
-
-        return results;
     }
 
     private static async Task<AnalysisModuleResult> MeasureModuleAsync(

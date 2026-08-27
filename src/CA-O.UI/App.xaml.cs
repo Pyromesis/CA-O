@@ -19,6 +19,19 @@ public partial class App : Application
         try
         {
             AppHost.Initialize();
+            // Fase 1 startup: cargar análisis persistido + historial + recovery sin bloquear UI (§7, §68)
+            try
+            {
+                var store = AppHost.Resolve<Infrastructure.Persistence.AnalysisStateStore>();
+                var persisted = store.LoadLatestAnalysis();
+                if (persisted?.Context != null)
+                {
+                    AppHost.Resolve<ViewModels.UiState>().Context = persisted.Context;
+                    AppHost.Resolve<ViewModels.UiState>().Recommendations = persisted.Recommendations ?? Array.Empty<CAO.Shared.Recommendation>();
+                    AppHost.Resolve<ViewModels.UiState>().LastAnalysisUtc = persisted.TimestampUtc;
+                }
+            }
+            catch { /* degradado: sin análisis previo */ }
             _window = new MainWindow();
             _window.Activate();
         }

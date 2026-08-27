@@ -56,7 +56,21 @@ public static class IpcRequestValidator
             return false;
         }
 
-                if (request.Payload is not global::CAO.Shared.IPC.IOptimizationIdPayload target)
+        // Ping y GetServiceStatus no llevan OptimizationId (§10)
+        if (request.Operation is PrivilegedOperationKind.Ping or PrivilegedOperationKind.GetServiceStatus)
+        {
+            var pingExpected = request.Operation == PrivilegedOperationKind.Ping ? typeof(global::CAO.Shared.IPC.PingPayload) : typeof(global::CAO.Shared.IPC.GetServiceStatusPayload);
+            if (request.Payload.GetType() != pingExpected)
+            {
+                errorCode = ErrorCodes.IpcPayloadSchemaInvalid;
+                error = "Payload de Ping/Status inválido.";
+                return false;
+            }
+            error = string.Empty;
+            return true;
+        }
+
+        if (request.Payload is not global::CAO.Shared.IPC.IOptimizationIdPayload target)
         {
             errorCode = ErrorCodes.IpcPayloadSchemaInvalid;
             error = "Payload no coincide con el esquema de la operacion.";
