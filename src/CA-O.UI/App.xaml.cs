@@ -31,7 +31,7 @@ public partial class App : Application
                     AppHost.Resolve<ViewModels.UiState>().LastAnalysisUtc = persisted.TimestampUtc;
                 }
             }
-            catch { /* degradado: sin análisis previo */ }
+            catch (Exception ex) { WriteCrashLog(ex); /* degradado: sin análisis previo, no bloquear startup */ }
             _window = new MainWindow();
             _window.Activate();
         }

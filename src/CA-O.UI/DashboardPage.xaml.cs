@@ -45,7 +45,7 @@ public sealed partial class DashboardPage : Page
                     await _vm.LoadCommand.ExecuteAsync(null);
                     RenderState();
                 }
-                catch { }
+                catch (Exception ex) { App.WriteCrashLog(ex); }
             }
             ServiceInfoBar.IsOpen = AppServices.State.ServiceStatus is "unavailable" or "unknown";
         };
