@@ -39,6 +39,16 @@ Calidad sobre cantidad (spec 131): cada entrada responde qué cambia, por qué, 
 - **optimize-system-drive**: mantenimiento irreversible (defrag HDD / retrim SSD según medio real). Siempre bucket Optional, jamás auto-aplicado.
 - **Privacidad (telemetry/cortana/widgets/copilot/suggestions/onedrive)**: gestión de funciones y privacidad (spec 61, 63, 97); su puntuación nunca alimenta métricas de rendimiento.
 
+## Matriz Gaming §24 (GameCompatibilityPolicy)
+
+| Optimización | Vanguard (Valorant) | EAC (Fortnite/Apex) | BattlEye (R6) | Sin anti-cheat | Veredicto |
+|---|---|---|---|---|---|
+| `disable-vbs` / `disable-hvci` / `hypervisor-launchtype-off` | **BLOQUEADA** `CAO-GAME-001` | **BLOQUEADA** | **BLOQUEADA** | Permitida (Expert + confirmación) | `VbsRelated` |
+| `disable-transparency` / `gpu-scheduling` / `disable-game-bar` | Permitida | Permitida | Permitida | Permitida | `SafeForGaming` |
+| Resto con `Risk High/Critical` + categoría `PrivacySecurity` | **BLOQUEADA** categoría | **BLOQUEADA** | **BLOQUEADA** | `Caution` | `AntiCheatGuard` |
+
+> Bloqueo se aplica en **Core** (`OptimizationEngine.ApplyAsync`) **y** **Privileged** (§26) + UI muestra `3 bloqueadas · 5 permitidas · 2 revisión` en `GamingViewModel`.
+
 ## Bloqueos por defecto (spec 95)
 
 `AntiCheatGuard.NeverAutoRecommend` contiene además ids reservados para tweaks que CA-O **no ofrece hoy** pero reconoce como peligrosos si aparecieran importados: CPU min state 100%, core parking off, memory compression off, MPO off global, FSO global, pagefile estático, NetworkThrottlingIndex/SvcHostSplit hacks, borrado de Prefetch, hypervisorlaunchtype off directo, etc.

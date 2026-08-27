@@ -6,14 +6,14 @@ CA-O manipula configuración crítica de Windows. Las superficies relevantes son
 
 ## Controles implementados
 
-### Canal privilegiado
-- Named Pipe con ACL restrictiva creada vía `NamedPipeServerStreamAcl` (Administrators: RW, SYSTEM: Full, Interactive: RW).
-- Verificación de identidad del cliente con `GetImpersonationUserName()`; solicitudes sin identidad se rechazan.
-- Validación estricta de esquema (`PrivilegedOperationValidator`): versión de protocolo exacta, `RequestId` no vacío, nonce sin caracteres de control y longitud acotada, `OptimizationId` con whitelist regex `[a-z0-9-]{1,80}`, nombres de servicio alfanuméricos, letra de unidad A–Z.
-- Protección replay: cada `RequestId`/nonce acepta una sola vez por vida del servicio.
-- Timeout por conexión (15 s); fallos aislados por conexión sin tumbar el host.
-- **Lista blanca de operaciones**: sólo Apply/Revert/Detect/CaptureSnapshot/Verify. No hay operación "ejecutar comando".
-- Auditoría estructurada de cada request (identidad, operación, resultado) en el log del servicio.
+### Canal privilegiado (v2 + Ping health)
+- Named Pipe `CA-O.Privileged.v1` con ACL restrictiva `NamedPipeServerStreamAcl` (SYSTEM Full, Administrators R/W, Interactive R/W — conectar ≠ autorizar).
+- `GetCallerIdentity()` vía `RunAsClient()` + `WindowsCallerInspector` (SID real, nombre, `SessionId` del token, elevación) — `P1-8`.
+- Validación `IpcRequestValidator` (§10): `ProtocolVersion==2`, `RequestId!=Empty`, `Nonce` 1..128 sin control chars, `CreatedAtUtc` ±30s/ +1m futuro, `Operation` enum, `Payload` polimórfico exacto, `OptimizationId` regex `[a-z0-9-]{1,80}`.
+- **Ping / GetServiceStatus** (§10): operaciones sin `OptimizationId` para health check (`ServiceVersion, ProtocolVersion, ProcessId, IsSystem, Status, Capabilities`) — no usan optimización real como ping.
+- Protección replay `ReplayCache` con reloj inyectable + `MaxAge 30s` + tamaño 64KB/256KB; timeout 15s por conexión.
+- **Allowlist 7 operaciones**: `Apply/Revert/Detect/Verify/CaptureSnapshot/Ping/GetServiceStatus` — no hay “ejecutar comando”.
+- Auditoría: `requestedBy SID/Name → executedBy SYSTEM, op, accepted, code`.
 
 ### Ejecución externa
 - Catálogo estático `ElevatedCommandCatalog`: ejecutables permitidos (powercfg/netsh) con patrones de argumentos cerrados; probado contra inyección, encadenamiento y expansión de variables (`tests\CA-O.Security.Tests\ElevatedCommandCatalogTests`).
@@ -24,9 +24,9 @@ CA-O manipula configuración crítica de Windows. Las superficies relevantes son
 - Los snapshots restauran ausencias (DELETE) — jamás valores por defecto inventados.
 - Sin telemetría, analytics ni red hacia terceros salvo sondas de latencia explícitas del usuario (ping/DNS/Cloudflare speed endpoints para bufferbloat).
 
-### Autorización por token (FASE 2)
+### Autorización por token (FASE 2 + SessionId)
 
-Tras la impersonación del cliente en el pipe, el servicio extrae la identidad real del token (SID, nombre, grupo Administrators, elevación) y aplica `AdministratorsOnlyAuthorizer`:
+Tras `RunAsClient()` + `WindowsIdentity.GetCurrent()` el servicio inspecciona SID, `IsInRole(Administrators)`, `IsElevated` y `SessionId` del token y aplica `AdministratorsOnlyAuthorizer`:
 
 - Permitido: token elevado con grupo Administrators, o SID en la lista configurada.
 - Denegado: usuario estándar (CAO-SEC-005), admin sin elevación / token filtrado (CAO-SEC-003), SID inválido (CAO-SEC-004).
@@ -48,9 +48,17 @@ La cancelación solo se atiende antes de SNAPSHOT/APPLY; durante APPLY es atómi
 
 `VerificationStatus { Passed, Failed, Unknown, NotApplicable }`. Unknown jamás es éxito: provoca rollback automático (CAO-VERIFY-002). Acciones irreversibles: NotApplicable + auditada como irreversible.
 
+### Gaming — bloqueo real (§24-26)
+
+`GameCompatibilityPolicy` matriz `SAFE/CAUTION/BLOCKED` — `disable-vbs/hvci/hypervisor-launchtype-off` → **BLOCKED `CAO-GAME-001`** si Vanguard/EAC/BattlEye detectado. `OptimizationEngine.ApplyAsync` valida antes de transacción en **Core y Privileged** (no solo UI). `Expert` no bypassa bloqueos críticos.
+
+### Instalador
+
+`app.manifest` + `CA-O.InstallerGui` + `CA-O.Setup` ambos `requireAdministrator` — UAC siempre. `CA-O-Setup-GUI-x64.exe` 135 MB self-contained single-file instala en `C:\Program Files\CA-O`, registra `CAO.Privileged` (failure 86400) y crea atajos Escritorio/Inicio. Log `%TEMP%\CA-O-Setup*.log`.
+
 ### Cadena de suministro
 - CodeQL + NuGet audit en CI (`.github/workflows/ci.yml`), Dependabot semanal.
-- Release firma Authenticode con timestamp cuando existe certificado (`CAO_SIGN_THUMBPRINT`) y genera manifiesto SHA-256 + SBOM.
+- Release `v2.0.1` firma Authenticode con timestamp cuando existe certificado (`CAO_SIGN_THUMBPRINT`) y genera `SHA256SUMS.txt` + **SBOM CycloneDX 1.7 `bom.json` 71 packages** (`artifacts/sbom/bom.json`).
 
 ## Reporte de vulnerabilidades
 
