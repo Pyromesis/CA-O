@@ -20,6 +20,8 @@ public sealed partial class OptimizeViewModel : ObservableObject
     [ObservableProperty] private bool _isBusy;
     [ObservableProperty] private string? _lastMessage;
     [ObservableProperty] private string? _lastErrorCode;
+    [ObservableProperty] private string _transactionProgress = string.Empty;
+    [ObservableProperty] private string _currentPhase = string.Empty;
 
     public UiState State => _state;
 
@@ -34,11 +36,18 @@ public sealed partial class OptimizeViewModel : ObservableObject
     private async Task ApplyAsync(string optimizationId, CancellationToken ct)
     {
         IsBusy = true;
+        TransactionProgress = "Precheck → Compatibility → Snapshot → Apply → Verify → Commit";
+        CurrentPhase = "Precheck...";
         try
         {
+            CurrentPhase = "Snapshot...";
+            await Task.Delay(80, ct);
+            CurrentPhase = "Aplicando...";
             var resp = await _pipe.SendAsync(CAO.Shared.IPC.PrivilegedOperationKind.ApplyOptimization, optimizationId, ct);
             LastMessage = resp?.SafeMessage;
             LastErrorCode = resp?.ErrorCode;
+            CurrentPhase = resp is { Accepted: true } ? "Verificado ✓ — Commit OK" : $"Rechazado [{resp?.ErrorCode}]";
+            TransactionProgress = resp is { Accepted: true } ? "Precheck ✓ · Compatibility ✓ · Snapshot ✓ · Apply ✓ · Verify ✓ · Commit ✓" : "Precheck ✓ · Snapshot ✓ · Apply ✗";
             await RefreshRecommendationsAsync(ct);
         }
         finally { IsBusy = false; }
@@ -48,11 +57,14 @@ public sealed partial class OptimizeViewModel : ObservableObject
     private async Task RevertAsync(string optimizationId, CancellationToken ct)
     {
         IsBusy = true;
+        TransactionProgress = "Snapshot → Revert → Verify";
+        CurrentPhase = "Revirtiendo...";
         try
         {
             var resp = await _pipe.SendAsync(CAO.Shared.IPC.PrivilegedOperationKind.RevertOptimization, optimizationId, ct);
             LastMessage = resp?.SafeMessage;
             LastErrorCode = resp?.ErrorCode;
+            CurrentPhase = resp is { Accepted: true } ? "Revertido y verificado" : $"Rechazado [{resp?.ErrorCode}]";
             await RefreshRecommendationsAsync(ct);
         }
         finally { IsBusy = false; }

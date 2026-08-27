@@ -19,7 +19,7 @@ public sealed partial class HistoryPage : Page
         DataContext = _vm;
         _vm.PropertyChanged += (_, e) =>
         {
-            if (e.PropertyName is null or nameof(ViewModels.HistoryViewModel.FilteredRows) or nameof(ViewModels.HistoryViewModel.IsEmpty))
+            if (e.PropertyName is null or nameof(ViewModels.HistoryViewModel.FilteredRows) or nameof(ViewModels.HistoryViewModel.IsEmpty) or nameof(ViewModels.HistoryViewModel.WarningMessage) or nameof(ViewModels.HistoryViewModel.CorruptedCount))
                 DispatcherQueue.TryEnqueue(RenderVm);
         };
     }
@@ -36,6 +36,8 @@ public sealed partial class HistoryPage : Page
         EmptyHistoryCard.Visibility = _vm.IsEmpty ? Visibility.Visible : Visibility.Collapsed;
         HistoryList.Visibility = _vm.IsEmpty ? Visibility.Collapsed : Visibility.Visible;
         HistoryList.ItemsSource = _vm.FilteredRows;
+        WarningBar.IsOpen = !string.IsNullOrWhiteSpace(_vm.WarningMessage);
+        WarningBar.Message = _vm.WarningMessage;
     }
 
     private void OnRefreshClick(object sender, RoutedEventArgs e) { _vm.RefreshCommand.Execute(null); RenderVm(); }

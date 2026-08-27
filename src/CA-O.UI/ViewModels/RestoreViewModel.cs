@@ -9,33 +9,37 @@ public sealed partial class RestoreViewModel : ObservableObject
 {
     private readonly UiState _state;
     private readonly PrivilegedPipeClient _pipe;
+    private readonly Infrastructure.Persistence.SnapshotRepository _repository;
 
-    public RestoreViewModel(UiState state, PrivilegedPipeClient pipe)
+    public RestoreViewModel(UiState state, PrivilegedPipeClient pipe, Infrastructure.Persistence.SnapshotRepository repository)
     {
         _state = state;
         _pipe = pipe;
+        _repository = repository;
     }
 
     [ObservableProperty] private IReadOnlyList<string> _snapshots = Array.Empty<string>();
+    [ObservableProperty] private IReadOnlyList<Infrastructure.Persistence.SnapshotRepository.SnapshotInfo> _snapshotInfos = Array.Empty<Infrastructure.Persistence.SnapshotRepository.SnapshotInfo>();
     [ObservableProperty] private string _recoveryHint = string.Empty;
     [ObservableProperty] private bool _isEmpty;
 
     [RelayCommand]
-    private void Refresh()
+    private async Task RefreshAsync(CancellationToken ct = default)
     {
-        var directory = CaOPaths.SnapshotsDirectory;
-        if (!Directory.Exists(directory))
+        try
         {
+            var infos = await _repository.GetSnapshotInfosAsync(ct);
+            SnapshotInfos = infos;
+            Snapshots = infos.Select(i => $"{i.TimestampUtc:yyyy-MM-dd HH:mm} — {i.OptimizationId} — TX:{i.TransactionId.ToString()[..8]} — {i.EntryCount} valores — build {i.WindowsBuild}").ToList();
+            IsEmpty = infos.Count == 0;
+        }
+        catch
+        {
+            // Degradado: si falla, mostrar vacío pero no crashear (§19)
+            SnapshotInfos = Array.Empty<Infrastructure.Persistence.SnapshotRepository.SnapshotInfo>();
             Snapshots = Array.Empty<string>();
             IsEmpty = true;
-            RecoveryHint = _state.RecoveryCandidates.Count == 0 ? "Sin recuperaciones pendientes." : $"Recuperación requerida: {string.Join(", ", _state.RecoveryCandidates)}";
-            return;
         }
-        var folders = Directory.GetDirectories(directory).Select(Path.GetFileName).Where(s => s is not null).Cast<string>().OrderByDescending(s => s).ToList();
-        var files = Directory.GetFiles(directory, "*.json").Select(Path.GetFileNameWithoutExtension).Where(s => s is not null).Cast<string>().OrderBy(s => s).ToList();
-        var combined = folders.Count > 0 ? folders! : files;
-        Snapshots = combined;
-        IsEmpty = combined.Count == 0;
         RecoveryHint = _state.RecoveryCandidates.Count == 0 ? "Sin recuperaciones pendientes." : $"Recuperación requerida: {string.Join(", ", _state.RecoveryCandidates)}";
     }
 

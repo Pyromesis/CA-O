@@ -42,6 +42,10 @@ public sealed partial class OptimizePage : Page
         {
             if (e.PropertyName == nameof(ViewModels.OptimizeViewModel.IsBusy))
                 DispatcherQueue.TryEnqueue(() => BusyRing.IsActive = _vm.IsBusy);
+            if (e.PropertyName == nameof(ViewModels.OptimizeViewModel.CurrentPhase))
+                DispatcherQueue.TryEnqueue(() => TxText.Text = _vm.CurrentPhase);
+            if (e.PropertyName == nameof(ViewModels.OptimizeViewModel.TransactionProgress))
+                DispatcherQueue.TryEnqueue(() => StatusText.Text = _vm.TransactionProgress);
         };
     }
 

@@ -20,22 +20,38 @@ public sealed partial class HistoryViewModel : ObservableObject
     [ObservableProperty] private string _filter = "all";
     [ObservableProperty] private string _search = string.Empty;
     [ObservableProperty] private bool _isEmpty;
+    [ObservableProperty] private string _warningMessage = string.Empty;
+    [ObservableProperty] private int _corruptedCount;
 
     [RelayCommand]
     private void Refresh()
     {
-        var entries = _history.ReadLast(200);
-        Rows = entries.Select(entry => new HistoryRow(
-            entry.TimestampUtc.ToLocalTime().ToString("g"),
-            entry.Operation,
-            entry.OptimizationId,
-            entry.Success,
-            BuildDetail(entry),
-            $"TX: {entry.SnapshotId ?? "—"} · {entry.TimestampUtc:O}",
-            entry.Success ? "OK" : "FALLO",
-            entry.Success ? new SolidColorBrush(Colors.ForestGreen) : new SolidColorBrush(Colors.IndianRed),
-            $"{entry.OptimizationId} {entry.Operation} {entry.SnapshotId} {entry.Error}".ToLowerInvariant())).ToList();
-        IsEmpty = Rows.Count == 0;
+        try
+        {
+            var warnings = _history.VerifyIntegrity();
+            CorruptedCount = warnings.Count;
+            WarningMessage = warnings.Count == 0 ? string.Empty : $"{warnings.Count} entradas no pudieron leerse (corruptas) — se omitieron. Historial disponible con {Math.Max(0, 200 - warnings.Count)} registros válidos.";
+            var entries = _history.ReadLast(200);
+            Rows = entries.Select(entry => new HistoryRow(
+                entry.TimestampUtc.ToLocalTime().ToString("g"),
+                entry.Operation,
+                entry.OptimizationId,
+                entry.Success,
+                BuildDetail(entry),
+                $"TX: {entry.SnapshotId ?? "—"} · {entry.TimestampUtc:O}",
+                entry.Success ? "OK" : "FALLO",
+                entry.Success ? new SolidColorBrush(Colors.ForestGreen) : new SolidColorBrush(Colors.IndianRed),
+                $"{entry.OptimizationId} {entry.Operation} {entry.SnapshotId} {entry.Error}".ToLowerInvariant())).ToList();
+            IsEmpty = Rows.Count == 0;
+        }
+        catch (Exception ex)
+        {
+            // Nunca cerrar la app (§19, §43)
+            WarningMessage = $"No se pudo cargar el historial: {ex.GetType().Name} — se muestra lo recuperable.";
+            try { Rows = _history.ReadLast(200).Select(entry => new HistoryRow(entry.TimestampUtc.ToLocalTime().ToString("g"), entry.Operation, entry.OptimizationId, entry.Success, BuildDetail(entry), $"TX: {entry.SnapshotId ?? "—"}", entry.Success ? "OK" : "FALLO", new SolidColorBrush(entry.Success ? Colors.ForestGreen : Colors.IndianRed), "")).ToList(); } catch { Rows = Array.Empty<HistoryRow>(); }
+            IsEmpty = Rows.Count == 0;
+            try { App.WriteCrashLog(ex); } catch { }
+        }
         ApplyFilter();
     }
 

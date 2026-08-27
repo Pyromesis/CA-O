@@ -24,6 +24,7 @@
                     <TextBlock Text="Aplique un cambio para generar la primera entrada JSONL en %ProgramData%\CA-O\history.jsonl." FontSize="12" Opacity="0.6" TextAlignment="Center"/>
                 </StackPanel>
             </Border>
+            <InfoBar x:Name="WarningBar" IsOpen="False" Severity="Warning" Title="Historial con entradas corruptas" IsClosable="True"/>
             <TextBlock x:Name="SourceNote" FontSize="11" Opacity="0.55" TextWrapping="Wrap" IsTextSelectionEnabled="True"/>
             <ListView x:Name="HistoryList" SelectionMode="None">
                 <ListView.ItemContainerStyle>
