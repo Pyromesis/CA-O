@@ -14,6 +14,13 @@
                 <ProgressRing x:Name="Ring" IsActive="False" Width="22" Height="22"/>
                 <TextBlock x:Name="BenchStatusText" FontSize="12" Opacity="0.6" VerticalAlignment="Center"/>
             </StackPanel>
+            <TextBlock Text="Flujo guiado: Paso 1 Crear línea base → Paso 2 Aplicar optimización → Paso 3 Medir después → Paso 4 Comparar → Paso 5 Veredicto" FontSize="11" Opacity="0.55" TextWrapping="Wrap"/>
+            <Border Style="{StaticResource CaoCardStyle}" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" Visibility="Collapsed" x:Name="StepCard">
+                <StackPanel Spacing="4">
+                    <TextBlock x:Name="CurrentStepText" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AccentFillColorDefaultBrush}"/>
+                    <TextBlock x:Name="VerdictText" FontSize="12" TextWrapping="Wrap" IsTextSelectionEnabled="True"/>
+                </StackPanel>
+            </Border>
             <Grid ColumnSpacing="12">
                 <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                 <Border Style="{StaticResource CaoCardStyle}">

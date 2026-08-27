@@ -15,11 +15,14 @@ public sealed partial class BenchmarkViewModel : ObservableObject
     [ObservableProperty] private string _baselineSummary = string.Empty;
     [ObservableProperty] private string _comparisonSummary = string.Empty;
     [ObservableProperty] private string _status = string.Empty;
+    [ObservableProperty] private string _currentStep = "Paso 1: Crear línea base";
+    [ObservableProperty] private string _verdict = string.Empty;
 
     public async Task RunAsync(bool isBaseline, CancellationToken ct)
     {
         IsRunning = true;
         Status = "Midiendo…";
+        CurrentStep = isBaseline ? "Paso 1: Creando línea base..." : "Paso 3: Midiendo después del cambio...";
         try
         {
             Directory.CreateDirectory(CaOPaths.BenchmarksDirectory);
@@ -31,29 +34,41 @@ public sealed partial class BenchmarkViewModel : ObservableObject
             if (isBaseline)
             {
                 await File.WriteAllTextAsync(BaselinePath, JsonSerializer.Serialize(result), ct);
-                ComparisonSummary = "Línea base guardada; mida tras aplicar un cambio para comparar.";
+                ComparisonSummary = "✓ Línea base guardada (Paso 1 completado). Ahora aplique una optimización y vuelva para Paso 3.";
+                Verdict = "Línea base lista";
+                CurrentStep = "Paso 2: Aplique una optimización en Optimizar";
+                Status = "Línea base completada";
             }
             else
             {
+                CurrentStep = "Paso 4: Comparando...";
                 if (!File.Exists(BaselinePath))
                 {
-                    ComparisonSummary = "No hay línea base guardada; mida primero la línea base.";
+                    ComparisonSummary = "No hay línea base guardada; mida primero la línea base (Paso 1).";
+                    Verdict = "Sin datos";
                     return;
                 }
                 var baseline = JsonSerializer.Deserialize<SystemBenchmarkResult>(await File.ReadAllTextAsync(BaselinePath, ct));
-                if (baseline is null) { ComparisonSummary = "La línea base guardada no es legible."; return; }
+                if (baseline is null) { ComparisonSummary = "La línea base guardada no es legible."; Verdict = "Error"; return; }
                 var comparison = SystemBenchmarkRunner.Compare(baseline, result);
+                // Veredicto honesto con suelo de ruido §33
+                var noise = SystemBenchmarkRunner.NoiseFloorPercent;
                 ComparisonSummary =
                     $"CPU: {comparison.CpuDeltaPercent:+0.0;-0.0}% | Memoria: {comparison.MemoryDeltaPercent:+0.0;-0.0}% — {comparison.VerdictEs} " +
-                    $"(suelo ±{SystemBenchmarkRunner.NoiseFloorPercent:0}%).\n" +
-                    (comparison.VerdictEs == "Regresión" ? "Recomendación: revertir." : comparison.VerdictEs == "Sin mejora medible" ? "Recomendación: sin evidencia para mantener." : "Mejora medida; puede mantenerse.");
+                    $"(suelo ±{noise:0}%).\n" +
+                    $"Paso 5 — Veredicto: {comparison.VerdictEs}\n" +
+                    (comparison.VerdictEs == "Regresión" ? "Regresión — Recomendación: revertir el cambio." : comparison.VerdictEs == "Sin mejora medible" ? $"Sin mejora medible (dentro de ±{noise}%) — sin evidencia para mantener." : "Mejora medida — puede mantenerse si es estable.");
+                Verdict = comparison.VerdictEs;
+                CurrentStep = $"Paso 5: {comparison.VerdictEs}";
+                Status = $"Benchmark completado — {comparison.VerdictEs}";
             }
         }
-        catch (OperationCanceledException) { Status = "Benchmark cancelado."; }
+        catch (OperationCanceledException) { Status = "Benchmark cancelado."; Verdict = "Cancelado"; }
         catch (Exception ex)
         {
             ComparisonSummary = $"{ErrorCodes.UiBenchmarkFailed}: El benchmark no pudo completarse. [Técnico: {ex.GetType().Name}]";
             Status = $"{ErrorCodes.UiBenchmarkFailed}: benchmark fallido";
+            Verdict = "Error";
             App.WriteCrashLog(ex);
         }
         finally { IsRunning = false; if (Status == "Midiendo…") Status = string.Empty; }

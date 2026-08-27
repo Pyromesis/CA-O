@@ -24,7 +24,7 @@ public sealed partial class BenchmarkPage : Page
         DataContext = _vm;
         _vm.PropertyChanged += (_, e) =>
         {
-            if (e.PropertyName is null or nameof(ViewModels.BenchmarkViewModel.BaselineSummary) or nameof(ViewModels.BenchmarkViewModel.ComparisonSummary))
+            if (e.PropertyName is null or nameof(ViewModels.BenchmarkViewModel.BaselineSummary) or nameof(ViewModels.BenchmarkViewModel.ComparisonSummary) or nameof(ViewModels.BenchmarkViewModel.CurrentStep) or nameof(ViewModels.BenchmarkViewModel.Verdict))
                 DispatcherQueue.TryEnqueue(RenderVm);
         };
     }
@@ -34,6 +34,9 @@ public sealed partial class BenchmarkPage : Page
         BaselineText.Text = _vm.BaselineSummary;
         ComparisonText.Text = _vm.ComparisonSummary;
         if (BenchStatusText is not null) BenchStatusText.Text = _vm.Status;
+        if (CurrentStepText is not null) CurrentStepText.Text = _vm.CurrentStep;
+        if (VerdictText is not null) VerdictText.Text = _vm.Verdict;
+        if (StepCard is not null) StepCard.Visibility = string.IsNullOrWhiteSpace(_vm.CurrentStep) ? Visibility.Collapsed : Visibility.Visible;
     }
 
     private async void OnBaselineClick(object sender, RoutedEventArgs e) => await RunWithVm(true, BaselineButton);
