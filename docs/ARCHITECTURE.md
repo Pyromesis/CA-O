@@ -26,11 +26,12 @@ No "¿qué tweaks tiene Internet?". Cada decisión de diseño sirve a los cuatro
 
 | Proyecto | Responsabilidad | Dependencias |
 |---|---|---|
-| `CA-O.Shared` | DTOs, contratos IPC, enums, constantes de rutas/IPC, versionado (`Contracts/`, `DTO/`, `IPC/`, `Enums/`, `Versioning/`) | — |
-| `CA-O.Core` | Catálogo y motor transaccional, motor de recomendaciones/scoring, perfiles, guardas anti-cheat, reglas de compatibilidad + known-issues matcher, health engine, crash recovery (`Optimization/`, `Diagnostics/`, `Benchmark/`, `Compatibility/`, `Gaming/`, `Profiles/`, `Rollback/`, `Scoring/`, `Interfaces/`) | Shared |
-| `CA-O.Infrastructure` | Implementaciones Windows: WMI/CIM, contadores, sondas DNS/bufferbloat, DPC sampler, detección de juegos y anti-cheats, stores de snapshots/historial/known-issues, benchmark in-process | Core, Shared |
-| `CA-O.Privileged` | Host de servicio + servidor Named Pipes + auditoría | Core, Infrastructure, Shared |
-| `CA-O.UI` | Shell WinUI 3 (NavigationView/Mica), páginas, ViewModels MVVM, navegación tipada (`Pages/`, `ViewModels/`, `Navigation/`, `Resources/`) | Core, Infrastructure, Shared |
+| `CA-O.Shared` | DTOs, contratos IPC v2 (+Ping/GetServiceStatus), `CorrelationId`, `CaOPaths`, `ErrorCodes CAO-XXX-nnn` (`Contracts/`, `DTO/`, `IPC/`, `Enums/`, `Versioning/`) | — |
+| `CA-O.Core` | Catálogo y motor transaccional (`PRECHECK→SNAPSHOT→APPLY→VERIFY→COMMIT` + `GameCompatibilityPolicy` matriz SAFE/CAUTION/BLOCKED `CAO-GAME-001`), scoring, perfiles, `AntiCheatGuard`, `HealthEngine`, `CaoHealthCheck`, `CrashRecovery` | Shared |
+| `CA-O.Infrastructure` | WMI 5s timeout + `SystemAnalysisService` (WhenAll, cancelación) + `AnalysisStateStore` (atomico, 24h TTL) + `SnapshotRepository` (TX identity) + `StructuredLogger` (correlation) + `FileSnapshotStore` (SHA-256) + `JsonHistoryLogger` (hash-chain) + benchmark | Core, Shared |
+| `CA-O.Privileged` | Servicio `SYSTEM` + Named Pipe `CA-O.Privileged.v1` (ACL + `Ping` health + `ReplayCache` 30s) + `OptimizationEngine` con hard block gaming | Core, Infrastructure, Shared |
+| `CA-O.UI` | WinUI 3 Mica + 8 ViewModels DI (`AppHost`) + `Controls` (`MetricCard/RiskBadge/ScoreRing`) + `ErrorTranslator` + `ReducedMotion` + páginas con `VisualState` responsive | Core, Infrastructure, Shared |
+| `CA-O.InstallerGui` / `CA-O.Setup` | Instalador GUI 680×620 + consola fallback, ambos `requireAdministrator`, auto-registro servicio + atajos | — |
 
 Las versiones de paquetes se centralizan en `Directory.Packages.props`.
 
@@ -75,14 +76,15 @@ El health score **nunca depende** de la cantidad de tweaks aplicados: cada dimen
 
 Safe · Balanced · Gaming · Competitive · Privacy · Security · Maintenance · Expert · Custom. Cada perfil consulta el `SystemContext`; ninguno es una lista fija. Expert es el único que ve experimental/security-sensitive y aun así exige confirmación + snapshot.
 
-## Persistencia
+## Persistencia (atomica + versionada + tolerante a corrupción)
 
-| Ruta | Contenido |
-|---|---|
-| `%ProgramData%\CA-O\history.jsonl` | Una entrada JSON por operación (spec 74): timestampUtc, appVersion, windowsBuild, optimizationId, operation, precondition, snapshotId, applyResult, verification, rollbackAvailable |
-| `%ProgramData%\CA-O\snapshots\*.json` | Estado capturado por optimización (valores presentes *y ausencias* para restaurar con DELETE) |
-| `%ProgramData%\CA-O\benchmarks\baseline.json` | Línea base del benchmark de sistema |
-| `%AppData%\CA-O\settings.json` | Preferencias UI |
+| Ruta | Contenido | Garantía |
+|---|---|---|
+| `%ProgramData%\CA-O\analysis-state.json` | `AnalysisStateStore` Schema v2: `TimestampUtc, AppVersion, WindowsBuild, Context, Recommendations, Health, AnalysisState (Completed/WithWarnings/Failed), Warnings, Duration, CorrelationId` | `tmp→flush→Move(overwrite)`, cuarentena `.corrupt.timestamp` |
+| `%ProgramData%\CA-O\history.jsonl` | `JsonHistoryLogger` hash-chain SHA-256: `seq, prevHash, hash, entry` — `ReadLast` tolera líneas corruptas, `VerifyIntegrity` reporta | `VerifyIntegrity` warnings, nunca crash |
+| `%ProgramData%\CA-O\snapshots/{txid}/` | `snapshot.json + manifest.json + integrity.json (SHA256)` — TX identity, `FindLatestForOptimization` | `SnapshotRepository` (UI nunca `Directory.GetDirectories`) |
+| `%ProgramData%\CA-O\benchmarks\baseline.json` | `SystemBenchmarkResult` + `BenchmarkRunHeader` | Mediana de trials, suelo 3% |
+| `%AppData%\CA-O\settings.json` | Preferencias UI + `UiState.LastAnalysisUtc` restaurado al iniciar | 3 fases startup sin bloquear UI |
 
 Nunca se registran secretos, credenciales ni contenido de entrada del usuario (spec 75, 116).
 
@@ -94,10 +96,14 @@ Nunca se registran secretos, credenciales ni contenido de entrada del usuario (s
 - **i18n**: diccionario tipado es-ES/en-US (`Localizer`); migración a `.resw` planificada sin cambiar llamadas (`Localizer.Get(key)`).
 - **HAGS/VBS/MPO/etc.**: nunca tratados como ganancias universales; HAGS es WorkloadDependent+Conditional+RequiresReboot, VBS es Critical+SecurityTradeoff+ExpertOnly.
 
-## Pruebas
+## Pruebas (245 passed, 0 failed — Release)
 
-| Suite | Cubre |
-|---|---|
-| `CA-O.Core.Tests` (109) | Contratos de catálogo (spec 92), transacciones (122–124), perfiles (14/59/95), buckets de recomendación, scoring, health honesto |
-| `CA-O.Security.Tests` (27) | Validador IPC adversarial, catálogo de comandos contra inyección |
-| `CA-O.Infrastructure.Tests` (8) | history.jsonl round-trip tolerante, snapshot store (preserva ausencias, sanitiza ids), paquetes DNS y percentiles |
+| Suite | Cubre | Count |
+|---|---|---|
+| `CA-O.Core.Tests` | Contratos catálogo, `AnalysisStateStore` (save/load/corrupt), `GameCompatibility` (VBS bloqueado), transacciones, scoring, health | 134 |
+| `CA-O.Security.Tests` | IPC validator (`Ping`/`Apply` cross-check), `IpcPingTests`, inyección | 33 |
+| `CA-O.Infrastructure.Tests` | `HistoryRobustness` (malformed), `SnapshotRepository` (TX identity), `SystemContextCache` dual-TTL | 17 |
+| `CA-O.Integration.Tests` | `E2EFlowsTests` 10 flujos (Abrir→Analizar→Persistir→Vanguard→Restore→Benchmark) + `TransactionJournalRecovery` | 46 |
+| `CA-O.Benchmark.Tests` | `SystemBenchmarkRunner` (suelo 3%, mediana) | 7 |
+| `CA-O.UI.Tests` | `ViewModelTests` (Analyze/Dashboard con `SystemAnalysisService` + `Correlation`) | 8 |
+| **Total** | **Gates 1-5 `verify.ps1` + `build-release` con `gui-installer`** | **245** |
