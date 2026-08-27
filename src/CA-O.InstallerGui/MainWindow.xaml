@@ -1,0 +1,192 @@
+﻿<Window
+    x:Class="CAO.InstallerGui.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:local="using:CAO.InstallerGui"
+    mc:Ignorable="d"
+    Title="CA-O 2.0 Setup">
+
+    <Window.SystemBackdrop>
+        <MicaBackdrop Kind="Base"/>
+    </Window.SystemBackdrop>
+
+    <Grid x:Name="RootGrid">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="48"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <local:AppTitleBar x:Name="AppTitleBar" Grid.Row="0"/>
+
+        <!-- Header -->
+        <Border Grid.Row="1"
+                Padding="32,24,32,16"
+                Background="Transparent">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <Image Grid.Column="0"
+                       Source="Assets/ca-o-logo.png"
+                       Width="56" Height="56"
+                       Margin="0,0,24,0"
+                       VerticalAlignment="Top"/>
+
+                <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,4,0,0">
+                    <TextBlock Text="CA-O 2.0 Setup"
+                               Style="{StaticResource InstallerTitleStyle}"/>
+                    <TextBlock Text="Optimizador nativo para Windows 11 - Transaccional - Seguro - Benchmark honesto"
+                               Style="{StaticResource InstallerSubtitleStyle}"
+                               Margin="0,6,0,0"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Main Content -->
+        <ScrollViewer Grid.Row="1" Style="{StaticResource InstallerScrollViewerStyle}">
+            <Grid Style="{StaticResource InstallerPageContainerStyle}">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <!-- Destination Card -->
+                <Border Grid.Row="0" Style="{StaticResource InstallerCardStyle}" x:Name="DestinationCard">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <TextBlock Grid.Row="0" Text="Destino de instalacion"
+                                   FontSize="14" FontWeight="SemiBold"
+                                   Foreground="{StaticResource CAOTextPrimaryBrush}"
+                                   Margin="0,0,0,8"/>
+
+                        <TextBlock Grid.Row="1" x:Name="DestinationPathText"
+                                   FontFamily="Cascadia Code, Consolas, monospace"
+                                   FontSize="15" FontWeight="SemiBold"
+                                   Foreground="{StaticResource CAOPrimaryBrush}"
+                                   Text="C:\Program Files\CA-O"/>
+
+                        <TextBlock Grid.Row="2"
+                                   Text="Se instalara el servicio CAO.Privileged y se crearan accesos directos en Menu Inicio y Escritorio."
+                                   Style="{StaticResource InstallerCaptionStyle}"
+                                   Margin="0,12,0,0"
+                                   Foreground="{StaticResource CAOTextSecondaryBrush}"/>
+                    </Grid>
+                </Border>
+
+                <!-- Options Card -->
+                <Border Grid.Row="1" Style="{StaticResource InstallerCardStyle}" Margin="0,16,0,0">
+                    <StackPanel Spacing="12">
+                        <TextBlock Text="Opciones de instalacion"
+                                   FontSize="14" FontWeight="SemiBold"
+                                   Foreground="{StaticResource CAOTextPrimaryBrush}"
+                                   Margin="0,0,0,8"/>
+
+                        <CheckBox x:Name="DesktopShortcutCheck"
+                                  Content="Crear acceso directo en el escritorio"
+                                  Style="{StaticResource InstallerCheckBoxStyle}"
+                                  IsChecked="True"/>
+
+                        <CheckBox x:Name="StartMenuShortcutCheck"
+                                  Content="Crear acceso en el Menu Inicio"
+                                  Style="{StaticResource InstallerCheckBoxStyle}"
+                                  IsChecked="True"/>
+
+                        <CheckBox x:Name="AutoLaunchCheck"
+                                  Content="Iniciar CA-O despues de la instalacion"
+                                  Style="{StaticResource InstallerCheckBoxStyle}"
+                                  IsChecked="True"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Progress Section -->
+                <Border Grid.Row="2" Style="{StaticResource InstallerCardStyle}" Margin="0,16,0,0" x:Name="ProgressCard" Visibility="Collapsed">
+                    <StackPanel Spacing="12">
+                        <TextBlock Text="Progreso de la instalacion"
+                                   FontSize="14" FontWeight="SemiBold"
+                                   Foreground="{StaticResource CAOTextPrimaryBrush}"/>
+
+                        <ProgressBar x:Name="ProgressBar"
+                                     Style="{StaticResource InstallerProgressBarStyle}"
+                                     Value="0"/>
+
+                        <TextBlock x:Name="ProgressStatusText"
+                                   Text="Iniciando..."
+                                   Style="{StaticResource InstallerCaptionStyle}"/>
+
+                        <TextBlock x:Name="ProgressDetailText"
+                                   Text=""
+                                   Style="{StaticResource InstallerCaptionStyle}"
+                                   Foreground="{StaticResource CAOTextSecondaryBrush}"
+                                   Visibility="Collapsed"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Log Section -->
+                <Border Grid.Row="3" Style="{StaticResource InstallerCardStyle}" Margin="0,16,0,0" Height="200" x:Name="LogCard" Visibility="Collapsed">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+
+                        <TextBlock Grid.Row="0" Text="Registro de instalacion"
+                                   FontSize="13" FontWeight="SemiBold"
+                                   Foreground="{StaticResource CAOTextPrimaryBrush}"
+                                   Margin="0,0,0,8"/>
+
+                        <ScrollViewer Grid.Row="1" Style="{StaticResource InstallerScrollViewerStyle}">
+                            <TextBox x:Name="LogTextBox"
+                                     Style="{StaticResource InstallerLogStyle}"
+                                     IsReadOnly="True"/>
+                        </ScrollViewer>
+                    </Grid>
+                </Border>
+
+                <!-- Buttons -->
+                <StackPanel Grid.Row="5" Orientation="Horizontal"
+                            HorizontalAlignment="Right"
+                            Spacing="12"
+                            Margin="0,24,0,0">
+                    <Button x:Name="CancelButton"
+                            Content="Cancelar"
+                            Style="{StaticResource InstallerSecondaryButtonStyle}"
+                            Width="120"
+                            Height="40"
+                            IsEnabled="False"
+                            Click="OnCancelClick"/>
+
+                    <Button x:Name="InstallButton"
+                            Content="Instalar"
+                            Style="{StaticResource InstallerPrimaryButtonStyle}"
+                            Width="160"
+                            Height="44"
+                            Click="OnInstallClick"/>
+                </StackPanel>
+            </Grid>
+        </ScrollViewer>
+
+        <!-- Bottom Info Bar -->
+        <InfoBar Grid.Row="2"
+                 x:Name="InfoBar"
+                 Style="{StaticResource InstallerInfoBarStyle}"
+                 Title="Instalador CA-O 2.0"
+                 Message="Se instalara CA-O 2.0 en C:\Program Files\CA-O. Requiere permisos de administrador."
+                 Severity="Informational"
+                 IsOpen="True"
+                 IsClosable="False"/>
+    </Grid>
+</Window>

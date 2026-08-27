@@ -1,0 +1,304 @@
+using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Media;
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
+using System.IO.Compression;
+using System.Net.Http;
+using System.Threading;
+using System.Threading.Tasks;
+
+namespace CAO.InstallerGui;
+
+public sealed partial class MainWindow : Window
+{
+    private readonly CancellationTokenSource _installCts = new();
+    private readonly HttpClient _httpClient = new() { Timeout = TimeSpan.FromMinutes(15) };
+
+public MainWindow()
+{
+    InitializeComponent();
+    // SystemBackdrop = new MicaBackdrop { Kind = MicaKind.Base };
+    ExtendsContentIntoTitleBar = true;
+}
+
+private async Task LoadPreviousAnalysisAsync()
+{
+    await Task.CompletedTask;
+}
+
+internal void OnInstallClick(object sender, RoutedEventArgs e)
+{
+    _ = InstallAsync();
+}
+
+private async Task InstallAsync()
+    {
+        if (!IsAdmin())
+        {
+            await ShowErrorAsync("Se requieren permisos de administrador", "El instalador debe ejecutarse con permisos de administrador. Haga clic derecho y seleccione 'Ejecutar como administrador'.");
+            return;
+        }
+
+        InstallButton.IsEnabled = false;
+        CancelButton.IsEnabled = true;
+        ProgressCard.Visibility = Visibility.Visible;
+        LogCard.Visibility = Visibility.Visible;
+        ProgressBar.Value = 0;
+        ProgressStatusText.Text = "Iniciando instalacion...";
+        ProgressDetailText.Visibility = Visibility.Visible;
+        Log("Iniciando instalacion como administrador...");
+
+        var installDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "CA-O");
+        var serviceName = "CAO.Privileged";
+        var logFile = Path.Combine(Path.GetTempPath(), "CA-O-Setup-Gui.log");
+
+        try { File.AppendAllText(logFile, $"[{DateTime.Now:O}] GUI Setup iniciado\n"); } catch { }
+
+        var installCts = CancellationTokenSource.CreateLinkedTokenSource(_installCts.Token);
+        installCts.CancelAfter(TimeSpan.FromMinutes(10));
+
+        try
+        {
+            var exeDir = AppContext.BaseDirectory;
+            var payloadUi = Path.Combine(exeDir, "ui", "CA-O.UI.exe");
+            var payloadService = Path.Combine(exeDir, "service", "CA-O.Privileged.exe");
+
+            if (!File.Exists(payloadUi))
+            {
+                var dev = Path.GetFullPath(Path.Combine(exeDir, "..", "..", "..", "artifacts", "release-singlefile", "ui", "CA-O.UI.exe"));
+                if (File.Exists(dev)) payloadUi = dev;
+            }
+            if (!File.Exists(payloadService))
+            {
+                var dev2 = Path.GetFullPath(Path.Combine(exeDir, "..", "..", "..", "artifacts", "release-singlefile", "service", "CA-O.Privileged.exe"));
+                if (File.Exists(dev2)) payloadService = dev2;
+            }
+            Log($"Origen UI: {payloadUi} {(File.Exists(payloadUi) ? "OK" : "NO")}");
+            Log($"Origen Service: {payloadService} {(File.Exists(payloadService) ? "OK" : "NO")}");
+            Log($"Destino: {installDir}");
+
+            if (!File.Exists(payloadUi) || !File.Exists(payloadService))
+            {
+                await DownloadPayloadAsync(payloadUi, payloadService, installCts.Token);
+            }
+
+            UpdateProgress(10, "Preparando instalacion...", "Creando directorio de instalacion");
+            Directory.CreateDirectory(installDir);
+            var destUi = Path.Combine(installDir, "ui");
+            var destSvc = Path.Combine(installDir, "service");
+            CopyDirectory(Path.GetDirectoryName(payloadUi)!, destUi, p => UpdateProgress(10 + p / 5, "Copiando archivos de la aplicacion...", null));
+            CopyDirectory(Path.GetDirectoryName(payloadService)!, destSvc, null);
+            var installedExe = Path.Combine(destUi, "CA-O.UI.exe");
+            Log($"Instalado en {installedExe} ({new FileInfo(installedExe).Length / 1024 / 1024} MB)");
+
+            UpdateProgress(60, "Registrando servicio...", "Registrando servicio privilegiado CAO.Privileged");
+            Run("sc.exe", $"stop {serviceName}", true);
+            await Task.Delay(600);
+            Run("sc.exe", $"delete {serviceName}", true);
+            await Task.Delay(600);
+            Run("sc.exe", $"create {serviceName} binPath= \"{Path.Combine(destSvc, "CA-O.Privileged.exe")}\" start= demand DisplayName= \"CA-O Privileged Service\"");
+            Run("sc.exe", $"failure {serviceName} reset= 86400 actions= restart/5000/restart/10000/reboot/60000");
+            Run("sc.exe", $"description {serviceName} \"CA-O 2.0 servicio privilegiado - IPC Named Pipe con ACL + replay guard\"");
+
+            UpdateProgress(80, "Creando accesos directos...", "Creando atajos en Menu Inicio y Escritorio");
+            if (StartMenuShortcutCheck.IsChecked == true)
+            {
+                var start = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonStartMenu), "Programs", "CA-O.lnk");
+                CreateShortcut(start, installedExe, "CA-O 2.0", Path.GetDirectoryName(installedExe)!);
+                Log($"  Inicio: {start}");
+            }
+            if (DesktopShortcutCheck.IsChecked == true)
+            {
+                var common = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonDesktopDirectory), "CA-O.lnk");
+                var user = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "CA-O.lnk");
+                bool ok = false;
+                foreach (var d in new[] { common, user })
+                {
+                    try { CreateShortcut(d, installedExe, "CA-O 2.0", Path.GetDirectoryName(installedExe)!); Log($"  Escritorio: {d}"); ok = true; } catch (Exception ex) { Log($"  No {d}: {ex.Message}"); }
+                }
+                if (!ok) Log("  WARN: ningun atajo de escritorio creado");
+            }
+
+            UpdateProgress(90, "Iniciando servicio...", "Iniciando servicio privilegiado");
+            Run("sc.exe", $"start {serviceName}", true);
+            await Task.Delay(800);
+
+            UpdateProgress(95, "Verificando instalacion...", "Comprobando servicio y archivos");
+            var qc = RunCapture("sc.exe", $"qc {serviceName}");
+            Log(qc);
+
+            UpdateProgress(100, "Instalacion completada", null);
+            Log($"Instalado en {installDir}");
+            await ShowSuccessDialogAsync(installedExe);
+            try { Process.Start(new ProcessStartInfo(installedExe) { UseShellExecute = true }); } catch { }
+            Close();
+        }
+        catch (OperationCanceledException)
+        {
+            Log("Instalacion cancelada por el usuario");
+            await ShowErrorAsync("Instalacion cancelada", "La instalacion fue cancelada por el usuario.");
+        }
+        catch (Exception ex)
+        {
+            Log($"ERROR: {ex.Message}\n{ex.StackTrace}");
+            await ShowErrorAsync("Error en la instalacion", $"Error instalando CA-O:\n{ex.Message}\n\nLog: {Path.Combine(Path.GetTempPath(), "CA-O-Setup-Gui.log")}\nDestino: {installDir}");
+        }
+        finally
+        {
+            InstallButton.IsEnabled = true;
+            CancelButton.IsEnabled = false;
+        }
+    }
+
+internal void OnCancelClick(object sender, RoutedEventArgs e)
+{
+    _installCts.Cancel();
+    Log("Cancelando instalacion...");
+}
+
+private async Task DownloadPayloadAsync(string payloadUi, string payloadService, CancellationToken ct)
+    {
+        UpdateProgress(5, "Descargando payload (127 MB)...", "Descargando desde GitHub Release v2.0.1");
+        var zipUrl = "https://github.com/Pyromesis/CA-O/releases/download/v2.0.1/CA-O-2.0.0-20260826-1958-win-x64-selfcontained-singlefile.zip";
+        var tmpZip = Path.Combine(Path.GetTempPath(), "CA-O-payload.zip");
+        var tmpDir = Path.Combine(Path.GetTempPath(), "CA-O-payload-gui");
+
+        var data = await _httpClient.GetByteArrayAsync(zipUrl, ct);
+        await File.WriteAllBytesAsync(tmpZip, data, ct);
+        Log($"Descargado {tmpZip} ({data.Length / 1024 / 1024} MB)");
+        if (Directory.Exists(tmpDir)) Directory.Delete(tmpDir, true);
+        ZipFile.ExtractToDirectory(tmpZip, tmpDir);
+var foundUi = Directory.GetFiles(tmpDir, "CA-O.UI.exe", SearchOption.AllDirectories).FirstOrDefault() ?? throw new InvalidOperationException("ZIP sin CA-O.UI.exe");
+            var foundSvc = Directory.GetFiles(tmpDir, "CA-O.Privileged.exe", SearchOption.AllDirectories).FirstOrDefault() ?? throw new InvalidOperationException("ZIP sin service");
+        payloadUi = foundUi; payloadService = foundSvc;
+        Log($"Payload extraido: {payloadUi}");
+    }
+
+    internal void UpdateProgress(int value, string status, string? detail = null)
+    {
+        DispatcherQueue.TryEnqueue(() =>
+        {
+            ProgressBar.Value = value;
+            ProgressStatusText.Text = status;
+            if (detail != null)
+            {
+                ProgressDetailText.Text = detail;
+                ProgressDetailText.Visibility = Visibility.Visible;
+            }
+        });
+    }
+
+    internal void Log(string msg)
+    {
+        var line = $"[{DateTime.Now:HH:mm:ss}] {msg}";
+        DispatcherQueue.TryEnqueue(() =>
+        {
+            LogTextBox.Text += line + "\n";
+            var scrollViewer = GetScrollViewer(LogTextBox);
+            scrollViewer?.ScrollToVerticalOffset(LogTextBox.ActualHeight);
+        });
+        try { File.AppendAllText(Path.Combine(Path.GetTempPath(), "CA-O-Setup-Gui.log"), line + "\n"); } catch { }
+    }
+
+    private ScrollViewer? GetScrollViewer(DependencyObject element)
+    {
+        if (element is ScrollViewer sv) return sv;
+        for (int i = 0; i < VisualTreeHelper.GetChildrenCount(element); i++)
+        {
+            var child = VisualTreeHelper.GetChild(element, i);
+            var result = GetScrollViewer(child);
+            if (result != null) return result;
+        }
+        return null;
+    }
+
+    private static void CopyDirectory(string src, string dst, Action<int>? progress)
+    {
+        var files = Directory.GetFiles(src, "*", SearchOption.AllDirectories);
+        Directory.CreateDirectory(dst);
+        for (int i = 0; i < files.Length; i++)
+        {
+            var rel = Path.GetRelativePath(src, files[i]);
+            var dest = Path.Combine(dst, rel);
+            Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
+            File.Copy(files[i], dest, true);
+            progress?.Invoke((int)((i + 1) / (double)files.Length * 100));
+        }
+    }
+
+    private static void Run(string file, string args, bool ignoreError = false)
+    {
+        var psi = new ProcessStartInfo(file, args) { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true };
+        using var p = Process.Start(psi)!;
+        var stdout = p.StandardOutput.ReadToEnd();
+        var stderr = p.StandardError.ReadToEnd();
+        p.WaitForExit();
+        if (p.ExitCode != 0 && !ignoreError) throw new InvalidOperationException($"{file} {args} -> {p.ExitCode}: {stderr} {stdout}");
+    }
+
+    private static string RunCapture(string file, string args)
+    {
+        var psi = new ProcessStartInfo(file, args) { UseShellExecute = false, RedirectStandardOutput = true, CreateNoWindow = true };
+        using var p = Process.Start(psi)!;
+        var stdout = p.StandardOutput.ReadToEnd();
+        p.WaitForExit();
+        return stdout;
+    }
+
+    private static void CreateShortcut(string lnk, string target, string desc, string workDir)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(lnk)!);
+        var shell = Type.GetTypeFromProgID("WScript.Shell")!;
+        dynamic wsh = Activator.CreateInstance(shell)!;
+        var sc = wsh.CreateShortcut(lnk);
+        sc.TargetPath = target;
+        sc.WorkingDirectory = workDir;
+        sc.Description = desc;
+        sc.IconLocation = target;
+        sc.Save();
+    }
+
+    internal async Task<ContentDialogResult> ShowSuccessDialogAsync(string installedExe)
+    {
+        var dialog = new ContentDialog
+        {
+            Title = "CA-O 2.0 instalado correctamente",
+            Content = new TextBlock
+            {
+                Text = $"CA-O 2.0 se ha instalado correctamente.\n\nCarpeta: {Path.GetDirectoryName(installedExe)!}\nEjecutable: {Path.GetFileName(installedExe)}\nEscritorio: {(DesktopShortcutCheck.IsChecked == true ? "Si" : "No")}\n\nPulsa Aceptar para abrir CA-O.",
+                TextWrapping = TextWrapping.Wrap,
+            },
+            PrimaryButtonText = "Abrir CA-O",
+            CloseButtonText = "Cerrar",
+            DefaultButton = ContentDialogButton.Primary,
+            XamlRoot = Content.XamlRoot
+        };
+        return await dialog.ShowAsync();
+    }
+
+    internal async Task ShowErrorAsync(string title, string message)
+    {
+        var dialog = new ContentDialog
+        {
+            Title = title,
+            Content = new TextBlock
+            {
+                Text = message,
+                TextWrapping = TextWrapping.Wrap,
+            },
+            CloseButtonText = "Aceptar",
+            DefaultButton = ContentDialogButton.Close,
+            XamlRoot = Content.XamlRoot
+        };
+        await dialog.ShowAsync();
+    }
+
+    internal static bool IsAdmin()
+    {
+        using var id = System.Security.Principal.WindowsIdentity.GetCurrent();
+        return new System.Security.Principal.WindowsPrincipal(id).IsInRole(System.Security.Principal.WindowsBuiltInRole.Administrator);
+    }
+}

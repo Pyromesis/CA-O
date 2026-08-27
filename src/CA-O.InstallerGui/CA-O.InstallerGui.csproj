@@ -1,14 +1,33 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
+<Project Sdk="Microsoft.NET.Sdk">
+
+<PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
-    <UseWindowsForms>true</UseWindowsForms>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
+    <Platform>x64</Platform>
+    <RootNamespace>CAO.InstallerGui</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <UseWinUI>true</UseWinUI>
+    <WindowsPackageType>None</WindowsPackageType>
+    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
     <PublishSingleFile>true</PublishSingleFile>
     <SelfContained>true</SelfContained>
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <PublishTrimmed>false</PublishTrimmed>
+    <EnableMsixTooling>true</EnableMsixTooling>
   </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.WindowsAppSDK" />
+    <PackageReference Include="CommunityToolkit.Mvvm" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\CA-O.Core\CA-O.Core.csproj" />
+    <ProjectReference Include="..\CA-O.Infrastructure\CA-O.Infrastructure.csproj" />
+    <ProjectReference Include="..\CA-O.Shared\CA-O.Shared.csproj" />
+  </ItemGroup>
+
 </Project>
