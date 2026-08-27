@@ -18,6 +18,7 @@ public partial class App : Application
     {
         try
         {
+            AppHost.Initialize();
             _window = new MainWindow();
             _window.Activate();
         }

@@ -14,13 +14,20 @@ namespace CAO.UI.Pages;
 public sealed partial class DashboardPage : Page
 {
     private sealed record FindingRow(string SeverityLabel, string MessageEs, Brush SeverityBrush);
-    private SystemDiagnosticReport? _lastReport;
+    private readonly ViewModels.DashboardViewModel _vm;
 
     public DashboardPage()
     {
         InitializeComponent();
+        _vm = AppHost.Resolve<ViewModels.DashboardViewModel>();
+        DataContext = _vm;
         ApplyTexts();
         RenderState();
+        _vm.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName is null or nameof(ViewModels.DashboardViewModel.Health) or nameof(ViewModels.DashboardViewModel.Recommendations) or nameof(ViewModels.DashboardViewModel.StatusMessage))
+                DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Normal, RenderState);
+        };
         AppServices.State.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName is null or nameof(ViewModels.UiState.Context) or nameof(ViewModels.UiState.Recommendations) or nameof(ViewModels.UiState.LastAnalysisUtc) or nameof(ViewModels.UiState.ServiceStatus))
@@ -28,12 +35,18 @@ public sealed partial class DashboardPage : Page
         };
         Loaded += async (_, __) =>
         {
-            // Fast first render: if no cached context, hydrate in background without blocking UI (Fase 25)
+            // Perceived startup <500ms: UI primero, diagnóstico pesado después (§87-88)
+            RenderState();
             if (AppServices.State.Context is null)
             {
-                try { AppServices.State.Context = await AppServices.ContextProvider.GetAsync(); RenderState(); } catch { }
+                try
+                {
+                    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+                    await _vm.LoadCommand.ExecuteAsync(null);
+                    RenderState();
+                }
+                catch { }
             }
-            // Reflect service availability (read-only mode if unavailable)
             ServiceInfoBar.IsOpen = AppServices.State.ServiceStatus is "unavailable" or "unknown";
         };
     }
@@ -135,16 +148,16 @@ public sealed partial class DashboardPage : Page
         // Compact system summary (secondary)
         SystemSummary.Text = $"{context.WindowsEdition} build {context.WindowsBuild} ({context.Architecture})";
 
-        // Health scores (Fase 6: never magic number alone)
-        if (_lastReport is not null)
+        // Health scores (Fase 6: never magic number alone) — via ViewModel
+        if (_vm.Health is not null)
         {
-            HealthScoresText.Text = DescribeScores(_lastReport);
+            HealthScoresText.Text = DescribeScores(_vm.Health);
             WhyScoresButton.Visibility = string.IsNullOrWhiteSpace(HealthScoresText.Text) ? Visibility.Collapsed : Visibility.Visible;
-            var findings = _lastReport.Findings.Select(f => new FindingRow(f.Severity.ToString(), f.MessageEs, BrushFor(f.Severity.ToString()))).ToList();
+            var findings = _vm.Health.Findings.Select(f => new FindingRow(f.Severity.ToString(), f.MessageEs, BrushFor(f.Severity.ToString()))).ToList();
             FindingsList.ItemsSource = findings;
             FindingsList.Visibility = findings.Count == 0 ? Visibility.Collapsed : Visibility.Visible;
             EmptyFindingsState.Visibility = findings.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
-            SystemHealthText.Text = DeriveSystemStatus(_lastReport);
+            SystemHealthText.Text = DeriveSystemStatus(_vm.Health);
             SystemHealthBadge.Background = BrushForStatus(SystemHealthText.Text);
         }
         else
@@ -185,63 +198,33 @@ public sealed partial class DashboardPage : Page
     {
         AnalyzeButton.IsEnabled = false;
         AnalyzingRing.IsActive = true;
+        // Respect reduced motion: no pulse animation if disabled
+        var animate = CAO.UI.Accessibility.ReducedMotion.ShouldAnimate;
+        if (!animate) AnalyzingRing.IsActive = false;
         AnalyzeStatusText.Text = Localizer.Get("dashboard.analyzing");
         try
         {
-            var candidates = AppServices.Recovery.Scan();
-            AppServices.State.RecoveryCandidates = candidates.Select(candidate => candidate.OptimizationId).ToList();
-            RecoveryBar.IsOpen = candidates.Count > 0;
-            if (candidates.Count > 0)
-            {
-                RecoveryBar.Message = "Operaciones incompletas: " + string.Join(", ", candidates.Select(c => c.OptimizationId)) +
-                    ". Revise Restaurar/Historial y revierta desde el servicio si procede.";
-            }
-
-            var context = await AppServices.ContextProvider.GetAsync();
-            AppServices.State.Context = context;
-
-            var network = await new CAO.Infrastructure.Networking.NetworkDiagnosticsProvider().MeasureAsync();
-            var storage = new CAO.Infrastructure.Storage.StorageDiagnosticsProvider().Measure();
-            var security = new CAO.Infrastructure.Security.SecurityDiagnosticsProvider().Measure();
-
-            await Task.Run(() =>
-            {
-                var recommendations = RecommendationEngine.BuildAll(AppServices.Catalog, AppServices.Registry, context);
-                AppServices.State.Recommendations = recommendations;
-
-                var report = HealthEngine.Evaluate(
-                    context: context,
-                    network: network,
-                    storage: storage,
-                    security: security);
-                _lastReport = report;
-                DispatcherQueue.TryEnqueue(() =>
-                {
-                    FindingsList.ItemsSource = report.Findings
-                        .Select(finding => new FindingRow(finding.Severity.ToString(), finding.MessageEs, BrushFor(finding.Severity.ToString())))
-                        .ToList();
-                    HealthScoresText.Text = DescribeScores(report);
-                    WhyScoresButton.Visibility = string.IsNullOrWhiteSpace(HealthScoresText.Text) ? Visibility.Collapsed : Visibility.Visible;
-                    EmptyFindingsState.Visibility = report.Findings.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
-                    FindingsList.Visibility = report.Findings.Count == 0 ? Visibility.Collapsed : Visibility.Visible;
-                });
-            });
-
-            ThermalBar.IsOpen = context.ThermalState == ThermalState.Throttling;
-            RecoveryBar.IsOpen = AppServices.State.RecoveryCandidates.Count > 0;
-            PendingRebootBar.IsOpen = context.PendingReboot;
-            if (context.PendingReboot)
-            {
-                PendingRebootBar.Message = "Reinicio pendiente por: " +
-                    string.Join(", ", context.PendingRebootReasons) + ".";
-            }
-
-            AppServices.State.LastAnalysisUtc = DateTime.UtcNow;
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            await _vm.AnalyzeCommand.ExecuteAsync(null);
             RenderState();
+            if (!string.IsNullOrEmpty(_vm.StatusMessage) && _vm.StatusMessage.Contains(ErrorCodes.UiAnalyzeFailed))
+            {
+                SystemSummary.Text = $"{_vm.StatusMessage} [Detalles técnicos: {_vm.StatusMessage}]";
+                AnalyzeStatusText.Text = _vm.StatusMessage;
+            }
+            else
+            {
+                var context = AppServices.State.Context;
+                ThermalBar.IsOpen = context?.ThermalState == ThermalState.Throttling;
+                RecoveryBar.IsOpen = AppServices.State.RecoveryCandidates.Count > 0;
+                PendingRebootBar.IsOpen = context?.PendingReboot ?? false;
+                if (context?.PendingReboot ?? false)
+                    PendingRebootBar.Message = "Reinicio pendiente por: " + string.Join(", ", context.PendingRebootReasons) + ".";
+                RenderState();
+            }
         }
         catch (Exception ex)
         {
-            // Fase 50: nunca exponer ex.Message crudo como UX final — usar código + SafeMessage
             SystemSummary.Text = $"{ErrorCodes.UiAnalyzeFailed}: No fue posible completar el análisis. Verifique que el servicio no esté bloqueando WMI y reintente. [Detalles técnicos: {ex.GetType().Name}]";
             AnalyzeStatusText.Text = $"{ErrorCodes.UiAnalyzeFailed}: análisis no completado";
             App.WriteCrashLog(ex);
@@ -250,14 +233,14 @@ public sealed partial class DashboardPage : Page
         {
             AnalyzingRing.IsActive = false;
             AnalyzeButton.IsEnabled = true;
-            if (AnalyzeStatusText.Text == Localizer.Get("dashboard.analyzing")) AnalyzeStatusText.Text = "";
+            if (AnalyzeStatusText.Text == Localizer.Get("dashboard.analyzing")) AnalyzeStatusText.Text = _vm.StatusMessage;
         }
     }
 
     private async void OnWhyScoresClick(object sender, RoutedEventArgs e)
     {
-        if (_lastReport is null) return;
-        var detail = string.Join("\n", _lastReport.Scores.Where(s => s.IsMeasured).Select(s => $"• {s.Dimension}: {s.Score}/100 — {s.ReasonEs}"));
+        if (_vm.Health is null) return;
+        var detail = string.Join("\n", _vm.Health.Scores.Where(s => s.IsMeasured).Select(s => $"• {s.Dimension}: {s.Score}/100 — {s.ReasonEs}"));
         if (string.IsNullOrWhiteSpace(detail)) detail = "No hay dimensiones medidas suficientes para un score. Ejecute más diagnósticos.";
         var dialog = new ContentDialog
         {

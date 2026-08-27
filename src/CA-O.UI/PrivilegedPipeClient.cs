@@ -12,7 +12,7 @@ namespace CAO.UI;
 /// authenticated pipe as a typed payload with request id + nonce + timestamp.
 /// Structured error codes (CAO-XXX-nnn) surface rejections verbatim.
 /// </summary>
-internal sealed class PrivilegedPipeClient
+public sealed class PrivilegedPipeClient
 {
     private static readonly TimeSpan CallTimeout = TimeSpan.FromSeconds(10);
 

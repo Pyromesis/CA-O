@@ -13,23 +13,33 @@ namespace CAO.UI.Pages;
 /// </summary>
 public sealed partial class BenchmarkPage : Page
 {
-    private static string BaselinePath =>
-        Path.Combine(CaOPaths.BenchmarksDirectory, "baseline.json");
+    private readonly ViewModels.BenchmarkViewModel _vm;
 
     public BenchmarkPage()
     {
         InitializeComponent();
         BaselineButton.Content = Localizer.Get("benchmark.baseline");
         AfterButton.Content = Localizer.Get("benchmark.after");
+        _vm = AppHost.Resolve<ViewModels.BenchmarkViewModel>();
+        DataContext = _vm;
+        _vm.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName is null or nameof(ViewModels.BenchmarkViewModel.BaselineSummary) or nameof(ViewModels.BenchmarkViewModel.ComparisonSummary))
+                DispatcherQueue.TryEnqueue(RenderVm);
+        };
     }
 
-    private async void OnBaselineClick(object sender, RoutedEventArgs e) =>
-        await RunAsync(BaselineButton, isBaseline: true);
+    private void RenderVm()
+    {
+        BaselineText.Text = _vm.BaselineSummary;
+        ComparisonText.Text = _vm.ComparisonSummary;
+        if (BenchStatusText is not null) BenchStatusText.Text = _vm.Status;
+    }
 
-    private async void OnAfterClick(object sender, RoutedEventArgs e) =>
-        await RunAsync(AfterButton, isBaseline: false);
+    private async void OnBaselineClick(object sender, RoutedEventArgs e) => await RunWithVm(true, BaselineButton);
+    private async void OnAfterClick(object sender, RoutedEventArgs e) => await RunWithVm(false, AfterButton);
 
-    private async Task RunAsync(Button button, bool isBaseline)
+    private async Task RunWithVm(bool isBaseline, Button button)
     {
         var previous = button.Content;
         button.IsEnabled = false;
@@ -37,47 +47,13 @@ public sealed partial class BenchmarkPage : Page
         if (BenchStatusText is not null) BenchStatusText.Text = "Midiendo…";
         try
         {
-            Directory.CreateDirectory(CaOPaths.BenchmarksDirectory);
-            var runner = new SystemBenchmarkRunner();
-            var result = await runner.RunAsync(isBaseline ? "baseline" : "after-change");
-
-            BaselineText.Text = Describe(result);
-
-            if (isBaseline)
-            {
-                await File.WriteAllTextAsync(BaselinePath, JsonSerializer.Serialize(result));
-                ComparisonText.Text = "Línea base guardada; mida de nuevo tras aplicar un cambio para comparar.";
-            }
-            else
-            {
-                if (!File.Exists(BaselinePath))
-                {
-                    ComparisonText.Text = "No hay línea base guardada; mida primero la línea base.";
-                    return;
-                }
-
-                var baseline = JsonSerializer.Deserialize<SystemBenchmarkResult>(await File.ReadAllTextAsync(BaselinePath));
-                if (baseline is null)
-                {
-                    ComparisonText.Text = "La línea base guardada no es legible.";
-                    return;
-                }
-
-                var comparison = SystemBenchmarkRunner.Compare(baseline, result);
-                ComparisonText.Text =
-                    $"CPU: {comparison.CpuDeltaPercent:+0.0;-0.0}% | Memoria: {comparison.MemoryDeltaPercent:+0.0;-0.0}% — {comparison.VerdictEs} " +
-                    $"(suelo de ruido ±{SystemBenchmarkRunner.NoiseFloorPercent:0}%).\n" +
-                    (comparison.VerdictEs == "Regresión"
-                        ? "Recomendación: revertir el cambio."
-                        : comparison.VerdictEs == "Sin mejora medible"
-                            ? "Recomendación: sin evidencia para mantener el cambio."
-                            : "Mejora medida; puede mantenerse.");
-            }
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            await _vm.RunAsync(isBaseline, cts.Token);
+            RenderVm();
         }
         catch (Exception ex)
         {
-            ComparisonText.Text = $"{ErrorCodes.UiBenchmarkFailed}: El benchmark no pudo completarse. Cierre cargas pesadas y reintente. [Técnico: {ex.GetType().Name}]";
-            if (BenchStatusText is not null) BenchStatusText.Text = $"{ErrorCodes.UiBenchmarkFailed}: benchmark fallido";
+            ComparisonText.Text = $"{ErrorCodes.UiBenchmarkFailed}: El benchmark no pudo completarse. [Técnico: {ex.GetType().Name}]";
             App.WriteCrashLog(ex);
         }
         finally
@@ -85,14 +61,7 @@ public sealed partial class BenchmarkPage : Page
             Ring.IsActive = false;
             button.Content = previous;
             button.IsEnabled = true;
-            if (BenchStatusText is not null && BenchStatusText.Text == "Midiendo…") BenchStatusText.Text = "";
+            if (BenchStatusText is not null && BenchStatusText.Text == "Midiendo…") BenchStatusText.Text = _vm.Status;
         }
     }
-
-    private static string Describe(SystemBenchmarkResult result) =>
-        $"{result.WorkloadId} @ {result.Header.TimestampUtc.ToLocalTime():g}\n" +
-        $"CPU (nº de primos en carga fija): {result.CpuScore:0}\n" +
-        $"Memoria: {result.MemoryBandwidthGbs:0.00} GB/s\n" +
-        $"Disco secuencial: lectura {result.DiskReadMbs:0} MB/s, escritura {result.DiskWriteMbs:0} MB/s\n" +
-        $"Duración total: {result.Elapsed.TotalSeconds:0.0}s";
 }

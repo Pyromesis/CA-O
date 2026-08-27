@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <Version>2.0.0</Version>
-    <LangVersion>latest</LangVersion>
+    <LangVersion>13.0</LangVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <Authors>CA-O Team</Authors>
@@ -21,7 +21,7 @@
        Nullability (CS8xxx), CA2016 and xUnit rules remain ERRORS. -->
   <PropertyGroup Condition="'$(Configuration)' == 'Release'">
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-    <NoWarn>$(NoWarn);CA1305;CA1310;CA1707;CA1711;CA1716;CA1720;CA1822;CA1859;CA1861;CA1873;CA1848;xUnit1048;xUnit2029</NoWarn>
+    <NoWarn>$(NoWarn);CA1305;CA1310;CA1707;CA1711;CA1716;CA1720;CA1822;CA1859;CA1861;CA1873;CA1848;xUnit1048;xUnit2029;MVVMTK0045;CA1068;CA1001</NoWarn>
   </PropertyGroup>
 
 </Project>

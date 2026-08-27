@@ -25,6 +25,7 @@ public sealed class RegistryAccessor : IRegistryAccessor
 
     public object? GetValue(RegistryHive2 hive, string keyPath, string valueName)
     {
+        ValidatePath(hive, keyPath, valueName);
         using var key = OpenBase(hive).OpenSubKey(keyPath);
         return key?.GetValue(valueName);
     }
@@ -57,8 +58,20 @@ public sealed class RegistryAccessor : IRegistryAccessor
 
     public void SetValueRaw(RegistryHive2 hive, string keyPath, string valueName, object value, RegistryValueKind2 kind)
     {
+        ValidatePath(hive, keyPath, valueName);
         using var key = OpenBase(hive).CreateSubKey(keyPath, writable: true)!;
         key.SetValue(valueName, Coerce(value), MapToWin(kind));
+    }
+
+    private static void ValidatePath(RegistryHive2 hive, string keyPath, string valueName)
+    {
+        if (string.IsNullOrWhiteSpace(keyPath) || keyPath.Contains("..") || keyPath.Length > 512)
+            throw new ArgumentException("Registry path inválido.", nameof(keyPath));
+        if (string.IsNullOrWhiteSpace(valueName) || valueName.Length > 256)
+            throw new ArgumentException("Registry value name inválido.", nameof(valueName));
+        // Sólo HKLM/HKCU permitidos — nunca HKCR/HKCC
+        if (hive is not (RegistryHive2.CurrentUser or RegistryHive2.LocalMachine))
+            throw new UnauthorizedAccessException("Hive no permitido.");
     }
 
     public bool DeleteValue(RegistryHive2 hive, string keyPath, string valueName)

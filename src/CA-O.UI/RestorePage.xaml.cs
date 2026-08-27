@@ -11,25 +11,41 @@ namespace CAO.UI.Pages;
 /// </summary>
 public sealed partial class RestorePage : Page
 {
+    private readonly ViewModels.RestoreViewModel _vm;
+
     public RestorePage()
     {
         InitializeComponent();
         NoteBar.Message = Localizer.Get("restore.pointNote");
-        RecoveryHintText.Text = AppServices.State.RecoveryCandidates.Count == 0
-            ? "Sin recuperaciones pendientes."
-            : $"Recuperación requerida: {string.Join(", ", AppServices.State.RecoveryCandidates)} — revise transacción y revierta.";
+        _vm = AppHost.Resolve<ViewModels.RestoreViewModel>();
+        DataContext = _vm;
+        _vm.RefreshCommand.Execute(null);
+        RecoveryHintText.Text = _vm.RecoveryHint;
+        _vm.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName is null or nameof(ViewModels.RestoreViewModel.Snapshots) or nameof(ViewModels.RestoreViewModel.RecoveryHint) or nameof(ViewModels.RestoreViewModel.IsEmpty))
+                DispatcherQueue.TryEnqueue(RenderVm);
+        };
+        RenderVm();
     }
 
     protected override void OnNavigatedTo(Microsoft.UI.Xaml.Navigation.NavigationEventArgs e)
     {
         base.OnNavigatedTo(e);
-        Refresh();
+        _vm.RefreshCommand.Execute(null);
     }
 
-    private void OnRefreshClick(object sender, RoutedEventArgs e) => Refresh();
+    private void RenderVm()
+    {
+        EmptySnapshotsCard.Visibility = _vm.IsEmpty ? Visibility.Visible : Visibility.Collapsed;
+        SnapshotsList.Visibility = _vm.IsEmpty ? Visibility.Collapsed : Visibility.Visible;
+        SnapshotsList.ItemsSource = _vm.Snapshots;
+        RecoveryHintText.Text = _vm.RecoveryHint;
+    }
+
+    private void OnRefreshClick(object sender, RoutedEventArgs e) => _vm.RefreshCommand.Execute(null);
     private void OnGoHistoryClick(object sender, RoutedEventArgs e)
     {
-        // Navigation via MainWindow already hosts history; emit hint.
         RecoveryHintText.Text = "Historial contiene el timeline auditable con TransactionId por operación.";
     }
 
@@ -75,41 +91,14 @@ public sealed partial class RestorePage : Page
         };
         if (await confirm.ShowAsync() != ContentDialogResult.Primary) return;
 
-        // Dispatch revert through IPC if optimization id can be derived; otherwise show guidance.
-        var match = snapshotId.Split(new[] { '-', '_' }, StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
         try
         {
-            // For demo we attempt to revert by snapshot folder name heuristic; real path loads manifest.
-            var resp = await AppServices.Pipe.SendAsync(CAO.Shared.IPC.PrivilegedOperationKind.RevertOptimization, snapshotId);
-            RecoveryHintText.Text = resp is { Accepted: true } ? "✓ Reversión solicitada y aceptada." : $"Rechazado [{resp?.ErrorCode}]: {resp?.SafeMessage}";
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+            await _vm.RevertCommand.ExecuteAsync(snapshotId);
         }
         catch (Exception ex)
         {
             RecoveryHintText.Text = $"Restauración falló (servicio no disponible): {ex.Message}";
         }
-    }
-
-    private void Refresh()
-    {
-        var directory = CaOPaths.SnapshotsDirectory;
-        if (!Directory.Exists(directory))
-        {
-            SnapshotsList.ItemsSource = Array.Empty<string>();
-            EmptySnapshotsCard.Visibility = Visibility.Visible;
-            SnapshotsList.Visibility = Visibility.Collapsed;
-            return;
-        }
-
-        var folders = Directory.GetDirectories(directory).Select(Path.GetFileName).OrderByDescending(s => s).ToList();
-        var files = Directory.GetFiles(directory, "*.json").Select(Path.GetFileNameWithoutExtension).OrderBy(s => s).ToList();
-        var combined = folders.Count > 0 ? folders! : files;
-
-        EmptySnapshotsCard.Visibility = combined.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
-        SnapshotsList.Visibility = combined.Count == 0 ? Visibility.Collapsed : Visibility.Visible;
-        SnapshotsList.ItemsSource = combined.Count == 0 ? Array.Empty<string>() : combined;
-
-        RecoveryHintText.Text = AppServices.State.RecoveryCandidates.Count == 0
-            ? "Sin recuperaciones pendientes."
-            : $"Recuperación requerida: {string.Join(", ", AppServices.State.RecoveryCandidates)}";
     }
 }

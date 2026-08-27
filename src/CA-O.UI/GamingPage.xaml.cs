@@ -12,10 +12,36 @@ namespace CAO.UI.Pages;
 /// </summary>
 public sealed partial class GamingPage : Page
 {
+    private readonly ViewModels.GamingViewModel _vm;
+
     public GamingPage()
     {
         InitializeComponent();
         ScanButton.Content = "Escanear entorno gaming";
+        _vm = AppHost.Resolve<ViewModels.GamingViewModel>();
+        DataContext = _vm;
+        _vm.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName is null or nameof(ViewModels.GamingViewModel.AntiCheats) or nameof(ViewModels.GamingViewModel.GameProfiles) or nameof(ViewModels.GamingViewModel.GpuSummary) or nameof(ViewModels.GamingViewModel.VendorGuidance))
+                DispatcherQueue.TryEnqueue(RenderVm);
+        };
+    }
+
+    private void RenderVm()
+    {
+        AntiCheatText.Text = _vm.AntiCheats.Count == 0
+            ? "No se han detectado servicios/drivers de anti-cheat conocidos."
+            : string.Join("\n", _vm.AntiCheats.Select(cheat => $"• {cheat.Kind}: {string.Join(", ", cheat.Components)}"));
+        VanguardBar.IsOpen = _vm.VanguardDetected;
+        GameProfilesText.Text = _vm.GameProfiles.Count == 0
+            ? "Sin juegos conocidos en ejecución/detección ahora mismo."
+            : string.Join("\n\n", _vm.GameProfiles.Select(game =>
+                $"▸ {game.DisplayName} ({game.Launcher})\n" +
+                $"  Anti-cheat: {game.AntiCheatPolicy}\n" +
+                string.Join("\n", game.GuidanceEs.Select(line => "  - " + line))));
+        GpuText.Text = _vm.GpuSummary;
+        VendorText.Text = _vm.VendorGuidance;
+        if (GamingStatusText is not null) GamingStatusText.Text = _vm.Status;
     }
 
     private async void OnScanClick(object sender, RoutedEventArgs e)
@@ -25,52 +51,13 @@ public sealed partial class GamingPage : Page
         if (GamingStatusText is not null) GamingStatusText.Text = "Escaneando…";
         try
         {
-            var context = AppServices.State.Context ?? await AppServices.ContextProvider.GetAsync();
-            AppServices.State.Context = context;
-
-            var antiCheats = new AntiCheatScanProvider().Scan();
-            AntiCheatText.Text = antiCheats.Count == 0
-                ? "No se han detectado servicios/drivers de anti-cheat conocidos."
-                : string.Join("\n", antiCheats.Select(cheat =>
-                    $"• {cheat.Kind}: {string.Join(", ", cheat.Components)}"));
-
-            VanguardBar.IsOpen = context.VanguardDetected;
-
-            // Per-game profiles (FASE 22): advisory guidance only.
-            var games = context.GamesDetected
-                .Select(gameName => CAO.Core.Gaming.GameProfileCatalog.All.FirstOrDefault(profile =>
-                    profile.DisplayName.Equals(gameName, StringComparison.OrdinalIgnoreCase)))
-                .Where(profile => profile is not null)
-                .Cast<CAO.Shared.GameProfile>()
-                .ToList();
-
-            GameProfilesText.Text = games.Count == 0
-                ? "Sin juegos conocidos en ejecución/detección ahora mismo."
-                : string.Join("\n\n", games.Select(game =>
-                    $"▸ {game.DisplayName} ({game.Launcher})\n" +
-                    $"  Anti-cheat: {game.AntiCheatPolicy}\n" +
-                    string.Join("\n", game.GuidanceEs.Select(line => "  - " + line))));
-
-            GpuText.Text =
-                $"GPU: {(string.IsNullOrWhiteSpace(context.GpuName) ? "desconocida" : context.GpuName)}\n" +
-                $"Driver: {(string.IsNullOrWhiteSpace(context.GpuDriverVersion) ? "desconocido" : context.GpuDriverVersion)}\n" +
-                $"Refresco del monitor principal: {(context.DisplayRefreshHz > 0 ? $"{context.DisplayRefreshHz} Hz" : "desconocido")}\n" +
-                $"Estado térmico: {context.ThermalState}";
-
-            VendorText.Text = context.GpuVendor switch
-            {
-                "NVIDIA" =>
-                    "NVIDIA Reflex (y Reflex 2 con Frame Warp) es la vía correcta para reducir latencia del sistema cuando el juego lo soporta; " +
-                    "tiene prioridad sobre ajustes globales como Ultra Low Latency Mode. Configure Reflex dentro del juego y mantenga el driver actualizado.",
-                "AMD" =>
-                    "AMD Anti-Lag / Anti-Lag 2 e HYPR-RX se controlan desde el driver Adrenalin o el propio juego. " +
-                    "CA-O no aplica equivalentes de registro: las tecnologías nativas del fabricante tienen prioridad.",
-                _ => "Use el panel del fabricante de su GPU para las tecnologías de latencia nativas (Reflex, Anti-Lag). No existen hacks de registro fiables que las sustituyan.",
-            };
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+            await _vm.ScanCommand.ExecuteAsync(null);
+            RenderVm();
         }
         catch (Exception ex)
         {
-            AntiCheatText.Text = $"{ErrorCodes.UiGamingScanFailed}: El escaneo gaming no pudo completarse. Verifique permisos de lectura de servicios/drivers. [Técnico: {ex.GetType().Name}]";
+            AntiCheatText.Text = $"{ErrorCodes.UiGamingScanFailed}: El escaneo gaming no pudo completarse. [Técnico: {ex.GetType().Name}]";
             if (GamingStatusText is not null) GamingStatusText.Text = $"{ErrorCodes.UiGamingScanFailed}: escaneo fallido";
             App.WriteCrashLog(ex);
         }

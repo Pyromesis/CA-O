@@ -5,6 +5,8 @@ namespace CAO.Infrastructure.SystemInterop;
 
 public sealed class ThermalDiagnosticsProvider
 {
+    private static readonly TimeSpan WmiTimeout = TimeSpan.FromSeconds(5);
+
     public async Task<ThermalDiagnosticsReport> MeasureAsync(CancellationToken ct = default)
     {
         return await Task.Run(() =>
@@ -12,9 +14,11 @@ public sealed class ThermalDiagnosticsProvider
             var zones = new List<ThermalZoneDiagnostic>();
             try
             {
+                var opts = new System.Management.EnumerationOptions { Timeout = WmiTimeout, BlockSize = 10, Rewindable = false };
                 using var searcher = new ManagementObjectSearcher(
                     new ManagementScope(@"root\WMI"),
-                    new ObjectQuery("SELECT InstanceName, CurrentTemperature FROM MSAcpi_ThermalZoneTemperature"));
+                    new ObjectQuery("SELECT InstanceName, CurrentTemperature FROM MSAcpi_ThermalZoneTemperature"),
+                    opts);
                 foreach (var zone in searcher.Get().Cast<ManagementObject>())
                 {
                     ct.ThrowIfCancellationRequested();
@@ -26,6 +30,7 @@ public sealed class ThermalDiagnosticsProvider
                         "MSAcpi_ThermalZoneTemperature"));
                 }
             }
+            catch (OperationCanceledException) { throw; }
             catch (ManagementException)
             {
                 // Many modern systems do not expose ACPI thermal zones through WMI.

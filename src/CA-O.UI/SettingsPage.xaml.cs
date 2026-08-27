@@ -6,6 +6,8 @@ namespace CAO.UI.Pages;
 /// <summary>Settings (spec 80): expert mode with warning, theme and language.</summary>
 public sealed partial class SettingsPage : Page
 {
+    private readonly ViewModels.SettingsViewModel _vm;
+
     public SettingsPage()
     {
         InitializeComponent();
@@ -21,19 +23,24 @@ public sealed partial class SettingsPage : Page
             LanguageBox.Items.Add(language);
         }
 
-        var state = AppServices.State;
-        ExpertSwitch.IsOn = state.ExpertMode;
-        ExpertWarnBar.IsOpen = state.ExpertMode;
-        Select(ThemeBox, state.Theme);
-        Select(LanguageBox, state.Language);
-
-        ServiceStatusText.Text = $"Servicio: {state.ServiceStatus}";
+        _vm = AppHost.Resolve<ViewModels.SettingsViewModel>();
+        DataContext = _vm;
+        ExpertSwitch.IsOn = _vm.ExpertMode;
+        ExpertWarnBar.IsOpen = _vm.ExpertMode;
+        Select(ThemeBox, _vm.Theme);
+        Select(LanguageBox, _vm.Language);
+        ServiceStatusText.Text = $"Servicio: {_vm.ServiceStatus}";
         VersionsText.Text = $"CA-O UI {CAO.Shared.AppVersion.Semantic} · Protocolo v{CAO.Shared.IPC.IpcProtocol.Version} · Settings: {CAO.Shared.CaOPaths.SettingsFile}";
+        _vm.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(ViewModels.SettingsViewModel.ServiceStatus))
+                DispatcherQueue.TryEnqueue(() => ServiceStatusText.Text = $"Servicio: {_vm.ServiceStatus}");
+        };
     }
 
     private void OnExpertToggled(object sender, RoutedEventArgs e)
     {
-        AppServices.State.ExpertMode = ExpertSwitch.IsOn;
+        _vm.ExpertMode = ExpertSwitch.IsOn;
         ExpertWarnBar.IsOpen = ExpertSwitch.IsOn;
     }
 
@@ -41,16 +48,15 @@ public sealed partial class SettingsPage : Page
     {
         if (ThemeBox.SelectedItem is ComboBoxItem { Tag: string theme })
         {
-            AppServices.State.Theme = theme;
-            MainWindow.ApplyThemeGlobally?.Invoke(theme);
+            _vm.Theme = theme;
         }
     }
 
     private void OnLanguageSelected(object sender, SelectionChangedEventArgs e)
     {
-        if (LanguageBox.SelectedItem is string language && language != AppServices.State.Language)
+        if (LanguageBox.SelectedItem is string language && language != _vm.Language)
         {
-            AppServices.State.Language = language; // triggers shell re-localization
+            _vm.Language = language;
         }
     }
 
@@ -59,21 +65,15 @@ public sealed partial class SettingsPage : Page
         ServiceRing.IsActive = true;
         try
         {
-            var response = await AppServices.Pipe.DetectAsync("disable-transparency");
-            AppServices.State.ServiceStatus = response is { Accepted: true } ? "conectado" : "rechazado";
-            ServiceStatusText.Text = response is { Accepted: true }
-                ? "Servicio privilegiado OK"
-                : $"Servicio respondió rechazo: {response?.ErrorCode ?? "?"}";
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            await _vm.CheckServiceCommand.ExecuteAsync(null);
+            ServiceStatusText.Text = _vm.ServiceStatus == "conectado" ? "Servicio privilegiado OK" : $"Servicio: {_vm.ServiceStatus}";
         }
         catch (Exception ex)
         {
-            AppServices.State.ServiceStatus = "no disponible";
             ServiceStatusText.Text = $"Servicio no disponible (normal si aún no está instalado): {ex.Message}";
         }
-        finally
-        {
-            ServiceRing.IsActive = false;
-        }
+        finally { ServiceRing.IsActive = false; }
     }
 
     private static void Select(ComboBox box, string value)

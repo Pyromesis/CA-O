@@ -5,6 +5,8 @@ namespace CAO.Infrastructure.SystemInterop;
 
 public sealed class PerformanceDiagnosticsProvider
 {
+    private static readonly TimeSpan WmiTimeout = TimeSpan.FromSeconds(5);
+
     public async Task<PerformanceDiagnosticsReport> MeasureAsync(CancellationToken ct = default)
     {
         return await Task.Run(() =>
@@ -13,8 +15,11 @@ public sealed class PerformanceDiagnosticsProvider
             var graphicsAdapters = new List<GraphicsAdapterDiagnostic>();
             try
             {
+                var opts = new System.Management.EnumerationOptions { Timeout = WmiTimeout, BlockSize = 10, Rewindable = false };
                 using var processorSearcher = new ManagementObjectSearcher(
-                    "SELECT Name, LoadPercentage, CurrentClockSpeed, MaxClockSpeed FROM Win32_Processor");
+                    new System.Management.ManagementScope(@"root\cimv2"),
+                    new System.Management.ObjectQuery("SELECT Name, LoadPercentage, CurrentClockSpeed, MaxClockSpeed FROM Win32_Processor"),
+                    opts);
                 foreach (var processor in processorSearcher.Get().Cast<ManagementObject>())
                 {
                     ct.ThrowIfCancellationRequested();
@@ -26,7 +31,9 @@ public sealed class PerformanceDiagnosticsProvider
                 }
 
                 using var graphicsSearcher = new ManagementObjectSearcher(
-                    "SELECT Name, DriverVersion, AdapterRAM, Status FROM Win32_VideoController");
+                    new System.Management.ManagementScope(@"root\cimv2"),
+                    new System.Management.ObjectQuery("SELECT Name, DriverVersion, AdapterRAM, Status FROM Win32_VideoController"),
+                    opts);
                 foreach (var adapter in graphicsSearcher.Get().Cast<ManagementObject>())
                 {
                     ct.ThrowIfCancellationRequested();
@@ -37,6 +44,7 @@ public sealed class PerformanceDiagnosticsProvider
                         adapter["Status"]?.ToString() ?? string.Empty));
                 }
             }
+            catch (OperationCanceledException) { throw; }
             catch (ManagementException)
             {
                 // Return partial observations when WMI is restricted or unavailable.

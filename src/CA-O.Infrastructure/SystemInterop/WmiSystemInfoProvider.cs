@@ -8,6 +8,8 @@ namespace CAO.Infrastructure.SystemInterop;
 /// <summary>Live system facts via WMI/CIM for the Dashboard.</summary>
 public sealed class WmiSystemInfoProvider : ISystemInfoProvider
 {
+    private static readonly TimeSpan WmiTimeout = TimeSpan.FromSeconds(5);
+
     public async Task<SystemInfoReport> GetAsync(CancellationToken ct = default)
     {
         return await Task.Run(() =>
@@ -21,24 +23,29 @@ public sealed class WmiSystemInfoProvider : ISystemInfoProvider
 
             try
             {
-                using var osSearcher = new ManagementObjectSearcher("SELECT Caption, TotalVisibleMemorySize FROM Win32_OperatingSystem");
-                foreach (var os in osSearcher.Get())
+                // WMI con timeout explícito y cancellation para no bloquear UI ( §12 )
+                var opts = new System.Management.EnumerationOptions { Timeout = WmiTimeout, BlockSize = 1, Rewindable = false };
+                using var osSearcher = new ManagementObjectSearcher(new ManagementScope(@"root\cimv2"), new ObjectQuery("SELECT Caption, TotalVisibleMemorySize FROM Win32_OperatingSystem"), opts);
+                foreach (ManagementBaseObject os in WithCancellation(osSearcher.Get().Cast<ManagementBaseObject>(), ct))
                 {
+                    ct.ThrowIfCancellationRequested();
                     edition = os["Caption"]?.ToString() ?? string.Empty;
                     if (ulong.TryParse(os["TotalVisibleMemorySize"]?.ToString(), out var kb))
                     {
                         ramGb = (int)Math.Round(kb / (1024d * 1024d));
                     }
                 }
-                using var cpuSearcher = new ManagementObjectSearcher("SELECT Name, NumberOfCores, NumberOfLogicalProcessors FROM Win32_Processor");
-                foreach (var cpu in cpuSearcher.Get().Cast<ManagementObject>())
+                using var cpuSearcher = new ManagementObjectSearcher(new ManagementScope(@"root\cimv2"), new ObjectQuery("SELECT Name, NumberOfCores, NumberOfLogicalProcessors FROM Win32_Processor"), opts);
+                foreach (var cpu in WithCancellation(cpuSearcher.Get().Cast<ManagementObject>(), ct))
                 {
+                    ct.ThrowIfCancellationRequested();
                     cpuName = cpu["Name"]?.ToString()?.Trim() ?? cpuName;
                     cpuCores = Convert.ToInt32(cpu["NumberOfCores"] ?? 0);
                     cpuLogicalProcessors = Convert.ToInt32(cpu["NumberOfLogicalProcessors"] ?? cpuLogicalProcessors);
                     break;
                 }
             }
+            catch (OperationCanceledException) { throw; }
             catch
             {
                 // WMI can fail on hardened systems; the report degrades gracefully.
@@ -101,7 +108,8 @@ public sealed class WmiSystemInfoProvider : ISystemInfoProvider
     {
         try
         {
-            using var searcher = new ManagementObjectSearcher("SELECT ChassisTypes FROM Win32_SystemEnclosure");
+            var opts = new System.Management.EnumerationOptions { Timeout = WmiTimeout };
+            using var searcher = new ManagementObjectSearcher(new ManagementScope(@"root\cimv2"), new ObjectQuery("SELECT ChassisTypes FROM Win32_SystemEnclosure"), opts);
             foreach (var enclosure in searcher.Get())
             {
                 if (enclosure["ChassisTypes"] is not int[] chassisTypes) continue;
@@ -114,5 +122,14 @@ public sealed class WmiSystemInfoProvider : ISystemInfoProvider
         }
         catch { }
         return false;
+    }
+
+    private static IEnumerable<T> WithCancellation<T>(IEnumerable<T> source, CancellationToken ct)
+    {
+        foreach (var item in source)
+        {
+            ct.ThrowIfCancellationRequested();
+            yield return item;
+        }
     }
 }

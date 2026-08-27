@@ -13,11 +13,28 @@ namespace CAO.UI.Pages;
 /// </summary>
 public sealed partial class DiagnosticsPage : Page
 {
+    private readonly ViewModels.DiagnosticsViewModel _vm;
+
     public DiagnosticsPage()
     {
         InitializeComponent();
         RunButton.Content = Localizer.Get("analyze.run");
         if (StatusText is not null) StatusText.Text = "";
+        _vm = AppHost.Resolve<ViewModels.DiagnosticsViewModel>();
+        DataContext = _vm;
+        _vm.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName is null or nameof(ViewModels.DiagnosticsViewModel.InputSummary) or nameof(ViewModels.DiagnosticsViewModel.ThermalSummary) or nameof(ViewModels.DiagnosticsViewModel.PerformanceSummary))
+                DispatcherQueue.TryEnqueue(RenderVm);
+        };
+    }
+
+    private void RenderVm()
+    {
+        InputText.Text = _vm.InputSummary;
+        ThermalText.Text = _vm.ThermalSummary;
+        PerfText.Text = _vm.PerformanceSummary;
+        if (StatusText is not null) StatusText.Text = _vm.Status;
     }
 
     private async void OnRunClick(object sender, RoutedEventArgs e)
@@ -27,29 +44,13 @@ public sealed partial class DiagnosticsPage : Page
         if (StatusText is not null) StatusText.Text = "Midiendo…";
         try
         {
-            var input = await new InputDiagnosticsProvider().MeasureAsync();
-            InputText.Text =
-                $"Aceleración del ratón: {(input.MouseAccelerationEnabled is null ? "desconocida" : input.MouseAccelerationEnabled.Value ? "activada" : "desactivada")} · " +
-                $"Dispositivos HID: {input.HidDeviceCount}\n" +
-                "No se captura contenido de entrada: sólo estado y temporización de dispositivos.";
-
-            var thermals = await new ThermalDiagnosticsProvider().MeasureAsync();
-            ThermalText.Text = thermals.IsAvailable
-                ? string.Join("\n", thermals.Zones.Select(zone =>
-                    $"• {zone.Name}: {(zone.TemperatureCelsius is null ? "sin lectura" : $"{zone.TemperatureCelsius:0.0} °C")} ({zone.Source})"))
-                : "Este sistema no expone zonas térmicas ACPI legibles; los sensores CPU/GPU requieren APIs del fabricante.";
-
-            var performance = await new PerformanceDiagnosticsProvider().MeasureAsync();
-            PerfText.Text =
-                string.Join("; ", performance.Processors.Select(processor =>
-                    $"CPU {processor.LoadPercent?.ToString("0") ?? "?"}% @ {processor.CurrentClockMHz?.ToString("0") ?? "?"} MHz")) +
-                "\n" +
-                string.Join("\n", performance.GraphicsAdapters.Select(adapter =>
-                    $"GPU: {adapter.Name} (driver {adapter.DriverVersion})"));
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+            await _vm.RunCommand.ExecuteAsync(null);
+            RenderVm();
         }
         catch (Exception ex)
         {
-            InputText.Text = $"{ErrorCodes.UiDiagnosticsFailed}: No fue posible completar el diagnóstico. Reintente tras cerrar otras herramientas de monitorización. [Técnico: {ex.GetType().Name}]";
+            InputText.Text = $"{ErrorCodes.UiDiagnosticsFailed}: No fue posible completar el diagnóstico. [Técnico: {ex.GetType().Name}]";
             if (StatusText is not null) StatusText.Text = $"{ErrorCodes.UiDiagnosticsFailed}: diagnóstico no completado";
             App.WriteCrashLog(ex);
         }
@@ -57,7 +58,7 @@ public sealed partial class DiagnosticsPage : Page
         {
             Ring.IsActive = false;
             RunButton.IsEnabled = true;
-            if (StatusText is not null && StatusText.Text == "Midiendo…") StatusText.Text = "Diagnóstico completo.";
+            if (StatusText is not null && StatusText.Text == "Midiendo…") StatusText.Text = _vm.Status;
         }
     }
 }

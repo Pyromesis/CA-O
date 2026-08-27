@@ -51,7 +51,7 @@ public sealed class ResourceLockTests
     }
 
     [Fact]
-    public async void ConcurrentSameKeyTransactionsNeverOverlap()
+    public async Task ConcurrentSameKeyTransactionsNeverOverlap()
     {
         var context = SystemContextFactory.Default();
         var first = new TrackedOptimization(Definition("lock-test"));

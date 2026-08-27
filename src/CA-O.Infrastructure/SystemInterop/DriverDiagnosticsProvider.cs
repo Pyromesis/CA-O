@@ -5,6 +5,8 @@ namespace CAO.Infrastructure.SystemInterop;
 
 public sealed class DriverDiagnosticsProvider
 {
+    private static readonly TimeSpan WmiTimeout = TimeSpan.FromSeconds(5);
+
     public async Task<DriverDiagnosticsReport> MeasureAsync(CancellationToken ct = default)
     {
         return await Task.Run(() =>
@@ -12,8 +14,11 @@ public sealed class DriverDiagnosticsProvider
             var drivers = new List<DriverDiagnostic>();
             try
             {
+                var opts = new System.Management.EnumerationOptions { Timeout = WmiTimeout, BlockSize = 20, Rewindable = false };
                 using var searcher = new ManagementObjectSearcher(
-                    "SELECT DeviceName, DeviceClass, Manufacturer, DriverVersion, DriverDate, IsSigned, Status, ConfigManagerErrorCode FROM Win32_PnPSignedDriver");
+                    new System.Management.ManagementScope(@"root\cimv2"),
+                    new System.Management.ObjectQuery("SELECT DeviceName, DeviceClass, Manufacturer, DriverVersion, DriverDate, IsSigned, Status, ConfigManagerErrorCode FROM Win32_PnPSignedDriver"),
+                    opts);
                 foreach (var device in searcher.Get().Cast<ManagementObject>())
                 {
                     ct.ThrowIfCancellationRequested();
@@ -28,6 +33,7 @@ public sealed class DriverDiagnosticsProvider
                         Convert.ToInt32(device["ConfigManagerErrorCode"] ?? 0)));
                 }
             }
+            catch (OperationCanceledException) { throw; }
             catch (ManagementException)
             {
                 // WMI may be unavailable or restricted; return the partial report.

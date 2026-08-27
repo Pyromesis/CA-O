@@ -30,10 +30,19 @@ public sealed partial class OptimizePage : Page
         string ReasonMessage,
         RecommendationBucket Bucket);
 
+    private readonly ViewModels.OptimizeViewModel _vm;
+
     public OptimizePage()
     {
         InitializeComponent();
         ApplyTexts();
+        _vm = AppHost.Resolve<ViewModels.OptimizeViewModel>();
+        DataContext = _vm;
+        _vm.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(ViewModels.OptimizeViewModel.IsBusy))
+                DispatcherQueue.TryEnqueue(() => BusyRing.IsActive = _vm.IsBusy);
+        };
     }
 
     private void ApplyTexts()
@@ -96,7 +105,8 @@ public sealed partial class OptimizePage : Page
 
         try
         {
-            var preview = await match.PreviewAsync(AppServices.Registry);
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            var preview = await match.PreviewAsync(AppServices.Registry, cts.Token);
             // Real diff view (Fase 12): Before/After per target, not generic text.
             var diffPanel = new StackPanel { Spacing = 10 };
             foreach (var line in preview.Lines)
@@ -198,12 +208,14 @@ public sealed partial class OptimizePage : Page
         TxText.Text = operation == PrivilegedOperationKind.ApplyOptimization ? "Aplicando cambio transaccional…" : "Revirtiendo…";
         try
         {
-            var response = await AppServices.Pipe.SendAsync(operation, optimizationId);
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+            var response = await AppServices.Pipe.SendAsync(operation, optimizationId, cts.Token);
             AppServices.State.ServiceStatus = response is { Accepted: true } ? "connected" : "rejected";
             if (response is { Accepted: true })
             {
                 StatusText.Text = operation == PrivilegedOperationKind.ApplyOptimization ? "✓ Aplicado y verificado. Snapshot disponible para reversión." : "✓ Revertido y verificado.";
                 TxText.Text = "Verificado ✓ — Commit OK";
+                if (operation == PrivilegedOperationKind.ApplyOptimization) StatusText.Text += $" [{_vm.LastErrorCode ?? ""}]";
             }
             else
             {
@@ -211,12 +223,20 @@ public sealed partial class OptimizePage : Page
                 TxText.Text = "Rechazado — transacción no comprometida";
             }
 
-            await RefreshRecommendationsAsync();
+            using var refreshCts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            await _vm.RefreshRecommendationsAsync(refreshCts.Token);
+            Render();
+        }
+        catch (OperationCanceledException)
+        {
+            StatusText.Text = "Operación cancelada.";
+            TxText.Text = "Cancelado";
         }
         catch (Exception ex)
         {
             StatusText.Text = $"Servicio no disponible: {ex.Message} (CAO-IPC-004 — verifique que CA-O Service esté instalado)";
             TxText.Text = "Servicio no disponible";
+            App.WriteCrashLog(ex);
         }
         finally
         {
@@ -246,7 +266,8 @@ public sealed partial class OptimizePage : Page
         {
             foreach (var id in recommended)
             {
-                var response = await AppServices.Pipe.SendAsync(PrivilegedOperationKind.ApplyOptimization, id);
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+                var response = await AppServices.Pipe.SendAsync(PrivilegedOperationKind.ApplyOptimization, id, cts.Token);
                 if (response is not { Accepted: true })
                 {
                     failures.Add($"{id}: [{response?.ErrorCode}] {response?.SafeMessage ?? "sin respuesta"}");
@@ -254,7 +275,9 @@ public sealed partial class OptimizePage : Page
                 }
             }
 
-            await RefreshRecommendationsAsync();
+            using var refreshCts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            await _vm.RefreshRecommendationsAsync(refreshCts.Token);
+            Render();
             StatusText.Text = failures.Count == 0
                 ? $"Aplicados {recommended.Count} cambios recomendados."
                 : $"Lote detenido: {string.Join("; ", failures)}";
@@ -262,18 +285,11 @@ public sealed partial class OptimizePage : Page
         catch (Exception ex)
         {
             StatusText.Text = $"Servicio no disponible: {ex.Message}";
+            App.WriteCrashLog(ex);
         }
         finally
         {
             BusyRing.IsActive = false;
         }
-    }
-
-    private async Task RefreshRecommendationsAsync()
-    {
-        var context = AppServices.State.Context ?? await AppServices.ContextProvider.GetAsync();
-        AppServices.State.Context = context;
-        AppServices.State.Recommendations = RecommendationEngine.BuildAll(AppServices.Catalog, AppServices.Registry, context);
-        Render();
     }
 }

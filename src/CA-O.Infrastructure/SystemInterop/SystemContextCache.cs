@@ -21,20 +21,35 @@ public sealed class SystemContextCache
         a.RamGb == b.RamGb && a.HasSsd == b.HasSsd && a.IsLaptop == b.IsLaptop &&
         a.GpuName == b.GpuName && a.GpuVendor == b.GpuVendor;
 
+    private SystemContext? _staticPart;
+    private DateTime _staticAt;
+
     public bool TryGet(out SystemContext? context)
     {
         lock (_lock)
         {
             if (_cached is null) { context = null; return false; }
             var age = DateTime.UtcNow - _cachedAt;
-            if (age > TimeSpan.FromMinutes(StaticTtlMinutes)) { context = null; return false; }
-            // Dynamic parts expire faster: if any dynamic field is stale, treat as miss
+            var staticAge = DateTime.UtcNow - _staticAt;
+            if (staticAge > TimeSpan.FromMinutes(StaticTtlMinutes)) { context = null; return false; }
             if (age > DynamicTtl)
             {
-                // Allow stale static via separate path? For now, full miss after DynamicTtl to refresh thermals/battery.
-                context = null; return false;
+                // Dynamic expirado → devolver parte estática con marca stale para refresh no bloqueante (§11)
+                context = _cached;
+                return false; // señal: necesita refresco dinámico pero puede usar stale si no hay tiempo
             }
             context = _cached;
+            return true;
+        }
+    }
+
+    public bool TryGetStaleStatic(out SystemContext? context)
+    {
+        lock (_lock)
+        {
+            if (_staticPart is null) { context = null; return false; }
+            if (DateTime.UtcNow - _staticAt > TimeSpan.FromMinutes(StaticTtlMinutes)) { context = null; return false; }
+            context = _staticPart;
             return true;
         }
     }
@@ -43,9 +58,15 @@ public sealed class SystemContextCache
     {
         lock (_lock)
         {
-            // Preserve hardware fingerprint if only dynamic changed and static equal? We keep full context but could merge.
+            var isFirst = _staticPart is null;
+            var staticChanged = _staticPart is null || !IsStaticEqual(_staticPart, context);
             _cached = context;
             _cachedAt = DateTime.UtcNow;
+            if (isFirst || staticChanged)
+            {
+                _staticPart = context;
+                _staticAt = DateTime.UtcNow;
+            }
         }
     }
 
