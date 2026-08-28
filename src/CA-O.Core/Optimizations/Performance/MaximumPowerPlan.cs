@@ -14,11 +14,11 @@ public sealed class MaximumPowerPlan : IOptimization
     public OptimizationDefinition Definition => new()
     {
         Id = Id,
-        NameEs = "Plan de energ├¡a: m├íximo rendimiento",
+        NameEs = "Plan de energía: máximo rendimiento",
         NameEn = "Power plan: high performance",
-        DescriptionEs = "Activa el plan de alto rendimiento (crea el oculto 'Rendimiento m├íximo' si falta).",
+        DescriptionEs = "Activa el plan de alto rendimiento (crea el oculto 'Rendimiento máximo' si falta).",
         DescriptionEn = "Activates the high performance plan (creates hidden Ultimate Performance if missing).",
-        TooltipEs = "Captura tu plan actual y lo restaura con la reversi├│n. En port├ítiles con bater├¡a aumentar├í el consumo.",
+        TooltipEs = "Captura tu plan actual y lo restaura con la reversión. En portátiles con batería aumentará el consumo.",
         Category = OptimizationCategory.Performance,
         ExpectedImpact = PerformanceImpact.Small,
         Evidence = EvidenceLevel.Official,

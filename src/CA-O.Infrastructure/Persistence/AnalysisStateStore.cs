@@ -42,7 +42,13 @@ public sealed class AnalysisStateStore
         {
             var tmp = _filePath + ".tmp";
             var json = JsonSerializer.Serialize(analysis, JsonOpts);
-            File.WriteAllText(tmp, json, System.Text.Encoding.UTF8);
+            using (var stream = File.Create(tmp))
+            using (var writer = new StreamWriter(stream, System.Text.Encoding.UTF8))
+            {
+                writer.Write(json);
+                writer.Flush();
+                stream.Flush(flushToDisk: true);
+            }
             // Atomic replace
             File.Move(tmp, _filePath, overwrite: true);
         }

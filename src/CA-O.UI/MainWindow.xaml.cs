@@ -16,8 +16,9 @@ public sealed partial class MainWindow : Window
     {
         InitializeComponent();
         SystemBackdrop = new MicaBackdrop();
-        AppServices.State.LanguageChanged += (_, language) => ApplyLocalization();
-        AppServices.State.PropertyChanged += (_, e) =>
+        var uiState = AppHost.Resolve<ViewModels.UiState>();
+        uiState.LanguageChanged += (_, language) => ApplyLocalization();
+        uiState.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName is null or nameof(ViewModels.UiState.ServiceStatus) or nameof(ViewModels.UiState.Context) or nameof(ViewModels.UiState.LastAnalysisUtc) or nameof(ViewModels.UiState.Recommendations))
                 DispatcherQueue.TryEnqueue(() => RefreshChrome());
@@ -46,7 +47,8 @@ public sealed partial class MainWindow : Window
     private void ApplyLocalization()
     {
         // Ensure dictionary matches selected language before any Get()
-        Localizer.SetLanguage(AppServices.State.Language);
+        var uiState = AppHost.Resolve<ViewModels.UiState>();
+        Localizer.SetLanguage(uiState.Language);
         var navItems = new (string Tag, string Key)[]
         {
             ("dashboard", "nav.dashboard"),
@@ -80,7 +82,7 @@ public sealed partial class MainWindow : Window
 
     private void RefreshChrome()
     {
-        var state = AppServices.State;
+        var state = AppHost.Resolve<ViewModels.UiState>();
         var ctx = state.Context;
 
         // Sidebar bottom context (Fase 3 spec)
@@ -126,14 +128,16 @@ public sealed partial class MainWindow : Window
 
     private async Task ProbeServiceAsync()
     {
+        var uiState = AppHost.Resolve<ViewModels.UiState>();
+        var pipe = AppHost.Resolve<PrivilegedPipeClient>();
         try
         {
-            var resp = await AppServices.Pipe.DetectAsync("disable-transparency");
-            AppServices.State.ServiceStatus = resp is { Accepted: true } ? "connected" : "rejected";
+            var resp = await pipe.DetectAsync("disable-transparency");
+            uiState.ServiceStatus = resp is { Accepted: true } ? "connected" : "rejected";
         }
         catch
         {
-            AppServices.State.ServiceStatus = "unavailable";
+            uiState.ServiceStatus = "unavailable";
         }
         DispatcherQueue.TryEnqueue(RefreshChrome);
     }

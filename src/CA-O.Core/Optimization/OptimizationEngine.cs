@@ -98,7 +98,7 @@ public sealed class OptimizationEngine
         string? backupWarning = null;
         if (!_restorePointCreatedThisSession)
         {
-            var (ok, reason) = await _restorePoints.CreateAsync("CA-O 2.0 ΓÇö antes de optimizar", ct);
+            var (ok, reason) = await _restorePoints.CreateAsync("CA-O 2.0 — antes de optimizar", ct);
             if (ok)
             {
                 _restorePointCreatedThisSession = true;
@@ -138,7 +138,7 @@ public sealed class OptimizationEngine
 
         if (!_snapshots.TryLoadLatestForOptimization(optimizationId, out var record) || record is null)
         {
-            return OperationResult.Fail("No hay snapshot guardado para esta optimizaci├│n.", "no-snapshot");
+            return OperationResult.Fail("No hay snapshot guardado para esta optimización.", "no-snapshot");
         }
 
         var context = new OptimizationContext { Registry = _registry, Executor = _executor, Services = _services };

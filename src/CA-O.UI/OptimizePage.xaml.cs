@@ -63,9 +63,10 @@ public sealed partial class OptimizePage : Page
 
     private void Render()
     {
-        ExpertBar.IsOpen = AppServices.State.ExpertMode;
+        var uiState = AppHost.Resolve<ViewModels.UiState>();
+        ExpertBar.IsOpen = uiState.ExpertMode;
 
-        var rows = AppServices.State.Recommendations
+        var rows = uiState.Recommendations
             .OrderBy(row => row.Bucket switch
             {
                 RecommendationBucket.Recommended => 0,
@@ -99,7 +100,8 @@ public sealed partial class OptimizePage : Page
     {
         if (sender is not Button { Tag: string id }) return;
 
-        var match = AppServices.Catalog.FirstOrDefault(o =>
+        var catalog = CAO.Core.Catalog.OptimizationCatalog.All;
+        var match = catalog.FirstOrDefault(o =>
             o.Definition.Id.Equals(id, StringComparison.OrdinalIgnoreCase));
         if (match is null)
         {
@@ -110,7 +112,8 @@ public sealed partial class OptimizePage : Page
         try
         {
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-            var preview = await match.PreviewAsync(AppServices.Registry, cts.Token);
+            var registry = AppHost.Resolve<CAO.Infrastructure.Windows.SystemRegistry.RegistryAccessor>();
+            var preview = await match.PreviewAsync(registry, cts.Token);
             // Real diff view (Fase 12): Before/After per target, not generic text.
             var diffPanel = new StackPanel { Spacing = 10 };
             foreach (var line in preview.Lines)
@@ -183,14 +186,17 @@ public sealed partial class OptimizePage : Page
         await RunOperationAsync(PrivilegedOperationKind.RevertOptimization, id);
     }
 
-    private bool CanOperate(string optimizationId) =>
-        AppServices.State.Recommendations.Any(recommendation =>
+    private bool CanOperate(string optimizationId) {
+        var uiState = AppHost.Resolve<ViewModels.UiState>();
+        return uiState.Recommendations.Any(recommendation =>
             recommendation.OptimizationId == optimizationId &&
-            (recommendation.Bucket == RecommendationBucket.Recommended || AppServices.State.ExpertMode));
+            (recommendation.Bucket == RecommendationBucket.Recommended || uiState.ExpertMode));
+    }
 
     private async Task RunOperationAsync(PrivilegedOperationKind operation, string optimizationId)
     {
-        if (AppServices.State.ExpertMode || operation == PrivilegedOperationKind.ApplyOptimization)
+        var uiState = AppHost.Resolve<ViewModels.UiState>();
+        if (uiState.ExpertMode || operation == PrivilegedOperationKind.ApplyOptimization)
         {
             var dialog = new ContentDialog
             {
@@ -213,8 +219,9 @@ public sealed partial class OptimizePage : Page
         try
         {
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
-            var response = await AppServices.Pipe.SendAsync(operation, optimizationId, cts.Token);
-            AppServices.State.ServiceStatus = response is { Accepted: true } ? "connected" : "rejected";
+            var pipe = AppHost.Resolve<PrivilegedPipeClient>();
+            var response = await pipe.SendAsync(operation, optimizationId, cts.Token);
+            uiState.ServiceStatus = response is { Accepted: true } ? "connected" : "rejected";
             if (response is { Accepted: true })
             {
                 StatusText.Text = operation == PrivilegedOperationKind.ApplyOptimization ? "✓ Aplicado y verificado. Snapshot disponible para reversión." : "✓ Revertido y verificado.";
@@ -252,7 +259,8 @@ public sealed partial class OptimizePage : Page
 
     private async void OnApplyRecommendedClick(object sender, RoutedEventArgs e)
     {
-        var recommended = AppServices.State.Recommendations
+        var uiState = AppHost.Resolve<ViewModels.UiState>();
+        var recommended = uiState.Recommendations
             .Where(recommendation => recommendation.Bucket == RecommendationBucket.Recommended &&
                                      recommendation.CurrentState != OptimizationState.AppliedByCao)
             .Select(recommendation => recommendation.OptimizationId)
@@ -271,7 +279,8 @@ public sealed partial class OptimizePage : Page
             foreach (var id in recommended)
             {
                 using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
-                var response = await AppServices.Pipe.SendAsync(PrivilegedOperationKind.ApplyOptimization, id, cts.Token);
+                var pipe = AppHost.Resolve<PrivilegedPipeClient>();
+                var response = await pipe.SendAsync(PrivilegedOperationKind.ApplyOptimization, id, cts.Token);
                 if (response is not { Accepted: true })
                 {
                     failures.Add($"{id}: [{response?.ErrorCode}] {response?.SafeMessage ?? "sin respuesta"}");

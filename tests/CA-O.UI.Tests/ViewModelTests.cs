@@ -32,7 +32,11 @@ public sealed class ViewModelTests
         var logger = new Infrastructure.Logging.StructuredLogger(Path.Combine(Path.GetTempPath(), $"cao-log-{Guid.NewGuid():N}.log"));
         var svc = new SystemAnalysisService(new StubProvider(), store, new StubRegistry());
         var state = new UiState();
-        return (new AnalyzeViewModel(svc, state, logger), new DashboardViewModel(state, svc, store, logger));
+        var provider = new CAO.Infrastructure.SystemInterop.SystemContextProvider();
+        var snapshotStore = new CAO.Infrastructure.Persistence.FileSnapshotStore();
+        var journal = new CAO.Infrastructure.Persistence.FileTransactionJournal();
+        var recoveryService = new CAO.Core.Rollback.CrashRecoveryService(journal, snapshotStore, _ => CAO.Shared.OptimizationState.Unknown);
+        return (new AnalyzeViewModel(svc, state, logger), new DashboardViewModel(state, svc, store, logger, provider, recoveryService));
     }
 
     [Fact]

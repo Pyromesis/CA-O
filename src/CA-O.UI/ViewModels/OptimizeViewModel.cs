@@ -11,10 +11,15 @@ public sealed partial class OptimizeViewModel : ObservableObject
     private readonly UiState _state;
     private readonly PrivilegedPipeClient _pipe;
 
-    public OptimizeViewModel(UiState state, PrivilegedPipeClient pipe)
+    private readonly CAO.Infrastructure.SystemInterop.SystemContextProvider _contextProvider;
+    private readonly CAO.Infrastructure.Windows.SystemRegistry.RegistryAccessor _registry;
+
+    public OptimizeViewModel(UiState state, PrivilegedPipeClient pipe, CAO.Infrastructure.SystemInterop.SystemContextProvider contextProvider, CAO.Infrastructure.Windows.SystemRegistry.RegistryAccessor registry)
     {
         _state = state;
         _pipe = pipe;
+        _contextProvider = contextProvider;
+        _registry = registry;
     }
 
     [ObservableProperty] private bool _isBusy;
@@ -28,8 +33,9 @@ public sealed partial class OptimizeViewModel : ObservableObject
     [RelayCommand]
     private async Task<OptimizationPreview?> PreviewAsync(string optimizationId, CancellationToken ct)
     {
-        var match = AppServices.Catalog.FirstOrDefault(o => o.Definition.Id == optimizationId);
-        return match is null ? null : await match.PreviewAsync(AppServices.Registry, ct);
+        var catalog = CAO.Core.Catalog.OptimizationCatalog.All;
+        var match = catalog.FirstOrDefault(o => o.Definition.Id == optimizationId);
+        return match is null ? null : await match.PreviewAsync(_registry, ct);
     }
 
     [RelayCommand]
@@ -72,8 +78,10 @@ public sealed partial class OptimizeViewModel : ObservableObject
 
     public async Task RefreshRecommendationsAsync(CancellationToken ct = default)
     {
-        var context = _state.Context ?? await AppServices.ContextProvider.GetAsync(ct);
+        var context = _state.Context ?? await _contextProvider.GetAsync(ct);
         _state.Context = context;
-        _state.Recommendations = CAO.Core.Engine.RecommendationEngine.BuildAll(AppServices.Catalog, AppServices.Registry, context);
+
+        var catalog = CAO.Core.Catalog.OptimizationCatalog.All;
+        _state.Recommendations = CAO.Core.Engine.RecommendationEngine.BuildAll(catalog, _registry, context);
     }
 }

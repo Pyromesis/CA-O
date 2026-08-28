@@ -14,7 +14,7 @@ namespace CAO.Integration.Tests;
 [Collection("E2E")]
 public sealed class E2EFlowsTests
 {
-    private static SystemAnalysisService NewAnalysisService(string dir)
+    private static IAnalysisCoordinator NewAnalysisService(string dir)
     {
         var store = new AnalysisStateStore(Path.Combine(dir, "analysis.json"));
         var provider = new StubContextProvider();

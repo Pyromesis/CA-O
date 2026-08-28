@@ -10,7 +10,7 @@ namespace CAO.Infrastructure.Services;
 /// estado propio, registrar duración/errores, persistir resultado, calcular health y recommendations.
 /// Elimina duplicación entre DashboardViewModel/AnalyzeViewModel/AnalyzePage.
 /// </summary>
-public sealed class SystemAnalysisService
+public sealed class SystemAnalysisService : IAnalysisCoordinator
 {
     private readonly ISystemContextProvider _contextProvider;
     private readonly AnalysisStateStore _store;
@@ -23,19 +23,7 @@ public sealed class SystemAnalysisService
         _registry = registry;
     }
 
-    public sealed record ModuleResult(string Module, bool Success, TimeSpan Duration, string? Value, string? Warning, string? ErrorCode);
-    public sealed record AnalysisResult(
-        string AnalysisState,
-        IReadOnlyList<ModuleResult> Modules,
-        SystemContext? Context,
-        SystemDiagnosticReport? Health,
-        IReadOnlyList<Recommendation> Recommendations,
-        TimeSpan TotalDuration,
-        IReadOnlyList<string> Warnings,
-        string? CorrelationId
-    );
-
-    public async Task<AnalysisResult> RunAsync(CancellationToken ct = default)
+    public async Task<AnalysisReport> RunAsync(CancellationToken ct = default)
     {
         var correlationId = Correlation.New();
         var sw = System.Diagnostics.Stopwatch.StartNew();
@@ -79,7 +67,7 @@ public sealed class SystemAnalysisService
         if (ct.IsCancellationRequested) analysisState = "Cancelled";
 
         sw.Stop();
-        var result = new AnalysisResult(analysisState, modules, context, health, recommendations, sw.Elapsed, warnings, correlationId);
+        var result = new AnalysisReport(analysisState, modules, context, health, recommendations, sw.Elapsed, warnings, correlationId);
 
         try
         {

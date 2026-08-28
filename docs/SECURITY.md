@@ -38,7 +38,7 @@ Envelope versionado (`IpcProtocol.Version = 2`): RequestId GUID, nonce, CreatedA
 
 ### Gateway de ejecución (FASE 4)
 
-Toda ejecución privilegiada pasa por `IPrivilegedCommandExecutor` → `CommandPolicy.Resolve`: rutas absolutas %SystemRoot% (anti PATH-hijacking), tokens exactos sin metacaracteres (anti chaining/redirección/inyección), sin shell; Optimize-Volume usa powershell.exe con -Command estático. Desviación → CAO-SEC-010.
+Toda ejecución privilegiada pasa por `IPrivilegedCommandExecutor` → `CommandPolicy.Resolve`: rutas absolutas %SystemRoot% (anti PATH-hijacking), tokens exactos sin metacaracteres (anti chaining/redirección/inyección), sin shell; OptimizeSystemDrive usa defrag.exe con argumentos fijos (`C: /O`). Desviación → CAO-SEC-010.
 
 ### Cancelación segura (FASE 6)
 

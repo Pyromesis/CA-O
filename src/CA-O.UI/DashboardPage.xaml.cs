@@ -28,7 +28,8 @@ public sealed partial class DashboardPage : Page
             if (e.PropertyName is null or nameof(ViewModels.DashboardViewModel.Health) or nameof(ViewModels.DashboardViewModel.Recommendations) or nameof(ViewModels.DashboardViewModel.StatusMessage))
                 DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Normal, RenderState);
         };
-        AppServices.State.PropertyChanged += (_, e) =>
+        var uiState = AppHost.Resolve<ViewModels.UiState>();
+        uiState.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName is null or nameof(ViewModels.UiState.Context) or nameof(ViewModels.UiState.Recommendations) or nameof(ViewModels.UiState.LastAnalysisUtc) or nameof(ViewModels.UiState.ServiceStatus))
                 DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Normal, RenderState);
@@ -37,7 +38,7 @@ public sealed partial class DashboardPage : Page
         {
             // Perceived startup <500ms: UI primero, diagnóstico pesado después (§87-88)
             RenderState();
-            if (AppServices.State.Context is null)
+            if (uiState.Context is null)
             {
                 try
                 {
@@ -47,7 +48,7 @@ public sealed partial class DashboardPage : Page
                 }
                 catch (Exception ex) { App.WriteCrashLog(ex); }
             }
-            ServiceInfoBar.IsOpen = AppServices.State.ServiceStatus is "unavailable" or "unknown";
+            ServiceInfoBar.IsOpen = uiState.ServiceStatus is "unavailable" or "unknown";
         };
     }
 
@@ -64,7 +65,8 @@ public sealed partial class DashboardPage : Page
         FindingsHeader.Text = Localizer.Get("dashboard.findings");
         HardwareHeader.Text = "Hardware y sistema";
         NoClaimsNote.Text = Localizer.Get("dashboard.noClaims");
-        var when = AppServices.State.LastAnalysisUtc?.ToLocalTime().ToString("g") ?? Localizer.Get("dashboard.never");
+        var uiState = AppHost.Resolve<ViewModels.UiState>();
+        var when = uiState.LastAnalysisUtc?.ToLocalTime().ToString("g") ?? Localizer.Get("dashboard.never");
         LastAnalysisText.Text = $"{Localizer.Get("dashboard.lastAnalysis")}: {when}";
         AnalyzeStatusText.Text = "";
     }
@@ -73,7 +75,8 @@ public sealed partial class DashboardPage : Page
     {
         ApplyTexts();
 
-        var recommendations = AppServices.State.Recommendations;
+        var uiState = AppHost.Resolve<ViewModels.UiState>();
+        var recommendations = uiState.Recommendations;
         RecommendedCount.Text = recommendations.Count(r => r.Bucket == RecommendationBucket.Recommended).ToString();
         OptionalCount.Text = recommendations.Count(r => r.Bucket == RecommendationBucket.Optional).ToString();
         ExperimentalCount.Text = recommendations.Count(r => r.Bucket == RecommendationBucket.Experimental).ToString();
@@ -87,13 +90,13 @@ public sealed partial class DashboardPage : Page
         else
             NextStepText.Text = "No hay recomendados pendientes. Revise opcionales/experimentales en Modo Expert si lo necesita.";
 
-        var context = AppServices.State.Context;
+        var context = uiState.Context;
         ThermalBar.IsOpen = context?.ThermalState == ThermalState.Throttling;
         PendingRebootBar.IsOpen = context?.PendingReboot == true;
         if (context is not null && context.PendingReboot)
             PendingRebootBar.Message = "Reinicio pendiente por: " + string.Join(", ", context.PendingRebootReasons) + ".";
-        RecoveryBar.IsOpen = AppServices.State.RecoveryCandidates.Count > 0;
-        ServiceInfoBar.IsOpen = AppServices.State.ServiceStatus is "unavailable" or "unknown";
+        RecoveryBar.IsOpen = uiState.RecoveryCandidates.Count > 0;
+        ServiceInfoBar.IsOpen = uiState.ServiceStatus is "unavailable" or "unknown";
 
         if (context is null)
         {
@@ -214,9 +217,10 @@ public sealed partial class DashboardPage : Page
             }
             else
             {
-                var context = AppServices.State.Context;
+                var uiState = AppHost.Resolve<ViewModels.UiState>();
+                var context = uiState.Context;
                 ThermalBar.IsOpen = context?.ThermalState == ThermalState.Throttling;
-                RecoveryBar.IsOpen = AppServices.State.RecoveryCandidates.Count > 0;
+                RecoveryBar.IsOpen = uiState.RecoveryCandidates.Count > 0;
                 PendingRebootBar.IsOpen = context?.PendingReboot ?? false;
                 if (context?.PendingReboot ?? false)
                     PendingRebootBar.Message = "Reinicio pendiente por: " + string.Join(", ", context.PendingRebootReasons) + ".";

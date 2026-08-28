@@ -35,12 +35,12 @@ public sealed record AnalysisModuleResult(
 
 public sealed partial class AnalyzeViewModel : ObservableObject
 {
-    private readonly Infrastructure.Services.SystemAnalysisService _analysisService;
+    private readonly CAO.Core.Abstractions.IAnalysisCoordinator _analysisService;
     private readonly UiState _uiState;
     private readonly Infrastructure.Logging.StructuredLogger _logger;
     private CancellationTokenSource? _cts;
 
-    public AnalyzeViewModel(Infrastructure.Services.SystemAnalysisService analysisService, UiState uiState, Infrastructure.Logging.StructuredLogger logger)
+    public AnalyzeViewModel(CAO.Core.Abstractions.IAnalysisCoordinator analysisService, UiState uiState, Infrastructure.Logging.StructuredLogger logger)
     {
         _analysisService = analysisService;
         _uiState = uiState;

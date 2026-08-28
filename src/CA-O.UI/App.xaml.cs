@@ -19,21 +19,22 @@ public partial class App : Application
         try
         {
             AppHost.Initialize();
-            // Fase 1 startup: cargar análisis persistido + historial + recovery sin bloquear UI (§7, §68)
-            try
+        // Phase 1 startup: load persisted analysis + history + recovery without blocking UI (§7, §68)
+        try
+        {
+            var store = AppHost.Resolve<CAO.Infrastructure.Persistence.AnalysisStateStore>();
+            var persisted = store.LoadLatestAnalysis();
+            if (persisted?.Context != null)
             {
-                var store = AppHost.Resolve<Infrastructure.Persistence.AnalysisStateStore>();
-                var persisted = store.LoadLatestAnalysis();
-                if (persisted?.Context != null)
-                {
-                    AppHost.Resolve<ViewModels.UiState>().Context = persisted.Context;
-                    AppHost.Resolve<ViewModels.UiState>().Recommendations = persisted.Recommendations ?? Array.Empty<CAO.Shared.Recommendation>();
-                    AppHost.Resolve<ViewModels.UiState>().LastAnalysisUtc = persisted.TimestampUtc;
-                }
+                var uiState = AppHost.Resolve<CAO.UI.ViewModels.UiState>();
+                uiState.Context = persisted.Context;
+                uiState.Recommendations = persisted.Recommendations ?? Array.Empty<CAO.Shared.Recommendation>();
+                uiState.LastAnalysisUtc = persisted.TimestampUtc;
             }
-            catch (Exception ex) { WriteCrashLog(ex); /* degradado: sin análisis previo, no bloquear startup */ }
-            _window = new MainWindow();
-            _window.Activate();
+        }
+        catch (Exception ex) { WriteCrashLog(ex); /* degraded: no previous analysis, don't block startup */ }
+        _window = new MainWindow();
+        _window.Activate();
         }
         catch (Exception ex)
         {

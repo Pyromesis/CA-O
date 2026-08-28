@@ -8,16 +8,21 @@ namespace CAO.UI.ViewModels;
 public sealed partial class DashboardViewModel : ObservableObject
 {
     private readonly UiState _state;
-    private readonly Infrastructure.Services.SystemAnalysisService _analysisService;
+    private readonly CAO.Core.Abstractions.IAnalysisCoordinator _analysisService;
     private readonly Infrastructure.Persistence.AnalysisStateStore _store;
     private readonly Infrastructure.Logging.StructuredLogger _logger;
 
-    public DashboardViewModel(UiState state, Infrastructure.Services.SystemAnalysisService analysisService, Infrastructure.Persistence.AnalysisStateStore store, Infrastructure.Logging.StructuredLogger logger)
+    private readonly CAO.Infrastructure.SystemInterop.SystemContextProvider _contextProvider;
+    private readonly CAO.Core.Rollback.CrashRecoveryService _recoveryService;
+
+    public DashboardViewModel(UiState state, CAO.Core.Abstractions.IAnalysisCoordinator analysisService, Infrastructure.Persistence.AnalysisStateStore store, Infrastructure.Logging.StructuredLogger logger, CAO.Infrastructure.SystemInterop.SystemContextProvider contextProvider, CAO.Core.Rollback.CrashRecoveryService recoveryService)
     {
         _state = state;
         _analysisService = analysisService;
         _store = store;
         _logger = logger;
+        _contextProvider = contextProvider;
+        _recoveryService = recoveryService;
     }
 
     [ObservableProperty] private bool _isLoading;
@@ -50,7 +55,7 @@ public sealed partial class DashboardViewModel : ObservableObject
             }
             else
             {
-                var context = _state.Context ?? await AppServices.ContextProvider.GetAsync(ct);
+                var context = _state.Context ?? await _contextProvider.GetAsync(ct);
                 _state.Context = context;
                 Health = Core.Diagnostics.HealthEngine.Evaluate(context);
                 Recommendations = _state.Recommendations;
@@ -70,7 +75,7 @@ public sealed partial class DashboardViewModel : ObservableObject
         {
             var correlation = CAO.Shared.Correlation.New();
             try { _logger.Info("Dashboard", $"Analyze correlation={correlation}", correlation); } catch { }
-            var candidates = AppServices.Recovery.Scan();
+            var candidates = _recoveryService.Scan();
             _state.RecoveryCandidates = candidates.Select(c => c.OptimizationId).ToList();
 
             var result = await _analysisService.RunAsync(ct);

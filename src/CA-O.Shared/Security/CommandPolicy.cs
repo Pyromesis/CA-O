@@ -20,8 +20,7 @@ public enum SystemCommandKey
     BcdEditHypervisorRestore,
     NetShTcpShowGlobal,
     NetShTcpAutotuningNormal,
-    OptimizeVolumeReTrimC,
-    OptimizeVolumeDefragC,
+    DefragC,
     WprStartCpuFileMode,
     WprStopToDefaultFile,
     LogmanDeleteSession,
@@ -111,15 +110,8 @@ public static partial class CommandPolicy
                 AutotuningLevels.Contains(arguments[4]["autotuninglevel=".Length..]) =>
                 Path.Combine(system32, "netsh.exe"),
 
-            // Static PowerShell fallback (spec §7): fixed -Command text with
-            // no interpolation of user-controlled data anywhere.
-            SystemCommandKey.OptimizeVolumeReTrimC when Eq(arguments,
-                "-NoProfile", "-NonInteractive", "-Command",
-                "Optimize-Volume -DriveLetter C -ReTrim") => powershell,
-
-            SystemCommandKey.OptimizeVolumeDefragC when Eq(arguments,
-                "-NoProfile", "-NonInteractive", "-Command",
-                "Optimize-Volume -DriveLetter C -Defrag") => powershell,
+            SystemCommandKey.DefragC when Eq(arguments, "C:", "/O") =>
+                Path.Combine(system32, "defrag.exe"),
 
             // FASE 20: kernel trace lifecycle (DPC/ISR). Fixed profile and
             // fixed output location; cleanup is guaranteed by the collector.

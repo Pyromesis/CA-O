@@ -1,4 +1,4 @@
-<UserControl
+﻿<UserControl
     x:Class="CAO.InstallerGui.AppTitleBar"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -28,6 +28,6 @@
                    Margin="8,0,0,0"
                    FontSize="12"
                    FontWeight="Medium"
-                   Foreground="{StaticResource CAOTextPrimaryBrush}"/>
+                   Foreground="{StaticResource CaoTextPrimaryBrush}"/>
 </Grid>
 </UserControl>

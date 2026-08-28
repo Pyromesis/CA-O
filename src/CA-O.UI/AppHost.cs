@@ -40,7 +40,7 @@ internal static class AppHost
         services.AddSingleton<FileSnapshotStore>();
         services.AddSingleton<FileTransactionJournal>();
         services.AddSingleton<AnalysisStateStore>();
-        services.AddSingleton<Infrastructure.Services.SystemAnalysisService>();
+        services.AddSingleton<CAO.Core.Abstractions.IAnalysisCoordinator, Infrastructure.Services.SystemAnalysisService>();
         services.AddSingleton<SnapshotRepository>();
         services.AddSingleton<Infrastructure.Windows.SystemRegistry.RegistryAccessor>();
         services.AddSingleton<Infrastructure.Logging.StructuredLogger>();

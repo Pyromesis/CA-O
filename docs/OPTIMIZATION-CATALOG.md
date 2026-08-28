@@ -74,6 +74,6 @@ Calidad sobre cantidad (spec 131): cada entrada responde qué cambia, por qué, 
 | disable-telemetry | Telemetría completa | AllowTelemetry=0(+servicios) | Registro/servicio observado | n/a |
 | disable-widgets | Widgets habilitados | Dsh Allowed=0 | Registro en vivo | n/a |
 | disable-hibernate | Hibernación activa | powercfg /h off (captura previa) | Estado powercfg | n/a |
-| optimize-system-drive | — (mantenimiento) | Optimize-Volume -Defrag/-ReTrim | Exit code + salida | Duración informada |
+| optimize-system-drive | — (mantenimiento) | defrag C: /O (según medio real) | Exit code + salida | Duración informada |
 
 > "n/a" significa que la optimización no tiene ruta de benchmark propia; el benchmark de sistema (BenchmarkPage) sirve para comparar antes/después a nivel máquina.

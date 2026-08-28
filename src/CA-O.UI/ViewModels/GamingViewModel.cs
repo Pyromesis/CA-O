@@ -11,7 +11,13 @@ public sealed partial class GamingViewModel : ObservableObject
 {
     private readonly UiState _state;
 
-    public GamingViewModel(UiState state) => _state = state;
+    private readonly CAO.Infrastructure.SystemInterop.SystemContextProvider _contextProvider;
+
+    public GamingViewModel(UiState state, CAO.Infrastructure.SystemInterop.SystemContextProvider contextProvider)
+    {
+        _state = state;
+        _contextProvider = contextProvider;
+    }
 
     [ObservableProperty] private bool _isScanning;
     [ObservableProperty] private string _status = string.Empty;
@@ -33,7 +39,7 @@ public sealed partial class GamingViewModel : ObservableObject
         Status = "Escaneando…";
         try
         {
-            var context = _state.Context ?? await AppServices.ContextProvider.GetAsync(ct);
+            var context = _state.Context ?? await _contextProvider.GetAsync(ct);
             _state.Context = context;
 
             AntiCheats = await Task.Run(() => new AntiCheatScanProvider().Scan(), ct);
