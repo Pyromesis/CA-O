@@ -26,6 +26,13 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 Write-Host '== publish UI ==' -ForegroundColor Cyan
 dotnet publish (Join-Path $repository 'src\CA-O.UI\CA-O.UI.csproj') --configuration Release --runtime win-x64 --self-contained true /p:PublishSingleFile=false /p:PublishTrimmed=false --output $uiOutput
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+# Workaround WinUI 2.4: publish self-contained omite CA-O.UI.pri (necesario para XAML, HResult 0x802B000A)
+$priSrc = Join-Path $repository 'src\CA-O.UI\bin\x64\Release\net10.0-windows10.0.19041.0\win-x64\CA-O.UI.pri'
+if (Test-Path $priSrc) { Copy-Item $priSrc $uiOutput -Force; Write-Host "  patched CA-O.UI.pri -> $uiOutput" -ForegroundColor Yellow }
+else { Write-Warning "CA-O.UI.pri no encontrado en $priSrc" }
+# Asegurar recursos XAML completos (Assets, pri extras)
+$assetsSrc = Join-Path $repository 'src\CA-O.UI\bin\x64\Release\net10.0-windows10.0.19041.0\win-x64\Microsoft.UI.Xaml'
+if (Test-Path $assetsSrc) { Copy-Item $assetsSrc $uiOutput -Recurse -Force }
 
 Write-Host '== publish privileged service ==' -ForegroundColor Cyan
 dotnet publish (Join-Path $repository 'src\CA-O.Privileged\CA-O.Privileged.csproj') --configuration Release --runtime win-x64 --self-contained false --output $serviceOutput
