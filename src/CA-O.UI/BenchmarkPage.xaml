@@ -2,8 +2,8 @@
     x:Class="CAO.UI.Pages.BenchmarkPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-    <ScrollViewer Padding="{StaticResource CaoPagePadding}" VerticalScrollBarVisibility="Auto">
-        <StackPanel Spacing="16" MaxWidth="1100" HorizontalAlignment="Stretch">
+    <ScrollViewer Padding="{StaticResource CaoPagePadding}" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Spacing="16" MaxWidth="1100" HorizontalAlignment="Center">
             <TextBlock Text="Benchmark" Style="{StaticResource CaoPageTitleStyle}"/>
             <InfoBar IsOpen="True" Severity="Informational" IsClosable="False"
                      Title="Metodología honesta"

@@ -48,18 +48,35 @@ public sealed class SystemContextProvider : ISystemContextProvider
             return cached;
         }
 
-        var info = await _systemInfo.GetAsync(ct);
-        var securityReport = _security.Measure();
-        var antiCheats = _antiCheats.Scan();
-        var thermal = await _thermals.MeasureAsync(ct);
+        // Cada proveedor se protege individualmente: un fallo de WMI no debe dejar sin contexto
+        SystemInfoReport info;
+        try { info = await _systemInfo.GetAsync(ct); } catch { info = FallbackSystemInfo(); }
+
+        SecurityDiagnosticsReport securityReport;
+        try { securityReport = _security.Measure(); } catch { securityReport = new SecurityDiagnosticsReport(Array.Empty<SecurityFeatureState>(), false, DateTime.UtcNow); }
+
+        IReadOnlyList<AntiCheatInfo> antiCheats;
+        try { antiCheats = _antiCheats.Scan(); } catch { antiCheats = Array.Empty<AntiCheatInfo>(); }
+
+        ThermalDiagnosticsReport thermal;
+        try { thermal = await _thermals.MeasureAsync(ct); } catch { thermal = new ThermalDiagnosticsReport(Array.Empty<ThermalZoneDiagnostic>(), false, DateTime.UtcNow); }
 
         var gpu = QueryPrimaryGpu();
-        var onBattery = QueryOnBattery();
-        var games = await _games.DetectAsync(ct);
+        bool onBattery;
+        try { onBattery = QueryOnBattery(); } catch { onBattery = false; }
+
+        IReadOnlyList<DetectedGame> games;
+        try { games = await _games.DetectAsync(ct); } catch { games = Array.Empty<DetectedGame>(); }
 
         var secureBoot = securityReport.Features.FirstOrDefault(feature => feature.Name == "Secure Boot")?.Enabled;
         var vbs = securityReport.Features.FirstOrDefault(feature => feature.Name == "VBS")?.Enabled;
         var hvci = securityReport.Features.FirstOrDefault(feature => feature.Name == "HVCI")?.Enabled;
+
+        bool? tpmPresent;
+        try { tpmPresent = QueryTpmPresent(); } catch { tpmPresent = null; }
+
+        PendingRebootReport pendingReport;
+        try { pendingReport = _pendingReboot.Check(); } catch { pendingReport = new PendingRebootReport(false, Array.Empty<string>()); }
 
         var context = new SystemContext
         {
@@ -67,10 +84,10 @@ public sealed class SystemContextProvider : ISystemContextProvider
             WindowsEdition = info.WindowsEdition,
             Architecture = info.Architecture,
             ServicingState = info.WindowsBuild >= 22000 ? WindowsServicingState.Supported : WindowsServicingState.Unknown,
-            CpuName = info.CpuName,
-            CpuCores = info.CpuCores,
-            CpuLogicalProcessors = info.CpuLogicalProcessors,
-            RamGb = info.RamGb,
+            CpuName = string.IsNullOrWhiteSpace(info.CpuName) ? FallbackCpuName() : info.CpuName,
+            CpuCores = info.CpuCores == 0 ? Environment.ProcessorCount : info.CpuCores,
+            CpuLogicalProcessors = info.CpuLogicalProcessors == 0 ? Environment.ProcessorCount : info.CpuLogicalProcessors,
+            RamGb = info.RamGb == 0 ? FallbackRamGb() : info.RamGb,
             HasSsd = info.HasSsd,
             IsLaptop = info.IsLaptop,
             OnBattery = onBattery,
@@ -79,7 +96,7 @@ public sealed class SystemContextProvider : ISystemContextProvider
             GpuDriverVersion = gpu?.DriverVersion ?? string.Empty,
             DisplayRefreshHz = gpu?.RefreshHz ?? 0,
             SecureBootEnabled = secureBoot,
-            TpmPresent = QueryTpmPresent(),
+            TpmPresent = tpmPresent,
             VbsEnabled = vbs,
             HvciEnabled = hvci,
             AntiCheats = antiCheats,
@@ -87,13 +104,48 @@ public sealed class SystemContextProvider : ISystemContextProvider
             KernelProtectedGameRunning = games.Any(detected =>
                 CAO.Core.Gaming.GameProfileCatalog.All.FirstOrDefault(profile =>
                     profile.DisplayName == detected.Name) is { } gp && gp.IsKernelProtected()),
-            PendingReboot = _pendingReboot.Check().Pending,
-            PendingRebootReasons = _pendingReboot.Check().Reasons,
+            PendingReboot = pendingReport.Pending,
+            PendingRebootReasons = pendingReport.Reasons,
             ThermalState = MapThermal(thermal),
             MeasuredUtc = DateTime.UtcNow,
         };
         _cache.Set(context);
         return context;
+    }
+
+    private static SystemInfoReport FallbackSystemInfo()
+    {
+        var ramGb = FallbackRamGb();
+        return new SystemInfoReport(
+            WindowsVersion: Environment.OSVersion.VersionString,
+            WindowsEdition: Environment.OSVersion.VersionString,
+            RamGb: ramGb,
+            CpuName: FallbackCpuName(),
+            HasSsd: true,
+            IsElevated: WmiSystemInfoProvider.IsElevated(),
+            IsLaptop: false)
+        {
+            CpuCores = Environment.ProcessorCount,
+            CpuLogicalProcessors = Environment.ProcessorCount,
+            Architecture = System.Runtime.InteropServices.RuntimeInformation.OSArchitecture.ToString(),
+            WindowsBuild = Environment.OSVersion.Version.Build,
+        };
+    }
+
+    private static string FallbackCpuName()
+    {
+        try { return Environment.GetEnvironmentVariable("PROCESSOR_IDENTIFIER") ?? "CPU no detectada (WMI no disponible)"; }
+        catch { return "CPU no detectada"; }
+    }
+
+    private static int FallbackRamGb()
+    {
+        try
+        {
+            var mem = GC.GetGCMemoryInfo().TotalAvailableMemoryBytes;
+            return (int)Math.Round(mem / (1024d * 1024 * 1024));
+        }
+        catch { return 0; }
     }
 
     private static (string Name, string DriverVersion, int RefreshHz)? QueryPrimaryGpu()

@@ -58,24 +58,32 @@ public partial class App : Application
                 "CA-O", "logs");
             Directory.CreateDirectory(logDir);
             var path = Path.Combine(logDir, "cao-ui-crash.log");
-            var text = new StringBuilder()
+            var sb = new StringBuilder()
                 .AppendLine("---- " + DateTime.UtcNow.ToString("o") + " ----")
                 .AppendLine(ex.GetType().FullName)
                 .AppendLine(ex.Message)
-                .AppendLine(ex.StackTrace)
-                .ToString();
-            File.AppendAllText(path, text, Encoding.UTF8);
+                .AppendLine(ex.StackTrace);
+            var inner = ex.InnerException;
+            while (inner != null)
+            {
+                sb.AppendLine("--- Inner ---");
+                sb.AppendLine(inner.GetType().FullName);
+                sb.AppendLine(inner.Message);
+                sb.AppendLine(inner.StackTrace);
+                inner = inner.InnerException;
+            }
+            try { sb.AppendLine("HResult: 0x" + ex.HResult.ToString("X")); } catch { }
+            File.AppendAllText(path, sb.ToString(), Encoding.UTF8);
         }
         catch
         {
-            // Never crash because of the crash logger. Fallback to ProgramData if LocalAppData unavailable.
             try
             {
                 var fallback = Path.Combine(
                     Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
                     "CA-O", "logs", "cao-ui-crash.log");
                 Directory.CreateDirectory(Path.GetDirectoryName(fallback)!);
-                var text = DateTime.UtcNow.ToString("o") + " " + ex.GetType().Name + ": " + ex.Message + Environment.NewLine;
+                var text = DateTime.UtcNow.ToString("o") + " " + ex.GetType().Name + ": " + ex.Message + (ex.InnerException != null ? " Inner: " + ex.InnerException.Message : "") + Environment.NewLine;
                 File.AppendAllText(fallback, text, Encoding.UTF8);
             }
             catch { }

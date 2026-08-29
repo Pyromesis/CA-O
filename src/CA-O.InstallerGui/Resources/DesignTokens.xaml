@@ -82,6 +82,9 @@
     <SolidColorBrush x:Key="CaoNeutralBrush" Color="#616161"/>
     <SolidColorBrush x:Key="CaoExperimentalBrush" Color="#6A1B9A"/>
     <SolidColorBrush x:Key="CaoSecurityBrush" Color="#C62828"/>
+    <SolidColorBrush x:Key="CaoTextPrimaryBrush" Color="#1A1A1A"/>
+    <SolidColorBrush x:Key="CaoPrimaryBrush" Color="#0078D4"/>
+    <SolidColorBrush x:Key="CaoTextSecondaryBrush" Color="#666666"/>
 
     <!-- Typography scale (§57) -->
     <x:Double x:Key="CaoFontSizeDisplay">32</x:Double>

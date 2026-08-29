@@ -31,6 +31,12 @@ Write-Host '== publish privileged service ==' -ForegroundColor Cyan
 dotnet publish (Join-Path $repository 'src\CA-O.Privileged\CA-O.Privileged.csproj') --configuration Release --runtime win-x64 --self-contained false --output $serviceOutput
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+Write-Host '== publish uninstaller ==' -ForegroundColor Cyan
+$uninstallOutput = Join-Path $artifactRoot 'uninstall'
+New-Item $uninstallOutput -ItemType Directory -Force | Out-Null
+dotnet publish (Join-Path $repository 'src\CA-O.Uninstaller\CA-O.Uninstaller.csproj') --configuration Release --runtime win-x64 --self-contained true /p:PublishSingleFile=true /p:TreatWarningsAsErrors=false --output $uninstallOutput
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
 Write-Host '== publish GUI installer (self-contained single-file) ==' -ForegroundColor Cyan
 $guiOutput = Join-Path $artifactRoot 'gui-installer'
 New-Item $guiOutput -ItemType Directory -Force | Out-Null
@@ -49,7 +55,8 @@ Write-Host '== signing ==' -ForegroundColor Cyan
     (Join-Path $uiOutput 'CA-O.UI.exe'),
     (Join-Path $serviceOutput 'CA-O.Privileged.exe'),
     (Join-Path $artifactRoot 'CA-O-Setup-GUI-x64.exe'),
-    (Join-Path $setupOutput 'CA-O.Setup.exe')
+    (Join-Path $setupOutput 'CA-O.Setup.exe'),
+    (Join-Path $uninstallOutput 'CA-O.Uninstaller.exe')
 )
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 

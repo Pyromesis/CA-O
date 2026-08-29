@@ -22,9 +22,21 @@ public sealed class PendingRebootProvider
             reasons.Add("Component Based Servicing");
         }
 
-        if (KeyHasValues(@"SYSTEM\CurrentControlSet\Control\Session Manager", "PendingFileRenameOperations"))
+        var fileRename = GetPendingFileRenameEntries();
+        if (fileRename.Count > 0)
         {
-            reasons.Add("File rename pendiente");
+            // Filtrar entradas benignas conocidas (EdgeUpdate, TEMP) que dejan la clave siempre presente
+            // y solo reportar si queda al menos una entrada significativa tras el filtro.
+            var significant = fileRename.Where(e =>
+                !e.Contains("EdgeUpdate", StringComparison.OrdinalIgnoreCase) &&
+                !e.Contains(@"\Temp\", StringComparison.OrdinalIgnoreCase) &&
+                !e.StartsWith(@"\??\C:\Windows\Temp", StringComparison.OrdinalIgnoreCase)).ToList();
+            // Si solo hay entradas benignas, no considerar como reinicio pendiente del sistema
+            if (significant.Count > 0)
+                reasons.Add("File rename pendiente");
+            else if (fileRename.Count > 5)
+                reasons.Add("File rename pendiente (múltiples operaciones)");
+            // Si solo hay 1-5 entradas benignas, silenciar para evitar banner permanente
         }
 
         return new PendingRebootReport(reasons.Count > 0, reasons);
@@ -34,6 +46,22 @@ public sealed class PendingRebootProvider
     {
         using var key = Registry.LocalMachine.OpenSubKey(path);
         return key is not null;
+    }
+
+    private static IReadOnlyList<string> GetPendingFileRenameEntries()
+    {
+        try
+        {
+            using var key = Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Control\Session Manager");
+            if (key is null) return Array.Empty<string>();
+            var value = key.GetValue("PendingFileRenameOperations");
+            if (value is string[] arr)
+                return arr.Where(s => !string.IsNullOrWhiteSpace(s)).ToList();
+            if (value is string s && !string.IsNullOrWhiteSpace(s))
+                return new[] { s };
+            return Array.Empty<string>();
+        }
+        catch { return Array.Empty<string>(); }
     }
 
     private static bool KeyHasValues(string path, string? valueName = null)

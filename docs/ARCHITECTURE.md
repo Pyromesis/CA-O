@@ -11,14 +11,14 @@ No "¿qué tweaks tiene Internet?". Cada decisión de diseño sirve a los cuatro
 ```
 ┌──────────────────────┐   Named Pipe (ACL+nonce)   ┌─────────────────────────┐
 │  CA-O.UI (WinUI 3)   │ ─────────────────────────► │ CA-O.Privileged         │
-│  Sin privilegios     │  Request fuertemente       │ Servicio Windows        │
+│  requireAdministrator│  Request fuertemente       │ Servicio Windows        │
 │  - Diagnóstico       │  tipado + allowlist        │ (LocalSystem)           │
 │  - Análisis          │ ◄───────────────────────── │ - Registry/Services     │
 │  - Benchmark local   │  Respuesta JSON            │ - Power/Network/BCD     │
 └──────────────────────┘                            └─────────────────────────┘
 ```
 
-- La UI jamás eleva: toda lectura es accesible sin admin; toda escritura cruza el pipe.
+- La UI **siempre eleva** (`app.manifest` `requireAdministrator` — UAC en cada inicio); toda escritura cruza el pipe al servicio `SYSTEM` aun estando elevada, manteniendo el modelo de privilegio mínimo y auditado.
 - El servicio valida: versión de protocolo, identidad del cliente (`GetImpersonationUserName`), GUID único + nonce (replay), esquema de `OperationParameters`, y sólo ejecuta operaciones de la lista blanca.
 - No existe ningún endpoint HTTP ni ejecución de cadenas arbitrarias.
 

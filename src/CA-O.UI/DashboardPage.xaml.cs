@@ -92,9 +92,13 @@ public sealed partial class DashboardPage : Page
 
         var context = uiState.Context;
         ThermalBar.IsOpen = context?.ThermalState == ThermalState.Throttling;
-        PendingRebootBar.IsOpen = context?.PendingReboot == true;
-        if (context is not null && context.PendingReboot)
-            PendingRebootBar.Message = "Reinicio pendiente por: " + string.Join(", ", context.PendingRebootReasons) + ".";
+        // Solo mostrar reinicio pendiente si es por Windows Update o CBS; file rename aislado (Edge/Chrome/fonts) no bloquea
+        var isSignificantReboot = context?.PendingReboot == true && context.PendingRebootReasons.Any(r => r.Contains("Windows Update", StringComparison.OrdinalIgnoreCase) || r.Contains("Component Based Servicing", StringComparison.OrdinalIgnoreCase));
+        PendingRebootBar.IsOpen = isSignificantReboot;
+        if (isSignificantReboot)
+            PendingRebootBar.Message = "Reinicio pendiente por: " + string.Join(", ", context!.PendingRebootReasons) + ".";
+        else if (context?.PendingReboot == true)
+            PendingRebootBar.IsOpen = false; // file rename solo -> silenciar banner, sigue en contexto para gating
         RecoveryBar.IsOpen = uiState.RecoveryCandidates.Count > 0;
         ServiceInfoBar.IsOpen = uiState.ServiceStatus is "unavailable" or "unknown";
 
@@ -221,9 +225,10 @@ public sealed partial class DashboardPage : Page
                 var context = uiState.Context;
                 ThermalBar.IsOpen = context?.ThermalState == ThermalState.Throttling;
                 RecoveryBar.IsOpen = uiState.RecoveryCandidates.Count > 0;
-                PendingRebootBar.IsOpen = context?.PendingReboot ?? false;
-                if (context?.PendingReboot ?? false)
-                    PendingRebootBar.Message = "Reinicio pendiente por: " + string.Join(", ", context.PendingRebootReasons) + ".";
+                var isSignificant2 = context?.PendingReboot == true && context.PendingRebootReasons.Any(r => r.Contains("Windows Update", StringComparison.OrdinalIgnoreCase) || r.Contains("Component Based Servicing", StringComparison.OrdinalIgnoreCase));
+                PendingRebootBar.IsOpen = isSignificant2;
+                if (isSignificant2)
+                    PendingRebootBar.Message = "Reinicio pendiente por: " + string.Join(", ", context!.PendingRebootReasons) + ".";
                 RenderState();
             }
         }

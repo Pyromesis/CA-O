@@ -22,7 +22,17 @@ if ($args -contains '--purge-history') {
     Remove-Item (Join-Path $env:ProgramData 'CA-O') -Recurse -Force -ErrorAction SilentlyContinue
 }
 
-$sm = [Environment]::GetFolderPath('StartMenu') + '\Programs\CA-O'
-if (Test-Path $sm) { Remove-Item $sm -Recurse -Force }
+$sm = [Environment]::GetFolderPath('CommonStartMenu') + '\Programs\CA-O'
+if (Test-Path $sm) { Remove-Item $sm -Recurse -Force -ErrorAction SilentlyContinue }
+$sm2 = [Environment]::GetFolderPath('StartMenu') + '\Programs\CA-O'
+if (Test-Path $sm2) { Remove-Item $sm2 -Recurse -Force -ErrorAction SilentlyContinue }
+foreach ($lnk in @(
+    [Environment]::GetFolderPath('CommonDesktopDirectory') + '\CA-O.lnk',
+    [Environment]::GetFolderPath('Desktop') + '\CA-O.lnk'
+)) { if (Test-Path $lnk) { Remove-Item $lnk -Force -ErrorAction SilentlyContinue } }
+
+# Eliminar entrada de Programas y características
+try { Remove-Item -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\CA-O" -Recurse -Force -ErrorAction Stop; Write-Host "  Registro desinstalador eliminado" } catch { }
+try { Remove-Item -Path "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\CA-O" -Recurse -Force -ErrorAction Stop } catch { }
 
 Write-Host 'Desinstalacion completa (historial conservado; use --purge-history para borrarlo).' -ForegroundColor Green

@@ -12,15 +12,8 @@ public partial class App : Application
     {
         InitializeComponent();
         UnhandledException += OnUnhandledException;
-
-        // Single instance handling
-        var mainInstance = AppInstance.FindOrRegisterForKey("CAO-Installer-GUI");
-        if (!mainInstance.IsCurrent)
-        {
-            mainInstance.RedirectActivationToAsync(AppInstance.GetCurrent().GetActivatedEventArgs()).AsTask().Wait();
-            Environment.Exit(0);
-            return;
-        }
+        // Single instance deshabilitado para garantizar que el GUI siempre abra (si o si)
+        // Si hay otra instancia, la nueva simplemente abre su propia ventana.
     }
 
     protected override void OnLaunched(LaunchActivatedEventArgs args)
@@ -51,13 +44,23 @@ public partial class App : Application
                 "CA-O", "logs");
             Directory.CreateDirectory(logDir);
             var path = Path.Combine(logDir, "cao-installer-crash.log");
-            var text = new StringBuilder()
+            var sb = new StringBuilder()
                 .AppendLine("---- " + DateTime.UtcNow.ToString("o") + " ----")
                 .AppendLine(ex.GetType().FullName)
                 .AppendLine(ex.Message)
-                .AppendLine(ex.StackTrace)
-                .ToString();
-            File.AppendAllText(path, text, Encoding.UTF8);
+                .AppendLine(ex.StackTrace);
+            var inner = ex.InnerException;
+            while (inner != null)
+            {
+                sb.AppendLine("--- Inner ---");
+                sb.AppendLine(inner.GetType().FullName);
+                sb.AppendLine(inner.Message);
+                sb.AppendLine(inner.StackTrace);
+                inner = inner.InnerException;
+            }
+            // Intentar extraer HRESULT y XAML line info si existe
+            try { sb.AppendLine("HResult: 0x" + ex.HResult.ToString("X")); } catch { }
+            File.AppendAllText(path, sb.ToString(), Encoding.UTF8);
         }
         catch
         {
@@ -67,7 +70,7 @@ public partial class App : Application
                     Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
                     "CA-O", "logs", "cao-installer-crash.log");
                 Directory.CreateDirectory(Path.GetDirectoryName(fallback)!);
-                var text = DateTime.UtcNow.ToString("o") + " " + ex.GetType().Name + ": " + ex.Message + Environment.NewLine;
+                var text = DateTime.UtcNow.ToString("o") + " " + ex.GetType().Name + ": " + ex.Message + (ex.InnerException != null ? " Inner: " + ex.InnerException.Message : "") + Environment.NewLine;
                 File.AppendAllText(fallback, text, Encoding.UTF8);
             }
             catch { }

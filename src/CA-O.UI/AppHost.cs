@@ -35,7 +35,9 @@ internal static class AppHost
         // Infrastructure
         services.AddSingleton<ISystemInfoProvider, WmiSystemInfoProvider>();
         services.AddSingleton<SystemContextProvider>();
+        services.AddSingleton<ISystemContextProvider>(sp => sp.GetRequiredService<SystemContextProvider>());
         services.AddSingleton<SystemContextCache>();
+        services.AddSingleton<IRegistryAccessor>(sp => sp.GetRequiredService<Infrastructure.Windows.SystemRegistry.RegistryAccessor>());
         services.AddSingleton<JsonHistoryLogger>();
         services.AddSingleton<FileSnapshotStore>();
         services.AddSingleton<FileTransactionJournal>();

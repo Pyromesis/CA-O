@@ -2,8 +2,8 @@
     x:Class="CAO.UI.Pages.GamingPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-    <ScrollViewer Padding="{StaticResource CaoPagePadding}" VerticalScrollBarVisibility="Auto">
-        <StackPanel Spacing="16" MaxWidth="1100" HorizontalAlignment="Stretch">
+    <ScrollViewer Padding="{StaticResource CaoPagePadding}" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Spacing="16" MaxWidth="1100" HorizontalAlignment="Center">
             <TextBlock Text="Gaming" Style="{StaticResource CaoPageTitleStyle}"/>
             <TextBlock Text="Centro gaming: juegos detectados, anti-cheat, perfil recomendado y cambios seguros." FontSize="12" Opacity="0.6"/>
 

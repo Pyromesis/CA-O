@@ -2,8 +2,8 @@
     x:Class="CAO.UI.Pages.RestorePage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-    <ScrollViewer Padding="{StaticResource CaoPagePadding}" VerticalScrollBarVisibility="Auto">
-        <StackPanel Spacing="16" MaxWidth="1100" HorizontalAlignment="Stretch">
+    <ScrollViewer Padding="{StaticResource CaoPagePadding}" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Spacing="16" MaxWidth="1100" HorizontalAlignment="Center">
             <TextBlock Text="Restaurar" Style="{StaticResource CaoPageTitleStyle}"/>
             <TextBlock Text="Centro de restauración — snapshots por TransactionId, no por OptimizationId. Cada reversión se verifica exactamente." FontSize="12" Opacity="0.6" TextWrapping="Wrap"/>
             <InfoBar x:Name="NoteBar" IsOpen="True" Severity="Informational" IsClosable="False"

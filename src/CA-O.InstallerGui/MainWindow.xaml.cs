@@ -1,6 +1,7 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
+using Microsoft.Win32;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -62,26 +63,42 @@ private async Task InstallAsync()
 
         try
         {
+            // Single-file: AppContext.BaseDirectory es temp de extracción, usar ProcessPath real
+            var baseDir = Path.GetDirectoryName(Environment.ProcessPath ?? AppContext.BaseDirectory) ?? AppContext.BaseDirectory;
             var exeDir = AppContext.BaseDirectory;
-            var payloadUi = Path.Combine(exeDir, "ui", "CA-O.UI.exe");
-            var payloadService = Path.Combine(exeDir, "service", "CA-O.Privileged.exe");
-
+            var payloadUi = Path.Combine(baseDir, "ui", "CA-O.UI.exe");
+            var payloadService = Path.Combine(baseDir, "service", "CA-O.Privileged.exe");
+            // Fallbacks para layout de build local
+            if (!File.Exists(payloadUi))
+                payloadUi = Path.Combine(exeDir, "ui", "CA-O.UI.exe");
             if (!File.Exists(payloadUi))
             {
-                var dev = Path.GetFullPath(Path.Combine(exeDir, "..", "..", "..", "artifacts", "release-singlefile", "ui", "CA-O.UI.exe"));
-                if (File.Exists(dev)) payloadUi = dev;
+                var alt1 = Path.Combine(baseDir, "..", "ui", "CA-O.UI.exe");
+                var alt2 = Path.Combine(baseDir, "artifacts", "release", "ui", "CA-O.UI.exe");
+                var dev = Path.GetFullPath(Path.Combine(baseDir, "..", "..", "..", "artifacts", "release", "ui", "CA-O.UI.exe"));
+                if (File.Exists(alt1)) payloadUi = alt1;
+                else if (File.Exists(alt2)) payloadUi = alt2;
+                else if (File.Exists(dev)) payloadUi = dev;
             }
             if (!File.Exists(payloadService))
+                payloadService = Path.Combine(exeDir, "service", "CA-O.Privileged.exe");
+            if (!File.Exists(payloadService))
             {
-                var dev2 = Path.GetFullPath(Path.Combine(exeDir, "..", "..", "..", "artifacts", "release-singlefile", "service", "CA-O.Privileged.exe"));
-                if (File.Exists(dev2)) payloadService = dev2;
+                var alt1 = Path.Combine(baseDir, "..", "service", "CA-O.Privileged.exe");
+                var alt2 = Path.Combine(baseDir, "artifacts", "release", "service", "CA-O.Privileged.exe");
+                var dev2 = Path.GetFullPath(Path.Combine(baseDir, "..", "..", "..", "artifacts", "release", "service", "CA-O.Privileged.exe"));
+                if (File.Exists(alt1)) payloadService = alt1;
+                else if (File.Exists(alt2)) payloadService = alt2;
+                else if (File.Exists(dev2)) payloadService = dev2;
             }
+            Log($"BaseDir: {baseDir} | ExeDir: {exeDir}");
             Log($"Origen UI: {payloadUi} {(File.Exists(payloadUi) ? "OK" : "NO")}");
             Log($"Origen Service: {payloadService} {(File.Exists(payloadService) ? "OK" : "NO")}");
             Log($"Destino: {installDir}");
 
             if (!File.Exists(payloadUi) || !File.Exists(payloadService))
             {
+                Log("Payload local no encontrado, intentando descarga...");
                 await DownloadPayloadAsync(payloadUi, payloadService, installCts.Token);
             }
 
@@ -121,6 +138,22 @@ private async Task InstallAsync()
                 }
                 if (!ok) Log("  WARN: ningun atajo de escritorio creado");
             }
+
+            UpdateProgress(82, "Registrando desinstalador...", "Creando entrada en Programas y características");
+            var uninstallSrc = FindUninstallerPayload(baseDir, exeDir);
+            var uninstallDest = Path.Combine(installDir, "uninstall.exe");
+            if (File.Exists(uninstallSrc))
+            {
+                File.Copy(uninstallSrc, uninstallDest, true);
+                Log($"  Desinstalador: {uninstallDest} ({new FileInfo(uninstallDest).Length / 1024} KB)");
+            }
+            else
+            {
+                Log($"  WARN: desinstalador no encontrado en {uninstallSrc}, se usará fallback PowerShell");
+                // Fallback: crear uninstall.ps1 como UninstallString
+                try { File.WriteAllText(Path.Combine(installDir, "uninstall.ps1"), "powershell -ExecutionPolicy Bypass -File \\\"" + Path.Combine(installDir, "uninstall.ps1") + "\\\""); } catch { }
+            }
+            CreateUninstallRegistryEntry(installDir, uninstallDest, installedExe);
 
             UpdateProgress(90, "Iniciando servicio...", "Iniciando servicio privilegiado");
             Run("sc.exe", $"start {serviceName}", true);
@@ -294,6 +327,63 @@ var foundUi = Directory.GetFiles(tmpDir, "CA-O.UI.exe", SearchOption.AllDirector
             XamlRoot = Content.XamlRoot
         };
         await dialog.ShowAsync();
+    }
+
+    private static string FindUninstallerPayload(string baseDir, string exeDir)
+    {
+        var candidates = new[]
+        {
+            Path.Combine(baseDir, "uninstall", "CA-O.Uninstaller.exe"),
+            Path.Combine(baseDir, "CA-O.Uninstaller.exe"),
+            Path.Combine(exeDir, "uninstall", "CA-O.Uninstaller.exe"),
+            Path.Combine(baseDir, "..", "uninstall", "CA-O.Uninstaller.exe"),
+            Path.Combine(baseDir, "artifacts", "release", "uninstall", "CA-O.Uninstaller.exe"),
+            Path.GetFullPath(Path.Combine(baseDir, "..", "..", "..", "artifacts", "release", "uninstall", "CA-O.Uninstaller.exe")),
+        };
+        foreach (var c in candidates)
+        {
+            var full = Path.GetFullPath(c);
+            if (File.Exists(full)) return full;
+        }
+        return Path.Combine(baseDir, "uninstall", "CA-O.Uninstaller.exe");
+    }
+
+    private static void CreateUninstallRegistryEntry(string installDir, string uninstallExe, string mainExe)
+    {
+        try
+        {
+            var keyPath = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\CA-O";
+            using var key = Registry.LocalMachine.CreateSubKey(keyPath);
+            if (key == null) throw new InvalidOperationException("No se pudo crear clave de registro");
+            key.SetValue("DisplayName", "CA-O 2.0", RegistryValueKind.String);
+            key.SetValue("DisplayVersion", "2.0.1", RegistryValueKind.String);
+            key.SetValue("Publisher", "CA-O", RegistryValueKind.String);
+            key.SetValue("InstallLocation", installDir, RegistryValueKind.String);
+            key.SetValue("DisplayIcon", mainExe, RegistryValueKind.String);
+            key.SetValue("UninstallString", $"\"{uninstallExe}\"", RegistryValueKind.String);
+            key.SetValue("QuietUninstallString", $"\"{uninstallExe}\" /S", RegistryValueKind.String);
+            key.SetValue("NoModify", 1, RegistryValueKind.DWord);
+            key.SetValue("NoRepair", 1, RegistryValueKind.DWord);
+            key.SetValue("EstimatedSize", GetDirectorySizeKb(installDir), RegistryValueKind.DWord);
+            key.SetValue("InstallDate", DateTime.Now.ToString("yyyyMMdd"), RegistryValueKind.String);
+            key.SetValue("HelpLink", "https://github.com/Pyromesis/CA-O", RegistryValueKind.String);
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException($"No se pudo registrar desinstalador: {ex.Message}", ex);
+        }
+    }
+
+    private static int GetDirectorySizeKb(string dir)
+    {
+        try
+        {
+            long bytes = 0;
+            foreach (var f in Directory.GetFiles(dir, "*", SearchOption.AllDirectories))
+                bytes += new FileInfo(f).Length;
+            return (int)(bytes / 1024);
+        }
+        catch { return 0; }
     }
 
     internal static bool IsAdmin()

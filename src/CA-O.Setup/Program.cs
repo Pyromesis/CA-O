@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Microsoft.Win32;
 
 // Log a %TEMP% para que el usuario vea por qué se cerró
 var logFile = Path.Combine(Path.GetTempPath(), "CA-O-Setup.log");
@@ -157,6 +158,20 @@ try
     }
     if (!desktopOk) Log("  ADVERTENCIA: No se pudo crear atajo en ningún escritorio.");
 
+    Log("[4/5] Registrando desinstalador...");
+    var uninstallSrc = FindUninstallerPayload(exeDir);
+    var uninstallDest = Path.Combine(installDir, "uninstall.exe");
+    if (File.Exists(uninstallSrc))
+    {
+        File.Copy(uninstallSrc, uninstallDest, true);
+        Log($"  Desinstalador: {uninstallDest}");
+    }
+    else
+    {
+        Log($"  WARN: desinstalador no encontrado en {uninstallSrc}");
+    }
+    CreateUninstallRegistryEntry(installDir, uninstallDest, installedExe);
+
     Console.WriteLine("[4/5] Iniciando servicio...");
     Run("sc.exe", $"start {serviceName}", ignoreError: true);
 
@@ -241,4 +256,57 @@ static void CreateShortcut(string lnkPath, string target, string desc, string wo
     sc.Description = desc;
     sc.Save();
     Console.WriteLine($"  Atajo: {lnkPath}");
+}
+static string FindUninstallerPayload(string exeDir)
+{
+    var candidates = new[]
+    {
+        Path.Combine(exeDir, "uninstall", "CA-O.Uninstaller.exe"),
+        Path.Combine(exeDir, "CA-O.Uninstaller.exe"),
+        Path.Combine(AppContext.BaseDirectory, "uninstall", "CA-O.Uninstaller.exe"),
+        Path.GetFullPath(Path.Combine(exeDir, "..", "..", "..", "artifacts", "release", "uninstall", "CA-O.Uninstaller.exe")),
+    };
+    foreach (var c in candidates)
+    {
+        var full = Path.GetFullPath(c);
+        if (File.Exists(full)) return full;
+    }
+    return Path.Combine(exeDir, "uninstall", "CA-O.Uninstaller.exe");
+}
+static void CreateUninstallRegistryEntry(string installDir, string uninstallExe, string mainExe)
+{
+    try
+    {
+        var keyPath = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\CA-O";
+        using var key = Registry.LocalMachine.CreateSubKey(keyPath);
+        if (key == null) throw new InvalidOperationException("No se pudo crear clave de registro");
+        key.SetValue("DisplayName", "CA-O 2.0", RegistryValueKind.String);
+        key.SetValue("DisplayVersion", "2.0.1", RegistryValueKind.String);
+        key.SetValue("Publisher", "CA-O", RegistryValueKind.String);
+        key.SetValue("InstallLocation", installDir, RegistryValueKind.String);
+        key.SetValue("DisplayIcon", mainExe, RegistryValueKind.String);
+        key.SetValue("UninstallString", $"\"{uninstallExe}\"", RegistryValueKind.String);
+        key.SetValue("QuietUninstallString", $"\"{uninstallExe}\" /S", RegistryValueKind.String);
+        key.SetValue("NoModify", 1, RegistryValueKind.DWord);
+        key.SetValue("NoRepair", 1, RegistryValueKind.DWord);
+        key.SetValue("EstimatedSize", GetDirectorySizeKb(installDir), RegistryValueKind.DWord);
+        key.SetValue("InstallDate", DateTime.Now.ToString("yyyyMMdd"), RegistryValueKind.String);
+        key.SetValue("HelpLink", "https://github.com/Pyromesis/CA-O", RegistryValueKind.String);
+        Console.WriteLine($"  Registro desinstalador creado: HKLM\\{keyPath}");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"  WARN: No se pudo registrar desinstalador: {ex.Message}");
+    }
+}
+static int GetDirectorySizeKb(string dir)
+{
+    try
+    {
+        long bytes = 0;
+        foreach (var f in Directory.GetFiles(dir, "*", SearchOption.AllDirectories))
+            bytes += new FileInfo(f).Length;
+        return (int)(bytes / 1024);
+    }
+    catch { return 0; }
 }

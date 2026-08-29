@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 using System.IO.Pipes;
 using System.Security.AccessControl;
 using System.Security.Principal;
@@ -44,7 +44,7 @@ internal sealed class PrivilegedPipeService(
             }
             catch (IOException ex)
             {
-                logger.LogWarning(ex, "La conexión IPC terminó de forma inesperada.");
+                logger.LogWarning(ex, "La conexiÃ³n IPC terminÃ³ de forma inesperada.");
             }
         }
     }
@@ -54,7 +54,7 @@ internal sealed class PrivilegedPipeService(
         var security = new PipeSecurity();
         // SYSTEM: full control. Administrators: read/write. Interactive:
         // read+write so the UI can CONNECT; authorization of the caller's
-        // token happens per-request — connecting is not authorizing.
+        // token happens per-request â€” connecting is not authorizing.
         security.AddAccessRule(new PipeAccessRule(
             new SecurityIdentifier(WellKnownSidType.BuiltinAdministratorsSid, null),
             PipeAccessRights.ReadWrite, AccessControlType.Allow));
@@ -78,7 +78,7 @@ internal sealed class PrivilegedPipeService(
 
     /// <summary>
     /// Extracts CallerIdentity from the client token via impersonation
-    /// (P1-8): real SID, name, session id and elevation — no derived values.
+    /// (P1-8): real SID, name, session id and elevation â€” no derived values.
     /// </summary>
     internal static CallerIdentity GetCallerIdentity(
         NamedPipeServerStream pipe,
@@ -100,30 +100,70 @@ internal sealed class PrivilegedPipeService(
 
         try
         {
-            var caller = GetCallerIdentity(pipe, new CAO.Infrastructure.Windows.Security.WindowsCallerInspector());
-            logger.LogInformation("Conexión IPC de {Sid} ({Name}).", caller.Sid, caller.Name);
+            // Leer primero para permitir RunAsClient (requiere datos leÃ­dos, ERROR 536)
+            string? line;
+            using (var reader = new StreamReader(pipe, System.Text.Encoding.UTF8, false, 1024, leaveOpen: true))
+            {
+                var readTask = reader.ReadLineAsync(timeout.Token).AsTask();
+                var completed = await Task.WhenAny(readTask, Task.Delay(RequestTimeout, timeout.Token));
+                if (completed != readTask)
+                    throw new OperationCanceledException("Timeout leyendo request");
+                line = await readTask;
+            }
+            if (string.IsNullOrWhiteSpace(line))
+            {
+                try { System.IO.File.AppendAllText(@"C:\Users\Hilo8\AppData\Local\Temp\ipc_debug.log", $"{DateTime.UtcNow:o} Empty line received, pipe may have been closed\n"); } catch { }
+                throw new JsonException("Request vacÃ­a");
+            }
+            if (System.Text.Encoding.UTF8.GetByteCount(line) > IpcProtocol.MaxRequestBytes)
+            {
+                await WriteResponse(pipe, IpcResponse.Rejected(ErrorCodes.IpcRequestTooLarge, "Solicitud excede 64KB."), stoppingToken);
+                return;
+            }
+            // Ahora sÃ­ se puede suplantar: el cliente ya escribiÃ³ y el servidor ya leyÃ³
+            CallerIdentity caller;
+            try { caller = GetCallerIdentity(pipe, new CAO.Infrastructure.Windows.Security.WindowsCallerInspector()); }
+            catch (Exception ex)
+            {
+                try { System.IO.File.AppendAllText(@"C:\Users\Hilo8\AppData\Local\Temp\ipc_debug.log", $"{DateTime.UtcNow:o} GetCallerIdentity FAIL {ex}\n"); } catch { }
+                throw;
+            }
+            logger.LogInformation("ConexiÃ³n IPC de {Sid} ({Name}).", caller.Sid, caller.Name);
+            try { System.IO.File.AppendAllText(@"C:\Users\Hilo8\AppData\Local\Temp\ipc_debug.log", $"{DateTime.UtcNow:o} Connected {caller.Sid} {caller.Name} Elevated={caller.IsElevated} Admin={caller.IsAdministrator}\n"); } catch { }
 
-            var request = await JsonSerializer.DeserializeAsync<IpcRequest>(
-                pipe, JsonOptions, timeout.Token);
+            IpcRequest? request;
+            try { request = JsonSerializer.Deserialize<IpcRequest>(line, JsonOptions); }
+            catch (JsonException ex)
+            {
+                logger.LogWarning(ex, "JSON invÃ¡lido recibido: {Line}", line.Length > 200 ? line[..200] : line);
+                try { System.IO.File.AppendAllText(@"C:\Users\Hilo8\AppData\Local\Temp\ipc_debug.log", $"{DateTime.UtcNow:o} JSON FAIL {ex.Message} Line={line}\n"); } catch { }
+                await WriteResponse(pipe, IpcResponse.Rejected(ErrorCodes.IpcMalformedRequest, $"JSON invÃ¡lido: {ex.Message}"), stoppingToken);
+                return;
+            }
+            try { System.IO.File.AppendAllText(@"C:\Users\Hilo8\AppData\Local\Temp\ipc_debug.log", $"{DateTime.UtcNow:o} Request OK op={request?.Operation} id={request?.RequestId}\n"); } catch { }
             var response = await ValidateAndDispatchAsync(request, caller, timeout.Token);
 
             logger.LogInformation(
-                "Auditoría IPC: requestedBy={Sid}/{Name} executedBy=SYSTEM op={Op} accepted={Accepted} code={Code}",
+                "AuditorÃ­a IPC: requestedBy={Sid}/{Name} executedBy=SYSTEM op={Op} accepted={Accepted} code={Code}",
                 caller.Sid, caller.Name, request?.Operation.ToString() ?? "?", response.Accepted, response.ErrorCode ?? "-");
 
-            await JsonSerializer.SerializeAsync(pipe, response, JsonOptions, timeout.Token);
+            await WriteResponse(pipe, response, stoppingToken);
         }
         catch (OperationCanceledException) when (timeout.IsCancellationRequested)
         {
-            logger.LogWarning("Solicitud IPC cancelada o excedió el tiempo límite.");
+            logger.LogWarning("Solicitud IPC cancelada o excediÃ³ el tiempo lÃ­mite.");
+            try { await WriteResponse(pipe, IpcResponse.Rejected(ErrorCodes.IpcTimeout, "Timeout del servicio (CAO-IPC-007)."), stoppingToken); } catch { }
         }
-        catch (JsonException)
+        catch (JsonException ex)
         {
-            await WriteResponse(pipe, IpcResponse.Rejected(ErrorCodes.IpcMalformedRequest, "JSON inválido."), stoppingToken);
+            logger.LogWarning(ex, "JSON invÃ¡lido en pipe");
+            await WriteResponse(pipe, IpcResponse.Rejected(ErrorCodes.IpcMalformedRequest, $"JSON invÃ¡lido: {ex.Message}"), stoppingToken);
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Fallo inesperado atendiendo la conexión IPC.");
+            try { System.IO.File.AppendAllText(@"C:\Users\Hilo8\AppData\Local\Temp\ipc_debug.log", $"{DateTime.UtcNow:o} GENERAL FAIL {ex.GetType().Name}: {ex.Message}\n{ex.StackTrace}\n"); } catch { }
+            try { await WriteResponse(pipe, IpcResponse.Rejected(ErrorCodes.IpcMalformedRequest, $"Error interno: {ex.GetType().Name} — {ex.Message}"), stoppingToken); } catch { }
         }
     }
 
@@ -138,7 +178,7 @@ internal sealed class PrivilegedPipeService(
         if (!authorization.Allowed)
         {
             return IpcResponse.Rejected(authorization.ReasonCode,
-                "El usuario actual no está autorizado para operaciones privilegiadas.");
+                "El usuario actual no estÃ¡ autorizado para operaciones privilegiadas.");
         }
 
         // Replay protection: request id and nonce are single-use.
@@ -147,7 +187,7 @@ internal sealed class PrivilegedPipeService(
             return IpcResponse.Rejected(ErrorCodes.IpcReplayDetected, "Solicitud repetida.");
         }
 
-        // Ping / GetServiceStatus no requieren OptimizationId (§10)
+        // Ping / GetServiceStatus no requieren OptimizationId (Â§10)
         if (request.Operation is PrivilegedOperationKind.Ping)
         {
             var ping = new PingResponse(CAO.Shared.AppVersion.Semantic, IpcProtocol.Version, Environment.ProcessId, true, "running");
@@ -170,13 +210,13 @@ internal sealed class PrivilegedPipeService(
                 PrivilegedOperationKind.CaptureSnapshot => Snapshot(engine.CaptureSnapshot(optimizationId)),
                 PrivilegedOperationKind.VerifyOptimization => await VerifyAsync(engine.VerifyAsync(optimizationId, ct)),
                 PrivilegedOperationKind.DetectOptimization => IpcResponse.Ok($"\"{engine.Detect(optimizationId)}\""),
-                _ => IpcResponse.Rejected(ErrorCodes.IpcPayloadSchemaInvalid, "Operación no disponible."),
+                _ => IpcResponse.Rejected(ErrorCodes.IpcPayloadSchemaInvalid, "OperaciÃ³n no disponible."),
             };
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Error ejecutando la operación IPC {Operation}.", request.Operation);
-            return IpcResponse.Rejected(ErrorCodes.TxnApplyFailed, "La operación falló en el sistema.");
+            logger.LogError(ex, "Error ejecutando la operaciÃ³n IPC {Operation}.", request.Operation);
+            return IpcResponse.Rejected(ErrorCodes.TxnApplyFailed, "La operaciÃ³n fallÃ³ en el sistema.");
         }
     }
 
@@ -190,7 +230,7 @@ internal sealed class PrivilegedPipeService(
         });
         return verification.Status is VerificationStatus.Passed or VerificationStatus.NotApplicable
             ? IpcResponse.Ok(detail)
-            : IpcResponse.Rejected(ErrorCodes.VerifyFailed, $"Verificación: {verification.MessageEs}");
+            : IpcResponse.Rejected(ErrorCodes.VerifyFailed, $"VerificaciÃ³n: {verification.MessageEs}");
     }
 
     private static IpcResponse FromResult(CAO.Core.Abstractions.OperationResult result) =>
@@ -203,7 +243,11 @@ internal sealed class PrivilegedPipeService(
     {
         try
         {
-            await JsonSerializer.SerializeAsync(pipe, response, JsonOptions, ct);
+            var json = JsonSerializer.Serialize(response, JsonOptions);
+            using var writer = new StreamWriter(pipe, System.Text.Encoding.UTF8, 1024, leaveOpen: true) { AutoFlush = true };
+            await writer.WriteLineAsync(json.AsMemory(), ct);
+            writer.Flush();
+            pipe.Flush();
         }
         catch (IOException)
         {

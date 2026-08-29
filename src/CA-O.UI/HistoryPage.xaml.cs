@@ -43,7 +43,15 @@ public sealed partial class HistoryPage : Page
     private void OnRefreshClick(object sender, RoutedEventArgs e) { _vm.RefreshCommand.Execute(null); RenderVm(); }
     private void OnFilterChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (FilterBox.SelectedItem is ComboBoxItem { Tag: string tag }) _vm.Filter = tag;
+        // Guard: During InitializeComponent the SelectedItem event fires before _vm is assigned (IsSelected=True),
+        // and FilterBox may still be null during XAML load – must not throw (spec §19 nunca cerrar).
+        if (_vm is null) return;
+        if (FilterBox?.SelectedItem is not ComboBoxItem { Tag: string tag }) return;
+        _vm.Filter = tag;
     }
-    private void OnSearchChanged(object sender, TextChangedEventArgs e) { _vm.Search = SearchBox.Text?.Trim() ?? ""; }
+    private void OnSearchChanged(object sender, TextChangedEventArgs e)
+    {
+        if (_vm is null) return;
+        _vm.Search = SearchBox?.Text?.Trim() ?? "";
+    }
 }

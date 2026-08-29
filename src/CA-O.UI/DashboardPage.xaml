@@ -14,8 +14,8 @@
                 </VisualState>
             </VisualStateGroup>
         </VisualStateManager.VisualStateGroups>
-        <ScrollViewer Padding="{StaticResource CaoPagePadding}" VerticalScrollBarVisibility="Auto">
-        <StackPanel Spacing="16" MaxWidth="1160" HorizontalAlignment="Stretch">
+        <ScrollViewer Padding="{StaticResource CaoPagePadding}" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Spacing="16" MaxWidth="1160" HorizontalAlignment="Center">
             <!-- Hero: System Intelligence -->
             <Grid ColumnSpacing="16" RowSpacing="12">
                 <Grid.ColumnDefinitions>

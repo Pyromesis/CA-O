@@ -11,8 +11,8 @@
                 </VisualState>
             </VisualStateGroup>
         </VisualStateManager.VisualStateGroups>
-        <ScrollViewer Padding="{StaticResource CaoPagePadding}" VerticalScrollBarVisibility="Auto">
-        <StackPanel Spacing="16" MaxWidth="1100" HorizontalAlignment="Stretch">
+        <ScrollViewer Padding="{StaticResource CaoPagePadding}" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Spacing="16" MaxWidth="1100" HorizontalAlignment="Center">
             <TextBlock Text="Analizar sistema" Style="{StaticResource CaoPageTitleStyle}"/>
             <TextBlock Text="Cada categoría mide estado real. Nada aquí modifica el sistema." FontSize="13" Opacity="0.6"/>
 
