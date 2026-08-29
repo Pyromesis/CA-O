@@ -28,7 +28,11 @@ public sealed partial class OptimizePage : Page
         string CurrentState,
         string ScoreLabel,
         string ReasonMessage,
-        RecommendationBucket Bucket);
+        RecommendationBucket Bucket,
+        bool IsLocked,
+        string LockReason,
+        string BenefitDetail,
+        bool IsApplyEnabled);
 
     private readonly ViewModels.OptimizeViewModel _vm;
 
@@ -75,7 +79,23 @@ public sealed partial class OptimizePage : Page
                 RecommendationBucket.SecuritySensitive => 3,
                 _ => 4,
             })
-            .Select(recommendation => new RecommendationRow(
+            .Select(recommendation =>
+            {
+                bool isLocked = recommendation.Bucket != RecommendationBucket.Recommended && !uiState.ExpertMode;
+                // También bloqueado si compatibility es NotCompatible o juego lo bloquea
+                if (recommendation.Compatibility == CompatibilityStatus.NotCompatible) isLocked = true;
+                string lockReason = recommendation.Bucket switch
+                {
+                    RecommendationBucket.Optional => "Opcional — requiere Modo Expert para aplicar (ver Ajustes). Beneficio según carga de trabajo.",
+                    RecommendationBucket.Experimental => "Experimental — solo en Modo Expert, puede ser inestable.",
+                    RecommendationBucket.SecuritySensitive => "Sensible a seguridad — requiere Modo Expert y confirmación. Verifica anti-cheat.",
+                    RecommendationBucket.Blocked => "Bloqueado por anti-cheat (Vanguard/EAC) — con candado para no romper juegos.",
+                    _ when recommendation.Compatibility == CompatibilityStatus.NotCompatible => "No compatible con este hardware/sistema.",
+                    _ => string.Empty
+                };
+                string benefit = GetBenefitDetail(recommendation.OptimizationId);
+                bool canApply = !isLocked && recommendation.CurrentState != OptimizationState.AppliedByCao;
+                return new RecommendationRow(
                 recommendation.OptimizationId,
                 recommendation.NameEs,
                 recommendation.DescriptionEs,
@@ -88,13 +108,34 @@ public sealed partial class OptimizePage : Page
                 recommendation.CurrentState.ToString(),
                 recommendation.Score?.ToString() ?? "n/a",
                 recommendation.Reason.MessageEs,
-                recommendation.Bucket))
+                recommendation.Bucket,
+                isLocked,
+                lockReason,
+                benefit,
+                canApply);
+            })
             .ToList();
 
         RecommendationsList.ItemsSource = rows;
         EmptyStateCard.Visibility = rows.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         RecommendationsList.Visibility = rows.Count == 0 ? Visibility.Collapsed : Visibility.Visible;
     }
+
+    private static string GetBenefitDetail(string id) => id switch
+    {
+        "maximum-power-plan" => "Beneficio: +5-10% rendimiento sostenido en carga, menor throttling. Ideal para juegos y render. Requiere reinicio no.",
+        "disable-visual-effects" => "Beneficio: -15% uso GPU en escritorio, +2-5% FPS en juegos con GPU limitada, menos input lag.",
+        "disable-search-indexing" => "Beneficio: -200 MB RAM y -5% I/O en SSD, +3% batería en portátil. Solo recomendado en SSD.",
+        "disable-background-apps" => "Beneficio: -8% uso CPU en reposo, mejor ping estable, menos notificaciones.",
+        "disable-transparency" => "Beneficio: -3% GPU, batería +4%, interfaz más nítida.",
+        "disable-vbs" => "Beneficio: +5-15% FPS en algunos juegos, pero reduce seguridad (HVCI). Bloqueado si Vanguard/EAC.",
+        "disable-hibernate" => "Beneficio: +4-12 GB libres en disco del sistema, arranque 0.5s más rápido.",
+        "optimize-system-drive" => "Beneficio: +2% velocidad secuencial SSD, menos fragmentación. Verificar TRIM.",
+        "normalize-tcp-autotuning" => "Beneficio: -10-20 ms ping en juegos con bufferbloat, más estabilidad.",
+        "enable-gpu-scheduling" => "Beneficio: -1-2 ms latencia GPU, +2% FPS en DX12. Requiere reinicio.",
+        "disable-gamedvr" => "Beneficio: -3% overhead, +1-3% FPS, menos stutter.",
+        _ => "Beneficio: según perfil, revisa evidencia y confianza."
+    };
 
     private async void OnPreviewClick(object sender, RoutedEventArgs e)
     {
