@@ -128,31 +128,79 @@ private async Task InstallAsync()
                 Log($"Payload descargado -> UI: {payloadUi} | Service: {payloadService}");
             }
 
+            // Si es actualización, detener servicio antes de tocar archivos (evita file in use CA-O.Core.dll)
+            if (isUpdate)
+            {
+                UpdateProgress(10, "Deteniendo servicio existente...", "Deteniendo CAO.Privileged para actualizar");
+                Run("sc.exe", $"stop {serviceName}", true);
+                // Esperar hasta que se detenga (hasta 8s) y matar proceso si persiste
+                for (int i = 0; i < 16; i++)
+                {
+                    await Task.Delay(500);
+                    var q = RunCapture("sc.exe", $"query {serviceName}");
+                    if (q.Contains("STOPPED") || q.Contains("does not exist")) break;
+                }
+                try
+                {
+                    foreach (var p in Process.GetProcessesByName("CA-O.Privileged"))
+                    {
+                        try { p.Kill(); } catch { }
+                    }
+                    await Task.Delay(500);
+                }
+                catch { }
+                Run("sc.exe", $"delete {serviceName}", true);
+                await Task.Delay(800);
+            }
+
             UpdateProgress(10, "Preparando instalacion...", "Creando directorio de instalacion");
             Directory.CreateDirectory(installDir);
             var destUi = Path.Combine(installDir, "ui");
             var destSvc = Path.Combine(installDir, "service");
-            // Si es actualización, limpiar destinos para no dejar archivos obsoletos
+            // Si es actualización, limpiar destinos para no dejar archivos obsoletos (con reintentos por file lock)
             if (Directory.Exists(destUi) && isUpdate)
             {
-                try { Directory.Delete(destUi, true); } catch (Exception ex) { Log($"  No se pudo limpiar {destUi}: {ex.Message}"); }
+                for (int r = 0; r < 3; r++)
+                {
+                    try { Directory.Delete(destUi, true); break; } catch (Exception ex) { Log($"  Intento {r+1} limpiar {destUi}: {ex.Message}"); await Task.Delay(700); }
+                }
             }
             if (Directory.Exists(destSvc) && isUpdate)
             {
-                try { Directory.Delete(destSvc, true); } catch (Exception ex) { Log($"  No se pudo limpiar {destSvc}: {ex.Message}"); }
+                for (int r = 0; r < 3; r++)
+                {
+                    try { Directory.Delete(destSvc, true); break; } catch (Exception ex) { Log($"  Intento {r+1} limpiar {destSvc}: {ex.Message}"); await Task.Delay(700); }
+                }
             }
             Directory.CreateDirectory(destUi);
             Directory.CreateDirectory(destSvc);
-            CopyDirectory(Path.GetDirectoryName(payloadUi)!, destUi, p => UpdateProgress(10 + p / 5, "Copiando archivos de la aplicacion...", null));
-            CopyDirectory(Path.GetDirectoryName(payloadService)!, destSvc, null);
+            // Copia con reintento si archivo bloqueado
+            async Task CopyWithRetry(string src, string dst)
+            {
+                for (int attempt = 0; attempt < 3; attempt++)
+                {
+                    try { CopyDirectory(src, dst, attempt == 0 ? p => UpdateProgress(10 + p / 5, "Copiando archivos de la aplicacion...", null) : null); return; }
+                    catch (IOException ex) when (ex.Message.Contains("being used"))
+                    {
+                        Log($"  Reintento copia {attempt+1}: {ex.Message}");
+                        await Task.Delay(800);
+                    }
+                }
+                CopyDirectory(src, dst, null);
+            }
+            await CopyWithRetry(Path.GetDirectoryName(payloadUi)!, destUi);
+            await CopyWithRetry(Path.GetDirectoryName(payloadService)!, destSvc);
             var installedExe = Path.Combine(destUi, "CA-O.UI.exe");
             Log($"Instalado en {installedExe} ({new FileInfo(installedExe).Length / 1024 / 1024} MB)");
 
             UpdateProgress(60, "Registrando servicio...", "Registrando servicio privilegiado CAO.Privileged");
-            Run("sc.exe", $"stop {serviceName}", true);
-            await Task.Delay(600);
-            Run("sc.exe", $"delete {serviceName}", true);
-            await Task.Delay(600);
+            if (!isUpdate)
+            {
+                Run("sc.exe", $"stop {serviceName}", true);
+                await Task.Delay(600);
+                Run("sc.exe", $"delete {serviceName}", true);
+                await Task.Delay(600);
+            }
             Run("sc.exe", $"create {serviceName} binPath= \"{Path.Combine(destSvc, "CA-O.Privileged.exe")}\" start= demand DisplayName= \"CA-O Privileged Service\"");
             Run("sc.exe", $"failure {serviceName} reset= 86400 actions= restart/5000/restart/10000/reboot/60000");
             Run("sc.exe", $"description {serviceName} \"CA-O 2.0 servicio privilegiado - IPC Named Pipe con ACL + replay guard\"");
@@ -231,10 +279,10 @@ internal void OnCancelClick(object sender, RoutedEventArgs e)
 
     private async Task<(string uiExe, string svcExe)> DownloadPayloadAsync(CancellationToken ct)
     {
-        UpdateProgress(5, "Descargando payload (308 MB)...", "Descargando desde GitHub Release v2.0.11");
-        var zipUrl = "https://github.com/Pyromesis/CA-O/releases/download/v2.0.11/CA-O-2.0.11-win-x64.zip";
-        var fallbackUrl = "https://github.com/Pyromesis/CA-O/releases/latest/download/CA-O-2.0.11-win-x64.zip";
-        var fallbackOld = "https://github.com/Pyromesis/CA-O/releases/download/v2.0.10/CA-O-2.0.10-win-x64.zip";
+        UpdateProgress(5, "Descargando payload (308 MB)...", "Descargando desde GitHub Release v2.0.12");
+        var zipUrl = "https://github.com/Pyromesis/CA-O/releases/download/v2.0.12/CA-O-2.0.12-win-x64.zip";
+        var fallbackUrl = "https://github.com/Pyromesis/CA-O/releases/latest/download/CA-O-2.0.12-win-x64.zip";
+        var fallbackOld = "https://github.com/Pyromesis/CA-O/releases/download/v2.0.11/CA-O-2.0.11-win-x64.zip";
         var tmpZip = Path.Combine(Path.GetTempPath(), "CA-O-payload.zip");
         var tmpDir = Path.Combine(Path.GetTempPath(), "CA-O-payload-gui");
 
@@ -427,9 +475,9 @@ internal void OnCancelClick(object sender, RoutedEventArgs e)
             using var key = Registry.LocalMachine.CreateSubKey(keyPath);
             if (key == null) throw new InvalidOperationException("No se pudo crear clave de registro");
             key.SetValue("DisplayName", "CA-O 2.0", RegistryValueKind.String);
-            var version = typeof(MainWindow).Assembly.GetName().Version?.ToString(3) ?? "2.0.11";
+            var version = typeof(MainWindow).Assembly.GetName().Version?.ToString(3) ?? "2.0.12";
             // Normalizar a 3 partes
-            if (version == "2.0.0.0") version = "2.0.11";
+            if (version == "2.0.0.0") version = "2.0.12";
             key.SetValue("DisplayVersion", version, RegistryValueKind.String);
             key.SetValue("Publisher", "CA-O", RegistryValueKind.String);
             key.SetValue("InstallLocation", installDir, RegistryValueKind.String);
