@@ -51,12 +51,22 @@
                             <Grid ColumnSpacing="10">
                                 <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                                 <StackPanel Spacing="3">
-                                    <TextBlock Text="{Binding}" FontSize="12" TextWrapping="Wrap" IsTextSelectionEnabled="True"/>
+                                    <TextBlock FontSize="12" TextWrapping="Wrap" IsTextSelectionEnabled="True">
+                                        <Run Text="{Binding TimestampUtc}" />
+                                        <Run Text=" — " />
+                                        <Run Text="{Binding OptimizationId}" />
+                                        <Run Text=" — TX:" />
+                                        <Run Text="{Binding TransactionId}" />
+                                        <Run Text=" — " />
+                                        <Run Text="{Binding EntryCount}" />
+                                        <Run Text=" valores — build " />
+                                        <Run Text="{Binding WindowsBuild}" />
+                                    </TextBlock>
                                     <TextBlock Text="TransactionId como identidad primaria — nunca se sobrescribe un snapshot." FontSize="10" Opacity="0.5"/>
                                 </StackPanel>
                                 <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                                    <Button Content="Inspeccionar" Tag="{Binding}" Click="OnInspectClick" FontSize="11"/>
-                                    <Button Content="Restaurar" Tag="{Binding}" Click="OnRestoreClick" FontSize="11" Style="{StaticResource AccentButtonStyle}"/>
+                                    <Button Content="Inspeccionar" Tag="{Binding TransactionId}" Click="OnInspectClick" FontSize="11"/>
+                                    <Button Content="Restaurar" Tag="{Binding TransactionId}" Click="OnRestoreClick" FontSize="11" Style="{StaticResource AccentButtonStyle}"/>
                                 </StackPanel>
                             </Grid>
                         </Border>

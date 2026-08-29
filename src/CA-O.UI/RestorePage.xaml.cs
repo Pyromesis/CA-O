@@ -39,7 +39,7 @@ public sealed partial class RestorePage : Page
     {
         EmptySnapshotsCard.Visibility = _vm.IsEmpty ? Visibility.Visible : Visibility.Collapsed;
         SnapshotsList.Visibility = _vm.IsEmpty ? Visibility.Collapsed : Visibility.Visible;
-        SnapshotsList.ItemsSource = _vm.Snapshots;
+        SnapshotsList.ItemsSource = _vm.SnapshotInfos;
         RecoveryHintText.Text = _vm.RecoveryHint;
     }
 
@@ -77,6 +77,7 @@ public sealed partial class RestorePage : Page
     {
         string? snapshotId = null;
         if (sender is Button { Tag: string sid }) snapshotId = sid;
+        else if (sender is Button { Tag: Guid gid }) snapshotId = gid.ToString();
         else if (sender is Button { Tag: object o }) snapshotId = o?.ToString();
         if (string.IsNullOrWhiteSpace(snapshotId)) return;
 
@@ -95,10 +96,32 @@ public sealed partial class RestorePage : Page
         {
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
             await _vm.RevertCommand.ExecuteAsync(snapshotId);
+            // Feedback explícito de éxito/fracaso
+            var hint = _vm.RecoveryHint;
+            var isSuccess = hint.Contains('✓') || hint.Contains("aceptada", StringComparison.OrdinalIgnoreCase);
+            var resultDialog = new ContentDialog
+            {
+                Title = isSuccess ? "Restauración completada" : "Restauración no completada",
+                Content = new TextBlock { Text = hint, TextWrapping = TextWrapping.Wrap },
+                CloseButtonText = "Aceptar",
+                DefaultButton = ContentDialogButton.Close,
+                XamlRoot = Content.XamlRoot
+            };
+            await resultDialog.ShowAsync();
+            _vm.RefreshCommand.Execute(null);
+            RenderVm();
         }
         catch (Exception ex)
         {
             RecoveryHintText.Text = $"Restauración falló (servicio no disponible): {ex.Message}";
+            var errDialog = new ContentDialog
+            {
+                Title = "Error en restauración",
+                Content = new TextBlock { Text = $"No se pudo revertir {snapshotId}:\n{ex.Message}\n\nVerifica que el servicio CAO.Privileged esté en ejecución.", TextWrapping = TextWrapping.Wrap },
+                CloseButtonText = "Aceptar",
+                XamlRoot = Content.XamlRoot
+            };
+            await errDialog.ShowAsync();
         }
     }
 }

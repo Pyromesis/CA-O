@@ -234,6 +234,20 @@ public sealed partial class OptimizePage : Page
                 TxText.Text = "Rechazado — transacción no comprometida";
             }
 
+            // Feedback explícito para reversión
+            if (operation == PrivilegedOperationKind.RevertOptimization)
+            {
+                var dialog = new ContentDialog
+                {
+                    Title = response is { Accepted: true } ? "Reversión completada" : "Reversión no completada",
+                    Content = new TextBlock { Text = response is { Accepted: true } ? $"Se revirtió {optimizationId} y se verificó el estado original." : $"No se pudo revertir {optimizationId}:\n[{response?.ErrorCode}] {response?.SafeMessage}", TextWrapping = TextWrapping.Wrap },
+                    CloseButtonText = "Aceptar",
+                    DefaultButton = ContentDialogButton.Close,
+                    XamlRoot = Content.XamlRoot
+                };
+                await dialog.ShowAsync();
+            }
+
             using var refreshCts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
             await _vm.RefreshRecommendationsAsync(refreshCts.Token);
             Render();

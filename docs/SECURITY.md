@@ -2,7 +2,7 @@
 
 ## Modelo de amenazas
 
-CA-O manipula configuración crítica de Windows. Las superficies relevantes son: (1) el canal IPC entre UI sin privilegios y el servicio SYSTEM, (2) la ejecución de herramientas externas, (3) los archivos de estado en `%ProgramData%`.
+CA-O manipula configuración crítica de Windows. Las superficies relevantes son: (1) el canal IPC entre UI elevada (requireAdministrator, UAC siempre) y el servicio SYSTEM — la UI está elevada pero toda mutación sigue auditada via pipe tipado, (2) la ejecución de herramientas externas, (3) los archivos de estado en `%ProgramData%`.
 
 ## Controles implementados
 

@@ -133,13 +133,25 @@ public sealed class OptimizationEngine
             return OperationResult.Fail("Se requieren permisos de administrador para revertir cambios.", "not-admin");
         }
 
-        var optimization = Resolve(optimizationId);
-        PrepareServiceAwareOptimization(optimization);
-
-        if (!_snapshots.TryLoadLatestForOptimization(optimizationId, out var record) || record is null)
+        TransactionSnapshotRecord? record = null;
+        string resolvedId = optimizationId;
+        // Si se pasa un TransactionId (GUID), usar ese snapshot específico (RestorePage)
+        if (Guid.TryParse(optimizationId, out var txid) && _snapshots.TryLoad(txid, out var byTx) && byTx != null)
+        {
+            record = byTx;
+            resolvedId = byTx.Manifest.OptimizationId;
+        }
+        else if (!_snapshots.TryLoadLatestForOptimization(optimizationId, out var byOpt) || byOpt is null)
         {
             return OperationResult.Fail("No hay snapshot guardado para esta optimización.", "no-snapshot");
         }
+        else
+        {
+            record = byOpt;
+        }
+
+        var optimization = Resolve(resolvedId);
+        PrepareServiceAwareOptimization(optimization);
 
         var context = new OptimizationContext { Registry = _registry, Executor = _executor, Services = _services };
         OperationResult result;

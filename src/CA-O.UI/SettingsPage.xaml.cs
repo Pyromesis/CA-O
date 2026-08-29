@@ -31,6 +31,10 @@ public sealed partial class SettingsPage : Page
         Select(LanguageBox, _vm.Language);
         ServiceStatusText.Text = $"Servicio: {_vm.ServiceStatus}";
         VersionsText.Text = $"CA-O UI {CAO.Shared.AppVersion.Semantic} · Protocolo v{CAO.Shared.IPC.IpcProtocol.Version} · Settings: {CAO.Shared.CaOPaths.SettingsFile}";
+        bool isAdmin = IsAdmin();
+        PrivilegeText.Text = isAdmin
+            ? "UI elevada (administrador, requireAdministrator) — toda escritura via Named Pipe tipado con ACL, nonce, expiración 30s y anti-replay. Ver docs/SECURITY.md."
+            : "UI sin privilegios — toda escritura via Named Pipe tipado con ACL, nonce, expiración 30s y anti-replay. Ver docs/SECURITY.md.";
         _vm.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName == nameof(ViewModels.SettingsViewModel.ServiceStatus))
@@ -86,5 +90,11 @@ public sealed partial class SettingsPage : Page
                 return;
             }
         }
+    }
+
+    private static bool IsAdmin()
+    {
+        using var id = System.Security.Principal.WindowsIdentity.GetCurrent();
+        return new System.Security.Principal.WindowsPrincipal(id).IsInRole(System.Security.Principal.WindowsBuiltInRole.Administrator);
     }
 }
