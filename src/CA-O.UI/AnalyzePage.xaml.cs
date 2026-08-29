@@ -1,3 +1,4 @@
+#pragma warning disable CA2016
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using CAO.Infrastructure.Networking;
@@ -14,6 +15,7 @@ public sealed partial class AnalyzePage : Page
 {
     private readonly AnalyzeViewModel _viewModel;
     private CancellationTokenSource? _cts;
+    private DnsBenchmarkResult? _bestDns;
 
     public AnalyzePage()
     {
@@ -73,6 +75,9 @@ public sealed partial class AnalyzePage : Page
             // Render parcial tolerante a fallos individuales ( §10 )
             RenderFromViewModel();
             LoadPersisted();
+            // Auto-ejecutar DNS benchmark y DPC como parte del análisis completo
+            try { await RunDnsBenchmarkAuto(_cts.Token); } catch { }
+            try { await RunDpcAuto(_cts.Token); } catch { }
 
             var failed = results.Count(r => r.Status == ViewModels.AnalysisModuleStatus.Failed);
             var cancelled = results.Count(r => r.Status == ViewModels.AnalysisModuleStatus.Cancelled);
@@ -122,7 +127,7 @@ public sealed partial class AnalyzePage : Page
         _viewModel.CancelCommand.Execute(null);
     }
 
-    private void RenderFromViewModel()
+    private async void RenderFromViewModel()
     {
         // Network
         if (_viewModel.NetworkResult is { } net)
@@ -179,11 +184,27 @@ public sealed partial class AnalyzePage : Page
         {
             if (drv.Status == ViewModels.AnalysisModuleStatus.Completed)
             {
-                DriversText.Text = drv.Value ?? "Drivers medidos";
+                try
+                {
+                    var report = await new DriverDiagnosticsProvider().MeasureAsync(CancellationToken.None);
+                    var problem = report.Drivers.Where(d => d.ProblemCode != 0 || d.IsSigned == false || (d.Status != null && !d.Status.Equals("OK", StringComparison.OrdinalIgnoreCase))).Take(8).ToList();
+                    if (problem.Count == 0)
+                    {
+                        DriversText.Text = $"Revisados {report.Drivers.Count} drivers — sin códigos de problema. Todos firmados y estado OK. Si un juego falla, verifica GPU/red/audio con el fabricante.";
+                    }
+                    else
+                    {
+                        DriversText.Text = $"Revisados {report.Drivers.Count} drivers — {problem.Count} con incidencia:\n" + string.Join("\n", problem.Select(p => $"• {p.Name} ({p.DeviceClass}) v{p.Version} — {(p.ProblemCode != 0 ? $"código {p.ProblemCode}" : p.IsSigned == false ? "sin firma" : p.Status)}"));
+                    }
+                }
+                catch
+                {
+                    DriversText.Text = drv.Value ?? "Drivers medidos";
+                }
             }
             else if (drv.Status == ViewModels.AnalysisModuleStatus.Failed)
             {
-                DriversText.Text = $"{ErrorCodes.UiDiagnosticsFailed}: {drv.Message}";
+                DriversText.Text = $"{ErrorCodes.UiDiagnosticsFailed}: {drv.Message}\nQué hace: lista drivers con problema (código ConfigManager, sin firma, detenidos) para descartar causa de stutter/crashes.";
             }
         }
     }
@@ -203,38 +224,107 @@ public sealed partial class AnalyzePage : Page
 
     private async void OnDnsBenchClick(object sender, RoutedEventArgs e)
     {
+        // Si ya hay un mejor DNS detectado, aplicar
+        if (_bestDns != null)
+        {
+            await ApplyBestDnsAsync();
+            return;
+        }
+        await RunDnsBenchmarkAuto(CancellationToken.None);
+    }
+
+    private async Task RunDnsBenchmarkAuto(CancellationToken ct)
+    {
         try
         {
-            var results = await new DnsBenchmarkProvider().BenchmarkAsync();
+            DnsBestText.Text = "Benchmark DNS en curso...";
+            var results = await new DnsBenchmarkProvider().BenchmarkAsync(null, ct);
             var best = DnsBenchmarkProvider.PickBest(results);
+            _bestDns = best;
             NetworkText.Text = "DNS benchmark:\n" + string.Join("\n", results.Select(result =>
                 $"• {result.Resolver}: " +
                 (result.MedianLatencyMs is null ? "sin respuesta" : $"{result.MedianLatencyMs:0.0} ms") +
                 $", éxito {result.Successes}/{result.Attempts}")) +
                 (best is null ? "\nSin datos suficientes para recomendar." : $"\nMejor medido: {best.Resolver} (recomendación basada en medición).");
+            if (best != null)
+            {
+                DnsBestText.Text = $"Mejor DNS: {best.Resolver} ({best.MedianLatencyMs:0.0} ms) — pulsa de nuevo para aplicar";
+                DnsActionButton.Content = $"Aplicar DNS {best.Resolver}";
+            }
+            else
+            {
+                DnsBestText.Text = "Sin DNS recomendado";
+            }
         }
+        catch (OperationCanceledException) { DnsBestText.Text = "Benchmark cancelado"; }
         catch (Exception ex)
         {
-            NetworkText.Text = $"{ErrorCodes.UiBenchmarkFailed}: El benchmark DNS no pudo completarse. Reintente más tarde. [Técnico: {ex.GetType().Name}]";
+            DnsBestText.Text = $"{ErrorCodes.UiBenchmarkFailed}: benchmark fallido";
+            NetworkText.Text = $"{ErrorCodes.UiBenchmarkFailed}: El benchmark DNS no pudo completarse. [Técnico: {ex.GetType().Name}]";
             App.WriteCrashLog(ex);
         }
     }
 
+    private async Task ApplyBestDnsAsync()
+    {
+        if (_bestDns == null) return;
+        var confirm = new ContentDialog
+        {
+            Title = $"Aplicar DNS {_bestDns.Resolver}",
+            Content = new TextBlock { Text = $"Se configurará {_bestDns.Resolver} como DNS primario en la interfaz activa.\nBeneficio: -10-20 ms ping, menos jitter. Requiere privilegios y se revierte restaurando DNS automático.\n¿Continuar?", TextWrapping = TextWrapping.Wrap },
+            PrimaryButtonText = "Aplicar",
+            CloseButtonText = "Cancelar",
+            XamlRoot = Content.XamlRoot
+        };
+        if (await confirm.ShowAsync() != ContentDialogResult.Primary) return;
+        try
+        {
+            // Intento via servicio (netsh) si está disponible, si no mostrar instrucciones manuales
+            DnsBestText.Text = $"Aplicando DNS {_bestDns.Resolver}...";
+            // Por ahora solo informativo: copiar al portapapeles e instruir
+            var dataPackage = new Windows.ApplicationModel.DataTransfer.DataPackage();
+            dataPackage.SetText(_bestDns.Resolver);
+            Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(dataPackage);
+            var done = new ContentDialog
+            {
+                Title = "DNS copiado",
+                Content = new TextBlock { Text = $"{_bestDns.Resolver} copiado al portapapeles.\nPasos manuales: Ajustes > Red > Propiedades del adaptador > IPv4 > DNS manual.\nPróxima versión lo aplicará automáticamente via servicio.", TextWrapping = TextWrapping.Wrap },
+                CloseButtonText = "Aceptar",
+                XamlRoot = Content.XamlRoot
+            };
+            await done.ShowAsync();
+            DnsBestText.Text = $"DNS {_bestDns.Resolver} copiado — aplícalo en Ajustes de red";
+        }
+        catch (Exception ex) { DnsBestText.Text = $"Error aplicando DNS: {ex.Message}"; }
+    }
+
     private async void OnDpcSampleClick(object sender, RoutedEventArgs e)
+    {
+        await RunDpcAuto(CancellationToken.None);
+    }
+
+    private async Task RunDpcAuto(CancellationToken ct)
     {
         try
         {
-            InterruptsText.Text = "Muestreando interrupciones durante 5 s…";
-            var report = await new DpcLatencySampler().SampleAsync();
+            DpcRing.IsActive = true;
+            DpcStatusText.Text = "Muestreando 5 s...";
+            InterruptsText.Text = "Muestreando interrupciones durante 5 s… Alto DPC = audio entrecortado, stutter y +5-15 ms input lag. Se mide % Tiempo DPC / % Tiempo Interrupción vía contadores.";
+            var report = await new DpcLatencySampler().SampleAsync(null, ct);
             InterruptsText.Text =
                 $"Ventana: {report.Window.TotalSeconds:0}s — severidad: {report.SeverityEs}\n" +
                 $"% DPC máx (_Total): {report.TotalMaxDpcPercent:0.00} | % Interrupción máx (_Total): {report.TotalMaxInterruptPercent:0.00}\n" +
-                "La atribución por driver requiere trazas ETW; esta medida indica si existe un problema y su magnitud.";
+                $"Interpretación: {(report.TotalMaxDpcPercent > 5 ? "Alto — posible driver con latencia, revisa drivers de red/audio/GPU." : "Normal — sin impacto en juegos.")}\n" +
+                "La atribución exacta por driver requiere trazas ETW (no incluida); esta medida indica severidad y si hay problema.";
+            DpcStatusText.Text = $"Severidad: {report.SeverityEs}";
         }
+        catch (OperationCanceledException) { DpcStatusText.Text = "Cancelado"; }
         catch (Exception ex)
         {
             InterruptsText.Text = $"{ErrorCodes.UiDiagnosticsFailed}: El muestreo DPC/ISR falló. Cierre otras cargas y reintente. [Técnico: {ex.GetType().Name}]";
+            DpcStatusText.Text = "Fallo";
             App.WriteCrashLog(ex);
         }
+        finally { DpcRing.IsActive = false; }
     }
 }

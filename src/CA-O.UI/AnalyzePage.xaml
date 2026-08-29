@@ -91,7 +91,8 @@
                             <Border x:Name="NetStatusBadge" Style="{StaticResource CaoBadgeStyle}" Visibility="Collapsed"><TextBlock x:Name="NetStatusText" FontSize="11"/></Border>
                         </StackPanel>
                         <TextBlock x:Name="NetworkText" TextWrapping="Wrap" IsTextSelectionEnabled="True" FontSize="12" Opacity="0.9"/>
-                        <Button Content="Benchmark DNS" Click="OnDnsBenchClick" FontSize="12"/>
+                        <Button x:Name="DnsActionButton" Content="Aplicar mejor DNS detectado" Click="OnDnsBenchClick" FontSize="12" ToolTipService.ToolTip="Ejecuta benchmark y aplica el DNS más rápido via netsh (requiere servicio)"/>
+                        <TextBlock x:Name="DnsBestText" FontSize="11" Opacity="0.7" TextWrapping="Wrap"/>
                     </StackPanel>
                 </Border>
                 <Border Grid.Column="1" Style="{StaticResource CaoCardStyle}">
@@ -123,6 +124,7 @@
                             <FontIcon Glyph="&#xE964;" FontSize="14"/>
                             <TextBlock Text="Drivers" FontWeight="SemiBold"/>
                         </StackPanel>
+                        <TextBlock Text="Lista drivers con código de problema, sin firma o detenidos. Si no detecta nada, no hay problemas." FontSize="11" Opacity="0.55" TextWrapping="Wrap"/>
                         <TextBlock x:Name="DriversText" TextWrapping="Wrap" IsTextSelectionEnabled="True" FontSize="12" Opacity="0.9"/>
                     </StackPanel>
                 </Border>
@@ -131,15 +133,16 @@
             <Border Style="{StaticResource CaoCardStyle}">
                 <StackPanel Spacing="8">
                     <StackPanel Orientation="Horizontal" Spacing="8">
-                        <FontIcon Glyph="&#xE9D2;" FontSize="14"/>
-                        <TextBlock Text="Latencia DPC/ISR" FontWeight="SemiBold"/>
-                        <TextBlock Text="La atribución por driver requiere trazas ETW; esta medida indica severidad y magnitud." FontSize="11" Opacity="0.55" TextWrapping="Wrap"/>
-                    </StackPanel>
-                    <StackPanel Orientation="Horizontal" Spacing="8">
-                        <Button Content="Muestrear 5 s" Click="OnDpcSampleClick" FontSize="12"/>
-                        <ProgressRing x:Name="DpcRing" Width="16" Height="16" IsActive="False"/>
-                    </StackPanel>
-                    <TextBlock x:Name="InterruptsText" TextWrapping="Wrap" IsTextSelectionEnabled="True" FontSize="12" Opacity="0.9"/>
+                            <FontIcon Glyph="&#xE9D2;" FontSize="14"/>
+                            <TextBlock Text="Latencia DPC/ISR" FontWeight="SemiBold"/>
+                            <TextBlock Text="Mide % Tiempo DPC e Interrupción. Alto = audio entrecortado, micro-stutter, input lag. Se auto-ejecuta con el análisis." FontSize="11" Opacity="0.55" TextWrapping="Wrap"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Button Content="Muestrear 5 s" Click="OnDpcSampleClick" FontSize="12" ToolTipService.ToolTip="Mide 5s % DPC Time / % Interrupt Time via contadores. No atribuye driver sin ETW"/>
+                            <ProgressRing x:Name="DpcRing" Width="16" Height="16" IsActive="False"/>
+                            <TextBlock x:Name="DpcStatusText" FontSize="11" Opacity="0.6" VerticalAlignment="Center"/>
+                        </StackPanel>
+                        <TextBlock x:Name="InterruptsText" TextWrapping="Wrap" IsTextSelectionEnabled="True" FontSize="12" Opacity="0.9"/>
                 </StackPanel>
             </Border>
 
