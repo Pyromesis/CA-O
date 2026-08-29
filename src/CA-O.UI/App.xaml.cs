@@ -39,8 +39,23 @@ public partial class App : Application
         catch (Exception ex)
         {
             WriteCrashLog(ex);
+            ShowFatalError(ex);
             throw;
         }
+    }
+
+    [System.Runtime.InteropServices.DllImport("user32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
+    private static extern int MessageBoxW(IntPtr hWnd, string text, string caption, uint type);
+
+    private static void ShowFatalError(Exception ex)
+    {
+        try
+        {
+            var logPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "CA-O", "logs", "cao-ui-crash.log");
+            var msg = $"CA-O no pudo iniciar.\n\n{ex.GetType().Name}: {ex.Message}\n\nLog: {logPath}\n\nSi es XAML parsing failed, reinstala con el ZIP de artifacts/release (self-contained) y ejecuta como administrador.";
+            _ = MessageBoxW(IntPtr.Zero, msg, "CA-O — error de inicio", 0x10);
+        }
+        catch { }
     }
 
     private void OnUnhandledException(object sender, Microsoft.UI.Xaml.UnhandledExceptionEventArgs e)

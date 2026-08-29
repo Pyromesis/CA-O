@@ -24,7 +24,7 @@ dotnet test $solution --configuration Release --no-build
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 Write-Host '== publish UI ==' -ForegroundColor Cyan
-dotnet publish (Join-Path $repository 'src\CA-O.UI\CA-O.UI.csproj') --configuration Release --runtime win-x64 --self-contained false --output $uiOutput
+dotnet publish (Join-Path $repository 'src\CA-O.UI\CA-O.UI.csproj') --configuration Release --runtime win-x64 --self-contained true /p:PublishSingleFile=false /p:PublishTrimmed=false --output $uiOutput
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 Write-Host '== publish privileged service ==' -ForegroundColor Cyan
@@ -37,12 +37,15 @@ New-Item $uninstallOutput -ItemType Directory -Force | Out-Null
 dotnet publish (Join-Path $repository 'src\CA-O.Uninstaller\CA-O.Uninstaller.csproj') --configuration Release --runtime win-x64 --self-contained true /p:PublishSingleFile=true /p:TreatWarningsAsErrors=false --output $uninstallOutput
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-Write-Host '== publish GUI installer (self-contained single-file) ==' -ForegroundColor Cyan
+Write-Host '== publish GUI installer (self-contained, no single-file - WinUI 3) ==' -ForegroundColor Cyan
 $guiOutput = Join-Path $artifactRoot 'gui-installer'
 New-Item $guiOutput -ItemType Directory -Force | Out-Null
-dotnet publish (Join-Path $repository 'src\CA-O.InstallerGui\CA-O.InstallerGui.csproj') --configuration Release --runtime win-x64 --self-contained true /p:PublishSingleFile=true /p:TreatWarningsAsErrors=false --output $guiOutput
+dotnet publish (Join-Path $repository 'src\CA-O.InstallerGui\CA-O.InstallerGui.csproj') --configuration Release --runtime win-x64 --self-contained true /p:PublishSingleFile=false /p:PublishTrimmed=false /p:TreatWarningsAsErrors=false --output $guiOutput
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+# Para distribución: comprimir carpeta gui-installer; mantener exe suelto para compatibilidad
 Copy-Item (Join-Path $guiOutput 'CA-O.InstallerGui.exe') (Join-Path $artifactRoot 'CA-O-Setup-GUI-x64.exe') -Force
+# También empaquetar carpeta completa como zip para evitar pérdida de dlls
+Compress-Archive -Path (Join-Path $guiOutput '*') -DestinationPath (Join-Path $artifactRoot 'CA-O-Setup-GUI-x64.zip') -Force
 
 Write-Host '== publish console setup (fallback) ==' -ForegroundColor Cyan
 $setupOutput = Join-Path $artifactRoot 'setup'
