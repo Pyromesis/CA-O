@@ -63,6 +63,29 @@ private async Task InstallAsync()
 
         try
         {
+            // Detectar instalación existente para actualización
+            bool isUpdate = Directory.Exists(installDir) || Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\CA-O") != null;
+            if (isUpdate)
+            {
+                Log("Instalación existente detectada — se realizará actualización (se sobrescribirán archivos).");
+                try
+                {
+                    var existingVer = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\CA-O")?.GetValue("DisplayVersion") as string ?? "desconocida";
+                    Log($"Versión instalada: {existingVer}");
+                }
+                catch { }
+                // Cerrar UI en ejecución para liberar archivos
+                try
+                {
+                    foreach (var p in Process.GetProcessesByName("CA-O.UI"))
+                    {
+                        try { p.Kill(); } catch { }
+                    }
+                    await Task.Delay(500);
+                }
+                catch { }
+            }
+
             // Single-file: AppContext.BaseDirectory es temp de extracción, usar ProcessPath real
             var baseDir = Path.GetDirectoryName(Environment.ProcessPath ?? AppContext.BaseDirectory) ?? AppContext.BaseDirectory;
             var exeDir = AppContext.BaseDirectory;
@@ -109,6 +132,17 @@ private async Task InstallAsync()
             Directory.CreateDirectory(installDir);
             var destUi = Path.Combine(installDir, "ui");
             var destSvc = Path.Combine(installDir, "service");
+            // Si es actualización, limpiar destinos para no dejar archivos obsoletos
+            if (Directory.Exists(destUi) && isUpdate)
+            {
+                try { Directory.Delete(destUi, true); } catch (Exception ex) { Log($"  No se pudo limpiar {destUi}: {ex.Message}"); }
+            }
+            if (Directory.Exists(destSvc) && isUpdate)
+            {
+                try { Directory.Delete(destSvc, true); } catch (Exception ex) { Log($"  No se pudo limpiar {destSvc}: {ex.Message}"); }
+            }
+            Directory.CreateDirectory(destUi);
+            Directory.CreateDirectory(destSvc);
             CopyDirectory(Path.GetDirectoryName(payloadUi)!, destUi, p => UpdateProgress(10 + p / 5, "Copiando archivos de la aplicacion...", null));
             CopyDirectory(Path.GetDirectoryName(payloadService)!, destSvc, null);
             var installedExe = Path.Combine(destUi, "CA-O.UI.exe");
@@ -195,11 +229,12 @@ internal void OnCancelClick(object sender, RoutedEventArgs e)
     Log("Cancelando instalacion...");
 }
 
-private async Task<(string uiExe, string svcExe)> DownloadPayloadAsync(CancellationToken ct)
+    private async Task<(string uiExe, string svcExe)> DownloadPayloadAsync(CancellationToken ct)
     {
-        UpdateProgress(5, "Descargando payload (343 MB)...", "Descargando desde GitHub Release v2.0.5");
-        var zipUrl = "https://github.com/Pyromesis/CA-O/releases/download/v2.0.5/CA-O-2.0.5-win-x64.zip";
-        var fallbackUrl = "https://github.com/Pyromesis/CA-O/releases/latest/download/CA-O-2.0.5-win-x64.zip";
+        UpdateProgress(5, "Descargando payload (344 MB)...", "Descargando desde GitHub Release v2.0.10");
+        var zipUrl = "https://github.com/Pyromesis/CA-O/releases/download/v2.0.10/CA-O-2.0.10-win-x64.zip";
+        var fallbackUrl = "https://github.com/Pyromesis/CA-O/releases/latest/download/CA-O-2.0.10-win-x64.zip";
+        var fallbackOld = "https://github.com/Pyromesis/CA-O/releases/download/v2.0.9/CA-O-2.0.9-win-x64.zip";
         var tmpZip = Path.Combine(Path.GetTempPath(), "CA-O-payload.zip");
         var tmpDir = Path.Combine(Path.GetTempPath(), "CA-O-payload-gui");
 
@@ -211,7 +246,12 @@ private async Task<(string uiExe, string svcExe)> DownloadPayloadAsync(Cancellat
         catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
         {
             Log($"404 en {zipUrl}, probando {fallbackUrl}...");
-            data = await _httpClient.GetByteArrayAsync(fallbackUrl, ct);
+            try { data = await _httpClient.GetByteArrayAsync(fallbackUrl, ct); }
+            catch (HttpRequestException)
+            {
+                Log($"404 en {fallbackUrl}, probando {fallbackOld}...");
+                data = await _httpClient.GetByteArrayAsync(fallbackOld, ct);
+            }
         }
         await File.WriteAllBytesAsync(tmpZip, data, ct);
         Log($"Descargado {tmpZip} ({data.Length / 1024 / 1024} MB)");
@@ -369,7 +409,10 @@ private async Task<(string uiExe, string svcExe)> DownloadPayloadAsync(Cancellat
             using var key = Registry.LocalMachine.CreateSubKey(keyPath);
             if (key == null) throw new InvalidOperationException("No se pudo crear clave de registro");
             key.SetValue("DisplayName", "CA-O 2.0", RegistryValueKind.String);
-            key.SetValue("DisplayVersion", "2.0.1", RegistryValueKind.String);
+            var version = typeof(MainWindow).Assembly.GetName().Version?.ToString(3) ?? "2.0.10";
+            // Normalizar a 3 partes
+            if (version == "2.0.0.0") version = "2.0.10";
+            key.SetValue("DisplayVersion", version, RegistryValueKind.String);
             key.SetValue("Publisher", "CA-O", RegistryValueKind.String);
             key.SetValue("InstallLocation", installDir, RegistryValueKind.String);
             key.SetValue("DisplayIcon", mainExe, RegistryValueKind.String);
