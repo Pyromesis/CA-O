@@ -75,6 +75,30 @@ public sealed class MaximumPowerPlan : IOptimization
         return OperationResult.Ok("Plan de máximo rendimiento activado.");
     }
 
+    public async Task<VerificationResult> VerifyAsync(OptimizationContext context, CancellationToken ct = default)
+    {
+        if (context.Executor is null)
+        {
+            return VerificationResult.Unknown(OptimizationState.Unknown, "No se pudo verificar: ejecutor no disponible.");
+        }
+        var query = await context.Executor.ExecuteAsync(SystemCommandKey.PowerCfgQueryActiveScheme, ["/getactivescheme"], ct);
+        if (!query.Success)
+        {
+            return VerificationResult.Unknown(OptimizationState.Unknown, "No se pudo consultar el plan activo: " + query.StdErr);
+        }
+        var output = query.StdOut ?? string.Empty;
+        if (output.Contains(HighPerformanceGuid, StringComparison.OrdinalIgnoreCase))
+        {
+            return VerificationResult.Passed(OptimizationState.AppliedByCao, "Plan de alto rendimiento verificado activo.");
+        }
+        if (output.Contains(UltimatePerformanceGuid, StringComparison.OrdinalIgnoreCase))
+        {
+            // Si el sistema activó Ultimate en lugar de High, también es éxito
+            return VerificationResult.Passed(OptimizationState.AppliedByCao, "Plan de rendimiento máximo verificado activo.");
+        }
+        return VerificationResult.Failed(OptimizationState.NotApplied, "El plan activo no coincide con el esperado tras aplicar.");
+    }
+
     public async Task<OperationResult> RevertAsync(OptimizationContext context, OptimizationSnapshot snapshot, CancellationToken ct = default)
     {
         if (context.Executor is null)

@@ -279,10 +279,10 @@ internal void OnCancelClick(object sender, RoutedEventArgs e)
 
     private async Task<(string uiExe, string svcExe)> DownloadPayloadAsync(CancellationToken ct)
     {
-        UpdateProgress(5, "Descargando payload (308 MB)...", "Descargando desde GitHub Release v2.0.12");
-        var zipUrl = "https://github.com/Pyromesis/CA-O/releases/download/v2.0.12/CA-O-2.0.12-win-x64.zip";
-        var fallbackUrl = "https://github.com/Pyromesis/CA-O/releases/latest/download/CA-O-2.0.12-win-x64.zip";
-        var fallbackOld = "https://github.com/Pyromesis/CA-O/releases/download/v2.0.11/CA-O-2.0.11-win-x64.zip";
+        UpdateProgress(5, "Descargando payload (308 MB)...", "Descargando desde GitHub Release v2.0.13");
+        var zipUrl = "https://github.com/Pyromesis/CA-O/releases/download/v2.0.13/CA-O-2.0.13-win-x64.zip";
+        var fallbackUrl = "https://github.com/Pyromesis/CA-O/releases/latest/download/CA-O-2.0.13-win-x64.zip";
+        var fallbackOld = "https://github.com/Pyromesis/CA-O/releases/download/v2.0.12/CA-O-2.0.12-win-x64.zip";
         var tmpZip = Path.Combine(Path.GetTempPath(), "CA-O-payload.zip");
         var tmpDir = Path.Combine(Path.GetTempPath(), "CA-O-payload-gui");
 
@@ -475,9 +475,9 @@ internal void OnCancelClick(object sender, RoutedEventArgs e)
             using var key = Registry.LocalMachine.CreateSubKey(keyPath);
             if (key == null) throw new InvalidOperationException("No se pudo crear clave de registro");
             key.SetValue("DisplayName", "CA-O 2.0", RegistryValueKind.String);
-            var version = typeof(MainWindow).Assembly.GetName().Version?.ToString(3) ?? "2.0.12";
+            var version = typeof(MainWindow).Assembly.GetName().Version?.ToString(3) ?? "2.0.13";
             // Normalizar a 3 partes
-            if (version == "2.0.0.0") version = "2.0.12";
+            if (version == "2.0.0.0") version = "2.0.13";
             key.SetValue("DisplayVersion", version, RegistryValueKind.String);
             key.SetValue("Publisher", "CA-O", RegistryValueKind.String);
             key.SetValue("InstallLocation", installDir, RegistryValueKind.String);
