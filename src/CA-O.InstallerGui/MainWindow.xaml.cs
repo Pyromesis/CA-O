@@ -231,30 +231,48 @@ internal void OnCancelClick(object sender, RoutedEventArgs e)
 
     private async Task<(string uiExe, string svcExe)> DownloadPayloadAsync(CancellationToken ct)
     {
-        UpdateProgress(5, "Descargando payload (344 MB)...", "Descargando desde GitHub Release v2.0.10");
-        var zipUrl = "https://github.com/Pyromesis/CA-O/releases/download/v2.0.10/CA-O-2.0.10-win-x64.zip";
-        var fallbackUrl = "https://github.com/Pyromesis/CA-O/releases/latest/download/CA-O-2.0.10-win-x64.zip";
-        var fallbackOld = "https://github.com/Pyromesis/CA-O/releases/download/v2.0.9/CA-O-2.0.9-win-x64.zip";
+        UpdateProgress(5, "Descargando payload (308 MB)...", "Descargando desde GitHub Release v2.0.11");
+        var zipUrl = "https://github.com/Pyromesis/CA-O/releases/download/v2.0.11/CA-O-2.0.11-win-x64.zip";
+        var fallbackUrl = "https://github.com/Pyromesis/CA-O/releases/latest/download/CA-O-2.0.11-win-x64.zip";
+        var fallbackOld = "https://github.com/Pyromesis/CA-O/releases/download/v2.0.10/CA-O-2.0.10-win-x64.zip";
         var tmpZip = Path.Combine(Path.GetTempPath(), "CA-O-payload.zip");
         var tmpDir = Path.Combine(Path.GetTempPath(), "CA-O-payload-gui");
 
-        byte[] data;
+        // Descarga por streaming para 300+ MB (evita ByteArray truncado/OOM y EndOfCentralDirectory)
+        async Task DownloadToFileAsync(string url, string dest, CancellationToken cts)
+        {
+            using var resp = await _httpClient.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, cts);
+            resp.EnsureSuccessStatusCode();
+            var total = resp.Content.Headers.ContentLength;
+            await using var net = await resp.Content.ReadAsStreamAsync(cts);
+            await using var file = File.Create(dest);
+            var buffer = new byte[81920];
+            long read = 0;
+            int n;
+            while ((n = await net.ReadAsync(buffer.AsMemory(0, buffer.Length), cts)) > 0)
+            {
+                await file.WriteAsync(buffer.AsMemory(0, n), cts);
+                read += n;
+                if (total.HasValue && read % (10 * 1024 * 1024) < 81920) Log($"  Descargando... {read / 1024 / 1024} / {total.Value / 1024 / 1024} MB");
+            }
+            Log($"Descargado {dest} ({new FileInfo(dest).Length / 1024 / 1024} MB)");
+        }
+
+        if (File.Exists(tmpZip)) try { File.Delete(tmpZip); } catch { }
         try
         {
-            data = await _httpClient.GetByteArrayAsync(zipUrl, ct);
+            await DownloadToFileAsync(zipUrl, tmpZip, ct);
         }
         catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
         {
             Log($"404 en {zipUrl}, probando {fallbackUrl}...");
-            try { data = await _httpClient.GetByteArrayAsync(fallbackUrl, ct); }
+            try { await DownloadToFileAsync(fallbackUrl, tmpZip, ct); }
             catch (HttpRequestException)
             {
                 Log($"404 en {fallbackUrl}, probando {fallbackOld}...");
-                data = await _httpClient.GetByteArrayAsync(fallbackOld, ct);
+                await DownloadToFileAsync(fallbackOld, tmpZip, ct);
             }
         }
-        await File.WriteAllBytesAsync(tmpZip, data, ct);
-        Log($"Descargado {tmpZip} ({data.Length / 1024 / 1024} MB)");
         if (Directory.Exists(tmpDir)) Directory.Delete(tmpDir, true);
         ZipFile.ExtractToDirectory(tmpZip, tmpDir);
         var foundUi = Directory.GetFiles(tmpDir, "CA-O.UI.exe", SearchOption.AllDirectories).FirstOrDefault() ?? throw new InvalidOperationException("ZIP sin CA-O.UI.exe");
@@ -409,9 +427,9 @@ internal void OnCancelClick(object sender, RoutedEventArgs e)
             using var key = Registry.LocalMachine.CreateSubKey(keyPath);
             if (key == null) throw new InvalidOperationException("No se pudo crear clave de registro");
             key.SetValue("DisplayName", "CA-O 2.0", RegistryValueKind.String);
-            var version = typeof(MainWindow).Assembly.GetName().Version?.ToString(3) ?? "2.0.10";
+            var version = typeof(MainWindow).Assembly.GetName().Version?.ToString(3) ?? "2.0.11";
             // Normalizar a 3 partes
-            if (version == "2.0.0.0") version = "2.0.10";
+            if (version == "2.0.0.0") version = "2.0.11";
             key.SetValue("DisplayVersion", version, RegistryValueKind.String);
             key.SetValue("Publisher", "CA-O", RegistryValueKind.String);
             key.SetValue("InstallLocation", installDir, RegistryValueKind.String);
