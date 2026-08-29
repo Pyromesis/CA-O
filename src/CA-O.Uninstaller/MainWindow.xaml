@@ -1,0 +1,44 @@
+<Window
+    x:Class="CAO.Uninstaller.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="CA-O Desinstalador">
+    <Grid Padding="24" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+        <StackPanel Spacing="16" MaxWidth="640" HorizontalAlignment="Center" VerticalAlignment="Center">
+            <TextBlock Text="Desinstalar CA-O 2.0" FontSize="28" FontWeight="Bold" HorizontalAlignment="Center"/>
+            <TextBlock Text="Se eliminará CA-O y su servicio privilegiado de este equipo" FontSize="14" Opacity="0.7" HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center"/>
+
+            <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="16">
+                <StackPanel Spacing="8">
+                    <TextBlock Text="Que se eliminará" FontWeight="SemiBold"/>
+                    <TextBlock Text="• Servicio CAO.Privileged&#x0a;• Archivos en C:\Program Files\CA-O&#x0a;• Accesos directos (Escritorio y Menú Inicio)&#x0a;• Entrada en Programas instalados" FontSize="12" Opacity="0.7" TextWrapping="Wrap"/>
+                    <TextBlock x:Name="InstallLocationText" Text="C:\Program Files\CA-O" FontFamily="Consolas" FontSize="11" Opacity="0.6"/>
+                </StackPanel>
+            </Border>
+
+            <CheckBox x:Name="DeleteHistoryCheck" Content="Borrar también historial y snapshots en %ProgramData%\CA-O" IsChecked="False"/>
+
+            <Border x:Name="ProgressCard" Visibility="Collapsed" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="8" Padding="12">
+                <StackPanel Spacing="8">
+                    <TextBlock Text="Progreso" FontWeight="SemiBold"/>
+                    <ProgressBar x:Name="ProgressBar" Value="0" Minimum="0" Maximum="100"/>
+                    <TextBlock x:Name="ProgressStatusText" Text="Iniciando..."/>
+                    <TextBlock x:Name="ProgressDetailText" Text="" FontSize="12" Opacity="0.6" Visibility="Collapsed"/>
+                </StackPanel>
+            </Border>
+
+            <Border x:Name="LogCard" Visibility="Collapsed" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="12" Height="140">
+                <ScrollViewer>
+                    <TextBox x:Name="LogTextBox" IsReadOnly="True" TextWrapping="Wrap" AcceptsReturn="True" BorderThickness="0" Background="Transparent"/>
+                </ScrollViewer>
+            </Border>
+
+            <InfoBar x:Name="InfoBar" Title="Desinstalador CA-O 2.0" Message="Esta acción requiere permisos de administrador." Severity="Informational" IsOpen="True" IsClosable="False"/>
+
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="12">
+                <Button x:Name="CancelButton" Content="Cancelar" Width="120" Click="OnCancelClick"/>
+                <Button x:Name="UninstallButton" Content="Desinstalar" Width="160" Style="{StaticResource AccentButtonStyle}" Click="OnUninstallClick"/>
+            </StackPanel>
+        </StackPanel>
+    </Grid>
+</Window>

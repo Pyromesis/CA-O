@@ -38,10 +38,13 @@ Write-Host '== publish privileged service ==' -ForegroundColor Cyan
 dotnet publish (Join-Path $repository 'src\CA-O.Privileged\CA-O.Privileged.csproj') --configuration Release --runtime win-x64 --self-contained false --output $serviceOutput
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-Write-Host '== publish uninstaller ==' -ForegroundColor Cyan
+Write-Host '== publish uninstaller (GUI, no single-file) ==' -ForegroundColor Cyan
 $uninstallOutput = Join-Path $artifactRoot 'uninstall'
 New-Item $uninstallOutput -ItemType Directory -Force | Out-Null
-dotnet publish (Join-Path $repository 'src\CA-O.Uninstaller\CA-O.Uninstaller.csproj') --configuration Release --runtime win-x64 --self-contained true /p:PublishSingleFile=true /p:TreatWarningsAsErrors=false --output $uninstallOutput
+dotnet publish (Join-Path $repository 'src\CA-O.Uninstaller\CA-O.Uninstaller.csproj') --configuration Release --runtime win-x64 --self-contained true /p:PublishSingleFile=false /p:PublishTrimmed=false /p:TreatWarningsAsErrors=false --output $uninstallOutput
+if (Test-Path (Join-Path $repository 'src\CA-O.Uninstaller\bin\x64\Release\net10.0-windows10.0.19041.0\win-x64\CA-O.Uninstaller.pri')) {
+    Copy-Item (Join-Path $repository 'src\CA-O.Uninstaller\bin\x64\Release\net10.0-windows10.0.19041.0\win-x64\CA-O.Uninstaller.pri') $uninstallOutput -Force
+}
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 Write-Host '== publish GUI installer (self-contained, no single-file - WinUI 3) ==' -ForegroundColor Cyan
