@@ -16,14 +16,17 @@ namespace CAO.InstallerGui;
 public sealed partial class MainWindow : Window
 {
     private readonly CancellationTokenSource _installCts = new();
-    private readonly HttpClient _httpClient = new() { Timeout = TimeSpan.FromMinutes(15) };
+    private readonly HttpClient _httpClient;
 
-public MainWindow()
-{
-    InitializeComponent();
-    // SystemBackdrop = new MicaBackdrop { Kind = MicaKind.Base };
-    ExtendsContentIntoTitleBar = true;
-}
+    public MainWindow()
+    {
+        InitializeComponent();
+        ExtendsContentIntoTitleBar = true;
+        _httpClient = new HttpClient() { Timeout = TimeSpan.FromMinutes(15) };
+        _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("CA-O-Installer/2.0.17");
+        _httpClient.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github.v3+json");
+        _httpClient.DefaultRequestHeaders.AcceptEncoding.ParseAdd("gzip");
+    }
 
 private async Task LoadPreviousAnalysisAsync()
 {
@@ -225,17 +228,31 @@ private async Task InstallAsync()
             }
 
             UpdateProgress(82, "Registrando desinstalador...", "Creando entrada en Programas y características");
+            // Copiar carpeta completa del desinstalador GUI (430 archivos) para que uninstall.exe tenga sus DLLs
+            var uninstallSrcFolder = Path.GetDirectoryName(FindUninstallerPayload(baseDir, exeDir))!;
+            var uninstallDestFolder = Path.Combine(installDir, "uninstall");
+            if (Directory.Exists(uninstallSrcFolder))
+            {
+                try
+                {
+                    if (Directory.Exists(uninstallDestFolder)) Directory.Delete(uninstallDestFolder, true);
+                    CopyDirectory(uninstallSrcFolder, uninstallDestFolder, null);
+                    Log($"  Desinstalador carpeta: {uninstallDestFolder}");
+                }
+                catch (Exception ex) { Log($"  WARN no se pudo copiar carpeta desinstalador: {ex.Message}"); }
+            }
             var uninstallSrc = FindUninstallerPayload(baseDir, exeDir);
-            var uninstallDest = Path.Combine(installDir, "uninstall.exe");
+            var uninstallDest = Path.Combine(uninstallDestFolder, "CA-O.Uninstaller.exe");
+            // Mantener compatibilidad: copiar exe también a raiz para ARP antiguo, pero ARP apuntará a la carpeta
+            var uninstallRoot = Path.Combine(installDir, "uninstall.exe");
             if (File.Exists(uninstallSrc))
             {
-                File.Copy(uninstallSrc, uninstallDest, true);
+                try { File.Copy(uninstallSrc, uninstallRoot, true); } catch { }
                 Log($"  Desinstalador: {uninstallDest} ({new FileInfo(uninstallDest).Length / 1024} KB)");
             }
             else
             {
                 Log($"  WARN: desinstalador no encontrado en {uninstallSrc}, se usará fallback PowerShell");
-                // Fallback: crear uninstall.ps1 como UninstallString
                 try { File.WriteAllText(Path.Combine(installDir, "uninstall.ps1"), "powershell -ExecutionPolicy Bypass -File \\\"" + Path.Combine(installDir, "uninstall.ps1") + "\\\""); } catch { }
             }
             CreateUninstallRegistryEntry(installDir, uninstallDest, installedExe);
@@ -279,10 +296,10 @@ internal void OnCancelClick(object sender, RoutedEventArgs e)
 
     private async Task<(string uiExe, string svcExe)> DownloadPayloadAsync(CancellationToken ct)
     {
-        UpdateProgress(5, "Descargando payload (308 MB)...", "Descargando desde GitHub Release v2.0.14");
-        var zipUrl = "https://github.com/Pyromesis/CA-O/releases/download/v2.0.14/CA-O-2.0.14-win-x64.zip";
-        var fallbackUrl = "https://github.com/Pyromesis/CA-O/releases/latest/download/CA-O-2.0.14-win-x64.zip";
-        var fallbackOld = "https://github.com/Pyromesis/CA-O/releases/download/v2.0.13/CA-O-2.0.13-win-x64.zip";
+        UpdateProgress(5, "Descargando payload (394 MB)...", "Descargando desde GitHub Release v2.0.17");
+        var zipUrl = "https://github.com/Pyromesis/CA-O/releases/download/v2.0.17/CA-O-2.0.17-win-x64.zip";
+        var fallbackUrl = "https://github.com/Pyromesis/CA-O/releases/latest/download/CA-O-2.0.17-win-x64.zip";
+        var fallbackOld = "https://github.com/Pyromesis/CA-O/releases/download/v2.0.16/CA-O-2.0.16-win-x64.zip";
         var tmpZip = Path.Combine(Path.GetTempPath(), "CA-O-payload.zip");
         var tmpDir = Path.Combine(Path.GetTempPath(), "CA-O-payload-gui");
 
@@ -504,9 +521,9 @@ internal void OnCancelClick(object sender, RoutedEventArgs e)
             using var key = Registry.LocalMachine.CreateSubKey(keyPath);
             if (key == null) throw new InvalidOperationException("No se pudo crear clave de registro");
             key.SetValue("DisplayName", "CA-O 2.0", RegistryValueKind.String);
-            var version = typeof(MainWindow).Assembly.GetName().Version?.ToString(3) ?? "2.0.14";
+            var version = typeof(MainWindow).Assembly.GetName().Version?.ToString(3) ?? "2.0.17";
             // Normalizar a 3 partes
-            if (version == "2.0.0.0") version = "2.0.14";
+            if (version == "2.0.0.0") version = "2.0.17";
             key.SetValue("DisplayVersion", version, RegistryValueKind.String);
             key.SetValue("Publisher", "CA-O", RegistryValueKind.String);
             key.SetValue("InstallLocation", installDir, RegistryValueKind.String);
