@@ -307,18 +307,47 @@ internal void OnCancelClick(object sender, RoutedEventArgs e)
         }
 
         if (File.Exists(tmpZip)) try { File.Delete(tmpZip); } catch { }
-        try
+        // Intentar descarga con fallbacks y API latest si todo 404 (releases antiguos borrados)
+        async Task<bool> TryDownload(string url)
         {
-            await DownloadToFileAsync(zipUrl, tmpZip, ct);
+            try { await DownloadToFileAsync(url, tmpZip, ct); return true; }
+            catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound) { Log($"404 en {url}"); return false; }
         }
-        catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+        if (!await TryDownload(zipUrl))
         {
-            Log($"404 en {zipUrl}, probando {fallbackUrl}...");
-            try { await DownloadToFileAsync(fallbackUrl, tmpZip, ct); }
-            catch (HttpRequestException)
+            Log($"Probando {fallbackUrl}...");
+            if (!await TryDownload(fallbackUrl))
             {
-                Log($"404 en {fallbackUrl}, probando {fallbackOld}...");
-                await DownloadToFileAsync(fallbackOld, tmpZip, ct);
+                Log($"Probando {fallbackOld}...");
+                if (!await TryDownload(fallbackOld))
+                {
+                    // Último recurso: consultar API GitHub para tag latest y construir URL
+                    try
+                    {
+                        Log("Consultando API GitHub para latest tag...");
+                        using var apiResp = await _httpClient.GetAsync("https://api.github.com/repos/Pyromesis/CA-O/releases/latest", ct);
+                        apiResp.EnsureSuccessStatusCode();
+                        var json = await apiResp.Content.ReadAsStringAsync(ct);
+                        var tag = System.Text.Json.JsonDocument.Parse(json).RootElement.GetProperty("tag_name").GetString();
+                        if (!string.IsNullOrWhiteSpace(tag))
+                        {
+                            var apiUrl = $"https://github.com/Pyromesis/CA-O/releases/download/{tag}/CA-O-{tag}-win-x64.zip";
+                            // fallback a nombre genérico si el tag no sigue patrón CA-O-2.x
+                            var altUrl = $"https://github.com/Pyromesis/CA-O/releases/download/{tag}/CA-O-2.0.15-win-x64.zip";
+                            Log($"Probando API latest {tag} -> {apiUrl}");
+                            if (!await TryDownload(apiUrl))
+                            {
+                                Log($"Probando alt {altUrl}");
+                                await DownloadToFileAsync(altUrl, tmpZip, ct);
+                            }
+                        }
+                        else throw new InvalidOperationException("Tag vacío en API");
+                    }
+                    catch (Exception ex2)
+                    {
+                        throw new InvalidOperationException($"No se pudo descargar payload (todas las URLs 404). Último error: {ex2.Message}. Descarga manualmente CA-O-2.0.15-win-x64.zip o usa el ZIP completo offline.", ex2);
+                    }
+                }
             }
         }
         if (Directory.Exists(tmpDir)) Directory.Delete(tmpDir, true);
