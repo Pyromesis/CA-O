@@ -99,7 +99,10 @@ private async Task InstallAsync()
             if (!File.Exists(payloadUi) || !File.Exists(payloadService))
             {
                 Log("Payload local no encontrado, intentando descarga...");
-                await DownloadPayloadAsync(payloadUi, payloadService, installCts.Token);
+                var downloaded = await DownloadPayloadAsync(installCts.Token);
+                payloadUi = downloaded.uiExe;
+                payloadService = downloaded.svcExe;
+                Log($"Payload descargado -> UI: {payloadUi} | Service: {payloadService}");
             }
 
             UpdateProgress(10, "Preparando instalacion...", "Creando directorio de instalacion");
@@ -192,22 +195,32 @@ internal void OnCancelClick(object sender, RoutedEventArgs e)
     Log("Cancelando instalacion...");
 }
 
-private async Task DownloadPayloadAsync(string payloadUi, string payloadService, CancellationToken ct)
+private async Task<(string uiExe, string svcExe)> DownloadPayloadAsync(CancellationToken ct)
     {
-        UpdateProgress(5, "Descargando payload (127 MB)...", "Descargando desde GitHub Release v2.0.1");
-        var zipUrl = "https://github.com/Pyromesis/CA-O/releases/download/v2.0.1/CA-O-2.0.0-20260826-1958-win-x64-selfcontained-singlefile.zip";
+        UpdateProgress(5, "Descargando payload (343 MB)...", "Descargando desde GitHub Release v2.0.5");
+        var zipUrl = "https://github.com/Pyromesis/CA-O/releases/download/v2.0.5/CA-O-2.0.5-win-x64.zip";
+        var fallbackUrl = "https://github.com/Pyromesis/CA-O/releases/latest/download/CA-O-2.0.5-win-x64.zip";
         var tmpZip = Path.Combine(Path.GetTempPath(), "CA-O-payload.zip");
         var tmpDir = Path.Combine(Path.GetTempPath(), "CA-O-payload-gui");
 
-        var data = await _httpClient.GetByteArrayAsync(zipUrl, ct);
+        byte[] data;
+        try
+        {
+            data = await _httpClient.GetByteArrayAsync(zipUrl, ct);
+        }
+        catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            Log($"404 en {zipUrl}, probando {fallbackUrl}...");
+            data = await _httpClient.GetByteArrayAsync(fallbackUrl, ct);
+        }
         await File.WriteAllBytesAsync(tmpZip, data, ct);
         Log($"Descargado {tmpZip} ({data.Length / 1024 / 1024} MB)");
         if (Directory.Exists(tmpDir)) Directory.Delete(tmpDir, true);
         ZipFile.ExtractToDirectory(tmpZip, tmpDir);
-var foundUi = Directory.GetFiles(tmpDir, "CA-O.UI.exe", SearchOption.AllDirectories).FirstOrDefault() ?? throw new InvalidOperationException("ZIP sin CA-O.UI.exe");
-            var foundSvc = Directory.GetFiles(tmpDir, "CA-O.Privileged.exe", SearchOption.AllDirectories).FirstOrDefault() ?? throw new InvalidOperationException("ZIP sin service");
-        payloadUi = foundUi; payloadService = foundSvc;
-        Log($"Payload extraido: {payloadUi}");
+        var foundUi = Directory.GetFiles(tmpDir, "CA-O.UI.exe", SearchOption.AllDirectories).FirstOrDefault() ?? throw new InvalidOperationException("ZIP sin CA-O.UI.exe");
+        var foundSvc = Directory.GetFiles(tmpDir, "CA-O.Privileged.exe", SearchOption.AllDirectories).FirstOrDefault() ?? throw new InvalidOperationException("ZIP sin service");
+        Log($"Payload extraido: {foundUi}");
+        return (foundUi, foundSvc);
     }
 
     internal void UpdateProgress(int value, string status, string? detail = null)
