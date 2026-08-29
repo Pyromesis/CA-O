@@ -71,7 +71,7 @@
                 <NavigationViewItem Content="Panel" Tag="dashboard" Icon="Home" ToolTipService.ToolTip="Panel — estado general"/>
                 <NavigationViewItem Content="Analizar" Tag="analyze" Icon="Zoom" ToolTipService.ToolTip="Analizar — diagnósticos por área"/>
                 <NavigationViewItem Content="Optimizar" Tag="optimize" Icon="Repair" ToolTipService.ToolTip="Optimizar — recomendaciones y cambios transaccionales"/>
-                <NavigationViewItem Content="Gaming" Tag="gaming" ToolTipService.ToolTip="Gaming — perfiles por juego y anti-cheat">
+                <NavigationViewItem Content="Gaming" Tag="gaming" Visibility="Collapsed" ToolTipService.ToolTip="Gaming — ahora dentro de Analizar">
                     <NavigationViewItem.Icon>
                         <FontIcon Glyph="&#xE7FC;" />
                     </NavigationViewItem.Icon>

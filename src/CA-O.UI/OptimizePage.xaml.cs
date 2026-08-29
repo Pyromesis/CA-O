@@ -6,33 +6,31 @@ using CAO.Shared.IPC;
 
 namespace CAO.UI.Pages;
 
-/// <summary>
-/// Optimization cards (spec 79): name, description, current vs target state,
-/// evidence, risk, security and anti-cheat impact, reboot requirement,
-/// rollback availability. Apply is restricted to Recommended unless Expert
-/// mode is on, and every apply travels through the privileged service.
-/// </summary>
+/// <summary>Row view-model binding the card template.</summary>
+public sealed record RecommendationRow(
+    string OptimizationId,
+    string NameEs,
+    string DescriptionEs,
+    string BucketLabel,
+    string RebootLabel,
+    string Evidence,
+    string Risk,
+    string SecurityImpact,
+    string Compatibility,
+    string CurrentState,
+    string ScoreLabel,
+    string ReasonMessage,
+    RecommendationBucket Bucket,
+    bool IsLocked,
+    string LockReason,
+    string BenefitDetail,
+    bool IsApplyEnabled)
+{
+    public Microsoft.UI.Xaml.Visibility LockVisibility => IsLocked ? Microsoft.UI.Xaml.Visibility.Visible : Microsoft.UI.Xaml.Visibility.Collapsed;
+}
+
 public sealed partial class OptimizePage : Page
 {
-    /// <summary>Row view-model binding the card template.</summary>
-    public sealed record RecommendationRow(
-        string OptimizationId,
-        string NameEs,
-        string DescriptionEs,
-        string BucketLabel,
-        string RebootLabel,
-        string Evidence,
-        string Risk,
-        string SecurityImpact,
-        string Compatibility,
-        string CurrentState,
-        string ScoreLabel,
-        string ReasonMessage,
-        RecommendationBucket Bucket,
-        bool IsLocked,
-        string LockReason,
-        string BenefitDetail,
-        bool IsApplyEnabled);
 
     private readonly ViewModels.OptimizeViewModel _vm;
 
@@ -82,15 +80,16 @@ public sealed partial class OptimizePage : Page
             .Select(recommendation =>
             {
                 bool isLocked = recommendation.Bucket != RecommendationBucket.Recommended && !uiState.ExpertMode;
-                // También bloqueado si compatibility es NotCompatible o juego lo bloquea
-                if (recommendation.Compatibility == CompatibilityStatus.NotCompatible) isLocked = true;
+                // También bloqueado si compatibility es Incompatible o juego lo bloquea
+                if (recommendation.Compatibility == CompatibilityStatus.Incompatible) isLocked = true;
+                if (recommendation.AntiCheatConflictRisk) isLocked = true;
                 string lockReason = recommendation.Bucket switch
                 {
                     RecommendationBucket.Optional => "Opcional — requiere Modo Expert para aplicar (ver Ajustes). Beneficio según carga de trabajo.",
                     RecommendationBucket.Experimental => "Experimental — solo en Modo Expert, puede ser inestable.",
                     RecommendationBucket.SecuritySensitive => "Sensible a seguridad — requiere Modo Expert y confirmación. Verifica anti-cheat.",
-                    RecommendationBucket.Blocked => "Bloqueado por anti-cheat (Vanguard/EAC) — con candado para no romper juegos.",
-                    _ when recommendation.Compatibility == CompatibilityStatus.NotCompatible => "No compatible con este hardware/sistema.",
+                    _ when recommendation.AntiCheatConflictRisk => "Bloqueado por anti-cheat (Vanguard/EAC) — con candado para no romper juegos.",
+                    _ when recommendation.Compatibility == CompatibilityStatus.Incompatible => "No compatible con este hardware/sistema.",
                     _ => string.Empty
                 };
                 string benefit = GetBenefitDetail(recommendation.OptimizationId);

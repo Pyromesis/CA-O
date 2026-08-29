@@ -11,10 +11,10 @@
                 </VisualState>
             </VisualStateGroup>
         </VisualStateManager.VisualStateGroups>
-        <ScrollViewer Padding="{StaticResource CaoPagePadding}" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-        <StackPanel Spacing="16" MaxWidth="1100" HorizontalAlignment="Center">
+        <ScrollViewer Padding="16" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalAlignment="Stretch">
+        <StackPanel Spacing="16" HorizontalAlignment="Stretch">
             <TextBlock Text="Analizar sistema" Style="{StaticResource CaoPageTitleStyle}"/>
-            <TextBlock Text="Cada categoría mide estado real. Nada aquí modifica el sistema." FontSize="13" Opacity="0.6"/>
+            <TextBlock Text="Escaneo completo: CPU, GPU, memoria, disco, velocidades, red, seguridad, drivers, térmica e input. Nada aquí modifica el sistema." FontSize="13" Opacity="0.6" TextWrapping="Wrap"/>
 
             <StackPanel Orientation="Horizontal" Spacing="12">
                 <Button x:Name="RunButton" Content="Ejecutar análisis completo" Click="OnRunClick" Style="{StaticResource AccentButtonStyle}"
@@ -49,6 +49,37 @@
                     </Grid>
                 </StackPanel>
             </Border>
+
+            <Grid ColumnSpacing="12" RowSpacing="12">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                <Border Style="{StaticResource CaoCardStyle}">
+                    <StackPanel Spacing="8">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <FontIcon Glyph="&#xE950;" FontSize="14"/>
+                            <TextBlock Text="CPU" FontWeight="SemiBold"/>
+                        </StackPanel>
+                        <TextBlock x:Name="CpuText" TextWrapping="Wrap" IsTextSelectionEnabled="True" FontSize="12" Opacity="0.9" Text="Ejecuta análisis para medir CPU"/>
+                    </StackPanel>
+                </Border>
+                <Border Grid.Column="1" Style="{StaticResource CaoCardStyle}">
+                    <StackPanel Spacing="8">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <FontIcon Glyph="&#xE7F4;" FontSize="14"/>
+                            <TextBlock Text="GPU" FontWeight="SemiBold"/>
+                        </StackPanel>
+                        <TextBlock x:Name="GpuText" TextWrapping="Wrap" IsTextSelectionEnabled="True" FontSize="12" Opacity="0.9" Text="Ejecuta análisis para medir GPU"/>
+                    </StackPanel>
+                </Border>
+                <Border Grid.Column="2" Style="{StaticResource CaoCardStyle}">
+                    <StackPanel Spacing="8">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <FontIcon Glyph="&#xE8BE;" FontSize="14"/>
+                            <TextBlock Text="Memoria" FontWeight="SemiBold"/>
+                        </StackPanel>
+                        <TextBlock x:Name="MemoryText" TextWrapping="Wrap" IsTextSelectionEnabled="True" FontSize="12" Opacity="0.9" Text="Ejecuta análisis para medir RAM"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
 
             <Grid x:Name="CardsGrid" ColumnSpacing="12" RowSpacing="12">
                 <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
@@ -109,6 +140,19 @@
                         <ProgressRing x:Name="DpcRing" Width="16" Height="16" IsActive="False"/>
                     </StackPanel>
                     <TextBlock x:Name="InterruptsText" TextWrapping="Wrap" IsTextSelectionEnabled="True" FontSize="12" Opacity="0.9"/>
+                </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource CaoCardStyle}" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}">
+                <StackPanel Spacing="8">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <FontIcon Glyph="&#xE7FC;" FontSize="14"/>
+                        <TextBlock Text="Gaming — optimizaciones bloqueadas" FontWeight="SemiBold"/>
+                        <FontIcon Glyph="&#xE72E;" FontSize="12" Foreground="{ThemeResource SystemFillColorCriticalBrush}"/>
+                    </StackPanel>
+                    <TextBlock Text="Anti-cheat detectado bloquea cambios que reducen seguridad. Con candado en Optimizar." FontSize="11" Opacity="0.6" TextWrapping="Wrap"/>
+                    <TextBlock x:Name="GamingBlockedText" TextWrapping="Wrap" IsTextSelectionEnabled="True" FontSize="12" Opacity="0.9" Text="Ejecuta análisis para detectar anti-cheat y juegos"/>
+                    <TextBlock x:Name="GamingGamesText" TextWrapping="Wrap" IsTextSelectionEnabled="True" FontSize="11" Opacity="0.7"/>
                 </StackPanel>
             </Border>
         </StackPanel>

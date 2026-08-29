@@ -21,6 +21,37 @@ public sealed partial class AnalyzePage : Page
         _viewModel = AppHost.Resolve<AnalyzeViewModel>();
         // Opcional: exponer para binding futuro
         DataContext = _viewModel;
+        Loaded += (_, _) => LoadPersisted();
+    }
+
+    private void LoadPersisted()
+    {
+        var state = AppHost.Resolve<ViewModels.UiState>();
+        if (state.Context is not { } ctx) return;
+        // Datos persistentes: mostrar sin necesidad de re-ejecutar análisis
+        CpuText.Text = $"CPU: {ctx.CpuName} · {ctx.CpuCores} núcleos / {ctx.CpuLogicalProcessors} hilos";
+        GpuText.Text = string.IsNullOrWhiteSpace(ctx.GpuName) ? "GPU: no detectada" : $"GPU: {ctx.GpuName} ({ctx.GpuVendor}) · Driver {ctx.GpuDriverVersion} · {ctx.DisplayRefreshHz} Hz {(ctx.VrrSupported ? "VRR" : "")}";
+        MemoryText.Text = $"RAM: {ctx.RamGb} GB · {(ctx.HasSsd ? "SSD" : "HDD")} {(ctx.HasNvme ? "NVMe" : "")} · {(ctx.IsLaptop ? "Portátil" : "Sobremesa")} {(ctx.OnBattery ? "· Batería" : "")}";
+        // Gaming bloqueos persistentes
+        var recs = state.Recommendations;
+        var blocked = recs.Where(r => r.AntiCheatConflictRisk || r.Bucket == RecommendationBucket.SecuritySensitive).ToList();
+        if (blocked.Count > 0)
+        {
+            GamingBlockedText.Text = string.Join("\n", blocked.Select(b => $"• {b.OptimizationId} — {b.NameEs}  [candado] {b.Reason.MessageEs}"));
+        }
+        else if (ctx.AntiCheats.Count > 0)
+        {
+            GamingBlockedText.Text = "Anti-cheat detectado pero ninguna optimización bloqueada en este perfil.";
+        }
+        else
+        {
+            GamingBlockedText.Text = "Sin anti-cheat detectado — todas las optimizaciones disponibles según perfil.";
+        }
+        GamingGamesText.Text = ctx.GamesDetected.Count == 0 ? "Juegos: ninguno detectado" : $"Juegos: {string.Join(", ", ctx.GamesDetected)}";
+        if (ctx.AntiCheats.Count > 0)
+            GamingGamesText.Text += $"\nAnti-cheats: {string.Join(", ", ctx.AntiCheats.Select(a => a.Kind.ToString()))}";
+
+        StatusText.Text = state.LastAnalysisUtc is null ? "Datos del último análisis cargados." : $"Datos del {state.LastAnalysisUtc.Value.ToLocalTime():g} cargados.";
     }
 
     private async void OnRunClick(object sender, RoutedEventArgs e)
@@ -41,6 +72,7 @@ public sealed partial class AnalyzePage : Page
 
             // Render parcial tolerante a fallos individuales ( §10 )
             RenderFromViewModel();
+            LoadPersisted();
 
             var failed = results.Count(r => r.Status == ViewModels.AnalysisModuleStatus.Failed);
             var cancelled = results.Count(r => r.Status == ViewModels.AnalysisModuleStatus.Cancelled);
