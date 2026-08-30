@@ -3,6 +3,7 @@ using Microsoft.UI.Xaml.Controls;
 using CAO.Core.Engine;
 using CAO.Shared;
 using CAO.Shared.IPC;
+using CAO.UI.Helpers;
 
 namespace CAO.UI.Pages;
 
@@ -33,6 +34,7 @@ public sealed partial class OptimizePage : Page
 {
 
     private readonly ViewModels.OptimizeViewModel _vm;
+    private RecommendationBucket? _activeFilter; // null = All
 
     public OptimizePage()
     {
@@ -49,17 +51,46 @@ public sealed partial class OptimizePage : Page
             if (e.PropertyName == nameof(ViewModels.OptimizeViewModel.TransactionProgress))
                 DispatcherQueue.TryEnqueue(() => StatusText.Text = _vm.TransactionProgress);
         };
+        var uiState = AppHost.Resolve<ViewModels.UiState>();
+        uiState.LanguageChanged += (_, __) => DispatcherQueue.TryEnqueue(ApplyTexts);
     }
 
     private void ApplyTexts()
     {
         ApplyRecommendedButton.Content = Localizer.Get("optimize.applyRecommended");
         ExpertBar.Message = Localizer.Get("optimize.expertWarning");
+        UpdateFilterButtons();
+        try { LocalizationHelper.LocalizeTree(this.Content as DependencyObject ?? this); } catch { }
     }
+
+    private void UpdateFilterButtons()
+    {
+        // Counters dynamic
+        var uiState = AppHost.Resolve<ViewModels.UiState>();
+        var all = uiState.Recommendations.Count;
+        var rec = uiState.Recommendations.Count(r => r.Bucket == RecommendationBucket.Recommended);
+        var opt = uiState.Recommendations.Count(r => r.Bucket == RecommendationBucket.Optional);
+        var exp = uiState.Recommendations.Count(r => r.Bucket == RecommendationBucket.Experimental);
+        FilterAllButton.Content = $"{Localizer.Get("optimize.filterAll")} ({all})";
+        FilterRecommendedButton.Content = $"{Localizer.Get("optimize.filterRecommended")} ({rec})";
+        FilterOptionalButton.Content = $"{Localizer.Get("optimize.filterOptional")} ({opt})";
+        FilterExperimentalButton.Content = $"{Localizer.Get("optimize.filterExperimental")} ({exp})";
+        // highlight active
+        FilterAllButton.Style = _activeFilter == null ? (Microsoft.UI.Xaml.Style)Application.Current.Resources["AccentButtonStyle"] : (Microsoft.UI.Xaml.Style)Application.Current.Resources["DefaultButtonStyle"];
+        FilterRecommendedButton.Style = _activeFilter == RecommendationBucket.Recommended ? (Microsoft.UI.Xaml.Style)Application.Current.Resources["AccentButtonStyle"] : (Microsoft.UI.Xaml.Style)Application.Current.Resources["DefaultButtonStyle"];
+        FilterOptionalButton.Style = _activeFilter == RecommendationBucket.Optional ? (Microsoft.UI.Xaml.Style)Application.Current.Resources["AccentButtonStyle"] : (Microsoft.UI.Xaml.Style)Application.Current.Resources["DefaultButtonStyle"];
+        FilterExperimentalButton.Style = _activeFilter == RecommendationBucket.Experimental ? (Microsoft.UI.Xaml.Style)Application.Current.Resources["AccentButtonStyle"] : (Microsoft.UI.Xaml.Style)Application.Current.Resources["DefaultButtonStyle"];
+    }
+
+    private void OnFilterAllClick(object sender, RoutedEventArgs e) { _activeFilter = null; Render(); }
+    private void OnFilterRecommendedClick(object sender, RoutedEventArgs e) { _activeFilter = RecommendationBucket.Recommended; Render(); }
+    private void OnFilterOptionalClick(object sender, RoutedEventArgs e) { _activeFilter = RecommendationBucket.Optional; Render(); }
+    private void OnFilterExperimentalClick(object sender, RoutedEventArgs e) { _activeFilter = RecommendationBucket.Experimental; Render(); }
 
     protected override void OnNavigatedTo(Microsoft.UI.Xaml.Navigation.NavigationEventArgs e)
     {
         base.OnNavigatedTo(e);
+        ApplyTexts();
         Render();
     }
 
@@ -67,8 +98,9 @@ public sealed partial class OptimizePage : Page
     {
         var uiState = AppHost.Resolve<ViewModels.UiState>();
         ExpertBar.IsOpen = uiState.ExpertMode;
+        UpdateFilterButtons();
 
-        var rows = uiState.Recommendations
+        var baseRows = uiState.Recommendations
             .OrderBy(row => row.Bucket switch
             {
                 RecommendationBucket.Recommended => 0,
@@ -76,20 +108,23 @@ public sealed partial class OptimizePage : Page
                 RecommendationBucket.Experimental => 2,
                 RecommendationBucket.SecuritySensitive => 3,
                 _ => 4,
-            })
-            .Select(recommendation =>
+            });
+
+        // Filter by active bucket (spec 12)
+        IEnumerable<Recommendation> filtered = _activeFilter == null ? baseRows : baseRows.Where(r => r.Bucket == _activeFilter.Value);
+
+        var rows = filtered.Select(recommendation =>
             {
                 bool isLocked = recommendation.Bucket != RecommendationBucket.Recommended && !uiState.ExpertMode;
-                // También bloqueado si compatibility es Incompatible o juego lo bloquea
                 if (recommendation.Compatibility == CompatibilityStatus.Incompatible) isLocked = true;
                 if (recommendation.AntiCheatConflictRisk) isLocked = true;
                 string lockReason = recommendation.Bucket switch
                 {
-                    RecommendationBucket.Optional => "Opcional — requiere Modo Expert para aplicar (ver Ajustes). Beneficio según carga de trabajo.",
-                    RecommendationBucket.Experimental => "Experimental — solo en Modo Expert, puede ser inestable.",
-                    RecommendationBucket.SecuritySensitive => "Sensible a seguridad — requiere Modo Expert y confirmación. Verifica anti-cheat.",
-                    _ when recommendation.AntiCheatConflictRisk => "Bloqueado por anti-cheat (Vanguard/EAC) — con candado para no romper juegos.",
-                    _ when recommendation.Compatibility == CompatibilityStatus.Incompatible => "No compatible con este hardware/sistema.",
+                    RecommendationBucket.Optional => Localizer.Get("optimize.lockedOptional"),
+                    RecommendationBucket.Experimental => Localizer.Get("optimize.lockedExperimental"),
+                    RecommendationBucket.SecuritySensitive => Localizer.Get("optimize.lockedSecurity"),
+                    _ when recommendation.AntiCheatConflictRisk => Localizer.Get("optimize.lockedAntiCheat"),
+                    _ when recommendation.Compatibility == CompatibilityStatus.Incompatible => Localizer.Get("optimize.lockedIncompatible"),
                     _ => string.Empty
                 };
                 string benefit = GetBenefitDetail(recommendation.OptimizationId);
@@ -98,11 +133,11 @@ public sealed partial class OptimizePage : Page
                 recommendation.OptimizationId,
                 recommendation.NameEs,
                 recommendation.DescriptionEs,
-                recommendation.Bucket.ToString(),
-                recommendation.RequiresReboot ? "requiere reinicio" : string.Empty,
-                recommendation.Evidence.ToString(),
-                recommendation.Risk.ToString(),
-                recommendation.SecurityImpact.ToString(),
+                Localizer.GetBucketLabel(recommendation.Bucket),
+                recommendation.RequiresReboot ? Localizer.Get("common.requiresReboot") : string.Empty,
+                Localizer.GetEvidenceLabel(recommendation.Evidence),
+                Localizer.GetRiskLabel(recommendation.Risk),
+                Localizer.GetSecurityLabel(recommendation.SecurityImpact),
                 recommendation.Compatibility.ToString(),
                 recommendation.CurrentState.ToString(),
                 recommendation.Score?.ToString() ?? "n/a",
@@ -115,9 +150,45 @@ public sealed partial class OptimizePage : Page
             })
             .ToList();
 
-        RecommendationsList.ItemsSource = rows;
-        EmptyStateCard.Visibility = rows.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
-        RecommendationsList.Visibility = rows.Count == 0 ? Visibility.Collapsed : Visibility.Visible;
+        // Expert mode handling for Experimental filter
+        if (_activeFilter == RecommendationBucket.Experimental && !uiState.ExpertMode)
+        {
+            FilterInfoBar.Message = Localizer.Get("optimize.expertRequired");
+            FilterInfoBar.Severity = InfoBarSeverity.Warning;
+            FilterInfoBar.IsOpen = true;
+            RecommendationsList.ItemsSource = null;
+            RecommendationsList.Visibility = Visibility.Collapsed;
+            EmptyStateCard.Visibility = Visibility.Collapsed;
+            return;
+        }
+        FilterInfoBar.IsOpen = false;
+
+        if (rows.Count == 0)
+        {
+            // Empty states per filter
+            var msg = _activeFilter switch
+            {
+                RecommendationBucket.Recommended => Localizer.Get("optimize.noRecommended"),
+                RecommendationBucket.Optional => Localizer.Get("optimize.noOptional"),
+                RecommendationBucket.Experimental => Localizer.Get("optimize.noExperimental"),
+                _ => Localizer.Get("optimize.noResults")
+            };
+            EmptyStateCard.Visibility = Visibility.Visible;
+            RecommendationsList.Visibility = Visibility.Collapsed;
+            // Update empty text dynamically by finding TextBlock inside EmptyStateCard
+            try
+            {
+                if (EmptyStateCard.Child is StackPanel sp && sp.Children.Count > 1 && sp.Children[1] is TextBlock tb) tb.Text = msg;
+                else if (EmptyStateCard.Child is StackPanel sp2 && sp2.Children.Count > 2 && sp2.Children[2] is TextBlock tb2) tb2.Text = msg;
+            } catch { }
+            RecommendationsList.ItemsSource = null;
+        }
+        else
+        {
+            RecommendationsList.ItemsSource = rows;
+            EmptyStateCard.Visibility = Visibility.Collapsed;
+            RecommendationsList.Visibility = Visibility.Visible;
+        }
     }
 
     private static string GetBenefitDetail(string id) => id switch

@@ -71,6 +71,7 @@ public sealed class SystemAnalysisService : IAnalysisCoordinator
 
         try
         {
+            var fp = context != null ? AnalysisStateStore.ComputeGamesFingerprint(context.GamesDetected) : null;
             _store.SaveAnalysis(new AnalysisStateStore.PersistedAnalysis(
                 SchemaVersion: AnalysisStateStore.SchemaVersion,
                 AppVersion: AppVersion.Semantic,
@@ -83,7 +84,8 @@ public sealed class SystemAnalysisService : IAnalysisCoordinator
                 Warnings: warnings,
                 Duration: sw.Elapsed,
                 ErrorCode: analysisState == "Failed" ? ErrorCodes.UiAnalyzeFailed : null,
-                CorrelationId: correlationId
+                CorrelationId: correlationId,
+                InstalledGamesFingerprint: fp
             ));
         }
         catch { }

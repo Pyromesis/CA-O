@@ -2,6 +2,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using CAO.Infrastructure.Gaming;
 using CAO.Shared;
+using CAO.UI.Helpers;
 
 namespace CAO.UI.Pages;
 
@@ -17,14 +18,28 @@ public sealed partial class GamingPage : Page
     public GamingPage()
     {
         InitializeComponent();
-        ScanButton.Content = "Escanear entorno gaming";
         _vm = AppHost.Resolve<ViewModels.GamingViewModel>();
         DataContext = _vm;
+        ApplyTexts();
+        var uiState = AppHost.Resolve<ViewModels.UiState>();
+        uiState.LanguageChanged += (_, __) => DispatcherQueue.TryEnqueue(ApplyTexts);
         _vm.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName is null or nameof(ViewModels.GamingViewModel.AntiCheats) or nameof(ViewModels.GamingViewModel.GameProfiles) or nameof(ViewModels.GamingViewModel.GpuSummary) or nameof(ViewModels.GamingViewModel.VendorGuidance))
                 DispatcherQueue.TryEnqueue(RenderVm);
         };
+    }
+
+    private void ApplyTexts()
+    {
+        ScanButton.Content = Localizer.Get("gaming.scan");
+        try { LocalizationHelper.LocalizeTree(this.Content as DependencyObject ?? this); } catch { }
+    }
+
+    protected override void OnNavigatedTo(Microsoft.UI.Xaml.Navigation.NavigationEventArgs e)
+    {
+        base.OnNavigatedTo(e);
+        ApplyTexts();
     }
 
     private void RenderVm()

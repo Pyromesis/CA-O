@@ -159,18 +159,30 @@ try
     if (!desktopOk) Log("  ADVERTENCIA: No se pudo crear atajo en ningún escritorio.");
 
     Log("[4/5] Registrando desinstalador...");
-    var uninstallSrc = FindUninstallerPayload(exeDir);
-    var uninstallDest = Path.Combine(installDir, "uninstall.exe");
-    if (File.Exists(uninstallSrc))
+    var uninstallSrcFolder = Path.GetDirectoryName(FindUninstallerPayload(exeDir))!;
+    var uninstallDestFolderSetup = Path.Combine(installDir, "uninstall");
+    if (Directory.Exists(uninstallSrcFolder))
     {
-        File.Copy(uninstallSrc, uninstallDest, true);
-        Log($"  Desinstalador: {uninstallDest}");
+        try
+        {
+            if (Directory.Exists(uninstallDestFolderSetup)) Directory.Delete(uninstallDestFolderSetup, true);
+            CopyDirectory(uninstallSrcFolder, uninstallDestFolderSetup);
+            Log($"  Desinstalador carpeta: {uninstallDestFolderSetup}");
+        }
+        catch (Exception ex) { Log($"  WARN no se pudo copiar carpeta desinstalador: {ex.Message}"); }
     }
-    else
+    var uninstallSrc2 = FindUninstallerPayload(exeDir);
+    var uninstallDestExe = Path.Combine(uninstallDestFolderSetup, "CA-O.Uninstaller.exe");
+    if (!File.Exists(uninstallDestExe) && File.Exists(uninstallSrc2))
     {
-        Log($"  WARN: desinstalador no encontrado en {uninstallSrc}");
+        try { Directory.CreateDirectory(uninstallDestFolderSetup); File.Copy(uninstallSrc2, uninstallDestExe, true); } catch { }
     }
-    CreateUninstallRegistryEntry(installDir, uninstallDest, installedExe);
+    // NO crear uninstall.exe en raiz - debe permanecer exclusivamente en uninstall\
+    var legacyRoot = Path.Combine(installDir, "uninstall.exe");
+    try { if (File.Exists(legacyRoot)) File.Delete(legacyRoot); } catch { }
+    var legacyPs1 = Path.Combine(installDir, "uninstall.ps1");
+    try { if (File.Exists(legacyPs1)) File.Delete(legacyPs1); } catch { }
+    CreateUninstallRegistryEntry(installDir, uninstallDestExe, installedExe);
 
     Console.WriteLine("[4/5] Iniciando servicio...");
     Run("sc.exe", $"start {serviceName}", ignoreError: true);

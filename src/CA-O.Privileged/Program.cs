@@ -23,6 +23,7 @@ internal static class Program
             new WmiSystemInfoProvider(),
             new SecurityDiagnosticsProvider(),
             new AntiCheatScanProvider()));
+        builder.Services.AddSingleton<CAO.Core.Interfaces.IDnsConfigurationProvider, CAO.Infrastructure.Networking.WmiDnsConfigurationProvider>();
         builder.Services.AddSingleton<OptimizationEngine>(services => new OptimizationEngine(
             new RegistryAccessor(),
             new WmiRestorePointService(),
@@ -30,7 +31,9 @@ internal static class Program
             new JsonHistoryLogger(),
             new ServiceManager(),
             new CAO.Infrastructure.Windows.Execution.SystemCommandGateway(),
-            services.GetRequiredService<ISystemContextProvider>()));
+            services.GetRequiredService<ISystemContextProvider>(),
+            null, null, null,
+            services.GetRequiredService<CAO.Core.Interfaces.IDnsConfigurationProvider>()));
         builder.Services.AddSingleton<IPrivilegedCallerAuthorizer, AdministratorsOnlyAuthorizer>();
         builder.Services.AddHostedService<PrivilegedPipeService>();
         builder.Services.AddWindowsService(options => options.ServiceName = "CA-O Privileged Service");

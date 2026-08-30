@@ -18,6 +18,9 @@ public sealed class UiState : ObservableObject
     private DateTime? _lastAnalysisUtc;
     private string _serviceStatus = "unknown";
     private IReadOnlyList<string> _recoveryCandidates = Array.Empty<string>();
+    private string _freshnessLabel = string.Empty;
+    private string _staleReason = string.Empty;
+    private string _analysisAgeLabel = string.Empty;
 
     public SystemContext? Context
     {
@@ -66,6 +69,24 @@ public sealed class UiState : ObservableObject
     {
         get => _recoveryCandidates;
         set => SetProperty(ref _recoveryCandidates, value);
+    }
+
+    public string FreshnessLabel
+    {
+        get => _freshnessLabel;
+        set => SetProperty(ref _freshnessLabel, value);
+    }
+
+    public string StaleReason
+    {
+        get => _staleReason;
+        set => SetProperty(ref _staleReason, value);
+    }
+
+    public string AnalysisAgeLabel
+    {
+        get => _analysisAgeLabel;
+        set => SetProperty(ref _analysisAgeLabel, value);
     }
 
     public event EventHandler<string>? ThemeChanged;

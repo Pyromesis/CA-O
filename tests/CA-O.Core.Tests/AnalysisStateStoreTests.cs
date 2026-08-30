@@ -55,7 +55,7 @@ public sealed class AnalysisStateStoreTests
     {
         var store = NewStore();
         var ctx = SystemContextFactory.Default();
-        var old = new AnalysisStateStore.PersistedAnalysis(AnalysisStateStore.SchemaVersion, "2.0.0", 26200, DateTime.UtcNow.AddHours(-25), ctx, null, null, "Completed", Array.Empty<string>(), TimeSpan.Zero, null, null);
+        var old = new AnalysisStateStore.PersistedAnalysis(AnalysisStateStore.SchemaVersion, "2.0.0", 26200, DateTime.UtcNow.AddDays(-8), ctx, null, null, "Completed", Array.Empty<string>(), TimeSpan.Zero, null, null);
         Assert.True(store.IsObsolete(old));
         var sameBuild = new AnalysisStateStore.PersistedAnalysis(AnalysisStateStore.SchemaVersion, "2.0.0", 26200, DateTime.UtcNow, ctx, null, null, "Completed", Array.Empty<string>(), TimeSpan.Zero, null, null);
         var newCtx = ctx with { WindowsBuild = 99999 };

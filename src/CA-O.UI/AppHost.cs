@@ -42,6 +42,7 @@ internal static class AppHost
         services.AddSingleton<FileSnapshotStore>();
         services.AddSingleton<FileTransactionJournal>();
         services.AddSingleton<AnalysisStateStore>();
+        services.AddSingleton<Infrastructure.Persistence.AnalysisSessionService>();
         services.AddSingleton<CAO.Core.Abstractions.IAnalysisCoordinator, Infrastructure.Services.SystemAnalysisService>();
         services.AddSingleton<SnapshotRepository>();
         services.AddSingleton<Infrastructure.Windows.SystemRegistry.RegistryAccessor>();
@@ -63,6 +64,7 @@ internal static class AppHost
                     return match is null ? CAO.Shared.OptimizationState.Unknown : match.Detect(registry);
                 }));
 
+        services.AddSingleton<Navigation.INavigationService>(sp => new Navigation.ShellNavigationServiceStub());
         // ViewModels (transient – cada página resuelve el suyo) (§5 MVVM real)
         services.AddTransient<AnalyzeViewModel>();
         services.AddTransient<DashboardViewModel>();

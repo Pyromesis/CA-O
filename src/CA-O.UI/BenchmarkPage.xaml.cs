@@ -3,6 +3,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using CAO.Infrastructure.Benchmarking;
 using CAO.Shared;
+using CAO.UI.Helpers;
 
 namespace CAO.UI.Pages;
 
@@ -18,15 +19,29 @@ public sealed partial class BenchmarkPage : Page
     public BenchmarkPage()
     {
         InitializeComponent();
-        BaselineButton.Content = Localizer.Get("benchmark.baseline");
-        AfterButton.Content = Localizer.Get("benchmark.after");
         _vm = AppHost.Resolve<ViewModels.BenchmarkViewModel>();
         DataContext = _vm;
+        ApplyTexts();
+        var uiState = AppHost.Resolve<ViewModels.UiState>();
+        uiState.LanguageChanged += (_, __) => DispatcherQueue.TryEnqueue(ApplyTexts);
         _vm.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName is null or nameof(ViewModels.BenchmarkViewModel.BaselineSummary) or nameof(ViewModels.BenchmarkViewModel.ComparisonSummary) or nameof(ViewModels.BenchmarkViewModel.CurrentStep) or nameof(ViewModels.BenchmarkViewModel.Verdict))
                 DispatcherQueue.TryEnqueue(RenderVm);
         };
+    }
+
+    private void ApplyTexts()
+    {
+        BaselineButton.Content = Localizer.Get("benchmark.baseline");
+        AfterButton.Content = Localizer.Get("benchmark.after");
+        try { LocalizationHelper.LocalizeTree(this.Content as DependencyObject ?? this); } catch { }
+    }
+
+    protected override void OnNavigatedTo(Microsoft.UI.Xaml.Navigation.NavigationEventArgs e)
+    {
+        base.OnNavigatedTo(e);
+        ApplyTexts();
     }
 
     private void RenderVm()

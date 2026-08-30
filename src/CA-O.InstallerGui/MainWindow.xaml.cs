@@ -243,17 +243,18 @@ private async Task InstallAsync()
             }
             var uninstallSrc = FindUninstallerPayload(baseDir, exeDir);
             var uninstallDest = Path.Combine(uninstallDestFolder, "CA-O.Uninstaller.exe");
-            // Mantener compatibilidad: copiar exe también a raiz para ARP antiguo, pero ARP apuntará a la carpeta
-            var uninstallRoot = Path.Combine(installDir, "uninstall.exe");
+            // NO crear uninstall.exe en raiz - debe permanecer exclusivamente en uninstall\ por spec 1
+            var uninstallRoot2 = Path.Combine(installDir, "uninstall.exe");
+            try { if (File.Exists(uninstallRoot2)) File.Delete(uninstallRoot2); } catch { }
+            var uninstallPs1Root = Path.Combine(installDir, "uninstall.ps1");
+            try { if (File.Exists(uninstallPs1Root)) File.Delete(uninstallPs1Root); } catch { }
             if (File.Exists(uninstallSrc))
             {
-                try { File.Copy(uninstallSrc, uninstallRoot, true); } catch { }
                 Log($"  Desinstalador: {uninstallDest} ({new FileInfo(uninstallDest).Length / 1024} KB)");
             }
             else
             {
-                Log($"  WARN: desinstalador no encontrado en {uninstallSrc}, se usará fallback PowerShell");
-                try { File.WriteAllText(Path.Combine(installDir, "uninstall.ps1"), "powershell -ExecutionPolicy Bypass -File \\\"" + Path.Combine(installDir, "uninstall.ps1") + "\\\""); } catch { }
+                Log($"  WARN: desinstalador no encontrado en {uninstallSrc}");
             }
             CreateUninstallRegistryEntry(installDir, uninstallDest, installedExe);
 

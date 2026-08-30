@@ -58,6 +58,7 @@
             <InfoBar x:Name="ServiceInfoBar" IsOpen="False" Severity="Informational" IsClosable="False"
                      Title="Modo solo lectura"
                      Message="Diagnósticos disponibles. Para aplicar cambios instale/inicie el servicio privilegiado."/>
+            <InfoBar x:Name="FreshnessBar" IsOpen="False" Severity="Informational" IsClosable="False"/>
 
             <!-- Hardware / System fingerprint (Fase 77) -->
             <TextBlock x:Name="HardwareHeader" Style="{StaticResource CaoSectionHeaderStyle}"/>

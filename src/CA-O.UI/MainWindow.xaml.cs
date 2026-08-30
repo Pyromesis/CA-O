@@ -12,8 +12,24 @@ public sealed partial class MainWindow : Window
     /// <summary>Lets any page re-theme every window root.</summary>
     public static Action<string>? ApplyThemeGlobally { get; private set; }
 
+    public static new MainWindow? Current { get; private set; }
+    public void SelectRoute(string tag)
+    {
+        foreach (var item in EnumerateItems())
+        {
+            if (item is NavigationViewItem nvi && nvi.Tag is string t && t == tag)
+            {
+                Nav.SelectedItem = nvi;
+                var pageType = Navigation.RouteTable.Resolve(tag);
+                if (pageType != null) ContentFrame.Navigate(pageType);
+                return;
+            }
+        }
+    }
+
     public MainWindow()
     {
+        Current = this;
         InitializeComponent();
         SystemBackdrop = new MicaBackdrop();
         var uiState = AppHost.Resolve<ViewModels.UiState>();

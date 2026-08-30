@@ -3,6 +3,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using CAO.Shared;
+using CAO.UI.Helpers;
 
 namespace CAO.UI.Pages;
 
@@ -17,6 +18,9 @@ public sealed partial class HistoryPage : Page
         SourceNote.Text = $"Fuente: {CaOPaths.HistoryFile}";
         _vm = AppHost.Resolve<ViewModels.HistoryViewModel>();
         DataContext = _vm;
+        ApplyTexts();
+        var uiState = AppHost.Resolve<ViewModels.UiState>();
+        uiState.LanguageChanged += (_, __) => DispatcherQueue.TryEnqueue(ApplyTexts);
         _vm.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName is null or nameof(ViewModels.HistoryViewModel.FilteredRows) or nameof(ViewModels.HistoryViewModel.IsEmpty) or nameof(ViewModels.HistoryViewModel.WarningMessage) or nameof(ViewModels.HistoryViewModel.CorruptedCount))
@@ -24,9 +28,15 @@ public sealed partial class HistoryPage : Page
         };
     }
 
+    private void ApplyTexts()
+    {
+        try { LocalizationHelper.LocalizeTree(this.Content as DependencyObject ?? this); } catch { }
+    }
+
     protected override void OnNavigatedTo(Microsoft.UI.Xaml.Navigation.NavigationEventArgs e)
     {
         base.OnNavigatedTo(e);
+        ApplyTexts();
         _vm.RefreshCommand.Execute(null);
         RenderVm();
     }

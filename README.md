@@ -198,7 +198,7 @@ sc.exe start CAO.Privileged
 sc.exe query CAO.Privileged
 ```
 
-Desinstalacion: usa `C:\Program Files\CA-O\uninstall.exe` o Panel de control y Programas y caracteristicas y CA-O, o ejecuta `scripts/uninstall.ps1` como administrador.
+Desinstalacion: abre `C:\Program Files\CA-O`, entra en `uninstall\` y ejecuta el desinstalador incluido. Tambien disponible en Panel de control > Programas y caracteristicas > CA-O. Para desinstalacion manual avanzada ejecuta `scripts/uninstall.ps1` como administrador.
 
 ---
 
@@ -238,7 +238,27 @@ Repositorio de snapshots `snapshots/{txid}/snapshot.json` y `manifest.json` con 
 
 ### Ajustes
 
-Tema claro, oscuro o sistema, idioma `es-ES` y `en-US`, modo Expert con advertencia explicita y estado del servicio con accion de comprobacion.
+Tema claro, oscuro o sistema, idioma `es-ES` y `en-US` (cambia toda la interfaz al instante), modo Expert con advertencia explicita y estado del servicio con accion de comprobacion.
+
+### Persistencia del análisis
+
+CA-O conserva el último análisis entre sesiones en `%ProgramData%\CA-O\analysis-state.json` con escritura atómica y versionado de schema. Al abrir la app recupera automáticamente el último análisis, muestra su antigüedad y freshness. Cambiar de pestaña no pierde datos: cada página hidrata desde `UiState`/`AnalysisSessionService`.
+
+### Recomendación de actualización
+
+Se recomienda ejecutar un nuevo análisis aproximadamente una vez por semana o después de instalar/desinstalar juegos. Hasta 7 días el análisis se considera actualizado; más de 7 días muestra advertencia "Se recomienda ejecutar un análisis nuevo"; si se detectan cambios en los juegos instalados marca `Stale (GameInventoryChanged)`. El análisis no se ejecuta automáticamente al abrir la app.
+
+### DNS
+
+CA-O puede aplicar la configuración DNS directamente cuando dispone del servicio privilegiado: detecta adaptador activo (ignora Hyper-V/VMware/VPN), crea snapshot del estado previo, aplica `1.1.1.1/1.0.0.1` etc., verifica el DNS activo y hace rollback si la verificación falla. Sin servicio muestra "No fue posible aplicar DNS" sin mandar al usuario a Windows Settings.
+
+### Filtros de optimización
+
+Optimizar permite filtrar por Recommended, Optional y Experimental con contadores dinámicos `Todas (X) | Recomendadas (X) | Opcionales (X) | Experimentales (X)`. El estado del filtro persiste en memoria mientras la app está abierta. "Aplicar recomendadas" solo aplica `Recommended`.
+
+### Desinstalación
+
+La desinstalación manual se encuentra en `C:\Program Files\CA-O\uninstall\` (ejecuta `CA-O.Uninstaller.exe` con elevación). También está disponible desde Aplicaciones instaladas / Programas y características (ARP apunta a `uninstall\CA-O.Uninstaller.exe`). El desinstalador detiene y elimina el servicio `CAO.Privileged`, elimina accesos directos, archivos y la entrada ARP con auto-borrado seguro de la carpeta raíz.
 
 ---
 

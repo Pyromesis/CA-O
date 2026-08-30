@@ -23,6 +23,7 @@ public sealed class OptimizationEngine
     private readonly IServiceManager? _services;
     private readonly Core.Interfaces.IPrivilegedCommandExecutor? _executor;
     private readonly ISystemContextProvider? _contextProvider;
+    private readonly Core.Interfaces.IDnsConfigurationProvider? _dnsProvider;
     private bool _restorePointCreatedThisSession;
 
     public OptimizationEngine(
@@ -35,7 +36,8 @@ public sealed class OptimizationEngine
         ISystemContextProvider? contextProvider = null,
         CAO.Core.Rollback.ITransactionJournal? journal = null,
         Func<bool>? hasPendingRecovery = null,
-        ISettingsStore? settings = null)
+        ISettingsStore? settings = null,
+        Core.Interfaces.IDnsConfigurationProvider? dnsProvider = null)
     {
         _registry = registry;
         _restorePoints = restorePoints;
@@ -47,6 +49,7 @@ public sealed class OptimizationEngine
         _journal = journal;
         _hasPendingRecovery = hasPendingRecovery;
         _settings = settings;
+        _dnsProvider = dnsProvider;
     }
 
     private readonly CAO.Core.Rollback.ITransactionJournal? _journal;
@@ -206,14 +209,51 @@ public sealed class OptimizationEngine
         return await optimization.VerifyAsync(context, ct);
     }
 
-    public async Task<OperationResult> SetDnsAsync(string interfaceName, string dnsIp, CancellationToken ct = default)
+    public async Task<OperationResult> SetDnsAsync(string interfaceName, string dnsIp, CancellationToken ct = default, CAO.Core.Interfaces.IDnsConfigurationProvider? dnsProviderOverride = null)
     {
         if (!IsRunningAsAdmin()) return OperationResult.Fail("Se requieren privilegios.", "not-admin");
         if (_executor is null) return OperationResult.Fail("Ejecutor no disponible.", "no-executor");
-        if (!System.Net.IPAddress.TryParse(dnsIp, out _)) return OperationResult.Fail($"IP DNS inválida: {dnsIp}", "invalid-ip");
+        if (string.IsNullOrWhiteSpace(interfaceName)) return OperationResult.Fail("Interfaz no especificada.", "invalid-adapter");
+        // Handle comma-separated primary,secondary
+        var parts = dnsIp.Split(',', StringSplitOptions.TrimEntries);
+        var primary = parts[0];
+        var secondary = parts.Length > 1 ? parts[1] : null;
+        if (!System.Net.IPAddress.TryParse(primary, out _)) return OperationResult.Fail($"IP DNS inválida: {primary}", "invalid-ip");
+        if (secondary != null && !System.Net.IPAddress.TryParse(secondary, out _)) return OperationResult.Fail($"IP DNS secundaria inválida: {secondary}", "invalid-ip");
+        var dnsProvider = dnsProviderOverride ?? _dnsProvider;
+        // Ignore virtual/VPN unless explicitly allowed
+        if (dnsProvider != null && dnsProvider.IsVirtualOrVpn(interfaceName)) return OperationResult.Fail($"Adaptador virtual/VPN ignorado: {interfaceName}", "virtual-adapter");
+        var before = dnsProvider?.GetDnsServers(interfaceName).ToArray() ?? Array.Empty<string>();
+        // Apply primary
         var result = await _executor.ExecuteAsync(CAO.Shared.Security.SystemCommandKey.NetShInterfaceIpSetDnsPrimary,
-            ["interface", "ip", "set", "dns", interfaceName, "static", dnsIp], ct);
-        return result.Success ? OperationResult.Ok($"DNS {dnsIp} aplicado a {interfaceName}.") : OperationResult.Fail($"No se pudo aplicar DNS {dnsIp} a {interfaceName}: {result.StdErr}", result.StdErr);
+            ["interface", "ip", "set", "dns", interfaceName, "static", primary], ct);
+        if (!result.Success) return OperationResult.Fail($"No se pudo aplicar DNS {primary} a {interfaceName}: {result.StdErr}", result.StdErr);
+        if (!string.IsNullOrEmpty(secondary))
+        {
+            var r2 = await _executor.ExecuteAsync(CAO.Shared.Security.SystemCommandKey.NetShInterfaceIpSetDnsSecondary,
+                ["interface", "ip", "add", "dns", interfaceName, secondary], ct);
+            if (!r2.Success) { /* rollback primary */ 
+                await _executor.ExecuteAsync(CAO.Shared.Security.SystemCommandKey.NetShInterfaceIpSetDnsDhcp, ["interface","ip","set","dns",interfaceName,"dhcp"], ct);
+                return OperationResult.Fail($"No se pudo aplicar DNS secundario {secondary}: {r2.StdErr}", r2.StdErr);
+            }
+        }
+        // Verify with small delay for adapter refresh
+        try { await Task.Delay(400, ct); } catch { }
+        if (dnsProvider != null)
+        {
+            var after = dnsProvider.GetDnsServers(interfaceName);
+            var ok = after.Any(a => a == primary);
+            if (!ok)
+            {
+                // Rollback to previous (DHCP if empty, else static)
+                if (before.Length == 0)
+                    await _executor.ExecuteAsync(CAO.Shared.Security.SystemCommandKey.NetShInterfaceIpSetDnsDhcp, ["interface","ip","set","dns",interfaceName,"dhcp"], ct);
+                else
+                    await _executor.ExecuteAsync(CAO.Shared.Security.SystemCommandKey.NetShInterfaceIpSetDnsPrimary, ["interface","ip","set","dns",interfaceName,"static", before[0]], ct);
+                return OperationResult.Fail($"Verificación fallida: DNS no coincide tras aplicar {primary}. Rollback ejecutado.", "verification-failed");
+            }
+        }
+        return OperationResult.Ok($"DNS {primary} aplicado a {interfaceName} — verificado.");
     }
 
     private async Task<SystemContext> GetContextAsync() =>

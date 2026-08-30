@@ -33,6 +33,15 @@ Write-Host "== Gate 5: E2E 10 flujos ==" -ForegroundColor Cyan
 dotnet test tests\CA-O.Integration.Tests -c $Configuration --no-build --filter "FullyQualifiedName~E2EFlowsTests"
 if ($LASTEXITCODE -ne 0) { $failed = $true }
 
+Write-Host "== Gate 6: packaging (no root uninstall.exe/.ps1) ==" -ForegroundColor Cyan
+$releaseDir = "artifacts/release"
+if (Test-Path $releaseDir) {
+    if (Test-Path (Join-Path $releaseDir "uninstall.exe")) { Write-Host "FAIL: uninstall.exe in root" -ForegroundColor Red; $failed = $true }
+    if (Test-Path (Join-Path $releaseDir "uninstall.ps1")) { Write-Host "FAIL: uninstall.ps1 in root" -ForegroundColor Red; $failed = $true }
+    if (-not (Test-Path (Join-Path $releaseDir "uninstall/CA-O.Uninstaller.exe"))) { Write-Host "FAIL: uninstall/CA-O.Uninstaller.exe missing" -ForegroundColor Red; $failed = $true }
+    else { Write-Host "Gate 6 packaging OK" -ForegroundColor Green }
+} else { Write-Host "Gate 6 skipped (no artifacts/release)" -ForegroundColor Yellow }
+
 if ($failed) {
     Write-Host "RELEASE GATES FAILED" -ForegroundColor Red
     exit 1

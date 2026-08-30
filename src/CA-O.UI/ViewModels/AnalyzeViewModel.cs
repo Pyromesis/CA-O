@@ -71,6 +71,41 @@ public sealed partial class AnalyzeViewModel : ObservableObject
     /// Delega al SystemAnalysisService unificado (§5) — elimina duplicación Dashboard/Analyze.
     /// Mantiene estado por módulo para UI pero la verdad proviene del servicio.
     /// </summary>
+    public void RestoreFromState(CAO.Shared.SystemContext? context, IReadOnlyList<AnalysisModuleResult>? modules = null)
+    {
+        if (context == null) return;
+        // Hydrate module results from persisted state without calling ResetResults
+        OverallStatus = $"Datos del {_uiState.LastAnalysisUtc?.ToLocalTime():g} cargados.";
+        if (modules != null)
+        {
+            foreach (var r in modules)
+            {
+                switch (r.Module)
+                {
+                    case "Network": NetworkResult = r; break;
+                    case "Security": SecurityResult = r; break;
+                    case "Storage": StorageResult = r; break;
+                    case "Drivers": DriversResult = r; break;
+                    case "System": SystemResult = r; break;
+                    case "Thermal": ThermalResult = r; break;
+                }
+            }
+        }
+    }
+
+    public void HydrateFromPersistedAnalysis(CAO.Infrastructure.Persistence.AnalysisStateStore.PersistedAnalysis? persisted)
+    {
+        if (persisted?.Context == null) return;
+        OverallStatus = persisted.AnalysisState == "CompletedWithWarnings" ? "Análisis completado con advertencias" : "Análisis completo";
+        // Populate module placeholders as Completed from persisted health
+        NetworkResult = new AnalysisModuleResult("Network", AnalysisModuleStatus.Completed, persisted.Duration, "persistido", null, null, Array.Empty<string>());
+        SecurityResult = new AnalysisModuleResult("Security", AnalysisModuleStatus.Completed, TimeSpan.Zero, "persistido", null, null, Array.Empty<string>());
+        StorageResult = new AnalysisModuleResult("Storage", AnalysisModuleStatus.Completed, TimeSpan.Zero, "persistido", null, null, Array.Empty<string>());
+        DriversResult = new AnalysisModuleResult("Drivers", AnalysisModuleStatus.Completed, TimeSpan.Zero, "persistido", null, null, Array.Empty<string>());
+        SystemResult = new AnalysisModuleResult("System", AnalysisModuleStatus.Completed, TimeSpan.Zero, $"{persisted.Context.CpuName}", null, null, Array.Empty<string>());
+        ThermalResult = new AnalysisModuleResult("Thermal", AnalysisModuleStatus.Completed, TimeSpan.Zero, persisted.Context.ThermalState.ToString(), null, null, Array.Empty<string>());
+    }
+
     public async Task<IReadOnlyList<AnalysisModuleResult>> RunAsync(CancellationToken ct = default)
     {
         if (IsRunning) return Array.Empty<AnalysisModuleResult>();

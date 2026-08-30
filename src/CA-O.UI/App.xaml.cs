@@ -19,17 +19,24 @@ public partial class App : Application
         try
         {
             AppHost.Initialize();
-        // Phase 1 startup: load persisted analysis + history + recovery without blocking UI (§7, §68)
+        // Phase 1 startup: load persisted analysis centrally via AnalysisSessionService (§7)
         try
         {
-            var store = AppHost.Resolve<CAO.Infrastructure.Persistence.AnalysisStateStore>();
-            var persisted = store.LoadLatestAnalysis();
+            var session = AppHost.Resolve<CAO.Infrastructure.Persistence.AnalysisSessionService>();
+            var persisted = session.LoadLatest();
             if (persisted?.Context != null)
             {
                 var uiState = AppHost.Resolve<CAO.UI.ViewModels.UiState>();
                 uiState.Context = persisted.Context;
                 uiState.Recommendations = persisted.Recommendations ?? Array.Empty<CAO.Shared.Recommendation>();
                 uiState.LastAnalysisUtc = persisted.TimestampUtc;
+                // freshness labels
+                var store = AppHost.Resolve<CAO.Infrastructure.Persistence.AnalysisStateStore>();
+                var fp = CAO.Infrastructure.Persistence.AnalysisStateStore.ComputeGamesFingerprint(persisted.Context.GamesDetected);
+                var (fresh, reason, age) = store.GetFreshness(persisted, persisted.Context, fp);
+                uiState.FreshnessLabel = store.GetFreshnessLabel(fresh, reason, age);
+                uiState.StaleReason = reason.ToString();
+                uiState.AnalysisAgeLabel = store.GetStatusLabel(persisted);
             }
         }
         catch (Exception ex) { WriteCrashLog(ex); /* degraded: no previous analysis, don't block startup */ }

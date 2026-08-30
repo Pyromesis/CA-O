@@ -23,6 +23,8 @@ public sealed partial class DashboardPage : Page
         DataContext = _vm;
         ApplyTexts();
         RenderState();
+        var uiState0 = AppHost.Resolve<ViewModels.UiState>();
+        uiState0.LanguageChanged += (_, __) => DispatcherQueue.TryEnqueue(ApplyTexts);
         _vm.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName is null or nameof(ViewModels.DashboardViewModel.Health) or nameof(ViewModels.DashboardViewModel.Recommendations) or nameof(ViewModels.DashboardViewModel.StatusMessage))
@@ -63,12 +65,15 @@ public sealed partial class DashboardPage : Page
         NotApplicableLabel.Text = Localizer.Get("dashboard.notApplicable");
         BucketsHeader.Text = Localizer.Get("dashboard.health");
         FindingsHeader.Text = Localizer.Get("dashboard.findings");
-        HardwareHeader.Text = "Hardware y sistema";
+        HardwareHeader.Text = Localizer.Get("dashboard.health"); // fallback localized
         NoClaimsNote.Text = Localizer.Get("dashboard.noClaims");
+        GoOptimizeButton.Content = Localizer.Get("dashboard.goOptimize");
+        WhyScoresButton.Content = Localizer.Get("dashboard.whyState");
         var uiState = AppHost.Resolve<ViewModels.UiState>();
         var when = uiState.LastAnalysisUtc?.ToLocalTime().ToString("g") ?? Localizer.Get("dashboard.never");
         LastAnalysisText.Text = $"{Localizer.Get("dashboard.lastAnalysis")}: {when}";
         AnalyzeStatusText.Text = "";
+        try { Helpers.LocalizationHelper.LocalizeTree(this.Content as Microsoft.UI.Xaml.DependencyObject ?? this); } catch { }
     }
 
     private void RenderState()
@@ -101,6 +106,19 @@ public sealed partial class DashboardPage : Page
             PendingRebootBar.IsOpen = false; // file rename solo -> silenciar banner, sigue en contexto para gating
         RecoveryBar.IsOpen = uiState.RecoveryCandidates.Count > 0;
         ServiceInfoBar.IsOpen = uiState.ServiceStatus is "unavailable" or "unknown";
+        // Freshness banner (weekly recommendation)
+        try
+        {
+            var store = AppHost.Resolve<Infrastructure.Persistence.AnalysisStateStore>();
+            var session = AppHost.Resolve<Infrastructure.Persistence.AnalysisSessionService>();
+            var fp = uiState.Context != null ? Infrastructure.Persistence.AnalysisStateStore.ComputeGamesFingerprint(uiState.Context.GamesDetected) : null;
+            var (fresh, reason, age) = store.GetFreshness(session.GetLastAnalysis(), uiState.Context, fp);
+            if (fresh == Infrastructure.Persistence.AnalysisFreshness.Unavailable) { FreshnessBar.IsOpen = false; }
+            else if (fresh == Infrastructure.Persistence.AnalysisFreshness.Fresh) { FreshnessBar.Title = Localizer.Get("analyze.fresh"); FreshnessBar.Message = Localizer.Format("analyze.lastAnalysis", (int)age.TotalDays); FreshnessBar.Severity = InfoBarSeverity.Success; FreshnessBar.IsOpen = true; }
+            else if (fresh == Infrastructure.Persistence.AnalysisFreshness.Stale && reason == Infrastructure.Persistence.StaleReason.GameInventoryChanged) { FreshnessBar.Title = Localizer.Get("analyze.gameChanged"); FreshnessBar.Message = Localizer.Get("analyze.gameChangedMessage"); FreshnessBar.Severity = InfoBarSeverity.Warning; FreshnessBar.IsOpen = true; }
+            else if (fresh == Infrastructure.Persistence.AnalysisFreshness.Stale) { FreshnessBar.Title = Localizer.Get("analyze.stale"); FreshnessBar.Message = Localizer.Get("analyze.staleMessage") + " " + Localizer.Get("analyze.gameHint"); FreshnessBar.Severity = InfoBarSeverity.Warning; FreshnessBar.IsOpen = true; }
+            else if (fresh == Infrastructure.Persistence.AnalysisFreshness.VeryStale) { FreshnessBar.Title = Localizer.Get("analyze.veryStale"); FreshnessBar.Message = Localizer.Get("analyze.veryStaleMessage"); FreshnessBar.Severity = InfoBarSeverity.Warning; FreshnessBar.IsOpen = true; }
+        } catch { FreshnessBar.IsOpen = false; }
 
         if (context is null)
         {
@@ -263,10 +281,11 @@ public sealed partial class DashboardPage : Page
 
     private void OnGoOptimizeClick(object sender, RoutedEventArgs e)
     {
-        // Navigate to Optimize — shell hosts NavigationView selection
-        if (App.Current is App app && app is not null)
+        if (MainWindow.Current != null) MainWindow.Current.SelectRoute("optimize");
+        else
         {
-            // Best effort: locate MainWindow via AppServices pattern
+            var nav = AppHost.Resolve<Navigation.INavigationService>();
+            nav.Select("optimize");
         }
     }
 

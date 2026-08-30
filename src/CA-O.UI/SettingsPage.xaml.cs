@@ -1,5 +1,6 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using CAO.UI.Helpers;
 
 namespace CAO.UI.Pages;
 
@@ -12,12 +13,6 @@ public sealed partial class SettingsPage : Page
     {
         InitializeComponent();
 
-        ExpertSwitch.Header = Localizer.Get("settings.expertMode");
-        ExpertWarnBar.Message = Localizer.Get("optimize.expertWarning");
-        ThemeLabel.Text = Localizer.Get("settings.theme");
-        LanguageLabel.Text = Localizer.Get("settings.language");
-        ServiceButton.Content = Localizer.Get("settings.serviceCheck");
-
         foreach (var language in Localizer.SupportedLanguages)
         {
             LanguageBox.Items.Add(language);
@@ -25,6 +20,9 @@ public sealed partial class SettingsPage : Page
 
         _vm = AppHost.Resolve<ViewModels.SettingsViewModel>();
         DataContext = _vm;
+        ApplyTexts();
+        var uiState = AppHost.Resolve<ViewModels.UiState>();
+        uiState.LanguageChanged += (_, __) => DispatcherQueue.TryEnqueue(ApplyTexts);
         ExpertSwitch.IsOn = _vm.ExpertMode;
         ExpertWarnBar.IsOpen = _vm.ExpertMode;
         Select(ThemeBox, _vm.Theme);
@@ -40,6 +38,22 @@ public sealed partial class SettingsPage : Page
             if (e.PropertyName == nameof(ViewModels.SettingsViewModel.ServiceStatus))
                 DispatcherQueue.TryEnqueue(() => ServiceStatusText.Text = $"Servicio: {_vm.ServiceStatus}");
         };
+    }
+
+    private void ApplyTexts()
+    {
+        ExpertSwitch.Header = Localizer.Get("settings.expertMode");
+        ExpertWarnBar.Message = Localizer.Get("optimize.expertWarning");
+        ThemeLabel.Text = Localizer.Get("settings.theme");
+        LanguageLabel.Text = Localizer.Get("settings.language");
+        ServiceButton.Content = Localizer.Get("settings.serviceCheck");
+        try { LocalizationHelper.LocalizeTree(this.Content as DependencyObject ?? this); } catch { }
+    }
+
+    protected override void OnNavigatedTo(Microsoft.UI.Xaml.Navigation.NavigationEventArgs e)
+    {
+        base.OnNavigatedTo(e);
+        ApplyTexts();
     }
 
     private void OnExpertToggled(object sender, RoutedEventArgs e)

@@ -1,5 +1,6 @@
 #pragma warning disable CA2016
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using CAO.Infrastructure.Networking;
 using CAO.Infrastructure.Security;
@@ -21,9 +22,96 @@ public sealed partial class AnalyzePage : Page
     {
         InitializeComponent();
         _viewModel = AppHost.Resolve<AnalyzeViewModel>();
-        // Opcional: exponer para binding futuro
         DataContext = _viewModel;
         Loaded += (_, _) => LoadPersisted();
+        var uiState = AppHost.Resolve<ViewModels.UiState>();
+        uiState.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(ViewModels.UiState.Language))
+                DispatcherQueue.TryEnqueue(ApplyTexts);
+        };
+        ApplyTexts();
+    }
+
+    private void ApplyTexts()
+    {
+        // Localized static texts via Localizer
+        try { NoteBar.Title = Localizer.Get("analyze.diagnosticsFirst"); } catch { }
+        try { NoteBar.Message = Localizer.Get("analyze.diagnosticsFirstMessage"); } catch { }
+        try { RunButton.Content = Localizer.Get("analyze.runFull"); AutomationProperties.SetName(RunButton, Localizer.Get("analyze.runFull")); } catch { }
+        try { CancelButton.Content = Localizer.Get("common.cancel"); AutomationProperties.SetName(CancelButton, Localizer.Get("common.cancel")); } catch { }
+        try { DnsActionButton.Content = Localizer.Get("analyze.applyDns"); } catch { }
+        try { Helpers.LocalizationHelper.LocalizeTree(this.Content as Microsoft.UI.Xaml.DependencyObject ?? this); } catch { }
+        if (_viewModel != null)
+        {
+            var state = AppHost.Resolve<ViewModels.UiState>();
+            var store = AppHost.Resolve<CAO.Infrastructure.Persistence.AnalysisStateStore>();
+            var session = AppHost.Resolve<CAO.Infrastructure.Persistence.AnalysisSessionService>();
+            var fp = state.Context != null ? CAO.Infrastructure.Persistence.AnalysisStateStore.ComputeGamesFingerprint(state.Context.GamesDetected) : null;
+            var (fresh, reason, age) = store.GetFreshness(session.GetLastAnalysis(), state.Context, fp);
+            state.FreshnessLabel = store.GetFreshnessLabel(fresh, reason, age);
+        }
+    }
+
+    protected override void OnNavigatedTo(Microsoft.UI.Xaml.Navigation.NavigationEventArgs e)
+    {
+        base.OnNavigatedTo(e);
+        LoadPersisted();
+        // Hydrate VM without ResetResults if persisted analysis exists
+        var session = AppHost.Resolve<CAO.Infrastructure.Persistence.AnalysisSessionService>();
+        var persisted = session.GetLastAnalysis();
+        if (persisted?.Context != null)
+        {
+            _viewModel.HydrateFromPersistedAnalysis(persisted);
+            RenderFromViewModel();
+        }
+        ApplyTexts();
+        UpdateFreshnessBanner();
+    }
+
+    private void UpdateFreshnessBanner()
+    {
+        var state = AppHost.Resolve<ViewModels.UiState>();
+        var store = AppHost.Resolve<CAO.Infrastructure.Persistence.AnalysisStateStore>();
+        var session = AppHost.Resolve<CAO.Infrastructure.Persistence.AnalysisSessionService>();
+        var persisted = session.GetLastAnalysis();
+        var fp = state.Context != null ? CAO.Infrastructure.Persistence.AnalysisStateStore.ComputeGamesFingerprint(state.Context.GamesDetected) : null;
+        var (fresh, reason, age) = store.GetFreshness(persisted, state.Context, fp);
+        if (fresh == CAO.Infrastructure.Persistence.AnalysisFreshness.Unavailable)
+        {
+            NoteBar.Severity = InfoBarSeverity.Informational;
+            NoteBar.Title = Localizer.Get("analyze.noAnalysis");
+            NoteBar.Message = Localizer.Get("analyze.noAnalysisMessage");
+            NoteBar.IsOpen = true;
+        }
+        else if (fresh == CAO.Infrastructure.Persistence.AnalysisFreshness.Fresh)
+        {
+            NoteBar.Severity = InfoBarSeverity.Success;
+            NoteBar.Title = Localizer.Get("analyze.fresh");
+            NoteBar.Message = $"{Localizer.Format("analyze.lastAnalysis", (int)age.TotalDays)} · {Localizer.Get("analyze.freshMessage")}";
+            NoteBar.IsOpen = true;
+        }
+        else if (fresh == CAO.Infrastructure.Persistence.AnalysisFreshness.Stale && reason == CAO.Infrastructure.Persistence.StaleReason.GameInventoryChanged)
+        {
+            NoteBar.Severity = InfoBarSeverity.Warning;
+            NoteBar.Title = Localizer.Get("analyze.gameChanged");
+            NoteBar.Message = Localizer.Get("analyze.gameChangedMessage");
+            NoteBar.IsOpen = true;
+        }
+        else if (fresh == CAO.Infrastructure.Persistence.AnalysisFreshness.Stale)
+        {
+            NoteBar.Severity = InfoBarSeverity.Warning;
+            NoteBar.Title = Localizer.Get("analyze.stale");
+            NoteBar.Message = Localizer.Get("analyze.staleMessage");
+            NoteBar.IsOpen = true;
+        }
+        else if (fresh == CAO.Infrastructure.Persistence.AnalysisFreshness.VeryStale)
+        {
+            NoteBar.Severity = InfoBarSeverity.Warning;
+            NoteBar.Title = Localizer.Get("analyze.veryStale");
+            NoteBar.Message = Localizer.Get("analyze.veryStaleMessage");
+            NoteBar.IsOpen = true;
+        }
     }
 
     private void LoadPersisted()
@@ -54,6 +142,7 @@ public sealed partial class AnalyzePage : Page
             GamingGamesText.Text += $"\nAnti-cheats: {string.Join(", ", ctx.AntiCheats.Select(a => a.Kind.ToString()))}";
 
         StatusText.Text = state.LastAnalysisUtc is null ? "Datos del último análisis cargados." : $"Datos del {state.LastAnalysisUtc.Value.ToLocalTime():g} cargados.";
+        UpdateFreshnessBanner();
     }
 
     private async void OnRunClick(object sender, RoutedEventArgs e)
@@ -299,27 +388,20 @@ public sealed partial class AnalyzePage : Page
             if (resp is { Accepted: true })
             {
                 DnsBestText.Text = $"✓ DNS {_bestDns.Resolver} aplicado a {iface} — verificado";
-                var ok = new ContentDialog { Title = "DNS aplicado", Content = new TextBlock { Text = $"{_bestDns.Resolver} aplicado correctamente a {iface}.\nHaz un test de ping para verificar la mejora.", TextWrapping = TextWrapping.Wrap }, CloseButtonText = "Aceptar", XamlRoot = Content.XamlRoot };
+                var ok = new ContentDialog { Title = Localizer.Get("dns.applied"), Content = new TextBlock { Text = $"{Localizer.Get("dns.applied")} {iface}\n{Localizer.Get("dns.primary")}: {_bestDns.Resolver}\n{Localizer.Get("dns.verified")}", TextWrapping = TextWrapping.Wrap }, CloseButtonText = "Aceptar", XamlRoot = Content.XamlRoot };
                 await ok.ShowAsync();
             }
             else
             {
-                // Fallback: copiar e instruir
-                var dataPackage = new Windows.ApplicationModel.DataTransfer.DataPackage();
-                dataPackage.SetText(_bestDns.Resolver);
-                Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(dataPackage);
-                var fallback = new ContentDialog { Title = "No se pudo aplicar automáticamente", Content = new TextBlock { Text = $"El servicio respondió [{resp?.ErrorCode}]: {resp?.SafeMessage}\n{_bestDns.Resolver} copiado al portapapeles.\nPasos manuales: Ajustes > Red > Propiedades del adaptador > IPv4 > DNS manual.", TextWrapping = TextWrapping.Wrap }, CloseButtonText = "Aceptar", XamlRoot = Content.XamlRoot };
+                var fallback = new ContentDialog { Title = Localizer.Get("dns.failed"), Content = new TextBlock { Text = $"{Localizer.Get("dns.failed")} [{resp?.ErrorCode}]: {resp?.SafeMessage}", TextWrapping = TextWrapping.Wrap }, CloseButtonText = "Aceptar", XamlRoot = Content.XamlRoot };
                 await fallback.ShowAsync();
-                DnsBestText.Text = $"DNS {_bestDns.Resolver} copiado — error: {resp?.ErrorCode}";
+                DnsBestText.Text = $"{Localizer.Get("dns.failed")} — {resp?.ErrorCode}";
             }
         }
         catch (Exception ex)
         {
-            DnsBestText.Text = $"Error aplicando DNS: {ex.Message}";
-            var dataPackage = new Windows.ApplicationModel.DataTransfer.DataPackage();
-            dataPackage.SetText(_bestDns.Resolver);
-            Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(dataPackage);
-            var err = new ContentDialog { Title = "DNS copiado (fallback)", Content = new TextBlock { Text = $"{_bestDns.Resolver} copiado. Aplícalo manualmente en Ajustes de red.\nError: {ex.Message}", TextWrapping = TextWrapping.Wrap }, CloseButtonText = "Aceptar", XamlRoot = Content.XamlRoot };
+            DnsBestText.Text = $"{Localizer.Get("dns.failed")}: {ex.Message}";
+            var err = new ContentDialog { Title = Localizer.Get("dns.failed"), Content = new TextBlock { Text = $"{Localizer.Get("dns.failed")}\n{ex.Message}", TextWrapping = TextWrapping.Wrap }, CloseButtonText = "Aceptar", XamlRoot = Content.XamlRoot };
             await err.ShowAsync();
         }
     }

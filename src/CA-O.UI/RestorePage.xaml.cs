@@ -1,6 +1,7 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using CAO.Shared;
+using CAO.UI.Helpers;
 
 namespace CAO.UI.Pages;
 
@@ -16,9 +17,11 @@ public sealed partial class RestorePage : Page
     public RestorePage()
     {
         InitializeComponent();
-        NoteBar.Message = Localizer.Get("restore.pointNote");
         _vm = AppHost.Resolve<ViewModels.RestoreViewModel>();
         DataContext = _vm;
+        ApplyTexts();
+        var uiState = AppHost.Resolve<ViewModels.UiState>();
+        uiState.LanguageChanged += (_, __) => DispatcherQueue.TryEnqueue(ApplyTexts);
         _vm.RefreshCommand.Execute(null);
         RecoveryHintText.Text = _vm.RecoveryHint;
         _vm.PropertyChanged += (_, e) =>
@@ -29,9 +32,16 @@ public sealed partial class RestorePage : Page
         RenderVm();
     }
 
+    private void ApplyTexts()
+    {
+        NoteBar.Message = Localizer.Get("restore.pointNote");
+        try { LocalizationHelper.LocalizeTree(this.Content as DependencyObject ?? this); } catch { }
+    }
+
     protected override void OnNavigatedTo(Microsoft.UI.Xaml.Navigation.NavigationEventArgs e)
     {
         base.OnNavigatedTo(e);
+        ApplyTexts();
         _vm.RefreshCommand.Execute(null);
     }
 

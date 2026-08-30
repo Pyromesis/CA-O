@@ -3,6 +3,7 @@ using Microsoft.UI.Xaml.Controls;
 using CAO.Infrastructure.Input;
 using CAO.Infrastructure.SystemInterop;
 using CAO.Shared;
+using CAO.UI.Helpers;
 
 namespace CAO.UI.Pages;
 
@@ -18,15 +19,28 @@ public sealed partial class DiagnosticsPage : Page
     public DiagnosticsPage()
     {
         InitializeComponent();
-        RunButton.Content = Localizer.Get("analyze.run");
-        if (StatusText is not null) StatusText.Text = "";
         _vm = AppHost.Resolve<ViewModels.DiagnosticsViewModel>();
         DataContext = _vm;
+        ApplyTexts();
+        var uiState = AppHost.Resolve<ViewModels.UiState>();
+        uiState.LanguageChanged += (_, __) => DispatcherQueue.TryEnqueue(ApplyTexts);
         _vm.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName is null or nameof(ViewModels.DiagnosticsViewModel.InputSummary) or nameof(ViewModels.DiagnosticsViewModel.ThermalSummary) or nameof(ViewModels.DiagnosticsViewModel.PerformanceSummary))
                 DispatcherQueue.TryEnqueue(RenderVm);
         };
+    }
+
+    private void ApplyTexts()
+    {
+        RunButton.Content = Localizer.Get("diagnostics.runAll");
+        try { LocalizationHelper.LocalizeTree(this.Content as DependencyObject ?? this); } catch { }
+    }
+
+    protected override void OnNavigatedTo(Microsoft.UI.Xaml.Navigation.NavigationEventArgs e)
+    {
+        base.OnNavigatedTo(e);
+        ApplyTexts();
     }
 
     private void RenderVm()

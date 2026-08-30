@@ -41,6 +41,14 @@
                 </StackPanel>
             </Border>
 
+            <!-- Bucket filters (spec 12-15) -->
+            <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4,0,0">
+                <Button x:Name="FilterAllButton" Content="Todas (0)" Click="OnFilterAllClick" Style="{StaticResource AccentButtonStyle}" FontSize="12"/>
+                <Button x:Name="FilterRecommendedButton" Content="Recomendadas (0)" Click="OnFilterRecommendedClick" FontSize="12"/>
+                <Button x:Name="FilterOptionalButton" Content="Opcionales (0)" Click="OnFilterOptionalClick" FontSize="12"/>
+                <Button x:Name="FilterExperimentalButton" Content="Experimentales (0)" Click="OnFilterExperimentalClick" FontSize="12"/>
+            </StackPanel>
+            <InfoBar x:Name="FilterInfoBar" IsOpen="False" Severity="Informational" IsClosable="False"/>
             <TextBlock Text="Recomendaciones" FontWeight="SemiBold" FontSize="13" Opacity="0.85"/>
 
             <Border x:Name="EmptyStateCard" Style="{StaticResource CaoCardStyle}" Visibility="Collapsed">
