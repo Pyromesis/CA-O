@@ -67,9 +67,9 @@ Log($"Destino (donde se instala la app): {installDir}");
 
 if (!File.Exists(payloadUi) || !File.Exists(payloadService))
 {
-    Console.WriteLine("Payload no local — descargando desde GitHub Release v2.1.2...");
-    var zipUrl = "https://github.com/Pyromesis/CA-O/releases/download/v2.1.2/CA-O-2.1.2-win-x64.zip";
-    var fallbackUrl = "https://github.com/Pyromesis/CA-O/releases/download/v2.1.1/CA-O-2.1.1-win-x64.zip";
+    Console.WriteLine("Payload no local — descargando desde GitHub Release v2.1.4...");
+    var zipUrl = "https://github.com/Pyromesis/CA-O/releases/download/v2.1.4/CA-O-2.1.4-win-x64.zip";
+    var fallbackUrl = "https://github.com/Pyromesis/CA-O/releases/download/v2.1.2/CA-O-2.1.2-win-x64.zip";
     var tmpZip = Path.Combine(Path.GetTempPath(), "CA-O-payload.zip");
     var tmpDir = Path.Combine(Path.GetTempPath(), "CA-O-payload");
     try
