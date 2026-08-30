@@ -297,10 +297,10 @@ internal void OnCancelClick(object sender, RoutedEventArgs e)
 
     private async Task<(string uiExe, string svcExe)> DownloadPayloadAsync(CancellationToken ct)
     {
-        UpdateProgress(5, "Descargando payload (394 MB)...", "Descargando desde GitHub Release v2.1.1");
-        var zipUrl = "https://github.com/Pyromesis/CA-O/releases/download/v2.1.1/CA-O-2.1.1-win-x64.zip";
-        var fallbackUrl = "https://github.com/Pyromesis/CA-O/releases/latest/download/CA-O-2.1.1-win-x64.zip";
-        var fallbackOld = "https://github.com/Pyromesis/CA-O/releases/download/v2.1.0/CA-O-2.1.0-win-x64.zip";
+        UpdateProgress(5, "Descargando payload (394 MB)...", "Descargando desde GitHub Release v2.1.2");
+        var zipUrl = "https://github.com/Pyromesis/CA-O/releases/download/v2.1.2/CA-O-2.1.2-win-x64.zip";
+        var fallbackUrl = "https://github.com/Pyromesis/CA-O/releases/latest/download/CA-O-2.1.2-win-x64.zip";
+        var fallbackOld = "https://github.com/Pyromesis/CA-O/releases/download/v2.1.1/CA-O-2.1.1-win-x64.zip";
         var tmpZip = Path.Combine(Path.GetTempPath(), "CA-O-payload.zip");
         var tmpDir = Path.Combine(Path.GetTempPath(), "CA-O-payload-gui");
 
