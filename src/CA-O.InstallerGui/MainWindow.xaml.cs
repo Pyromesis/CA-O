@@ -297,10 +297,10 @@ internal void OnCancelClick(object sender, RoutedEventArgs e)
 
     private async Task<(string uiExe, string svcExe)> DownloadPayloadAsync(CancellationToken ct)
     {
-        UpdateProgress(5, "Descargando payload (394 MB)...", "Descargando desde GitHub Release v2.1.0");
-        var zipUrl = "https://github.com/Pyromesis/CA-O/releases/download/v2.1.0/CA-O-2.1.0-win-x64.zip";
-        var fallbackUrl = "https://github.com/Pyromesis/CA-O/releases/latest/download/CA-O-2.1.0-win-x64.zip";
-        var fallbackOld = "https://github.com/Pyromesis/CA-O/releases/download/v2.0.17/CA-O-2.0.17-win-x64.zip";
+        UpdateProgress(5, "Descargando payload (394 MB)...", "Descargando desde GitHub Release v2.1.1");
+        var zipUrl = "https://github.com/Pyromesis/CA-O/releases/download/v2.1.1/CA-O-2.1.1-win-x64.zip";
+        var fallbackUrl = "https://github.com/Pyromesis/CA-O/releases/latest/download/CA-O-2.1.1-win-x64.zip";
+        var fallbackOld = "https://github.com/Pyromesis/CA-O/releases/download/v2.1.0/CA-O-2.1.0-win-x64.zip";
         var tmpZip = Path.Combine(Path.GetTempPath(), "CA-O-payload.zip");
         var tmpDir = Path.Combine(Path.GetTempPath(), "CA-O-payload-gui");
 
@@ -349,9 +349,8 @@ internal void OnCancelClick(object sender, RoutedEventArgs e)
                         var tag = System.Text.Json.JsonDocument.Parse(json).RootElement.GetProperty("tag_name").GetString();
                         if (!string.IsNullOrWhiteSpace(tag))
                         {
-                            var apiUrl = $"https://github.com/Pyromesis/CA-O/releases/download/{tag}/CA-O-{tag}-win-x64.zip";
-                            // fallback a nombre genérico si el tag no sigue patrón CA-O-2.x
-                            var altUrl = $"https://github.com/Pyromesis/CA-O/releases/download/{tag}/CA-O-2.0.15-win-x64.zip";
+                             var apiUrl = $"https://github.com/Pyromesis/CA-O/releases/download/{tag}/CA-O-{tag}-win-x64.zip";
+                             var altUrl = $"https://github.com/Pyromesis/CA-O/releases/download/{tag}/CA-O-2.1.1-win-x64.zip";
                             Log($"Probando API latest {tag} -> {apiUrl}");
                             if (!await TryDownload(apiUrl))
                             {
