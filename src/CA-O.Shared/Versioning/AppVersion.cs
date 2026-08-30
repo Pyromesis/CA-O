@@ -4,8 +4,8 @@ namespace CAO.Shared;
 public static class AppVersion
 {
     public const string Major = "2";
-    public const string Minor = "0";
-    public const string Patch = "0";
+    public const string Minor = "1";
+    public const string Patch = "4";
 
     public const string Semantic = $"{Major}.{Minor}.{Patch}";
 
