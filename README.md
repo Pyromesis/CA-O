@@ -6,11 +6,11 @@
 [![.NET 10](https://img.shields.io/badge/.NET%2010-512BD4?style=flat-square&logo=dotnet&logoColor=white)](global.json)
 [![WinUI 3](https://img.shields.io/badge/WinUI%203-00B7C3?style=flat-square&logo=windows&logoColor=white)](https://microsoft.github.io/microsoft-ui-xaml/)
 [![Build](https://img.shields.io/badge/build-passing-brightgreen?style=flat-square)](https://github.com/Pyromesis/CA-O/actions)
-[![Tests](https://img.shields.io/badge/tests-277%20passed-brightgreen?style=flat-square)](#pruebas)
-[![Release](https://img.shields.io/badge/release-v2.0.6-blue?style=flat-square)](https://github.com/Pyromesis/CA-O/releases/tag/v2.0.6)
+[![Tests](https://img.shields.io/badge/tests-334%20passed-brightgreen?style=flat-square)](#pruebas)
+[![Release](https://img.shields.io/badge/release-v2.1.0-blue?style=flat-square)](https://github.com/Pyromesis/CA-O/releases/tag/v2.1.0)
 [![License](https://img.shields.io/badge/license-privado-lightgrey?style=flat-square)](#licencia)
 
-**Descargas v2.0.6:** [CA-O-Setup-GUI-x64.zip (92 MB, instalador GUI)](https://github.com/Pyromesis/CA-O/releases/download/v2.0.6/CA-O-Setup-GUI-x64.zip) | [CA-O-2.0.6-win-x64.zip (343 MB, paquete completo offline)](https://github.com/Pyromesis/CA-O/releases/download/v2.0.6/CA-O-2.0.6-win-x64.zip) | [Notas de la version](https://github.com/Pyromesis/CA-O/releases/tag/v2.0.6) | [Documentacion](docs/ARCHITECTURE.md)
+**Descargas v2.1.0:** [CA-O-Setup-GUI-x64.zip (92 MB, instalador GUI)](https://github.com/Pyromesis/CA-O/releases/download/v2.0.6/CA-O-Setup-GUI-x64.zip) | [CA-O-2.1.0-win-x64.zip (394 MB, paquete completo offline)](https://github.com/Pyromesis/CA-O/releases/download/v2.0.6/CA-O-2.0.6-win-x64.zip) | [Notas de la version](https://github.com/Pyromesis/CA-O/releases/tag/v2.1.0) | [Documentacion](docs/ARCHITECTURE.md)
 
 ---
 
@@ -169,7 +169,7 @@ Documentacion detallada en [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). Catalog
 
 ### Opcion A — Instalador GUI (recomendado, offline)
 
-1. Descarga [CA-O-2.0.6-win-x64.zip (343 MB)](https://github.com/Pyromesis/CA-O/releases/download/v2.0.6/CA-O-2.0.6-win-x64.zip) desde [Releases](https://github.com/Pyromesis/CA-O/releases/tag/v2.0.6).
+1. Descarga [CA-O-2.1.0-win-x64.zip (394 MB)](https://github.com/Pyromesis/CA-O/releases/download/v2.0.6/CA-O-2.0.6-win-x64.zip) desde [Releases](https://github.com/Pyromesis/CA-O/releases/tag/v2.1.0).
 2. Descomprime el zip. Mantiene la estructura `ui/`, `service/`, `gui-installer/`, `uninstall/`, `setup/`.
 3. Entra en `gui-installer/` y ejecuta `CA-O.InstallerGui.exe` con clic derecho y Ejecutar como administrador. Acepta el prompt de UAC.
 4. El instalador muestra Destino `C:\Program Files\CA-O`, opciones de acceso directo en escritorio y menu inicio, y barra de progreso. Al finalizar registra el servicio `CAO.Privileged` (inicio bajo demanda, policy de fallo restart) y crea la entrada ARP para desinstalacion.
@@ -316,7 +316,7 @@ Versiones centralizadas en `Directory.Packages.props` y `global.json`.
 
 ## Release y verificacion
 
-- **Version actual:** 2.0.6 — [Releases](https://github.com/Pyromesis/CA-O/releases/tag/v2.0.6)
+- **Version actual:** 2.0.6 — [Releases](https://github.com/Pyromesis/CA-O/releases/tag/v2.1.0)
 - **Artefactos:** `CA-O-Setup-GUI-x64.zip` (92 MB, GUI online), `CA-O-2.0.6-win-x64.zip` (343 MB, paquete completo offline con `ui/`, `service/`, `gui-installer/`, `setup/`, `uninstall/`).
 - **Manifests:** `artifacts/release/SHA256SUMS.txt` y `artifacts/sbom/bom.json` (CycloneDX 1.7, 71 paquetes) cuando `CycloneDX` esta instalado (`dotnet tool install --global CycloneDX`).
 - **Empaquetado:** `scripts/package.ps1` genera zip versionado con hash SHA-256. `scripts/build-release.ps1` publica `ui` y `service` como self-contained y `gui-installer` como self-contained sin single-file (requerido por WinUI 3).

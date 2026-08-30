@@ -206,6 +206,16 @@ public sealed class OptimizationEngine
         return await optimization.VerifyAsync(context, ct);
     }
 
+    public async Task<OperationResult> SetDnsAsync(string interfaceName, string dnsIp, CancellationToken ct = default)
+    {
+        if (!IsRunningAsAdmin()) return OperationResult.Fail("Se requieren privilegios.", "not-admin");
+        if (_executor is null) return OperationResult.Fail("Ejecutor no disponible.", "no-executor");
+        if (!System.Net.IPAddress.TryParse(dnsIp, out _)) return OperationResult.Fail($"IP DNS inválida: {dnsIp}", "invalid-ip");
+        var result = await _executor.ExecuteAsync(CAO.Shared.Security.SystemCommandKey.NetShInterfaceIpSetDnsPrimary,
+            ["interface", "ip", "set", "dns", interfaceName, "static", dnsIp], ct);
+        return result.Success ? OperationResult.Ok($"DNS {dnsIp} aplicado a {interfaceName}.") : OperationResult.Fail($"No se pudo aplicar DNS {dnsIp} a {interfaceName}: {result.StdErr}", result.StdErr);
+    }
+
     private async Task<SystemContext> GetContextAsync() =>
         _contextProvider is not null
             ? await _contextProvider.GetAsync()

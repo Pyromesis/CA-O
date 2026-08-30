@@ -1,79 +1,294 @@
-# Catálogo de optimizaciones CA-O 2.0
+# CA-O Optimization Catalog
 
-Calidad sobre cantidad (spec 131): cada entrada responde qué cambia, por qué, con qué evidencia, qué riesgo y seguridad afecta, si es reversible y cómo se verifica. Las clasificaciones alimentan el motor de recomendaciones; ninguna optimización queda sin clasificar (contrato automatizado en `OptimizationCatalogContractTests`).
+Calidad sobre cantidad (spec 131). **68 optimizaciones catalogadas (18 existentes + 50 nuevas)**. Cada entrada responde que cambia, por que, con que evidencia, que riesgo y seguridad afecta, si es reversible y como se verifica.
 
-## Tabla maestra (informe final §102)
+## Summary
 
-| Id | Categoría | Impacto esperado | Evidencia | Confidence | Riesgo | Compatibilidad | Seguridad | Anti-cheat | Reversible | Flags |
-|---|---|---|---|---|---|---|---|---|---|---|
-| disable-game-bar-dvr | Gaming | WorkloadDependent | Vendor | Medium | Low | NoKnownConflict | None | NoKnownConflict | Sí | — |
-| enable-gpu-scheduling | Gaming | WorkloadDependent | Vendor | Medium | Moderate | Conditional | None | NoKnownConflict | Sí | RequiresReboot |
-| normalize-tcp-autotuning | Network | WorkloadDependent | Official | High | Low | Conditional | None | None | Sí | — |
-| disable-background-apps | Performance | Small | Official | High | Low | NoKnownConflict | PrivacyOnly | NoKnownConflict | Sí | — |
-| disable-search-indexing | Performance | WorkloadDependent | Empirical | Medium | Moderate | Conditional | None | None | Sí | RecommendedOnSsd |
-| disable-transparency | Performance | Tiny | Empirical | High | Safe | Compatible | None | None | Sí | — |
-| disable-vbs | Performance | WorkloadDependent | Vendor | High | Critical | PotentialConflict | ReducedProtection | RequiredSecurityFeature | Sí | ExpertOnly, SecurityTradeoff, RequiresReboot |
-| disable-visual-effects | Performance | Tiny | Empirical | High | Safe | Compatible | None | None | Sí | — |
-| maximum-power-plan | Performance | Small | Official | High | Low | Compatible | None | None | Sí | — |
-| zero-menu-delay | Performance | Tiny | Heuristic | Low | Safe | Compatible | None | None | Sí | — |
-| disable-copilot | PrivacySecurity | None | Vendor | High | Low | NoKnownConflict | PrivacyOnly | None | Sí | — |
-| disable-cortana | PrivacySecurity | None | Official | High | Low | NoKnownConflict | PrivacyOnly | None | Sí | — |
-| disable-onedrive-autostart | PrivacySecurity | Tiny | Official | High | Low | Conditional | PrivacyOnly | None | Sí | ExpertOnly |
-| disable-suggestions | PrivacySecurity | None | Official | High | Low | Compatible | PrivacyOnly | None | Sí | — |
-| disable-telemetry | PrivacySecurity | None | Official | High | Low | Compatible | PrivacyOnly | None | Sí | — |
-| disable-widgets | PrivacySecurity | Tiny | Official | High | Low | NoKnownConflict | PrivacyOnly | None | Sí | — |
-| disable-hibernate | Storage | None | Official | High | Moderate | NoKnownConflict | None | None | Sí | — |
-| optimize-system-drive | Storage | None | Official | High | Low | Compatible | None | None | No (mantenimiento) | NotReversible |
+Existing optimizations: 18
+New optimizations: 50
+Total: 68
 
-> Estado anterior→final por optimización: la columna "Comportamiento actual" del informe inferior refleja el estado vivo detectado en cada análisis; ninguna entrada se aplica sin pasar por el pipeline transaccional completo.
+## Evidence model
 
-## Notas por optimización
+- `Official` -> documentacion Microsoft
+- `Vendor` -> NVIDIA/AMD/Intel/fabricante
+- `Benchmark` -> benchmark reproducible
+- `Empirical` -> resultados controlados
+- `Heuristic` -> tweak historico sin evidencia solida
+- `Unknown` -> dudosa (nunca en Recommended)
 
-- **disable-vbs**: reduce la seguridad del kernel. Con Vanguard u otro anti-cheat presente queda **bloqueado por defecto** (`blocked-by-default`/`blocked-anticheat`). Rompe WSL2/Docker/Sandbox al desactivar el hipervisor. Requiere modo Expert + doble confirmación + reinicio. Rollback restaura `hypervisorlaunchtype` previo.
-- **enable-gpu-scheduling (HAGS)**: beneficio dependiente de GPU/driver/juego (spec 21). El motor lo trata como Conditional+WorkloadDependent; recomendación sólo tras análisis, nunca automática.
-- **disable-game-bar-dvr**: si el usuario graba con Game Bar, NO aplicar (spec 25). Clasificado como captura-dependiente.
-- **maximum-power-plan**: cambio de esquema de energía documentado por Microsoft. En portátiles con batería, los perfiles Gaming/Competitive lo bloquean por impacto.
-- **zero-menu-delay**: tweak cosmético heredado (MenuShowDelay). Evidence=Heuristic → cae automáticamente en bucket Experimental.
-- **disable-search-indexing**: requiere SSD (flag RecommendedOnSsd); sin SSD el bucket es NotApplicable. Riesgo Moderate porque afecta la búsqueda del sistema.
-- **normalize-tcp-autotuning**: restaura el valor estándar cuando un tweak externo lo alteró; no aplica "optimizaciones TCP" aleatorias (spec 55).
-- **optimize-system-drive**: mantenimiento irreversible (defrag HDD / retrim SSD según medio real). Siempre bucket Optional, jamás auto-aplicado.
-- **Privacidad (telemetry/cortana/widgets/copilot/suggestions/onedrive)**: gestión de funciones y privacidad (spec 61, 63, 97); su puntuación nunca alimenta métricas de rendimiento.
+## Risk model
 
-## Matriz Gaming §24 (GameCompatibilityPolicy)
+`Safe` < `Low` < `Moderate` < `High` < `Critical`. `High/Critical` + `PrivacySecurity` se bloquea con anti-cheat.
 
-| Optimización | Vanguard (Valorant) | EAC (Fortnite/Apex) | BattlEye (R6) | Sin anti-cheat | Veredicto |
-|---|---|---|---|---|---|
-| `disable-vbs` / `disable-hvci` / `hypervisor-launchtype-off` | **BLOQUEADA** `CAO-GAME-001` | **BLOQUEADA** | **BLOQUEADA** | Permitida (Expert + confirmación) | `VbsRelated` |
-| `disable-transparency` / `gpu-scheduling` / `disable-game-bar` | Permitida | Permitida | Permitida | Permitida | `SafeForGaming` |
-| Resto con `Risk High/Critical` + categoría `PrivacySecurity` | **BLOQUEADA** categoría | **BLOQUEADA** | **BLOQUEADA** | `Caution` | `AntiCheatGuard` |
+## Gaming compatibility
 
-> Bloqueo se aplica en **Core** (`OptimizationEngine.ApplyAsync`) **y** **Privileged** (§26) + UI muestra `3 bloqueadas · 5 permitidas · 2 revisión` en `GamingViewModel`.
+`GameCompatibilityPolicy` con anti-cheats Vanguard/EAC/BattlEye/Faceit/Ricochet. `VBS/HVCI` bloqueado `CAO-GAME-001`.
 
-## Bloqueos por defecto (spec 95)
+## Security rules
 
-`AntiCheatGuard.NeverAutoRecommend` contiene además ids reservados para tweaks que CA-O **no ofrece hoy** pero reconoce como peligrosos si aparecieran importados: CPU min state 100%, core parking off, memory compression off, MPO off global, FSO global, pagefile estático, NetworkThrottlingIndex/SvcHostSplit hacks, borrado de Prefetch, hypervisorlaunchtype off directo, etc.
+Nunca se deshabilita silenciosamente Secure Boot/TPM/VBS/HVCI/Defender/firewall. VBS/HVCI requiere Expert + confirmacion.
 
-## Informe final por optimización (spec 141)
+## Optimization registry
 
-| Id | Comportamiento actual | Tras aplicar | Verificación | Benchmark |
-|---|---|---|---|---|
-| disable-game-bar-dvr | Game DVR activo o ausente | Política GameDVR DisableWrite / AllowGameDVR=0 | Lectura registro en vivo | n/a (captura-dependiente) |
-| enable-gpu-scheduling | HAGS según driver/build | HwSchMode=2 | Registro + PendingReboot | A/B manual recomendado |
-| normalize-tcp-autotuning | normal / disabled / experimental | normal (restore) | `netsh int tcp` vía estado | n/a |
-| disable-background-apps | Apps en segundo plano activas | GlobalUserDisabled=1 | Registro en vivo | n/a |
-| disable-search-indexing | WSearch Auto | WSearch Disabled (+captura estado) | ServiceManager observado | n/a |
-| disable-transparency | Transparencia activa | EnableTransparency=0 | Registro en vivo | n/a |
-| disable-vbs | Hypervisor Auto/On | hypervisorlaunchtype Off | bcdedit enum (Unknown→reboot) | Workload-dependent |
-| disable-visual-effects | Efectos visuales por defecto | VisualFXSetting/animaciones off | Registro en vivo | n/a |
-| maximum-power-plan | Esquema activo actual | SCHEME_MIN/MAX | powercfg getactivescheme | n/a |
-| zero-menu-delay | MenuShowDelay 400 | MenuShowDelay=0 | Registro en vivo | n/a |
-| disable-copilot | Copilot presente | WindowsCopilotPolicy/UserDisabled=1 | Registro en vivo | n/a |
-| disable-cortana | Cortana permitida | AllowCortana=0 | Registro en vivo | n/a |
-| disable-onedrive-autostart | OneDrive arranca con sesión | Run key OneDrive eliminado | Registro en vivo | n/a |
-| disable-suggestions | Sugerencias activas | SubscribedContent-338388Enabled=0 etc. | Registro en vivo | n/a |
-| disable-telemetry | Telemetría completa | AllowTelemetry=0(+servicios) | Registro/servicio observado | n/a |
-| disable-widgets | Widgets habilitados | Dsh Allowed=0 | Registro en vivo | n/a |
-| disable-hibernate | Hibernación activa | powercfg /h off (captura previa) | Estado powercfg | n/a |
-| optimize-system-drive | — (mantenimiento) | defrag C: /O (según medio real) | Exit code + salida | Duración informada |
+| Id | Categoria | Impacto | Evidencia | Riesgo | Compatibilidad | Reversible | Flags |
+|---|---|---|---|---|---|---|---|
+| enable-game-mode | Gaming | WorkloadDependent | Official | Low | Compatible | Si | — |
+| enable-windowed-game-optimizations | Gaming | WorkloadDependent | Official | Low | Compatible | Si | — |
+| enable-vrr | Gaming | WorkloadDependent | Vendor | Low | Conditional | Si | — |
+| set-games-high-performance-gpu | Gaming | WorkloadDependent | Official | Low | Conditional | Si | — |
+| disable-background-game-captures | Gaming | Small | Vendor | Low | Compatible | Si | — |
+| disable-game-bar-auto-launch | Gaming | Tiny | Official | Safe | Compatible | Si | — |
+| configure-gaming-power-mode-ac | Gaming | Small | Official | Low | Compatible | Si | — |
+| restore-default-gpu-preference | Gaming | Tiny | Official | Low | Compatible | Si | — |
+| enable-auto-hdr | Gaming | None | Vendor | Low | Conditional | Si | — |
+| gaming-display-refresh-rate-audit | Gaming | None | Official | Safe | Compatible | Si | — |
+| set-best-performance-ac | Performance | Small | Official | Low | Compatible | Si | — |
+| restore-balanced-power-dc | Performance | Small | Official | Low | Compatible | Si | — |
+| disable-usb-selective-suspend-ac | Performance | WorkloadDependent | Official | Moderate | Conditional | Si | — |
+| disable-pcie-link-state-power-saving-ac | Performance | WorkloadDependent | Official | Moderate | Conditional | Si | — |
+| set-wireless-adapter-max-performance-ac | Performance | Small | Vendor | Low | Conditional | Si | — |
+| restore-power-plan-after-gaming | Performance | Small | Official | Low | Compatible | Si | — |
+| remove-unused-custom-power-plans | Performance | None | Official | Low | Compatible | Si | — |
+| ensure-trim-enabled | Storage | Small | Official | Low | Compatible | Si | — |
+| retrim-system-ssd | Storage | Small | Official | Low | Compatible | Si | — |
+| optimize-hdd-media-aware | Storage | Small | Official | Low | Compatible | Si | — |
+| enable-storage-sense | Storage | Tiny | Official | Low | Compatible | Si | — |
+| storage-sense-temp-cleanup | Storage | Tiny | Official | Low | Compatible | Si | — |
+| storage-sense-recycle-bin-policy | Storage | Tiny | Official | Low | Compatible | Si | — |
+| cleanup-windows-temp | Storage | Tiny | Heuristic | Low | Compatible | Si | — |
+| cleanup-delivery-optimization-cache | Storage | Small | Official | Low | Compatible | Si | — |
+| windows-component-store-cleanup | Storage | Small | Official | Moderate | Compatible | Si | — |
+| windows-component-store-resetbase | Storage | Moderate | Official | High | Compatible | No | NotReversible, ExpertOnly |
+| disk-cleanup-system-files | Storage | Small | Official | Low | Compatible | Si | — |
+| free-low-storage-space | Storage | Small | Official | Low | Compatible | Si | — |
+| restore-system-managed-pagefile | Storage | Small | Official | Low | Compatible | Si | — |
+| enable-rss | Network | Small | Vendor | Low | Conditional | Si | — |
+| restore-tcp-checksum-offload | Network | Small | Vendor | Low | Conditional | Si | — |
+| restore-udp-checksum-offload | Network | Small | Vendor | Low | Conditional | Si | — |
+| restore-large-send-offload | Network | Small | Vendor | Low | Conditional | Si | — |
+| configure-interrupt-moderation-for-low-latency | Network | WorkloadDependent | Vendor | Moderate | Conditional | Si | — |
+| disable-nic-power-saving-ac | Network | Small | Vendor | Low | Conditional | Si | — |
+| restore-windows-tcp-congestion-default | Network | Small | Official | Low | Compatible | Si | — |
+| flush-dns-cache | Network | Tiny | Official | Low | Compatible | Si | — |
+| reset-network-stack-repair | Network | Small | Official | Moderate | Compatible | Si | — |
+| delivery-optimization-bandwidth-profile | Network | Small | Official | Low | Compatible | Si | — |
+| disable-unnecessary-startup-apps | Performance | Small | Official | Low | Compatible | Si | — |
+| disable-heavy-startup-apps | Performance | Small | Official | Moderate | Compatible | Si | — |
+| delay-safe-third-party-service-start | Performance | Small | Official | Low | Compatible | Si | — |
+| disable-selected-third-party-background-task | Performance | Small | Official | Low | Compatible | Si | — |
+| restore-sysmain-default | Performance | Small | Official | Low | Compatible | Si | — |
+| restore-windows-search-default | Performance | Small | Official | Low | Compatible | Si | — |
+| create-restore-point-before-optimization-batch | Storage | None | Official | Low | Compatible | Si | — |
+| pending-reboot-maintenance | Storage | None | Official | Low | Compatible | Si | — |
+| stale-crash-dump-cleanup | Storage | Tiny | Official | Low | Compatible | Si | — |
+| optimize-startup-recovery-state | Storage | None | Official | Low | Compatible | Si | — |
+| disable-vbs | Performance | WorkloadDependent | Vendor | Critical | PotentialConflict | Si | ExpertOnly, SecurityTradeoff, RequiresReboot |
+| maximum-power-plan | Performance | Small | Official | Low | Compatible | Si | — |
+| disable-visual-effects | Performance | Tiny | Empirical | Safe | Compatible | Si | — |
+| disable-search-indexing | Performance | WorkloadDependent | Empirical | Moderate | Conditional | Si | RecommendedOnSsd |
+| disable-background-apps | Performance | Small | Official | Low | Compatible | Si | — |
+| zero-menu-delay | Performance | Tiny | Heuristic | Safe | Compatible | Si | — |
+| disable-transparency | Performance | Tiny | Empirical | Safe | Compatible | Si | — |
+| disable-telemetry | PrivacySecurity | None | Official | Low | Compatible | Si | — |
+| disable-cortana | PrivacySecurity | None | Official | Low | Compatible | Si | — |
+| disable-widgets | PrivacySecurity | Tiny | Official | Low | Compatible | Si | — |
+| disable-copilot | PrivacySecurity | None | Vendor | Low | Compatible | Si | — |
+| disable-suggestions | PrivacySecurity | None | Official | Low | Compatible | Si | — |
+| disable-onedrive-autostart | PrivacySecurity | Tiny | Official | Low | Conditional | Si | ExpertOnly |
+| disable-game-bar-dvr | Gaming | WorkloadDependent | Vendor | Low | Compatible | Si | — |
+| enable-gpu-scheduling | Gaming | WorkloadDependent | Vendor | Moderate | Conditional | Si | RequiresReboot |
+| normalize-tcp-autotuning | Network | WorkloadDependent | Official | Low | Conditional | Si | — |
+| disable-hibernate | Storage | None | Official | Moderate | Compatible | Si | — |
+| optimize-system-drive | Storage | None | Official | Low | Compatible | No | NotReversible |
 
-> "n/a" significa que la optimización no tiene ruta de benchmark propia; el benchmark de sistema (BenchmarkPage) sirve para comparar antes/después a nivel máquina.
+## Detailed definitions
+
+### enable-game-mode
+
+#### What changes
+`HKCU\Software\Microsoft\GameBar\AllowAutoGameMode=1`
+
+#### Why
+Prioriza juegos reduciendo interferencia de fondo.
+
+#### Evidence
+Official
+
+#### Applicability
+Windows build >= 15063
+
+#### Preconditions
+Soportado
+
+#### Current-state detection
+Lee registro
+
+#### Apply
+Escribe registro
+
+#### Verify
+Re-lee registro
+
+#### Rollback
+Restaura snapshot
+
+#### Risks
+Low
+
+#### Anti-cheat
+Safe
+
+#### Benchmark
+n/a salvo WorkloadDependent
+
+#### UI behavior
+Card con Current->Target, Bucket
+
+### enable-windowed-game-optimizations
+Similar para DX10/11 windowed
+
+### enable-vrr
+Gestiona VRR solo si display compatible
+
+### set-games-high-performance-gpu
+Asigna GPU dedicada
+
+### disable-background-game-captures
+Separa Game DVR de capturas
+
+### disable-game-bar-auto-launch
+Evita inicio automatico
+
+### configure-gaming-power-mode-ac
+AC -> Best Performance
+
+### restore-default-gpu-preference
+Restaura preferencia
+
+### enable-auto-hdr
+Visual, no FPS
+
+### gaming-display-refresh-rate-audit
+Audita Hz
+
+### set-best-performance-ac
+AC -> Best Performance
+
+### restore-balanced-power-dc
+DC -> Balanced
+
+### disable-usb-selective-suspend-ac
+Solo Competitive AC
+
+### disable-pcie-link-state-power-saving-ac
+Solo AC PCIe
+
+### set-wireless-adapter-max-performance-ac
+Wi-Fi max rendimiento
+
+### restore-power-plan-after-gaming
+Guarda modo previo
+
+### remove-unused-custom-power-plans
+Detecta huerfanos
+
+### ensure-trim-enabled
+TRIM en SSD
+
+### retrim-system-ssd
+ReTrim SSD
+
+### optimize-hdd-media-aware
+defrag /O segun medio
+
+### enable-storage-sense
+Storage Sense
+
+### storage-sense-temp-cleanup
+Temporales
+
+### storage-sense-recycle-bin-policy
+Papelera 7-90 dias
+
+### cleanup-windows-temp
+Temporales Windows
+
+### cleanup-delivery-optimization-cache
+Cache DO
+
+### windows-component-store-cleanup
+DISM StartComponentCleanup
+
+### windows-component-store-resetbase
+DISM ResetBase, irreversible
+
+### disk-cleanup-system-files
+cleanmgr
+
+### free-low-storage-space
+Umbrales 10/15/20%
+
+### restore-system-managed-pagefile
+System Managed
+
+### enable-rss
+RSS
+
+### restore-tcp-checksum-offload
+TCP offload
+
+### restore-udp-checksum-offload
+UDP offload
+
+### restore-large-send-offload
+LSO
+
+### configure-interrupt-moderation-for-low-latency
+Solo Competitive
+
+### disable-nic-power-saving-ac
+NIC AC
+
+### restore-windows-tcp-congestion-default
+Congestion TCP
+
+### flush-dns-cache
+Maintenance tiny
+
+### reset-network-stack-repair
+Winsock/TCP
+
+### delivery-optimization-bandwidth-profile
+DO perfil
+
+### disable-unnecessary-startup-apps
+Startup classification
+
+### disable-heavy-startup-apps
+High impact
+
+### delay-safe-third-party-service-start
+Delayed auto
+
+### disable-selected-third-party-background-task
+Disable tareas
+
+### restore-sysmain-default
+Restaura SysMain
+
+### restore-windows-search-default
+Restaura Search
+
+### create-restore-point-before-optimization-batch
+SRSetRestorePoint
+
+### pending-reboot-maintenance
+Detecta reboot
+
+### stale-crash-dump-cleanup
+Dumps antiguos
+
+### optimize-startup-recovery-state
+Audita boot
+

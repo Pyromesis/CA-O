@@ -27,6 +27,7 @@ public enum PrivilegedOperationKind
     CaptureSnapshot,
     Ping,
     GetServiceStatus,
+    SetDns,
 }
 
 /// <summary>
@@ -47,6 +48,7 @@ public interface IOptimizationIdPayload : ITypedPayload
 [JsonDerivedType(typeof(CaptureSnapshotPayload), "snapshot")]
 [JsonDerivedType(typeof(PingPayload), "ping")]
 [JsonDerivedType(typeof(GetServiceStatusPayload), "status")]
+[JsonDerivedType(typeof(SetDnsPayload), "setdns")]
 public interface ITypedPayload
 {
 }
@@ -64,6 +66,8 @@ public sealed record CaptureSnapshotPayload(string OptimizationId) : IOptimizati
 public sealed record PingPayload() : ITypedPayload;
 
 public sealed record GetServiceStatusPayload() : ITypedPayload;
+
+public sealed record SetDnsPayload(string InterfaceName, string DnsIp) : ITypedPayload;
 
 public sealed record PingResponse(string ServiceVersion, int ProtocolVersion, int ProcessId, bool IsSystem, string Status);
 public sealed record ServiceStatusResponse(string ServiceVersion, int ProtocolVersion, int ProcessId, bool IsSystem, string Status, IReadOnlyList<string> Capabilities);

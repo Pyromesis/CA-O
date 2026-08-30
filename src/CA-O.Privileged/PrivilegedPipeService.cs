@@ -199,6 +199,19 @@ internal sealed class PrivilegedPipeService(
             return IpcResponse.Ok(JsonSerializer.Serialize(status, JsonOptions));
         }
 
+            if (request.Operation == PrivilegedOperationKind.SetDns && request.Payload is SetDnsPayload dns)
+            {
+                try
+                {
+                    var result = await engine.SetDnsAsync(dns.InterfaceName, dns.DnsIp, ct);
+                    return result.Success ? IpcResponse.Ok() : IpcResponse.Rejected(ErrorCodes.TxnApplyFailed, result.MessageEs);
+                }
+                catch (Exception ex)
+                {
+                    return IpcResponse.Rejected(ErrorCodes.TxnApplyFailed, $"Error aplicando DNS: {ex.Message}");
+                }
+            }
+
             var optimizationId = ((IOptimizationIdPayload)request.Payload).OptimizationId;
 
         try
@@ -210,7 +223,7 @@ internal sealed class PrivilegedPipeService(
                 PrivilegedOperationKind.CaptureSnapshot => Snapshot(engine.CaptureSnapshot(optimizationId)),
                 PrivilegedOperationKind.VerifyOptimization => await VerifyAsync(engine.VerifyAsync(optimizationId, ct)),
                 PrivilegedOperationKind.DetectOptimization => IpcResponse.Ok($"\"{engine.Detect(optimizationId)}\""),
-                _ => IpcResponse.Rejected(ErrorCodes.IpcPayloadSchemaInvalid, "OperaciÃ³n no disponible."),
+                _ => IpcResponse.Rejected(ErrorCodes.IpcPayloadSchemaInvalid, "Operación no disponible."),
             };
         }
         catch (Exception ex)

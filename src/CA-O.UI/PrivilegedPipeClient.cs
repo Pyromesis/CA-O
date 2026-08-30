@@ -47,13 +47,19 @@ public sealed class PrivilegedPipeClient
             return IpcResponse.Rejected(ErrorCodes.IpcTimeout, "Servicio no disponible: timeout al conectar (CAO-IPC-004).");
         }
 
-        var request = new IpcRequest(
-            ProtocolVersion: IpcProtocol.Version,
-            RequestId: Guid.NewGuid(),
-            Nonce: Convert.ToHexString(RandomNumberGenerator.GetBytes(16)),
-            CreatedAtUtc: DateTime.UtcNow,
-            Operation: operation,
-            Payload: operation switch
+        // Soporte SetDns con payload tipado SetDnsPayload
+        ITypedPayload payload;
+        if (operation == PrivilegedOperationKind.SetDns)
+        {
+            // optimizationId lleva "interfaceName|dnsIp" para SetDns
+            var parts = optimizationId.Split('|', 2);
+            var iface = parts.Length > 0 ? parts[0] : "";
+            var dns = parts.Length > 1 ? parts[1] : "";
+            payload = new SetDnsPayload(iface, dns);
+        }
+        else
+        {
+            payload = operation switch
             {
                 PrivilegedOperationKind.ApplyOptimization => new ApplyOptimizationPayload(optimizationId),
                 PrivilegedOperationKind.RevertOptimization => new RevertOptimizationPayload(optimizationId),
@@ -63,7 +69,16 @@ public sealed class PrivilegedPipeClient
                 PrivilegedOperationKind.Ping => new PingPayload(),
                 PrivilegedOperationKind.GetServiceStatus => new GetServiceStatusPayload(),
                 _ => throw new ArgumentOutOfRangeException(nameof(operation)),
-            });
+            };
+        }
+
+        var request = new IpcRequest(
+            ProtocolVersion: IpcProtocol.Version,
+            RequestId: Guid.NewGuid(),
+            Nonce: Convert.ToHexString(RandomNumberGenerator.GetBytes(16)),
+            CreatedAtUtc: DateTime.UtcNow,
+            Operation: operation,
+            Payload: payload);
 
         try
         {
@@ -131,6 +146,9 @@ public sealed class PrivilegedPipeClient
 
     public Task<IpcResponse?> GetServiceStatusAsync(CancellationToken ct = default) =>
         SendAsync(PrivilegedOperationKind.GetServiceStatus, string.Empty, ct);
+
+    public Task<IpcResponse?> SetDnsAsync(string interfaceName, string dnsIp, CancellationToken ct = default) =>
+        SendAsync(PrivilegedOperationKind.SetDns, $"{interfaceName}|{dnsIp}", ct);
 
     /// <summary>Legacy response shape used by pages; maps v2 codes through.</summary>
     private static IpcResponse? Map(IpcResponse? response) => response;

@@ -271,7 +271,7 @@ public sealed partial class AnalyzePage : Page
         var confirm = new ContentDialog
         {
             Title = $"Aplicar DNS {_bestDns.Resolver}",
-            Content = new TextBlock { Text = $"Se configurará {_bestDns.Resolver} como DNS primario en la interfaz activa.\nBeneficio: -10-20 ms ping, menos jitter. Requiere privilegios y se revierte restaurando DNS automático.\n¿Continuar?", TextWrapping = TextWrapping.Wrap },
+            Content = new TextBlock { Text = $"Se configurará {_bestDns.Resolver} como DNS primario en la interfaz activa.\nBeneficio: -10-20 ms ping, menos jitter. Requiere privilegios.\n¿Continuar?", TextWrapping = TextWrapping.Wrap },
             PrimaryButtonText = "Aplicar",
             CloseButtonText = "Cancelar",
             XamlRoot = Content.XamlRoot
@@ -279,23 +279,49 @@ public sealed partial class AnalyzePage : Page
         if (await confirm.ShowAsync() != ContentDialogResult.Primary) return;
         try
         {
-            // Intento via servicio (netsh) si está disponible, si no mostrar instrucciones manuales
             DnsBestText.Text = $"Aplicando DNS {_bestDns.Resolver}...";
-            // Por ahora solo informativo: copiar al portapapeles e instruir
+            // Detectar interfaz activa (primera Up con gateway)
+            string iface = "Wi-Fi";
+            try
+            {
+                foreach (var nic in System.Net.NetworkInformation.NetworkInterface.GetAllNetworkInterfaces())
+                {
+                    if (nic.OperationalStatus == System.Net.NetworkInformation.OperationalStatus.Up && nic.NetworkInterfaceType != System.Net.NetworkInformation.NetworkInterfaceType.Loopback)
+                    {
+                        if (nic.GetIPProperties().GatewayAddresses.Count > 0) { iface = nic.Name; break; }
+                    }
+                }
+            }
+            catch { }
+            var pipe = AppHost.Resolve<PrivilegedPipeClient>();
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+            var resp = await pipe.SetDnsAsync(iface, _bestDns.Resolver, cts.Token);
+            if (resp is { Accepted: true })
+            {
+                DnsBestText.Text = $"✓ DNS {_bestDns.Resolver} aplicado a {iface} — verificado";
+                var ok = new ContentDialog { Title = "DNS aplicado", Content = new TextBlock { Text = $"{_bestDns.Resolver} aplicado correctamente a {iface}.\nHaz un test de ping para verificar la mejora.", TextWrapping = TextWrapping.Wrap }, CloseButtonText = "Aceptar", XamlRoot = Content.XamlRoot };
+                await ok.ShowAsync();
+            }
+            else
+            {
+                // Fallback: copiar e instruir
+                var dataPackage = new Windows.ApplicationModel.DataTransfer.DataPackage();
+                dataPackage.SetText(_bestDns.Resolver);
+                Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(dataPackage);
+                var fallback = new ContentDialog { Title = "No se pudo aplicar automáticamente", Content = new TextBlock { Text = $"El servicio respondió [{resp?.ErrorCode}]: {resp?.SafeMessage}\n{_bestDns.Resolver} copiado al portapapeles.\nPasos manuales: Ajustes > Red > Propiedades del adaptador > IPv4 > DNS manual.", TextWrapping = TextWrapping.Wrap }, CloseButtonText = "Aceptar", XamlRoot = Content.XamlRoot };
+                await fallback.ShowAsync();
+                DnsBestText.Text = $"DNS {_bestDns.Resolver} copiado — error: {resp?.ErrorCode}";
+            }
+        }
+        catch (Exception ex)
+        {
+            DnsBestText.Text = $"Error aplicando DNS: {ex.Message}";
             var dataPackage = new Windows.ApplicationModel.DataTransfer.DataPackage();
             dataPackage.SetText(_bestDns.Resolver);
             Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(dataPackage);
-            var done = new ContentDialog
-            {
-                Title = "DNS copiado",
-                Content = new TextBlock { Text = $"{_bestDns.Resolver} copiado al portapapeles.\nPasos manuales: Ajustes > Red > Propiedades del adaptador > IPv4 > DNS manual.\nPróxima versión lo aplicará automáticamente via servicio.", TextWrapping = TextWrapping.Wrap },
-                CloseButtonText = "Aceptar",
-                XamlRoot = Content.XamlRoot
-            };
-            await done.ShowAsync();
-            DnsBestText.Text = $"DNS {_bestDns.Resolver} copiado — aplícalo en Ajustes de red";
+            var err = new ContentDialog { Title = "DNS copiado (fallback)", Content = new TextBlock { Text = $"{_bestDns.Resolver} copiado. Aplícalo manualmente en Ajustes de red.\nError: {ex.Message}", TextWrapping = TextWrapping.Wrap }, CloseButtonText = "Aceptar", XamlRoot = Content.XamlRoot };
+            await err.ShowAsync();
         }
-        catch (Exception ex) { DnsBestText.Text = $"Error aplicando DNS: {ex.Message}"; }
     }
 
     private async void OnDpcSampleClick(object sender, RoutedEventArgs e)

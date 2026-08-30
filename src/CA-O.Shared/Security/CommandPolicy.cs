@@ -20,6 +20,11 @@ public enum SystemCommandKey
     BcdEditHypervisorRestore,
     NetShTcpShowGlobal,
     NetShTcpAutotuningNormal,
+    NetShInterfaceIpShowDns,
+    NetShInterfaceIpSetDnsPrimary,
+    NetShInterfaceIpSetDnsSecondary,
+    NetShInterfaceIpSetDnsDhcp,
+    IpConfigFlushDns,
     DefragC,
     WprStartCpuFileMode,
     WprStopToDefaultFile,
@@ -110,6 +115,31 @@ public static partial class CommandPolicy
                 AutotuningLevels.Contains(arguments[4]["autotuninglevel=".Length..]) =>
                 Path.Combine(system32, "netsh.exe"),
 
+            SystemCommandKey.NetShInterfaceIpShowDns when Eq(arguments,
+                "interface", "ip", "show", "dns") =>
+                Path.Combine(system32, "netsh.exe"),
+
+            SystemCommandKey.NetShInterfaceIpSetDnsPrimary when arguments.Count == 7 &&
+                arguments[0] == "interface" && arguments[1] == "ip" &&
+                arguments[2] == "set" && arguments[3] == "dns" &&
+                IsValidInterfaceName(arguments[4]) && arguments[5] == "static" && IsValidIp(arguments[6]) =>
+                Path.Combine(system32, "netsh.exe"),
+
+            SystemCommandKey.NetShInterfaceIpSetDnsSecondary when arguments.Count == 6 &&
+                arguments[0] == "interface" && arguments[1] == "ip" &&
+                arguments[2] == "add" && arguments[3] == "dns" &&
+                IsValidInterfaceName(arguments[4]) && IsValidIp(arguments[5]) =>
+                Path.Combine(system32, "netsh.exe"),
+
+            SystemCommandKey.NetShInterfaceIpSetDnsDhcp when arguments.Count == 6 &&
+                arguments[0] == "interface" && arguments[1] == "ip" &&
+                arguments[2] == "set" && arguments[3] == "dns" &&
+                IsValidInterfaceName(arguments[4]) && arguments[5] == "dhcp" =>
+                Path.Combine(system32, "netsh.exe"),
+
+            SystemCommandKey.IpConfigFlushDns when Eq(arguments, "/flushdns") =>
+                Path.Combine(system32, "ipconfig.exe"),
+
             SystemCommandKey.DefragC when Eq(arguments, "C:", "/O") =>
                 Path.Combine(system32, "defrag.exe"),
 
@@ -142,6 +172,12 @@ public static partial class CommandPolicy
         RegexOptions.CultureInvariant);
 
     private static bool IsPowerSchemeGuid(string token) => GuidShape.IsMatch(token);
+
+    private static bool IsValidInterfaceName(string name) =>
+        !string.IsNullOrWhiteSpace(name) && name.Length <= 64 && SafeArg().IsMatch(name);
+
+    private static bool IsValidIp(string ip) =>
+        System.Net.IPAddress.TryParse(ip, out var addr) && addr.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork;
 
     private static bool Eq(IReadOnlyList<string> arguments, params ReadOnlySpan<string> expected)
     {
