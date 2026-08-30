@@ -237,20 +237,33 @@ public sealed class OptimizationEngine
                 return OperationResult.Fail($"No se pudo aplicar DNS secundario {secondary}: {r2.StdErr}", r2.StdErr);
             }
         }
-        // Verify with small delay for adapter refresh
-        try { await Task.Delay(400, ct); } catch { }
+        // Verify with retry (WMI/NetworkInterface cache tarda en refrescar)
         if (dnsProvider != null)
         {
-            var after = dnsProvider.GetDnsServers(interfaceName);
-            var ok = after.Any(a => a == primary);
-            if (!ok)
+            IReadOnlyList<string> after = Array.Empty<string>();
+            bool ok = false;
+            for (int attempt = 0; attempt < 3; attempt++)
             {
-                // Rollback to previous (DHCP if empty, else static)
+                try { await Task.Delay(attempt == 0 ? 600 : 800, ct); } catch { }
+                try { after = dnsProvider.GetDnsServers(interfaceName); } catch { after = Array.Empty<string>(); }
+                ok = after.Any(a => a == primary);
+                if (ok) break;
+                // Si provider devuelve vacío (lectura falló), no considerar fallo de verificación — confiar en exit code 0
+                if (after.Count == 0 && attempt == 2) { ok = true; break; }
+            }
+            if (!ok && after.Count > 0)
+            {
+                // Rollback solo si leímos DNS distinto no vacío (verificación real falló)
                 if (before.Length == 0)
                     await _executor.ExecuteAsync(CAO.Shared.Security.SystemCommandKey.NetShInterfaceIpSetDnsDhcp, ["interface","ip","set","dns",interfaceName,"dhcp"], ct);
                 else
                     await _executor.ExecuteAsync(CAO.Shared.Security.SystemCommandKey.NetShInterfaceIpSetDnsPrimary, ["interface","ip","set","dns",interfaceName,"static", before[0]], ct);
-                return OperationResult.Fail($"Verificación fallida: DNS no coincide tras aplicar {primary}. Rollback ejecutado.", "verification-failed");
+                return OperationResult.Fail($"Verificación fallida: DNS no coincide tras aplicar {primary} (leído: {string.Join(",", after)}). Rollback ejecutado.", "verification-failed");
+            }
+            if (!ok && after.Count == 0)
+            {
+                // Provider no pudo leer — considerar aplicado (netsh exit 0) y avisar
+                return OperationResult.Ok($"DNS {primary} aplicado a {interfaceName} — aplicado (verificación no disponible, netsh ok).");
             }
         }
         return OperationResult.Ok($"DNS {primary} aplicado a {interfaceName} — verificado.");

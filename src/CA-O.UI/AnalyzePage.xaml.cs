@@ -385,19 +385,44 @@ public sealed partial class AnalyzePage : Page
         try
         {
             DnsBestText.Text = $"Aplicando DNS {_bestDns.Resolver}...";
-            // Detectar interfaz activa (primera Up con gateway)
+            // Detectar interfaz activa (prioriza Ethernet/Wi-Fi física, ignora virtual/VPN)
             string iface = "Wi-Fi";
             try
             {
-                foreach (var nic in System.Net.NetworkInformation.NetworkInterface.GetAllNetworkInterfaces())
+                var provider = AppHost.Resolve<CAO.Core.Interfaces.IDnsConfigurationProvider>();
+                var candidates = System.Net.NetworkInformation.NetworkInterface.GetAllNetworkInterfaces()
+                    .Where(n => n.OperationalStatus == System.Net.NetworkInformation.OperationalStatus.Up
+                        && n.NetworkInterfaceType != System.Net.NetworkInformation.NetworkInterfaceType.Loopback
+                        && n.GetIPProperties().GatewayAddresses.Count > 0
+                        && !provider.IsVirtualOrVpn(n.Name))
+                    .OrderBy(n => n.Name.Contains("Ethernet", StringComparison.OrdinalIgnoreCase) ? 0 : n.Name.Contains("Wi-Fi", StringComparison.OrdinalIgnoreCase) ? 1 : 2)
+                    .ThenBy(n => n.Name)
+                    .ToList();
+                if (candidates.Count > 0) iface = candidates[0].Name;
+                else
                 {
-                    if (nic.OperationalStatus == System.Net.NetworkInformation.OperationalStatus.Up && nic.NetworkInterfaceType != System.Net.NetworkInformation.NetworkInterfaceType.Loopback)
+                    foreach (var nic in System.Net.NetworkInformation.NetworkInterface.GetAllNetworkInterfaces())
                     {
-                        if (nic.GetIPProperties().GatewayAddresses.Count > 0) { iface = nic.Name; break; }
+                        if (nic.OperationalStatus == System.Net.NetworkInformation.OperationalStatus.Up && nic.NetworkInterfaceType != System.Net.NetworkInformation.NetworkInterfaceType.Loopback)
+                        {
+                            if (nic.GetIPProperties().GatewayAddresses.Count > 0) { iface = nic.Name; break; }
+                        }
                     }
                 }
             }
-            catch { }
+            catch
+            {
+                try
+                {
+                    foreach (var nic in System.Net.NetworkInformation.NetworkInterface.GetAllNetworkInterfaces())
+                    {
+                        if (nic.OperationalStatus == System.Net.NetworkInformation.OperationalStatus.Up && nic.NetworkInterfaceType != System.Net.NetworkInformation.NetworkInterfaceType.Loopback)
+                        {
+                            if (nic.GetIPProperties().GatewayAddresses.Count > 0) { iface = nic.Name; break; }
+                        }
+                    }
+                } catch { }
+            }
             var pipe = AppHost.Resolve<PrivilegedPipeClient>();
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
             var resp = await pipe.SetDnsAsync(iface, _bestDns.Resolver, cts.Token);

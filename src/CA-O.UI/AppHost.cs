@@ -48,6 +48,7 @@ internal static class AppHost
         services.AddSingleton<Infrastructure.Windows.SystemRegistry.RegistryAccessor>();
         services.AddSingleton<Infrastructure.Logging.StructuredLogger>();
 
+        services.AddSingleton<CAO.Core.Interfaces.IDnsConfigurationProvider, Infrastructure.Networking.WmiDnsConfigurationProvider>();
         // Privileged IPC
         services.AddSingleton<PrivilegedPipeClient>();
 
