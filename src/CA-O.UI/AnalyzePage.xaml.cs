@@ -15,6 +15,7 @@ namespace CAO.UI.Pages;
 public sealed partial class AnalyzePage : Page
 {
     private readonly AnalyzeViewModel _viewModel;
+    private readonly ViewModels.DiagnosticsViewModel _diagnosticsVm;
     private CancellationTokenSource? _cts;
     private DnsBenchmarkResult? _bestDns;
 
@@ -22,8 +23,14 @@ public sealed partial class AnalyzePage : Page
     {
         InitializeComponent();
         _viewModel = AppHost.Resolve<AnalyzeViewModel>();
+        _diagnosticsVm = AppHost.Resolve<ViewModels.DiagnosticsViewModel>();
         DataContext = _viewModel;
         Loaded += (_, _) => LoadPersisted();
+        _diagnosticsVm.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName is null or nameof(ViewModels.DiagnosticsViewModel.InputSummary) or nameof(ViewModels.DiagnosticsViewModel.ThermalSummary) or nameof(ViewModels.DiagnosticsViewModel.PerformanceSummary))
+                DispatcherQueue.TryEnqueue(RenderDiagnostics);
+        };
         var uiState = AppHost.Resolve<ViewModels.UiState>();
         uiState.PropertyChanged += (_, e) =>
         {
@@ -143,6 +150,14 @@ public sealed partial class AnalyzePage : Page
 
         StatusText.Text = state.LastAnalysisUtc is null ? "Datos del último análisis cargados." : $"Datos del {state.LastAnalysisUtc.Value.ToLocalTime():g} cargados.";
         UpdateFreshnessBanner();
+        RenderDiagnostics();
+    }
+
+    private void RenderDiagnostics()
+    {
+        DiagnInputText.Text = string.IsNullOrWhiteSpace(_diagnosticsVm.InputSummary) ? "Ejecuta análisis para medir entrada (HID, aceleración ratón)" : _diagnosticsVm.InputSummary;
+        DiagnThermalText.Text = string.IsNullOrWhiteSpace(_diagnosticsVm.ThermalSummary) ? "Ejecuta análisis para medir térmicas" : _diagnosticsVm.ThermalSummary;
+        DiagnPerfText.Text = string.IsNullOrWhiteSpace(_diagnosticsVm.PerformanceSummary) ? "Ejecuta análisis para medir rendimiento" : _diagnosticsVm.PerformanceSummary;
     }
 
     private async void OnRunClick(object sender, RoutedEventArgs e)
@@ -164,7 +179,8 @@ public sealed partial class AnalyzePage : Page
             // Render parcial tolerante a fallos individuales ( §10 )
             RenderFromViewModel();
             LoadPersisted();
-            // Auto-ejecutar DNS benchmark y DPC como parte del análisis completo
+            // Auto-ejecutar diagnósticos integrados + DNS benchmark y DPC como parte del análisis completo
+            try { await _diagnosticsVm.RunCommand.ExecuteAsync(null); RenderDiagnostics(); } catch { }
             try { await RunDnsBenchmarkAuto(_cts.Token); } catch { }
             try { await RunDpcAuto(_cts.Token); } catch { }
 

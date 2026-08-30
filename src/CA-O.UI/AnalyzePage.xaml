@@ -130,6 +130,29 @@
                 </Border>
             </Grid>
 
+            <!-- Diagnóstico integrado (reutiliza mismos providers que DiagnosticsPage, sin duplicar lógica) -->
+            <Grid ColumnSpacing="12" RowSpacing="12">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                <Border Style="{StaticResource CaoCardStyle}">
+                    <StackPanel Spacing="6">
+                        <StackPanel Orientation="Horizontal" Spacing="6"><FontIcon Glyph="&#xE8B0;" FontSize="13"/><TextBlock Text="Entrada" FontWeight="SemiBold" FontSize="13"/></StackPanel>
+                        <TextBlock x:Name="DiagnInputText" TextWrapping="Wrap" IsTextSelectionEnabled="True" FontSize="12" Opacity="0.9"/>
+                    </StackPanel>
+                </Border>
+                <Border Grid.Column="1" Style="{StaticResource CaoCardStyle}">
+                    <StackPanel Spacing="6">
+                        <StackPanel Orientation="Horizontal" Spacing="6"><FontIcon Glyph="&#xE9CA;" FontSize="13"/><TextBlock Text="Térmico" FontWeight="SemiBold" FontSize="13"/></StackPanel>
+                        <TextBlock x:Name="DiagnThermalText" TextWrapping="Wrap" IsTextSelectionEnabled="True" FontSize="12" Opacity="0.9"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
+            <Border Style="{StaticResource CaoCardStyle}">
+                <StackPanel Spacing="6">
+                    <TextBlock Text="Rendimiento actual" Style="{StaticResource CaoSectionHeaderStyle}" Margin="0,0,0,0"/>
+                    <TextBlock x:Name="DiagnPerfText" TextWrapping="Wrap" IsTextSelectionEnabled="True" FontSize="12" Opacity="0.9"/>
+                </StackPanel>
+            </Border>
+
             <Border Style="{StaticResource CaoCardStyle}">
                 <StackPanel Spacing="8">
                     <StackPanel Orientation="Horizontal" Spacing="8">

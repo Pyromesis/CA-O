@@ -76,11 +76,6 @@
                         <FontIcon Glyph="&#xE7FC;" />
                     </NavigationViewItem.Icon>
                 </NavigationViewItem>
-                <NavigationViewItem Content="Diagnóstico" Tag="diagnostics" ToolTipService.ToolTip="Diagnóstico — CPU, GPU, memoria, red, drivers">
-                    <NavigationViewItem.Icon>
-                        <FontIcon Glyph="&#xE90F;" />
-                    </NavigationViewItem.Icon>
-                </NavigationViewItem>
                 <NavigationViewItem Content="Benchmark" Tag="benchmark" ToolTipService.ToolTip="Benchmark — A/B honesto con suelo de ruido">
                     <NavigationViewItem.Icon>
                         <FontIcon Glyph="&#xE9D2;" />

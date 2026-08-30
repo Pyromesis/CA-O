@@ -71,7 +71,6 @@ public sealed partial class MainWindow : Window
             ("analyze", "nav.analyze"),
             ("optimize", "nav.optimize"),
             ("gaming", "nav.gaming"),
-            ("diagnostics", "nav.diagnostics"),
             ("benchmark", "nav.benchmark"),
             ("restore", "nav.restore"),
             ("history", "nav.history"),

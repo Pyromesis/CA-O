@@ -15,7 +15,6 @@ public static class RouteTable
             ["analyze"] = typeof(Pages.AnalyzePage),
             ["optimize"] = typeof(Pages.OptimizePage),
             ["gaming"] = typeof(Pages.GamingPage),
-            ["diagnostics"] = typeof(Pages.DiagnosticsPage),
             ["benchmark"] = typeof(Pages.BenchmarkPage),
             ["restore"] = typeof(Pages.RestorePage),
             ["history"] = typeof(Pages.HistoryPage),
@@ -26,7 +25,7 @@ public static class RouteTable
     public static readonly IReadOnlyList<string> Order = new[]
     {
         "dashboard", "analyze", "optimize", "gaming",
-        "diagnostics", "benchmark", "restore", "history", "settings",
+        "benchmark", "restore", "history", "settings",
     };
 
     public static Type? Resolve(string? tag) =>
