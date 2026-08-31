@@ -7,10 +7,10 @@
 [![WinUI 3](https://img.shields.io/badge/WinUI%203-00B7C3?style=flat-square&logo=windows&logoColor=white)](https://microsoft.github.io/microsoft-ui-xaml/)
 [![Build](https://img.shields.io/badge/build-passing-brightgreen?style=flat-square)](https://github.com/Pyromesis/CA-O/actions)
 [![Tests](https://img.shields.io/badge/tests-334%20passed-brightgreen?style=flat-square)](#pruebas)
-[![Release](https://img.shields.io/badge/release-v2.1.0-blue?style=flat-square)](https://github.com/Pyromesis/CA-O/releases/tag/v2.1.0)
+[![Release](https://img.shields.io/badge/release-v2.1.4-blue?style=flat-square)](https://github.com/Pyromesis/CA-O/releases/tag/v2.1.4)
 [![License](https://img.shields.io/badge/license-privado-lightgrey?style=flat-square)](#licencia)
 
-**Descargas v2.1.0:** [CA-O-Setup-GUI-x64.zip (92 MB, instalador GUI)](https://github.com/Pyromesis/CA-O/releases/download/v2.0.6/CA-O-Setup-GUI-x64.zip) | [CA-O-2.1.0-win-x64.zip (394 MB, paquete completo offline)](https://github.com/Pyromesis/CA-O/releases/download/v2.0.6/CA-O-2.0.6-win-x64.zip) | [Notas de la version](https://github.com/Pyromesis/CA-O/releases/tag/v2.1.0) | [Documentacion](docs/ARCHITECTURE.md)
+**Descargas v2.1.4:** [CA-O-Setup-GUI-x64.zip (92 MB, instalador GUI)](https://github.com/Pyromesis/CA-O/releases/download/v2.1.4/CA-O-Setup-GUI-x64.zip) | [CA-O-2.1.4-win-x64.zip (394 MB, paquete completo offline)](https://github.com/Pyromesis/CA-O/releases/download/v2.1.4/CA-O-2.1.4-win-x64.zip) | [Notas de la version](https://github.com/Pyromesis/CA-O/releases/tag/v2.1.4) | [Documentacion](docs/ARCHITECTURE.md)
 
 ---
 
@@ -169,7 +169,7 @@ Documentacion detallada en [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). Catalog
 
 ### Opcion A — Instalador GUI (recomendado, offline)
 
-1. Descarga [CA-O-2.1.0-win-x64.zip (394 MB)](https://github.com/Pyromesis/CA-O/releases/download/v2.0.6/CA-O-2.0.6-win-x64.zip) desde [Releases](https://github.com/Pyromesis/CA-O/releases/tag/v2.1.0).
+1. Descarga [CA-O-2.1.4-win-x64.zip (394 MB)](https://github.com/Pyromesis/CA-O/releases/download/v2.1.4/CA-O-2.1.4-win-x64.zip) desde [Releases](https://github.com/Pyromesis/CA-O/releases/tag/v2.1.4).
 2. Descomprime el zip. Mantiene la estructura `ui/`, `service/`, `gui-installer/`, `uninstall/`, `setup/`.
 3. Entra en `gui-installer/` y ejecuta `CA-O.InstallerGui.exe` con clic derecho y Ejecutar como administrador. Acepta el prompt de UAC.
 4. El instalador muestra Destino `C:\Program Files\CA-O`, opciones de acceso directo en escritorio y menu inicio, y barra de progreso. Al finalizar registra el servicio `CAO.Privileged` (inicio bajo demanda, policy de fallo restart) y crea la entrada ARP para desinstalacion.
@@ -179,9 +179,9 @@ Destino de instalacion: `C:\Program Files\CA-O\ui\CA-O.UI.exe` y `C:\Program Fil
 
 ### Opcion B — Instalador GUI online (92 MB)
 
-1. Descarga [CA-O-Setup-GUI-x64.zip (92 MB)](https://github.com/Pyromesis/CA-O/releases/download/v2.0.6/CA-O-Setup-GUI-x64.zip).
+1. Descarga [CA-O-Setup-GUI-x64.zip (92 MB)](https://github.com/Pyromesis/CA-O/releases/download/v2.1.4/CA-O-Setup-GUI-x64.zip).
 2. Descomprime y ejecuta `CA-O.InstallerGui.exe` como administrador.
-3. Si no se encuentra payload local (`ui/` y `service/` adyacentes), el instalador descarga `CA-O-2.0.6-win-x64.zip` desde GitHub Releases (requiere conexion a internet) y continua la instalacion. El archivo exe suelto de 295 KB no funciona aislado fuera del zip.
+3. Si no se encuentra payload local (`ui/` y `service/` adyacentes), el instalador descarga `CA-O-2.1.4-win-x64.zip` desde GitHub Releases (requiere conexion a internet) y continua la instalacion. El archivo exe suelto de 295 KB no funciona aislado fuera del zip.
 
 ### Opcion C — Portable ZIP (sin instalador)
 
@@ -336,15 +336,15 @@ Versiones centralizadas en `Directory.Packages.props` y `global.json`.
 
 ## Release y verificacion
 
-- **Version actual:** 2.0.6 — [Releases](https://github.com/Pyromesis/CA-O/releases/tag/v2.1.0)
-- **Artefactos:** `CA-O-Setup-GUI-x64.zip` (92 MB, GUI online), `CA-O-2.0.6-win-x64.zip` (343 MB, paquete completo offline con `ui/`, `service/`, `gui-installer/`, `setup/`, `uninstall/`).
+- **Version actual:** 2.1.4 — [Releases](https://github.com/Pyromesis/CA-O/releases/tag/v2.1.4)
+- **Artefactos:** `CA-O-Setup-GUI-x64.zip` (92 MB, GUI online), `CA-O-2.1.4-win-x64.zip` (343 MB, paquete completo offline con `ui/`, `service/`, `gui-installer/`, `setup/`, `uninstall/`).
 - **Manifests:** `artifacts/release/SHA256SUMS.txt` y `artifacts/sbom/bom.json` (CycloneDX 1.7, 71 paquetes) cuando `CycloneDX` esta instalado (`dotnet tool install --global CycloneDX`).
 - **Empaquetado:** `scripts/package.ps1` genera zip versionado con hash SHA-256. `scripts/build-release.ps1` publica `ui` y `service` como self-contained y `gui-installer` como self-contained sin single-file (requerido por WinUI 3).
 
 Comprobacion de integridad:
 
 ```powershell
-Get-FileHash artifacts/CA-O-2.0.6-win-x64.zip -Algorithm SHA256
+Get-FileHash artifacts/CA-O-2.1.4-win-x64.zip -Algorithm SHA256
 Get-Content artifacts/release/SHA256SUMS.txt
 ```
 
@@ -354,11 +354,11 @@ Get-Content artifacts/release/SHA256SUMS.txt
 
 **La aplicacion no abre o no muestra ventana.** Verifica `%LOCALAPPDATA%\CA-O\logs\cao-ui-crash.log` y `cao-installer-crash.log`. Si ves `XAML parsing failed`, usa el zip completo descomprimido y ejecuta como administrador. El exe suelto de 295 KB fuera de su carpeta no inicia por falta de DLLs de Windows App SDK. Cierra procesos elevados colgados con `taskkill /F /IM CA-O.UI.exe` desde una consola elevada.
 
-**Error 404 al instalar con el GUI.** Ocurria en v2.0.4 y anteriores por URL de descarga obsoleta (`v2.0.1/CA-O-2.0.0-...`). Corregido en v2.0.6 con URL `v2.0.5/CA-O-2.0.5-win-x64.zip` y fallback a `latest`. Usa `CA-O-2.0.6-win-x64.zip` para instalacion offline sin descarga, o `CA-O-Setup-GUI-x64.zip` con conexion a internet.
+**Error 404 al instalar con el GUI.** Ocurria en v2.0.4 y anteriores por URL de descarga obsoleta (`v2.0.1/CA-O-2.0.0-...`). Corregido en v2.1.4 con URL `v2.0.5/CA-O-2.0.5-win-x64.zip` y fallback a `latest`. Usa `CA-O-2.1.4-win-x64.zip` para instalacion offline sin descarga, o `CA-O-Setup-GUI-x64.zip` con conexion a internet.
 
 **Servicio no disponible.** Comprueba `sc.exe query CAO.Privileged`. Si no existe, ejecuta `scripts/install-privileged-service.ps1` como administrador. La UI probará conexion al iniciar y muestra Servicio conectado o no disponible en la barra superior.
 
-**Build Release falla con CA1806.** Corregido en v2.0.6 descartando el HRESULT de `MessageBoxW` con `_ = MessageBoxW(...)`.
+**Build Release falla con CA1806.** Corregido en v2.1.4 descartando el HRESULT de `MessageBoxW` con `_ = MessageBoxW(...)`.
 
 Logs adicionales: `%TEMP%\CA-O-Setup-Gui.log` del instalador y `%LOCALAPPDATA%\CA-O\logs\cao-ui-structured.log` (JSON estructurado).
 
@@ -386,4 +386,6 @@ Consulta [CONTRIBUTING.md](CONTRIBUTING.md). Flujo: rama `feature/*` desde `main
 ## Licencia
 
 Proyecto privado. Todos los derechos reservados. No se concede licencia de uso, copia o distribucion sin autorizacion expresa del titular.
+
+
 

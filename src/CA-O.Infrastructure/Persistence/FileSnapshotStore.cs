@@ -19,6 +19,7 @@ public sealed class FileSnapshotStore : ISnapshotStore
 
     private readonly string _root;
     private readonly object _sync = new();
+    private readonly string _mutexName;
 
     public FileSnapshotStore(string? rootDirectory = null)
     {
@@ -26,6 +27,21 @@ public sealed class FileSnapshotStore : ISnapshotStore
             ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
                 "CA-O", "snapshots");
         Directory.CreateDirectory(_root);
+        _mutexName = @"Global\CA-O-Snapshot-" + Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(_root)))[..8];
+    }
+
+    private IDisposable AcquireGlobalLock()
+    {
+        var mutex = new System.Threading.Mutex(false, _mutexName);
+        try { mutex.WaitOne(TimeSpan.FromSeconds(30)); } catch (AbandonedMutexException) { }
+        return new MutexReleaser(mutex);
+    }
+
+    private sealed class MutexReleaser : IDisposable
+    {
+        private readonly System.Threading.Mutex _m;
+        public MutexReleaser(System.Threading.Mutex m) => _m = m;
+        public void Dispose() { try { _m.ReleaseMutex(); } catch { } _m.Dispose(); }
     }
 
     // ---- DTOs ----
@@ -79,6 +95,7 @@ public sealed class FileSnapshotStore : ISnapshotStore
     public void Save(TransactionSnapshotRecord record)
     {
         lock (_sync)
+        using (AcquireGlobalLock())
         {
             var dir = Path.Combine(_root, record.Manifest.TransactionId.ToString("D"));
             if (Directory.Exists(dir))
@@ -158,14 +175,16 @@ public sealed class FileSnapshotStore : ISnapshotStore
 
     public bool TryLoad(Guid transactionId, out TransactionSnapshotRecord? record)
     {
-        lock (_sync) return TryLoadCore(transactionId, out record);
+        lock (_sync)
+        using (AcquireGlobalLock())
+            return TryLoadCore(transactionId, out record);
     }
 
     public bool TryLoadLatestForOptimization(string optimizationId, out TransactionSnapshotRecord? record)
     {
         lock (_sync)
+        using (AcquireGlobalLock())
         {
-            // Direct scan without re-entering ListAll lock
             record = null;
             if (!Directory.Exists(_root)) return false;
             TransactionSnapshotRecord? best = null;
@@ -185,6 +204,7 @@ public sealed class FileSnapshotStore : ISnapshotStore
     public void Delete(Guid transactionId)
     {
         lock (_sync)
+        using (AcquireGlobalLock())
         {
             var dir = Path.Combine(_root, transactionId.ToString("D"));
             if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
@@ -194,6 +214,7 @@ public sealed class FileSnapshotStore : ISnapshotStore
     public IReadOnlyList<TransactionSnapshotRecord> ListAll()
     {
         lock (_sync)
+        using (AcquireGlobalLock())
         {
             var result = new List<TransactionSnapshotRecord>();
             if (!Directory.Exists(_root)) return result;
