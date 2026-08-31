@@ -17,7 +17,9 @@ public sealed class ElevatedCommandCatalogTests
     [InlineData("netsh.exe", "advfirewall show allprofiles state")]
     public void AcceptsKnownStaticCommands(string file, string args)
     {
+#pragma warning disable CS0618
         Assert.True(ElevatedCommandCatalog.IsAllowed(file, args));
+#pragma warning restore CS0618
     }
 
     [Theory]
@@ -27,7 +29,9 @@ public sealed class ElevatedCommandCatalogTests
     [InlineData("bcdedit.exe", "/set {current} hypervisorlaunchtype off")] // boot-level: never via generic runner
     public void RejectsNonCatalogExecutablesOrArguments(string file, string args)
     {
+#pragma warning disable CS0618
         Assert.False(ElevatedCommandCatalog.IsAllowed(file, args));
+#pragma warning restore CS0618
     }
 
     [Theory]
@@ -36,6 +40,8 @@ public sealed class ElevatedCommandCatalogTests
     [InlineData("powercfg.exe", "$(calc.exe)")]
     public void RejectsInjectionAttempts(string file, string args)
     {
+#pragma warning disable CS0618
         Assert.False(ElevatedCommandCatalog.IsAllowed(file, args));
+#pragma warning restore CS0618
     }
 }
