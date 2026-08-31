@@ -99,8 +99,20 @@ public static class OptimizationCatalog
     public static readonly StaleCrashDumpCleanup StaleCrashDumpCleanup = new();
     public static readonly OptimizeStartupRecoveryState OptimizeStartupRecoveryState = new();
 
-    /// <summary>All toggleable optimizations (startup-apps management is separate).</summary>
+    /// <summary>All toggleable optimizations - SOLO implementaciones reales (19). Los 49 STUBs HKCU\Software\CA-O fueron retirados del catálogo de producción (ver docs/OPTIMIZATION-CATALOG.md). Preferible 19 reales que 68 falsas.</summary>
     public static IReadOnlyList<IOptimization> All { get; } = new IOptimization[]
+    {
+        // 15 IMPLEMENTED (registro real / powercfg / bcdedit / services / defrag)
+        DisableBackgroundApps, DisableCopilot, DisableCortana, DisableGameBarDvr, DisableSuggestions,
+        DisableTelemetry, DisableTransparency, DisableVisualEffects, DisableWidgets,
+        EnableGameMode, EnableGpuScheduling, ZeroMenuDelay,
+        DisableOneDriveAutostart, DisableSearchIndexing, MaximumPowerPlan,
+        // 4 PARTIALLY_IMPLEMENTED (aplica real pero necesita Verify robusto - se mantiene como EXPERIMENTAL/Optional)
+        DisableHibernate, DisableVbs, NormalizeTcpAutoTuning, OptimizeSystemDrive,
+    };
+
+    /// <summary>Catálogo completo histórico (68) - solo para tests de trazabilidad docs ↔ código. No usar en producción.</summary>
+    public static IReadOnlyList<IOptimization> AllLegacy { get; } = new IOptimization[]
     {
         DisableVbs, MaximumPowerPlan, DisableVisualEffects, DisableSearchIndexing,
         DisableBackgroundApps, ZeroMenuDelay, DisableTransparency,

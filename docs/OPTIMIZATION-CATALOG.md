@@ -1,12 +1,13 @@
 # CA-O Optimization Catalog
 
-Calidad sobre cantidad (spec 131). **68 optimizaciones catalogadas (18 existentes + 50 nuevas)**. Cada entrada responde que cambia, por que, con que evidencia, que riesgo y seguridad afecta, si es reversible y como se verifica.
+Calidad sobre cantidad (spec 131). **19 optimizaciones verificadas en producción (15 IMPLEMENTED + 4 PARTIALLY_IMPLEMENTED con Verify tolerante). 49 STUBs `HKCU\Software\CA-O` retirados del catálogo de producción (ver `OptimizationCatalog.All` vs `AllLegacy` 68 histórico).** Cada entrada responde que cambia, por que, con que evidencia, que riesgo y seguridad afecta, si es reversible y como se verifica.
 
 ## Summary
 
-Existing optimizations: 18
-New optimizations: 50
-Total: 68
+Existing optimizations: 18 (histórico)
+New optimizations: 50 (histórico)
+Total histórico: 68
+**Producción verificada: 19** (15 IMPLEMENTED + 4 PARTIALLY con Verify tolerante, DISM ResetBase y 48 STUBs excluidos por no modificar Windows real)
 
 ## Evidence model
 
@@ -29,63 +30,35 @@ Total: 68
 
 Nunca se deshabilita silenciosamente Secure Boot/TPM/VBS/HVCI/Defender/firewall. VBS/HVCI requiere Expert + confirmacion.
 
-## Optimization registry
+## Optimization registry — Producción verificada (19)
 
 | Id | Categoria | Impacto | Evidencia | Riesgo | Compatibilidad | Reversible | Flags |
 |---|---|---|---|---|---|---|---|
-| enable-game-mode | Gaming | WorkloadDependent | Official | Low | Compatible | Si | — |
-| enable-windowed-game-optimizations | Gaming | WorkloadDependent | Official | Low | Compatible | Si | — |
-| enable-vrr | Gaming | WorkloadDependent | Vendor | Low | Conditional | Si | — |
-| set-games-high-performance-gpu | Gaming | WorkloadDependent | Official | Low | Conditional | Si | — |
-| disable-background-game-captures | Gaming | Small | Vendor | Low | Compatible | Si | — |
-| disable-game-bar-auto-launch | Gaming | Tiny | Official | Safe | Compatible | Si | — |
-| configure-gaming-power-mode-ac | Gaming | Small | Official | Low | Compatible | Si | — |
-| restore-default-gpu-preference | Gaming | Tiny | Official | Low | Compatible | Si | — |
-| enable-auto-hdr | Gaming | None | Vendor | Low | Conditional | Si | — |
-| gaming-display-refresh-rate-audit | Gaming | None | Official | Safe | Compatible | Si | — |
-| set-best-performance-ac | Performance | Small | Official | Low | Compatible | Si | — |
-| restore-balanced-power-dc | Performance | Small | Official | Low | Compatible | Si | — |
-| disable-usb-selective-suspend-ac | Performance | WorkloadDependent | Official | Moderate | Conditional | Si | — |
-| disable-pcie-link-state-power-saving-ac | Performance | WorkloadDependent | Official | Moderate | Conditional | Si | — |
-| set-wireless-adapter-max-performance-ac | Performance | Small | Vendor | Low | Conditional | Si | — |
-| restore-power-plan-after-gaming | Performance | Small | Official | Low | Compatible | Si | — |
-| remove-unused-custom-power-plans | Performance | None | Official | Low | Compatible | Si | — |
-| ensure-trim-enabled | Storage | Small | Official | Low | Compatible | Si | — |
-| retrim-system-ssd | Storage | Small | Official | Low | Compatible | Si | — |
-| optimize-hdd-media-aware | Storage | Small | Official | Low | Compatible | Si | — |
-| enable-storage-sense | Storage | Tiny | Official | Low | Compatible | Si | — |
-| storage-sense-temp-cleanup | Storage | Tiny | Official | Low | Compatible | Si | — |
-| storage-sense-recycle-bin-policy | Storage | Tiny | Official | Low | Compatible | Si | — |
-| cleanup-windows-temp | Storage | Tiny | Heuristic | Low | Compatible | Si | — |
-| cleanup-delivery-optimization-cache | Storage | Small | Official | Low | Compatible | Si | — |
-| windows-component-store-cleanup | Storage | Small | Official | Moderate | Compatible | Si | — |
-| windows-component-store-resetbase | Storage | Moderate | Official | High | Compatible | No | NotReversible, ExpertOnly |
-| disk-cleanup-system-files | Storage | Small | Official | Low | Compatible | Si | — |
-| free-low-storage-space | Storage | Small | Official | Low | Compatible | Si | — |
-| restore-system-managed-pagefile | Storage | Small | Official | Low | Compatible | Si | — |
-| enable-rss | Network | Small | Vendor | Low | Conditional | Si | — |
-| restore-tcp-checksum-offload | Network | Small | Vendor | Low | Conditional | Si | — |
-| restore-udp-checksum-offload | Network | Small | Vendor | Low | Conditional | Si | — |
-| restore-large-send-offload | Network | Small | Vendor | Low | Conditional | Si | — |
-| configure-interrupt-moderation-for-low-latency | Network | WorkloadDependent | Vendor | Moderate | Conditional | Si | — |
-| disable-nic-power-saving-ac | Network | Small | Vendor | Low | Conditional | Si | — |
-| restore-windows-tcp-congestion-default | Network | Small | Official | Low | Compatible | Si | — |
-| flush-dns-cache | Network | Tiny | Official | Low | Compatible | Si | — |
-| reset-network-stack-repair | Network | Small | Official | Moderate | Compatible | Si | — |
-| delivery-optimization-bandwidth-profile | Network | Small | Official | Low | Compatible | Si | — |
-| disable-unnecessary-startup-apps | Performance | Small | Official | Low | Compatible | Si | — |
-| disable-heavy-startup-apps | Performance | Small | Official | Moderate | Compatible | Si | — |
-| delay-safe-third-party-service-start | Performance | Small | Official | Low | Compatible | Si | — |
-| disable-selected-third-party-background-task | Performance | Small | Official | Low | Compatible | Si | — |
-| restore-sysmain-default | Performance | Small | Official | Low | Compatible | Si | — |
-| restore-windows-search-default | Performance | Small | Official | Low | Compatible | Si | — |
-| create-restore-point-before-optimization-batch | Storage | None | Official | Low | Compatible | Si | — |
-| pending-reboot-maintenance | Storage | None | Official | Low | Compatible | Si | — |
-| stale-crash-dump-cleanup | Storage | Tiny | Official | Low | Compatible | Si | — |
-| optimize-startup-recovery-state | Storage | None | Official | Low | Compatible | Si | — |
-| disable-vbs | Performance | WorkloadDependent | Vendor | Critical | PotentialConflict | Si | ExpertOnly, SecurityTradeoff, RequiresReboot |
-| maximum-power-plan | Performance | Small | Official | Low | Compatible | Si | — |
+| disable-background-apps | Performance | Small | Official | Low | Compatible | Si | — |
+| disable-copilot | PrivacySecurity | None | Official | Low | Compatible | Si | — |
+| disable-cortana | PrivacySecurity | None | Official | Low | Compatible | Si | — |
+| disable-game-bar-dvr | Gaming | WorkloadDependent | Vendor | Low | Compatible | Si | — |
+| disable-suggestions | PrivacySecurity | None | Official | Low | Compatible | Si | — |
+| disable-telemetry | PrivacySecurity | None | Official | Low | Compatible | Si | — |
+| disable-transparency | Performance | Tiny | Empirical | Safe | Compatible | Si | — |
 | disable-visual-effects | Performance | Tiny | Empirical | Safe | Compatible | Si | — |
+| disable-widgets | PrivacySecurity | Tiny | Official | Low | Compatible | Si | — |
+| enable-game-mode | Gaming | WorkloadDependent | Official | Low | Compatible | Si | — |
+| enable-gpu-scheduling | Gaming | WorkloadDependent | Vendor | Moderate | Conditional | Si | RequiresReboot |
+| zero-menu-delay | Performance | Tiny | Heuristic | Safe | Compatible | Si | — |
+| disable-onedrive-autostart | PrivacySecurity | Tiny | Official | Low | Conditional | Si | ExpertOnly |
+| disable-search-indexing | Performance | WorkloadDependent | Empirical | Moderate | Conditional | Si | RecommendedOnSsd |
+| maximum-power-plan | Performance | Small | Official | Low | Compatible | Si | — |
+| disable-hibernate | Storage | None | Official | Moderate | Compatible | Si | — |
+| disable-vbs | Performance | WorkloadDependent | Vendor | Critical | PotentialConflict | Si | ExpertOnly, SecurityTradeoff, RequiresReboot |
+| normalize-tcp-autotuning | Network | WorkloadDependent | Official | Low | Conditional | Si | — |
+| optimize-system-drive | Storage | None | Official | Low | Compatible | No | NotReversible |
+
+*49 optimizaciones STUB `HKCU\Software\CA-O` retiradas del catálogo de producción; permanecen en `AllLegacy` solo para auditoría. Ver `OptimizationCatalog.AllLegacy`.*
+
+## Optimizaciones retiradas (STUB - no verificables)
+
+> `enable-windowed-game-optimizations`, `enable-vrr`, `set-games-high-performance-gpu`, `disable-background-game-captures`, `disable-game-bar-auto-launch`, `configure-gaming-power-mode-ac`, `restore-default-gpu-preference`, `enable-auto-hdr`, `gaming-display-refresh-rate-audit`, `set-best-performance-ac`, `restore-balanced-power-dc`, `disable-usb-selective-suspend-ac`, `disable-pcie-link-state-power-saving-ac`, `set-wireless-adapter-max-performance-ac`, `restore-power-plan-after-gaming`, `remove-unused-custom-power-plans`, `ensure-trim-enabled`, `retrim-system-ssd`, `optimize-hdd-media-aware`, `enable-storage-sense`, `storage-sense-temp-cleanup`, `storage-sense-recycle-bin-policy`, `cleanup-windows-temp`, `cleanup-delivery-optimization-cache`, `windows-component-store-cleanup`, `windows-component-store-resetbase`, `disk-cleanup-system-files`, `free-low-storage-space`, `restore-system-managed-pagefile`, `enable-rss`, `restore-tcp-checksum-offload`, `restore-udp-checksum-offload`, `restore-large-send-offload`, `configure-interrupt-moderation-for-low-latency`, `disable-nic-power-saving-ac`, `restore-windows-tcp-congestion-default`, `flush-dns-cache`, `reset-network-stack-repair`, `delivery-optimization-bandwidth-profile`, `disable-unnecessary-startup-apps`, `disable-heavy-startup-apps`, `delay-safe-third-party-service-start`, `disable-selected-third-party-background-task`, `restore-sysmain-default`, `restore-windows-search-default`, `create-restore-point-before-optimization-batch`, `pending-reboot-maintenance`, `stale-crash-dump-cleanup`, `optimize-startup-recovery-state` — todas escribían `HKCU\Software\CA-O\<id>` sin modificar Windows real.
 | disable-search-indexing | Performance | WorkloadDependent | Empirical | Moderate | Conditional | Si | RecommendedOnSsd |
 | disable-background-apps | Performance | Small | Official | Low | Compatible | Si | — |
 | zero-menu-delay | Performance | Tiny | Heuristic | Safe | Compatible | Si | — |

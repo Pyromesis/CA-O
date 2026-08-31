@@ -25,8 +25,14 @@ public sealed class OptimizationCatalogContractTests
     public void IdsAreUnique()
     {
         var ids = OptimizationCatalog.All.Select(o => o.Definition.Id).ToList();
-        Assert.Equal(68, ids.Count);
+        Assert.Equal(19, ids.Count); // producción verificada (49 STUBs retirados)
         Assert.Equal(ids.Count, ids.Distinct(StringComparer.Ordinal).Count());
+    }
+
+    [Fact]
+    public void LegacyCatalogKeeps68ForTraceability()
+    {
+        Assert.Equal(68, OptimizationCatalog.AllLegacy.Count);
     }
 
     [Theory]

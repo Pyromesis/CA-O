@@ -62,12 +62,39 @@ public static class RecommendationEngine
         };
     }
 
+    private static readonly HashSet<string> StubIds = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "cleanup-delivery-optimization-cache","cleanup-windows-temp","configure-gaming-power-mode-ac",
+        "configure-interrupt-moderation-for-low-latency","create-restore-point-before-optimization-batch",
+        "delay-safe-third-party-service-start","delivery-optimization-bandwidth-profile",
+        "disable-background-game-captures","disable-game-bar-auto-launch","disable-heavy-startup-apps",
+        "disable-nic-power-saving-ac","disable-pcie-link-state-power-saving-ac","disable-selected-third-party-background-task",
+        "disable-unnecessary-startup-apps","disable-usb-selective-suspend-ac","disk-cleanup-system-files",
+        "enable-auto-hdr","enable-rss","enable-storage-sense","enable-vrr","enable-windowed-game-optimizations",
+        "ensure-trim-enabled","flush-dns-cache","free-low-storage-space","gaming-display-refresh-rate-audit",
+        "optimize-hdd-media-aware","optimize-startup-recovery-state","pending-reboot-maintenance",
+        "remove-unused-custom-power-plans","reset-network-stack-repair","restore-balanced-power-dc",
+        "restore-default-gpu-preference","restore-large-send-offload","restore-power-plan-after-gaming",
+        "restore-sysmain-default","restore-system-managed-pagefile","restore-tcp-checksum-offload",
+        "restore-udp-checksum-offload","restore-windows-search-default","restore-windows-tcp-congestion-default",
+        "retrim-system-ssd","set-best-performance-ac","set-games-high-performance-gpu",
+        "set-wireless-adapter-max-performance-ac","stale-crash-dump-cleanup","storage-sense-recycle-bin-policy",
+        "storage-sense-temp-cleanup","windows-component-store-cleanup","windows-component-store-resetbase"
+    };
+
     private static (RecommendationBucket Bucket, RecommendationReason Reason) Classify(
         OptimizationDefinition definition,
         SystemContext context,
         OptimizationState currentState,
         RecommendationReason guardReason)
     {
+        // 0) STUB fail-closed: ninguna optimización placeholder puede ser Recommended/Optional
+        if (StubIds.Contains(definition.Id))
+        {
+            return (RecommendationBucket.NotApplicable,
+                new RecommendationReason("stub-not-implemented", "No implementada: solo escribe HKCU\\Software\\CA-O. Retirada del catálogo de producción."));
+        }
+
         // 1) Hard anti-cheat / default-block list wins over everything else.
         if (guardReason.Code == "blocked-by-default")
         {
