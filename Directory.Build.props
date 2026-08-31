@@ -1,4 +1,5 @@
 <Project>
+  <Import Project="Version.props" Condition="Exists('Version.props')" />
 
   <PropertyGroup>
     <Version>2.1.4</Version>
