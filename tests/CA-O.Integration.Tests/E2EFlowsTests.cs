@@ -1,10 +1,23 @@
 using CAO.Core.Abstractions;
 using CAO.Core.Diagnostics;
+using CAO.Core.Rollback;
 using CAO.Infrastructure.Benchmarking;
 using CAO.Infrastructure.Persistence;
 using CAO.Infrastructure.Services;
+using CAO.Infrastructure.Logging;
+using CAO.Infrastructure.Windows.Execution;
+using CAO.Infrastructure.Windows.Services;
+using CAO.Core;
+using CAO.Core.Engine;
+using CAO.Core.Catalog;
 using CAO.Shared;
 using Xunit;
+using System;
+using System.IO;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Collections.Generic;
+using System.Linq;
 
 [assembly: CollectionBehavior(DisableTestParallelization = true)]
 
@@ -21,10 +34,12 @@ public sealed class E2EFlowsTests
         var registry = new StubRegistry();
         return new SystemAnalysisService(provider, store, registry);
     }
+
     private sealed class StubContextProvider : ISystemContextProvider
     {
         public Task<SystemContext> GetAsync(CancellationToken ct = default) => Task.FromResult(SystemContextFactory.Default());
     }
+
     private sealed class StubRegistry : IRegistryAccessor
     {
         public RegistryValueKind2 GetKind(RegistryHive2 h, string p, string n) => RegistryValueKind2.None;
@@ -35,6 +50,7 @@ public sealed class E2EFlowsTests
         public bool DeleteValue(RegistryHive2 h, string p, string n) => false;
         public IReadOnlyList<string> GetValueNames(RegistryHive2 h, string p) => Array.Empty<string>();
     }
+
     private static string NewTempDir() => Directory.CreateTempSubdirectory($"cao-e2e-{Guid.NewGuid():N}").FullName;
 
     [Fact] // Caso 1: Abrir -> Dashboard visible con estado previo si existe
@@ -43,13 +59,11 @@ public sealed class E2EFlowsTests
         var dir = NewTempDir();
         var svc = NewAnalysisService(dir);
         var store = new AnalysisStateStore(Path.Combine(dir, "analysis.json"));
-        // Simular análisis previo persistido
         var result = await svc.RunAsync();
         Assert.Equal("Completed", result.AnalysisState);
         var loaded = store.LoadLatestAnalysis();
         Assert.NotNull(loaded);
         Assert.NotNull(loaded!.Context);
-        // "Reabrir": nuevo store debe ver mismo análisis
         var store2 = new AnalysisStateStore(Path.Combine(dir, "analysis.json"));
         var reloaded = store2.LoadLatestAnalysis();
         Assert.NotNull(reloaded);
@@ -66,7 +80,6 @@ public sealed class E2EFlowsTests
         var persisted = store.LoadLatestAnalysis();
         Assert.NotNull(persisted);
         Assert.True(persisted!.Recommendations?.Count > 0);
-        // Simular cierre: recrear servicio y verificar que Health sigue calculable
         var health = HealthEngine.Evaluate(persisted.Context);
         Assert.True(health.Scores.Count > 0);
     }
@@ -89,7 +102,6 @@ public sealed class E2EFlowsTests
     {
         var dir = NewTempDir();
         var svc = NewAnalysisService(dir);
-        // Sin servicio, el análisis (solo lectura) debe seguir funcionando
         var result = await svc.RunAsync();
         Assert.NotNull(result.Context);
         Assert.True(result.Modules.Count >= 4);
@@ -122,7 +134,6 @@ public sealed class E2EFlowsTests
     {
         var path = Path.Combine(Path.GetTempPath(), $"cao-e2e-hist2-{Guid.NewGuid():N}.jsonl");
         var logger = new CAO.Infrastructure.Logging.JsonHistoryLogger(path);
-        // Vacío debe ser seguro
         Assert.Empty(logger.ReadLast(10));
         logger.Log(new HistoryEntry { TimestampUtc = DateTime.UtcNow, AppVersion = "2.0.0", OptimizationId = "x", Operation = "apply", Success = true });
         Assert.Single(logger.ReadLast(10));

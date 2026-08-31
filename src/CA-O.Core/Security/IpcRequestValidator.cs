@@ -56,7 +56,7 @@ public static class IpcRequestValidator
             return false;
         }
 
-        // Ping y GetServiceStatus no llevan OptimizationId (§10)
+        // Ping, GetServiceStatus y SetDns no llevan OptimizationId (§10, FASE 8)
         if (request.Operation is PrivilegedOperationKind.Ping or PrivilegedOperationKind.GetServiceStatus)
         {
             var pingExpected = request.Operation == PrivilegedOperationKind.Ping ? typeof(global::CAO.Shared.IPC.PingPayload) : typeof(global::CAO.Shared.IPC.GetServiceStatusPayload);
@@ -64,6 +64,23 @@ public static class IpcRequestValidator
             {
                 errorCode = ErrorCodes.IpcPayloadSchemaInvalid;
                 error = "Payload de Ping/Status inválido.";
+                return false;
+            }
+            error = string.Empty;
+            return true;
+        }
+        if (request.Operation is PrivilegedOperationKind.SetDns)
+        {
+            if (request.Payload is not global::CAO.Shared.IPC.SetDnsPayload dns)
+            {
+                errorCode = ErrorCodes.IpcPayloadSchemaInvalid;
+                error = "Payload de SetDns inválido.";
+                return false;
+            }
+            if (string.IsNullOrWhiteSpace(dns.InterfaceName) || string.IsNullOrWhiteSpace(dns.DnsIp) ||
+                !System.Net.IPAddress.TryParse(dns.DnsIp.Split(',')[0].Trim(), out _))
+            {
+                error = "SetDns InterfaceName/DnsIp no valido.";
                 return false;
             }
             error = string.Empty;

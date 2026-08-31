@@ -1,7 +1,7 @@
 # Protocolo IPC v2
 
 ## Transporte
-Named Pipe `CAO Privileged Service` → `CA-O.Privileged.v1` (constante `IpcConstants.PipeName`), byte-mode, una instancia, ACL: SYSTEM Full / Administrators RW / Interactive RW. **Conectar no es autorizar**: cada request pasa por `IPrivilegedCallerAuthorizer`.
+Named Pipe `CAO.Privileged` → `CA-O.Privileged.v1` (constante `IpcConstants.PipeName`), byte-mode, una instancia, ACL: SYSTEM Full / Administrators RW / Interactive RW. **Conectar no es autorizar**: cada request pasa por `IPrivilegedCallerAuthorizer`.
 
 ## Envelope
 ```jsonc

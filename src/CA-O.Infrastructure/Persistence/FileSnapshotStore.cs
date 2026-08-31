@@ -18,6 +18,7 @@ public sealed class FileSnapshotStore : ISnapshotStore
     private const int SchemaVersion = 3;
 
     private readonly string _root;
+    private readonly object _sync = new();
 
     public FileSnapshotStore(string? rootDirectory = null)
     {
@@ -77,76 +78,63 @@ public sealed class FileSnapshotStore : ISnapshotStore
 
     public void Save(TransactionSnapshotRecord record)
     {
-        var dir = Path.Combine(_root, record.Manifest.TransactionId.ToString("D"));
-        if (Directory.Exists(dir))
+        lock (_sync)
         {
-            throw new InvalidOperationException($"Snapshot inmutable: {record.Manifest.TransactionId} ya existe.");
-        }
-        Directory.CreateDirectory(dir);
-
-        var stateJson = JsonSerializer.Serialize(ToStateDto(record.State), JsonOpts);
-        var sha = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(stateJson)));
-
-        try
-        {
-            WriteAtomic(Path.Combine(dir, "snapshot.json"), stateJson);
-            WriteAtomic(Path.Combine(dir, "manifest.json"), JsonSerializer.Serialize(
-                new ManifestDto(record.Manifest.TransactionId, record.Manifest.OptimizationId,
-                    record.Manifest.DefinitionVersion, record.Manifest.SchemaVersion,
-                    record.Manifest.AppVersion, record.Manifest.WindowsBuild,
-                    record.Manifest.TimestampUtc, record.Manifest.RequestedBySid), JsonOpts));
-            WriteAtomic(Path.Combine(dir, "integrity.json"), JsonSerializer.Serialize(
-                new IntegrityDto("SHA256", sha), JsonOpts));
-
-            if (!TryLoad(record.Manifest.TransactionId, out var reloaded) ||
-                reloaded is null ||
-                !SnapshotStateEquals(record.State, reloaded.State))
+            var dir = Path.Combine(_root, record.Manifest.TransactionId.ToString("D"));
+            if (Directory.Exists(dir))
             {
-                throw new InvalidOperationException("Snapshot no superó la verificación post-escritura.");
+                throw new InvalidOperationException($"Snapshot inmutable: {record.Manifest.TransactionId} ya existe.");
             }
-        }
-        catch
-        {
-            try { Directory.Delete(dir, recursive: true); } catch { /* best effort */ }
-            throw;
+            Directory.CreateDirectory(dir);
+
+            var stateJson = JsonSerializer.Serialize(ToStateDto(record.State), JsonOpts);
+            var sha = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(stateJson)));
+
+            try
+            {
+                WriteAtomic(Path.Combine(dir, "snapshot.json"), stateJson);
+                WriteAtomic(Path.Combine(dir, "manifest.json"), JsonSerializer.Serialize(
+                    new ManifestDto(record.Manifest.TransactionId, record.Manifest.OptimizationId,
+                        record.Manifest.DefinitionVersion, record.Manifest.SchemaVersion,
+                        record.Manifest.AppVersion, record.Manifest.WindowsBuild,
+                        record.Manifest.TimestampUtc, record.Manifest.RequestedBySid), JsonOpts));
+                WriteAtomic(Path.Combine(dir, "integrity.json"), JsonSerializer.Serialize(
+                    new IntegrityDto("SHA256", sha), JsonOpts));
+
+                // Verify without re-entering lock (direct read)
+                if (!TryLoadCore(record.Manifest.TransactionId, out var reloaded) ||
+                    reloaded is null ||
+                    !SnapshotStateEquals(record.State, reloaded.State))
+                {
+                    throw new InvalidOperationException("Snapshot no superó la verificación post-escritura.");
+                }
+            }
+            catch
+            {
+                try { Directory.Delete(dir, recursive: true); } catch { /* best effort */ }
+                throw;
+            }
         }
     }
 
-    public bool TryLoad(Guid transactionId, out TransactionSnapshotRecord? record)
+    private bool TryLoadCore(Guid transactionId, out TransactionSnapshotRecord? record)
     {
         record = null;
         var dir = Path.Combine(_root, transactionId.ToString("D"));
         var snapPath = Path.Combine(dir, "snapshot.json");
         var manifestPath = Path.Combine(dir, "manifest.json");
         var integrityPath = Path.Combine(dir, "integrity.json");
-        if (!File.Exists(snapPath) || !File.Exists(manifestPath) || !File.Exists(integrityPath))
-        {
-            return false; // incomplete tree == absent for restore purposes
-        }
-
+        if (!File.Exists(snapPath) || !File.Exists(manifestPath) || !File.Exists(integrityPath)) return false;
         try
         {
             var manifest = JsonSerializer.Deserialize<ManifestDto>(File.ReadAllText(manifestPath), JsonOpts);
             var integrity = JsonSerializer.Deserialize<IntegrityDto>(File.ReadAllText(integrityPath), JsonOpts);
-            if (manifest is null || integrity is null ||
-                !string.Equals(integrity.Algorithm, "SHA256", StringComparison.Ordinal))
-            {
-                return false;
-            }
-
+            if (manifest is null || integrity is null || !string.Equals(integrity.Algorithm, "SHA256", StringComparison.Ordinal)) return false;
             var stateJson = File.ReadAllText(snapPath);
             var expectedSha = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(stateJson)));
-            if (!string.Equals(expectedSha, integrity.StateSha256, StringComparison.Ordinal))
-            {
-                return false; // corruption blocks restore (P2-23)
-            }
-
+            if (!string.Equals(expectedSha, integrity.StateSha256, StringComparison.Ordinal)) return false;
             var stateDto = JsonSerializer.Deserialize<StateDto>(stateJson, JsonOpts);
-            if (stateDto is null)
-            {
-                return false;
-            }
-
+            if (stateDto is null) return false;
             record = new TransactionSnapshotRecord
             {
                 Manifest = new TransactionSnapshotManifest
@@ -165,46 +153,57 @@ public sealed class FileSnapshotStore : ISnapshotStore
             };
             return true;
         }
-        catch (JsonException)
-        {
-            return false;
-        }
+        catch (JsonException) { return false; }
+    }
+
+    public bool TryLoad(Guid transactionId, out TransactionSnapshotRecord? record)
+    {
+        lock (_sync) return TryLoadCore(transactionId, out record);
     }
 
     public bool TryLoadLatestForOptimization(string optimizationId, out TransactionSnapshotRecord? record)
     {
-        record = ListAll()
-            .Where(candidate => candidate.Manifest.OptimizationId.Equals(
-                optimizationId, StringComparison.OrdinalIgnoreCase))
-            .OrderByDescending(candidate => candidate.Manifest.TimestampUtc)
-            .FirstOrDefault();
-        return record is not null;
+        lock (_sync)
+        {
+            // Direct scan without re-entering ListAll lock
+            record = null;
+            if (!Directory.Exists(_root)) return false;
+            TransactionSnapshotRecord? best = null;
+            foreach (var dir in Directory.GetDirectories(_root))
+            {
+                if (Guid.TryParse(Path.GetFileName(dir), out var txid) && TryLoadCore(txid, out var cand) && cand is not null
+                    && cand.Manifest.OptimizationId.Equals(optimizationId, StringComparison.OrdinalIgnoreCase))
+                {
+                    if (best == null || cand.Manifest.TimestampUtc > best.Manifest.TimestampUtc) best = cand;
+                }
+            }
+            record = best;
+            return record is not null;
+        }
     }
 
     public void Delete(Guid transactionId)
     {
-        var dir = Path.Combine(_root, transactionId.ToString("D"));
-        if (Directory.Exists(dir))
+        lock (_sync)
         {
-            Directory.Delete(dir, recursive: true);
+            var dir = Path.Combine(_root, transactionId.ToString("D"));
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
         }
     }
 
     public IReadOnlyList<TransactionSnapshotRecord> ListAll()
     {
-        var result = new List<TransactionSnapshotRecord>();
-        if (!Directory.Exists(_root)) return result;
-
-        foreach (var dir in Directory.GetDirectories(_root))
+        lock (_sync)
         {
-            if (Guid.TryParse(Path.GetFileName(dir), out var txid) &&
-                TryLoad(txid, out var record) &&
-                record is not null)
+            var result = new List<TransactionSnapshotRecord>();
+            if (!Directory.Exists(_root)) return result;
+            foreach (var dir in Directory.GetDirectories(_root))
             {
-                result.Add(record);
+                if (Guid.TryParse(Path.GetFileName(dir), out var txid) && TryLoadCore(txid, out var record) && record is not null)
+                    result.Add(record);
             }
+            return result;
         }
-        return result;
     }
 
     // ---- legacy v2 ----

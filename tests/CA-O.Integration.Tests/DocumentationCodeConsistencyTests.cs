@@ -12,11 +12,10 @@ namespace CAO.Integration.Tests;
 /// </summary>
 public sealed class DocumentationCodeConsistencyTests
 {
-    private static string RepoRoot =>
-        Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
+    private static string RepoRoot => TestUtils.GetRepoRoot();
 
     private static string ReadRepoFile(params string[] parts) =>
-        File.ReadAllText(Path.Combine(new[] { RepoRoot }.Concat(parts).ToArray()));
+        TestUtils.ReadRepoFile(parts);
 
     [Fact]
     public void EveryCatalogIdInDocsMatchesTheCompiledCatalog()

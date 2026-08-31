@@ -110,10 +110,10 @@ internal sealed class PrivilegedPipeService(
                     throw new OperationCanceledException("Timeout leyendo request");
                 line = await readTask;
             }
-            if (string.IsNullOrWhiteSpace(line))
+if (string.IsNullOrWhiteSpace(line))
             {
-                try { System.IO.File.AppendAllText(@"C:\Users\Hilo8\AppData\Local\Temp\ipc_debug.log", $"{DateTime.UtcNow:o} Empty line received, pipe may have been closed\n"); } catch { }
-                throw new JsonException("Request vacÃ­a");
+                logger.LogWarning("Empty line received, pipe may have been closed");
+                throw new JsonException("Request vacía");
             }
             if (System.Text.Encoding.UTF8.GetByteCount(line) > IpcProtocol.MaxRequestBytes)
             {
@@ -122,25 +122,24 @@ internal sealed class PrivilegedPipeService(
             }
             // Ahora sÃ­ se puede suplantar: el cliente ya escribiÃ³ y el servidor ya leyÃ³
             CallerIdentity caller;
-            try { caller = GetCallerIdentity(pipe, new CAO.Infrastructure.Windows.Security.WindowsCallerInspector()); }
+try { caller = GetCallerIdentity(pipe, new CAO.Infrastructure.Windows.Security.WindowsCallerInspector()); }
             catch (Exception ex)
             {
-                try { System.IO.File.AppendAllText(@"C:\Users\Hilo8\AppData\Local\Temp\ipc_debug.log", $"{DateTime.UtcNow:o} GetCallerIdentity FAIL {ex}\n"); } catch { }
+                logger.LogError(ex, "GetCallerIdentity FAIL");
                 throw;
             }
-            logger.LogInformation("ConexiÃ³n IPC de {Sid} ({Name}).", caller.Sid, caller.Name);
-            try { System.IO.File.AppendAllText(@"C:\Users\Hilo8\AppData\Local\Temp\ipc_debug.log", $"{DateTime.UtcNow:o} Connected {caller.Sid} {caller.Name} Elevated={caller.IsElevated} Admin={caller.IsAdministrator}\n"); } catch { }
+            logger.LogInformation("Conexión IPC de {Sid} ({Name}).", caller.Sid, caller.Name);
+            logger.LogDebug("Connected {Sid} {Name} Elevated={IsElevated} Admin={IsAdministrator}", caller.Sid, caller.Name, caller.IsElevated, caller.IsAdministrator);
 
             IpcRequest? request;
-            try { request = JsonSerializer.Deserialize<IpcRequest>(line, JsonOptions); }
+try { request = JsonSerializer.Deserialize<IpcRequest>(line, JsonOptions); }
             catch (JsonException ex)
             {
-                logger.LogWarning(ex, "JSON invÃ¡lido recibido: {Line}", line.Length > 200 ? line[..200] : line);
-                try { System.IO.File.AppendAllText(@"C:\Users\Hilo8\AppData\Local\Temp\ipc_debug.log", $"{DateTime.UtcNow:o} JSON FAIL {ex.Message} Line={line}\n"); } catch { }
-                await WriteResponse(pipe, IpcResponse.Rejected(ErrorCodes.IpcMalformedRequest, $"JSON invÃ¡lido: {ex.Message}"), stoppingToken);
+                logger.LogWarning(ex, "JSON inválido recibido: {Line}", line.Length > 200 ? line[..200] : line);
+                await WriteResponse(pipe, IpcResponse.Rejected(ErrorCodes.IpcMalformedRequest, $"JSON inválido: {ex.Message}"), stoppingToken);
                 return;
             }
-            try { System.IO.File.AppendAllText(@"C:\Users\Hilo8\AppData\Local\Temp\ipc_debug.log", $"{DateTime.UtcNow:o} Request OK op={request?.Operation} id={request?.RequestId}\n"); } catch { }
+            logger.LogDebug("Request OK op={Operation} id={RequestId}", request?.Operation, request?.RequestId);
             var response = await ValidateAndDispatchAsync(request, caller, timeout.Token);
 
             logger.LogInformation(
@@ -159,12 +158,11 @@ internal sealed class PrivilegedPipeService(
             logger.LogWarning(ex, "JSON invÃ¡lido en pipe");
             await WriteResponse(pipe, IpcResponse.Rejected(ErrorCodes.IpcMalformedRequest, $"JSON invÃ¡lido: {ex.Message}"), stoppingToken);
         }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Fallo inesperado atendiendo la conexión IPC.");
-            try { System.IO.File.AppendAllText(@"C:\Users\Hilo8\AppData\Local\Temp\ipc_debug.log", $"{DateTime.UtcNow:o} GENERAL FAIL {ex.GetType().Name}: {ex.Message}\n{ex.StackTrace}\n"); } catch { }
-            try { await WriteResponse(pipe, IpcResponse.Rejected(ErrorCodes.IpcMalformedRequest, $"Error interno: {ex.GetType().Name} — {ex.Message}"), stoppingToken); } catch { }
-        }
+catch (Exception ex)
+            {
+                logger.LogError(ex, "Fallo inesperado atendiendo la conexión IPC.");
+                await WriteResponse(pipe, IpcResponse.Rejected(ErrorCodes.IpcMalformedRequest, $"Error interno: {ex.GetType().Name} — {ex.Message}"), stoppingToken);
+            }
     }
 
     private async Task<IpcResponse> ValidateAndDispatchAsync(IpcRequest? request, CallerIdentity caller, CancellationToken ct)

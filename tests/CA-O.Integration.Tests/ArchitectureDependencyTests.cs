@@ -12,13 +12,10 @@ namespace CAO.Integration.Tests;
 /// </summary>
 public sealed class ArchitectureDependencyTests
 {
-    private static string RepoRoot =>
-        Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
+    private static string RepoRoot => TestUtils.GetRepoRoot();
 
     private static IEnumerable<string> SourceFiles(string project) =>
-        Directory.EnumerateFiles(Path.Combine(RepoRoot, "src", project), "*.cs", SearchOption.AllDirectories)
-            .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}") &&
-                           !path.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}"));
+        TestUtils.GetProjectSourceFiles(project);
 
     [Fact]
     public void UiNeverSpawnsProcessesOrHostsThePipe()

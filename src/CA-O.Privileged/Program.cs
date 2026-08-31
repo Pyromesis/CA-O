@@ -11,6 +11,7 @@ using CAO.Infrastructure.SystemInterop;
 using CAO.Infrastructure.Windows.SystemRegistry;
 using CAO.Core.Security;
 using CAO.Shared.Security;
+using CAO.Shared.Constants;
 
 namespace CAO.Privileged;
 
@@ -36,7 +37,7 @@ internal static class Program
             services.GetRequiredService<CAO.Core.Interfaces.IDnsConfigurationProvider>()));
         builder.Services.AddSingleton<IPrivilegedCallerAuthorizer, AdministratorsOnlyAuthorizer>();
         builder.Services.AddHostedService<PrivilegedPipeService>();
-        builder.Services.AddWindowsService(options => options.ServiceName = "CA-O Privileged Service");
+        builder.Services.AddWindowsService(options => options.ServiceName = BuildConstants.ServiceName);
         return builder.Build().RunAsync();
     }
 }

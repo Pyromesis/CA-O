@@ -10,14 +10,10 @@ namespace CAO.Integration.Tests;
 /// </summary>
 public sealed class EncodingConsistencyTests
 {
-    private static string RepoRoot =>
-        Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
+    private static string RepoRoot => TestUtils.GetRepoRoot();
 
     private static IEnumerable<string> SourceFiles() =>
-        Directory.EnumerateFiles(Path.Combine(RepoRoot, "src"), "*", SearchOption.AllDirectories)
-            .Where(f => f.EndsWith(".cs", StringComparison.OrdinalIgnoreCase))
-            .Concat(Directory.EnumerateFiles(Path.Combine(RepoRoot, "tests"), "*", SearchOption.AllDirectories)
-                .Where(f => f.EndsWith(".cs", StringComparison.OrdinalIgnoreCase)));
+        TestUtils.GetAllSourceFiles();
 
     // Mojibake is produced when UTF-8 accented Spanish is read as a legacy
     // codepage. Every corruption variant shares the box-drawing marker char,

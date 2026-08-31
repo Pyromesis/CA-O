@@ -49,6 +49,9 @@ public sealed record OptimizationDefinition
     /// <summary>False only for operations that explicitly cannot restore prior state.</summary>
     public bool Reversible { get; init; } = true;
 
+    /// <summary>True if this optimization should trigger a Windows restore point before applying (FASE 12).</summary>
+    public bool RequiresRestorePoint { get; init; }
+
     public OptimizationFlags Flags { get; init; }
 
     /// <summary>Alias consumed by cards/report tables (spec 8 "RequiresRestart").</summary>

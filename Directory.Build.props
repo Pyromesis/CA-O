@@ -1,7 +1,7 @@
 <Project>
 
   <PropertyGroup>
-    <Version>2.1.0</Version>
+    <Version>2.1.4</Version>
     <LangVersion>13.0</LangVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -10,6 +10,19 @@
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
     <AnalysisLevel>latest-recommended</AnalysisLevel>
     <EnforceCodeStyleInBuild>false</EnforceCodeStyleInBuild>
+    <!-- Single source of truth for build constants -->
+    <ProductVersion>2.1.4</ProductVersion>
+    <ProductName>CA-O</ProductName>
+    <ProductTitle>CA-O Windows Optimizer</ProductTitle>
+    <ServiceName>CAO.Privileged</ServiceName>
+    <ServiceDisplayName>CA-O Privileged Service</ServiceDisplayName>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <InstallDirectoryName>CA-O</InstallDirectoryName>
+    <ProgramDataDirectoryName>CA-O</ProgramDataDirectoryName>
+    <UiExecutable>CA-O.UI.exe</UiExecutable>
+    <ServiceExecutable>CA-O.Privileged.exe</ServiceExecutable>
+    <UninstallerExecutable>CA-O.Uninstaller.exe</UninstallerExecutable>
   </PropertyGroup>
 
   <!-- FASE 30: Release builds are warning-as-error. The suppressed codes are

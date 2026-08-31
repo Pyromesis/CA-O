@@ -376,7 +376,7 @@ public sealed class OptimizationTransaction
         }
     }
 
-    private TransactionSnapshotRecord BuildRecord(string optimizationId, OptimizationSnapshot snapshot) => new()
+private TransactionSnapshotRecord BuildRecord(string optimizationId, OptimizationSnapshot snapshot) => new()
     {
         Manifest = new TransactionSnapshotManifest
         {

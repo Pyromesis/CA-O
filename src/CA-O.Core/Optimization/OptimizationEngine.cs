@@ -97,11 +97,14 @@ public sealed class OptimizationEngine
                 ErrorCodes.SecReadOnlyMode);
         }
 
-        // One restore point per session is enough; never block on failure.
+        // Restore point policy (FASE 12): per-optimization RequiresRestorePoint
+        var definition = OptimizationCatalog.All.FirstOrDefault(o => o.Definition.Id.Equals(optimizationId, StringComparison.OrdinalIgnoreCase));
+        var requiresRestorePoint = definition?.Definition.RequiresRestorePoint ?? false;
+
         string? backupWarning = null;
-        if (!_restorePointCreatedThisSession)
+        if (requiresRestorePoint && !_restorePointCreatedThisSession)
         {
-            var (ok, reason) = await _restorePoints.CreateAsync("CA-O 2.0 — antes de optimizar", ct);
+            var (ok, reason) = await _restorePoints.CreateAsync($"CA-O 2.0 — antes de {optimizationId}", ct);
             if (ok)
             {
                 _restorePointCreatedThisSession = true;
@@ -214,29 +217,47 @@ public sealed class OptimizationEngine
         if (!IsRunningAsAdmin()) return OperationResult.Fail("Se requieren privilegios.", "not-admin");
         if (_executor is null) return OperationResult.Fail("Ejecutor no disponible.", "no-executor");
         if (string.IsNullOrWhiteSpace(interfaceName)) return OperationResult.Fail("Interfaz no especificada.", "invalid-adapter");
+        
         // Handle comma-separated primary,secondary
         var parts = dnsIp.Split(',', StringSplitOptions.TrimEntries);
         var primary = parts[0];
         var secondary = parts.Length > 1 ? parts[1] : null;
         if (!System.Net.IPAddress.TryParse(primary, out _)) return OperationResult.Fail($"IP DNS inválida: {primary}", "invalid-ip");
         if (secondary != null && !System.Net.IPAddress.TryParse(secondary, out _)) return OperationResult.Fail($"IP DNS secundaria inválida: {secondary}", "invalid-ip");
+        
         var dnsProvider = dnsProviderOverride ?? _dnsProvider;
+        
         // Ignore virtual/VPN unless explicitly allowed
-        if (dnsProvider != null && dnsProvider.IsVirtualOrVpn(interfaceName)) return OperationResult.Fail($"Adaptador virtual/VPN ignorado: {interfaceName}", "virtual-adapter");
-        var before = dnsProvider?.GetDnsServers(interfaceName).ToArray() ?? Array.Empty<string>();
-        // Apply primary
+        if (dnsProvider != null && dnsProvider.IsVirtualOrVpn(interfaceName)) 
+            return OperationResult.Fail($"Adaptador virtual/VPN ignorado: {interfaceName}", "virtual-adapter");
+        
+        // Capture FULL state before any change (for exact rollback)
+        var adapterBefore = dnsProvider?.GetAdapter(interfaceName);
+        if (adapterBefore == null) 
+            return OperationResult.Fail($"Adaptador no encontrado: {interfaceName}", "adapter-not-found");
+        
+        var beforeDhcp = adapterBefore.DhcpEnabled;
+        var beforeDnsV4 = adapterBefore.CurrentDnsV4.ToArray();
+        var beforeDnsV6 = adapterBefore.CurrentDnsV6.ToArray();
+        
+        // Apply primary DNS
         var result = await _executor.ExecuteAsync(CAO.Shared.Security.SystemCommandKey.NetShInterfaceIpSetDnsPrimary,
             ["interface", "ip", "set", "dns", interfaceName, "static", primary], ct);
         if (!result.Success) return OperationResult.Fail($"No se pudo aplicar DNS {primary} a {interfaceName}: {result.StdErr}", result.StdErr);
+        
+        // Apply secondary if provided
         if (!string.IsNullOrEmpty(secondary))
         {
             var r2 = await _executor.ExecuteAsync(CAO.Shared.Security.SystemCommandKey.NetShInterfaceIpSetDnsSecondary,
                 ["interface", "ip", "add", "dns", interfaceName, secondary], ct);
-            if (!r2.Success) { /* rollback primary */ 
-                await _executor.ExecuteAsync(CAO.Shared.Security.SystemCommandKey.NetShInterfaceIpSetDnsDhcp, ["interface","ip","set","dns",interfaceName,"dhcp"], ct);
+            if (!r2.Success) 
+            { 
+                // Rollback primary to exact previous state
+                await RollbackDnsExact(interfaceName, beforeDhcp, beforeDnsV4, beforeDnsV6, ct);
                 return OperationResult.Fail($"No se pudo aplicar DNS secundario {secondary}: {r2.StdErr}", r2.StdErr);
             }
         }
+        
         // Verify with retry (WMI/NetworkInterface cache tarda en refrescar)
         if (dnsProvider != null)
         {
@@ -254,11 +275,8 @@ public sealed class OptimizationEngine
             if (!ok && after.Count > 0)
             {
                 // Rollback solo si leímos DNS distinto no vacío (verificación real falló)
-                if (before.Length == 0)
-                    await _executor.ExecuteAsync(CAO.Shared.Security.SystemCommandKey.NetShInterfaceIpSetDnsDhcp, ["interface","ip","set","dns",interfaceName,"dhcp"], ct);
-                else
-                    await _executor.ExecuteAsync(CAO.Shared.Security.SystemCommandKey.NetShInterfaceIpSetDnsPrimary, ["interface","ip","set","dns",interfaceName,"static", before[0]], ct);
-                return OperationResult.Fail($"Verificación fallida: DNS no coincide tras aplicar {primary} (leído: {string.Join(",", after)}). Rollback ejecutado.", "verification-failed");
+                await RollbackDnsExact(interfaceName, beforeDhcp, beforeDnsV4, beforeDnsV6, ct);
+                return OperationResult.Fail($"Verificación fallida: DNS no coincide tras aplicar {primary} (leído: {string.Join(",", after)}). Rollback exacto ejecutado.", "verification-failed");
             }
             if (!ok && after.Count == 0)
             {
@@ -267,6 +285,32 @@ public sealed class OptimizationEngine
             }
         }
         return OperationResult.Ok($"DNS {primary} aplicado a {interfaceName} — verificado.");
+    }
+
+    private async Task RollbackDnsExact(string interfaceName, bool wasDhcp, string[] beforeDnsV4, string[] beforeDnsV6, CancellationToken ct)
+    {
+        if (_executor == null) return;
+        
+        if (wasDhcp)
+        {
+            await _executor.ExecuteAsync(CAO.Shared.Security.SystemCommandKey.NetShInterfaceIpSetDnsDhcp, 
+                ["interface", "ip", "set", "dns", interfaceName, "dhcp"], ct);
+        }
+        else
+        {
+            // Restore exact static DNS configuration
+            if (beforeDnsV4.Length > 0)
+            {
+                await _executor.ExecuteAsync(CAO.Shared.Security.SystemCommandKey.NetShInterfaceIpSetDnsPrimary,
+                    ["interface", "ip", "set", "dns", interfaceName, "static", beforeDnsV4[0]], ct);
+                for (int i = 1; i < beforeDnsV4.Length; i++)
+                {
+                    await _executor.ExecuteAsync(CAO.Shared.Security.SystemCommandKey.NetShInterfaceIpSetDnsSecondary,
+                        ["interface", "ip", "add", "dns", interfaceName, beforeDnsV4[i]], ct);
+                }
+            }
+            // Note: IPv6 rollback would need additional netsh commands if supported
+        }
     }
 
     private async Task<SystemContext> GetContextAsync() =>
@@ -297,7 +341,7 @@ public sealed class OptimizationEngine
         {
             TimestampUtc = DateTime.UtcNow,
             AppVersion = AppVersion.Semantic,
-            User = "(sin auditar)",
+            User = caller is null ? Environment.UserName : $"{caller.Name} [{caller.Sid}]",
             OptimizationId = id,
             Operation = operation,
             Success = success,
