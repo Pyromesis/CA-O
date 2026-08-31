@@ -5,7 +5,7 @@ public static class AppVersion
 {
     public const string Major = "2";
     public const string Minor = "1";
-    public const string Patch = "4";
+    public const string Patch = "5";
 
     public const string Semantic = $"{Major}.{Minor}.{Patch}";
 
@@ -28,3 +28,4 @@ public enum ProfileId
     Expert,
     Custom,
 }
+

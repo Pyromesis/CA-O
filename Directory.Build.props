@@ -2,7 +2,7 @@
   <Import Project="Version.props" Condition="Exists('Version.props')" />
 
   <PropertyGroup>
-    <Version>2.1.4</Version>
+    <Version>2.1.5</Version>
     <LangVersion>13.0</LangVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -12,7 +12,7 @@
     <AnalysisLevel>latest-recommended</AnalysisLevel>
     <EnforceCodeStyleInBuild>false</EnforceCodeStyleInBuild>
     <!-- Single source of truth for build constants -->
-    <ProductVersion>2.1.4</ProductVersion>
+    <ProductVersion>2.1.5</ProductVersion>
     <ProductName>CA-O</ProductName>
     <ProductTitle>CA-O Windows Optimizer</ProductTitle>
     <ServiceName>CAO.Privileged</ServiceName>
@@ -39,4 +39,5 @@
   </PropertyGroup>
 
 </Project>
+
 
