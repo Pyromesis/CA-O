@@ -15,7 +15,7 @@ $constantsPath = Join-Path $repoRoot 'src\CA-O.Shared\Constants\BuildConstants.c
 function Get-BuildConstant {
     param([string]$Name)
     $content = Get-Content $constantsPath -Raw
-    $pattern = "public const string $Name = \"([^\"]+)\""
+    $pattern = 'public const string {0} = "([^"]+)"' -f [regex]::Escape($Name)
     $match = [regex]::Match($content, $pattern)
     if ($match.Success) { return $match.Groups[1].Value }
     throw "Constant $Name not found"

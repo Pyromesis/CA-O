@@ -78,7 +78,7 @@ dotnet publish $uiProject --configuration $Configuration --runtime $RuntimeIdent
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 # Workaround WinUI: publish self-contained omits .pri file
-$priSrc = Join-Path $repository "src\CA-O.UI\bin\x64\$Configuration\$TargetFramework\$RuntimeIdentifier\$(Get-BuildConstant 'UiExecutable').pri"
+$priSrc = Join-Path $repository "src\CA-O.UI\bin\x64\$Configuration\$TargetFramework\$RuntimeIdentifier\CA-O.UI.pri"
 if (-not (Test-Path $priSrc)) {
     # Fallback: search for .pri
     $priFiles = Get-ChildItem (Join-Path $repository "src\CA-O.UI\bin") -Filter '*.pri' -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
@@ -94,7 +94,7 @@ if (Test-Path $assetsSrc) { Copy-Item $assetsSrc $uiOutput -Recurse -Force }
 # Verify UI output
 $uiExePath = Join-Path $uiOutput (Get-BuildConstant 'UiExecutable')
 if (-not (Test-Path $uiExePath)) { throw "UI executable not found at $uiExePath" }
-$uiPriPath = Join-Path $uiOutput "$(Get-BuildConstant 'UiExecutable').pri"
+$uiPriPath = Join-Path $uiOutput "CA-O.UI.pri"
 if (-not (Test-Path $uiPriPath)) { throw "UI .pri not found at $uiPriPath" }
 
 Write-Host '== Publish Privileged Service ==' -ForegroundColor Cyan
@@ -134,6 +134,7 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 $setupExePath = Join-Path $setupOutput (Get-BuildConstant 'SetupExecutable')
 if (-not (Test-Path $setupExePath)) { throw "Setup executable not found at $setupExePath" }
+Copy-Item $setupExePath (Join-Path $artifactRoot "CA-O.Setup.exe") -Force
 
 Write-Host '== Signing ==' -ForegroundColor Cyan
 $signScript = Join-Path $scriptRoot 'sign.ps1'
