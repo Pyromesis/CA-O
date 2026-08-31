@@ -16,6 +16,7 @@ public sealed class AnalysisStateStore
     public const int SchemaVersion = 3;
     private readonly string _filePath;
     private readonly object _lock = new();
+    private readonly string _mutexName;
     private static readonly JsonSerializerOptions JsonOpts = new() { WriteIndented = true, DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull };
 
     public sealed record PersistedAnalysis(
@@ -38,11 +39,20 @@ public sealed class AnalysisStateStore
     {
         _filePath = filePath ?? Path.Combine(CaOPaths.ProgramDataRoot, "analysis-state.json");
         Directory.CreateDirectory(Path.GetDirectoryName(_filePath)!);
+        _mutexName = @"Global\CA-O-Analysis-" + Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(_filePath)))[..8];
     }
+    private IDisposable AcquireGlobalLock()
+    {
+        var m = new System.Threading.Mutex(false, _mutexName);
+        try { m.WaitOne(TimeSpan.FromSeconds(5)); } catch (AbandonedMutexException) { }
+        return new MutexReleaser(m);
+    }
+    private sealed class MutexReleaser : IDisposable { private readonly System.Threading.Mutex _m; public MutexReleaser(System.Threading.Mutex m)=>_m=m; public void Dispose(){ try{_m.ReleaseMutex();}catch{} _m.Dispose();} }
 
     public void SaveAnalysis(PersistedAnalysis analysis)
     {
         lock (_lock)
+        using (AcquireGlobalLock())
         {
             var tmp = _filePath + ".tmp";
             var json = JsonSerializer.Serialize(analysis, JsonOpts);
@@ -60,12 +70,13 @@ public sealed class AnalysisStateStore
 
     public bool HasAnalysis()
     {
-        lock (_lock) { return File.Exists(_filePath); }
+        lock (_lock) using (AcquireGlobalLock()) { return File.Exists(_filePath); }
     }
 
     public PersistedAnalysis? LoadLatestAnalysis()
     {
         lock (_lock)
+        using (AcquireGlobalLock())
         {
             if (!File.Exists(_filePath)) return null;
             try
@@ -89,7 +100,7 @@ public sealed class AnalysisStateStore
 
     public void DeleteAnalysis()
     {
-        lock (_lock) { try { if (File.Exists(_filePath)) File.Delete(_filePath); } catch { } }
+        lock (_lock) using (AcquireGlobalLock()) { try { if (File.Exists(_filePath)) File.Delete(_filePath); } catch { } }
     }
 
     public PersistedAnalysis? Validate()
