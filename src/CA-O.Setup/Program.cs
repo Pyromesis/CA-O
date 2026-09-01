@@ -67,9 +67,9 @@ Log($"Destino (donde se instala la app): {installDir}");
 
 if (!File.Exists(payloadUi) || !File.Exists(payloadService))
 {
-    Console.WriteLine("Payload no local — descargando desde GitHub Release v2.1.4...");
-    var zipUrl = "https://github.com/Pyromesis/CA-O/releases/download/v2.1.4/CA-O-2.1.4-win-x64.zip";
-    var fallbackUrl = "https://github.com/Pyromesis/CA-O/releases/download/v2.1.2/CA-O-2.1.2-win-x64.zip";
+    Console.WriteLine("Payload no local — descargando desde GitHub Release v2.1.5...");
+    var zipUrl = "https://github.com/Pyromesis/CA-O/releases/download/v2.1.5/CA-O-2.1.5-win-x64.zip";
+    var fallbackUrl = "https://github.com/Pyromesis/CA-O/releases/latest/download/CA-O-2.1.5-win-x64.zip";
     var tmpZip = Path.Combine(Path.GetTempPath(), "CA-O-payload.zip");
     var tmpDir = Path.Combine(Path.GetTempPath(), "CA-O-payload");
     try
@@ -95,7 +95,7 @@ if (!File.Exists(payloadUi) || !File.Exists(payloadService))
         {
             Console.ForegroundColor = ConsoleColor.Red;
             Console.WriteLine($"No se pudo descargar payload: {ex2.Message}");
-            Console.WriteLine("Descarga manual: https://github.com/Pyromesis/CA-O/releases/tag/v2.0.0");
+            Console.WriteLine("Descarga manual: https://github.com/Pyromesis/CA-O/releases/tag/v2.1.5");
             Console.ResetColor();
             return 1;
         }
