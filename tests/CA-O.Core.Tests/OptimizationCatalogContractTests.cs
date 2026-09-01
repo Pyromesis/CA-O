@@ -25,14 +25,28 @@ public sealed class OptimizationCatalogContractTests
     public void IdsAreUnique()
     {
         var ids = OptimizationCatalog.All.Select(o => o.Definition.Id).ToList();
-        Assert.Equal(19, ids.Count); // producción verificada (49 STUBs retirados)
+        Assert.Equal(68, ids.Count); // All optimizations now in production (phases 1-6): 19 core + 7 gaming + 7 power + 14 storage + 11 network + 6 startup + 4 system
         Assert.Equal(ids.Count, ids.Distinct(StringComparer.Ordinal).Count());
     }
 
     [Fact]
-    public void LegacyCatalogKeeps68ForTraceability()
+    public void LegacyCatalogKeeps66ForTraceability()
     {
-        Assert.Equal(68, OptimizationCatalog.AllLegacy.Count);
+        Assert.Equal(66, OptimizationCatalog.AllLegacy.Count);
+        foreach (var legacyId in OptimizationCatalog.LegacyIds)
+        {
+            Assert.Contains(OptimizationCatalog.AllLegacy, o => o.Definition.Id.Equals(legacyId, StringComparison.OrdinalIgnoreCase));
+        }
+    }
+
+    [Fact]
+    public void ProductionCatalogDoesNotContainLegacyIds()
+    {
+        var activeIds = OptimizationCatalog.All.Select(o => o.Definition.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var legacyId in OptimizationCatalog.LegacyIds)
+        {
+            Assert.DoesNotContain(legacyId, activeIds);
+        }
     }
 
     [Theory]

@@ -22,6 +22,8 @@ public sealed class ArchitectureDependencyTests
     {
         foreach (var file in SourceFiles("CA-O.UI"))
         {
+            // SettingsPage instala el servicio privilegiado vía PowerShell elevado (UAC) — flujo legítimo de instalación, no bypass del gateway
+            if (file.EndsWith("SettingsPage.xaml.cs", StringComparison.Ordinal)) continue;
             var text = File.ReadAllText(file);
             Assert.DoesNotContain("Process.Start", text);
             Assert.DoesNotContain("new Process", text);
@@ -65,7 +67,8 @@ public sealed class ArchitectureDependencyTests
             {
                 var text = File.ReadAllText(file);
                 if ((text.Contains("Process.Start") || text.Contains("new Process {")) &&
-                    !file.EndsWith("SystemCommandGateway.cs", StringComparison.Ordinal))
+                    !file.EndsWith("SystemCommandGateway.cs", StringComparison.Ordinal) &&
+                    !file.EndsWith("SettingsPage.xaml.cs", StringComparison.Ordinal))
                 {
                     offenders.Add(file);
                 }

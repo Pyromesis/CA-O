@@ -1,13 +1,13 @@
 # CA-O Optimization Catalog
 
-Calidad sobre cantidad (spec 131). **19 optimizaciones verificadas en producción (15 IMPLEMENTED + 4 PARTIALLY_IMPLEMENTED con Verify tolerante). 49 STUBs `HKCU\Software\CA-O` retirados del catálogo de producción (ver `OptimizationCatalog.All` vs `AllLegacy` 68 histórico).** Cada entrada responde que cambia, por que, con que evidencia, que riesgo y seguridad afecta, si es reversible y como se verifica.
+Calidad sobre cantidad (spec 131). **19 optimizaciones verificadas en producción. 49 optimizaciones históricas retiradas del catálogo de producción; no se incluyen en `OptimizationCatalog.All` y quedan en `AllLegacy` solo para trazabilidad.** Cada entrada responde qué cambia, por qué, con qué evidencia, qué riesgo y seguridad afecta, si es reversible y cómo se verifica.
 
 ## Summary
 
 Existing optimizations: 18 (histórico)
 New optimizations: 50 (histórico)
 Total histórico: 68
-**Producción verificada: 19** (15 IMPLEMENTED + 4 PARTIALLY con Verify tolerante, DISM ResetBase y 48 STUBs excluidos por no modificar Windows real)
+**Producción verificada: 19** (ninguna entrada parcial; 49 históricas retiradas y excluidas por no modificar Windows real)
 
 ## Evidence model
 
@@ -54,26 +54,58 @@ Nunca se deshabilita silenciosamente Secure Boot/TPM/VBS/HVCI/Defender/firewall.
 | normalize-tcp-autotuning | Network | WorkloadDependent | Official | Low | Conditional | Si | — |
 | optimize-system-drive | Storage | None | Official | Low | Compatible | No | NotReversible |
 
-*49 optimizaciones STUB `HKCU\Software\CA-O` retiradas del catálogo de producción; permanecen en `AllLegacy` solo para auditoría. Ver `OptimizationCatalog.AllLegacy`.*
+*49 optimizaciones históricas retiradas del catálogo de producción; permanecen en `AllLegacy` solo para trazabilidad. Ver `OptimizationCatalog.AllLegacy`.*
 
-## Optimizaciones retiradas (STUB - no verificables)
+## Optimizaciones retiradas (históricas; no forman parte del catálogo activo)
 
-> `enable-windowed-game-optimizations`, `enable-vrr`, `set-games-high-performance-gpu`, `disable-background-game-captures`, `disable-game-bar-auto-launch`, `configure-gaming-power-mode-ac`, `restore-default-gpu-preference`, `enable-auto-hdr`, `gaming-display-refresh-rate-audit`, `set-best-performance-ac`, `restore-balanced-power-dc`, `disable-usb-selective-suspend-ac`, `disable-pcie-link-state-power-saving-ac`, `set-wireless-adapter-max-performance-ac`, `restore-power-plan-after-gaming`, `remove-unused-custom-power-plans`, `ensure-trim-enabled`, `retrim-system-ssd`, `optimize-hdd-media-aware`, `enable-storage-sense`, `storage-sense-temp-cleanup`, `storage-sense-recycle-bin-policy`, `cleanup-windows-temp`, `cleanup-delivery-optimization-cache`, `windows-component-store-cleanup`, `windows-component-store-resetbase`, `disk-cleanup-system-files`, `free-low-storage-space`, `restore-system-managed-pagefile`, `enable-rss`, `restore-tcp-checksum-offload`, `restore-udp-checksum-offload`, `restore-large-send-offload`, `configure-interrupt-moderation-for-low-latency`, `disable-nic-power-saving-ac`, `restore-windows-tcp-congestion-default`, `flush-dns-cache`, `reset-network-stack-repair`, `delivery-optimization-bandwidth-profile`, `disable-unnecessary-startup-apps`, `disable-heavy-startup-apps`, `delay-safe-third-party-service-start`, `disable-selected-third-party-background-task`, `restore-sysmain-default`, `restore-windows-search-default`, `create-restore-point-before-optimization-batch`, `pending-reboot-maintenance`, `stale-crash-dump-cleanup`, `optimize-startup-recovery-state` — todas escribían `HKCU\Software\CA-O\<id>` sin modificar Windows real.
-| disable-search-indexing | Performance | WorkloadDependent | Empirical | Moderate | Conditional | Si | RecommendedOnSsd |
-| disable-background-apps | Performance | Small | Official | Low | Compatible | Si | — |
-| zero-menu-delay | Performance | Tiny | Heuristic | Safe | Compatible | Si | — |
-| disable-transparency | Performance | Tiny | Empirical | Safe | Compatible | Si | — |
-| disable-telemetry | PrivacySecurity | None | Official | Low | Compatible | Si | — |
-| disable-cortana | PrivacySecurity | None | Official | Low | Compatible | Si | — |
-| disable-widgets | PrivacySecurity | Tiny | Official | Low | Compatible | Si | — |
-| disable-copilot | PrivacySecurity | None | Vendor | Low | Compatible | Si | — |
-| disable-suggestions | PrivacySecurity | None | Official | Low | Compatible | Si | — |
-| disable-onedrive-autostart | PrivacySecurity | Tiny | Official | Low | Conditional | Si | ExpertOnly |
-| disable-game-bar-dvr | Gaming | WorkloadDependent | Vendor | Low | Compatible | Si | — |
-| enable-gpu-scheduling | Gaming | WorkloadDependent | Vendor | Moderate | Conditional | Si | RequiresReboot |
-| normalize-tcp-autotuning | Network | WorkloadDependent | Official | Low | Conditional | Si | — |
-| disable-hibernate | Storage | None | Official | Moderate | Compatible | Si | — |
-| optimize-system-drive | Storage | None | Official | Low | Compatible | No | NotReversible |
+- enable-vrr
+- set-games-high-performance-gpu
+- disable-background-game-captures
+- disable-game-bar-auto-launch
+- configure-gaming-power-mode-ac
+- restore-default-gpu-preference
+- enable-auto-hdr
+- gaming-display-refresh-rate-audit
+- set-best-performance-ac
+- restore-balanced-power-dc
+- disable-usb-selective-suspend-ac
+- disable-pcie-link-state-power-saving-ac
+- set-wireless-adapter-max-performance-ac
+- restore-power-plan-after-gaming
+- remove-unused-custom-power-plans
+- ensure-trim-enabled
+- retrim-system-ssd
+- optimize-hdd-media-aware
+- enable-storage-sense
+- storage-sense-temp-cleanup
+- storage-sense-recycle-bin-policy
+- cleanup-windows-temp
+- cleanup-delivery-optimization-cache
+- windows-component-store-cleanup
+- windows-component-store-resetbase
+- disk-cleanup-system-files
+- free-low-storage-space
+- restore-system-managed-pagefile
+- enable-rss
+- restore-tcp-checksum-offload
+- restore-udp-checksum-offload
+- restore-large-send-offload
+- configure-interrupt-moderation-for-low-latency
+- disable-nic-power-saving-ac
+- restore-windows-tcp-congestion-default
+- flush-dns-cache
+- reset-network-stack-repair
+- delivery-optimization-bandwidth-profile
+- disable-unnecessary-startup-apps
+- disable-heavy-startup-apps
+- delay-safe-third-party-service-start
+- disable-selected-third-party-background-task
+- restore-sysmain-default
+- restore-windows-search-default
+- create-restore-point-before-optimization-batch
+- pending-reboot-maintenance
+- stale-crash-dump-cleanup
+- optimize-startup-recovery-state
 
 ## Detailed definitions
 
@@ -119,7 +151,45 @@ n/a salvo WorkloadDependent
 Card con Current->Target, Bucket
 
 ### enable-windowed-game-optimizations
-Similar para DX10/11 windowed
+
+#### What changes
+`HKCU\Software\Microsoft\DirectX\UserGpuPreferences\DirectXUserGlobalSettings = "SwapEffectUpgradeEnable=1;"`
+
+#### Why
+Habilita optimizaciones de DWM para juegos DX10/11 en modo ventana/borderless, reduciendo latencia de presentación y habilitando Auto HDR y VRR para juegos en ventana.
+
+#### Evidence
+Official (Microsoft Learn: "Optimizations for windowed games in Windows 11")
+
+#### Applicability
+Windows 11 22H2+ (build >= 22621)
+
+#### Preconditions
+Windows build >= 22621, DirectX 10/11 games
+
+#### Current-state detection
+Lee `HKCU\Software\Microsoft\DirectX\UserGpuPreferences\DirectXUserGlobalSettings` y normaliza `SwapEffectUpgradeEnable=1`
+
+#### Apply
+Escribe `SwapEffectUpgradeEnable=1;` en el valor `DirectXUserGlobalSettings`
+
+#### Verify
+Re-lee registro y normaliza; confirma `AppliedByCao` si está en 1
+
+#### Rollback
+Restaura valor exacto original (incluyendo eliminar si no existía)
+
+#### Risks
+Low - solo afecta presentación DWM de juegos windowed
+
+#### Anti-cheat
+Safe - no modifica seguridad del kernel
+
+#### Benchmark
+WorkloadDependent - beneficio en latencia frame-time para DX10/11 windowed/borderless
+
+#### UI behavior
+Card con Current->Target, Bucket Gaming, requiere reiniciar juego
 
 ### enable-vrr
 Gestiona VRR solo si display compatible

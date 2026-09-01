@@ -3,6 +3,7 @@ using CAO.Shared;
 
 namespace CAO.Core.Optimizations.Network;
 
+/// <summary>Restores UDP checksum offloading for network performance on supported NICs.</summary>
 public sealed class RestoreUdpChecksumOffload : RegistryOptimizationBase
 {
     protected override IReadOnlyList<ValueTarget> Targets { get; } =

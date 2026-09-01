@@ -8,6 +8,74 @@
                 <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
                 <ResourceDictionary Source="Resources/DesignTokens.xaml" />
             </ResourceDictionary.MergedDictionaries>
+
+            <!-- Global Button Styles Override for consistency -->
+            <Style TargetType="Button" BasedOn="{StaticResource DefaultButtonStyle}">
+                <Setter Property="FontWeight" Value="SemiBold"/>
+                <Setter Property="CornerRadius" Value="10"/>
+                <Setter Property="Padding" Value="14,9,14,9"/>
+                <Setter Property="FontSize" Value="14"/>
+                <Setter Property="MinHeight" Value="36"/>
+                <Setter Property="BorderThickness" Value="1"/>
+                <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}"/>
+                <Setter Property="Background" Value="{ThemeResource CardBackgroundFillColorDefaultBrush}"/>
+            </Style>
+
+            <!-- Global TextBlock baseline -->
+            <Style TargetType="TextBlock">
+                <Setter Property="TextWrapping" Value="Wrap"/>
+                <Setter Property="OpticalMarginAlignment" Value="TrimSideBearings"/>
+                <Setter Property="Foreground" Value="{ThemeResource TextFillColorPrimaryBrush}"/>
+            </Style>
+
+            <!-- Global TextBox styling -->
+            <Style TargetType="TextBox">
+                <Setter Property="FontSize" Value="14"/>
+                <Setter Property="Padding" Value="12,8,12,8"/>
+                <Setter Property="CornerRadius" Value="10"/>
+                <Setter Property="MinHeight" Value="38"/>
+                <Setter Property="BorderThickness" Value="1"/>
+                <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}"/>
+            </Style>
+
+            <!-- Global ComboBox styling -->
+            <Style TargetType="ComboBox">
+                <Setter Property="FontSize" Value="14"/>
+                <Setter Property="Padding" Value="12,8,12,8"/>
+                <Setter Property="CornerRadius" Value="10"/>
+                <Setter Property="MinHeight" Value="38"/>
+                <Setter Property="BorderThickness" Value="1"/>
+                <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}"/>
+            </Style>
+
+            <!-- Global Border styling for cards -->
+            <Style TargetType="Border">
+                <Setter Property="CornerRadius" Value="8"/>
+            </Style>
+
+            <!-- Global StackPanel -->
+            <Style TargetType="StackPanel">
+                <Setter Property="Spacing" Value="8"/>
+            </Style>
+
+            <!-- Global Grid -->
+            <Style TargetType="Grid">
+                <Setter Property="ColumnSpacing" Value="12"/>
+                <Setter Property="RowSpacing" Value="12"/>
+            </Style>
+
+            <!-- Global InfoBar Enhanced -->
+            <Style TargetType="InfoBar">
+                <Setter Property="CornerRadius" Value="10"/>
+                <Setter Property="Margin" Value="0,8,0,8"/>
+            </Style>
+
+            <!-- Global ListView Enhanced -->
+            <Style TargetType="ListView">
+                <Setter Property="SelectionMode" Value="None"/>
+                <Setter Property="Padding" Value="0,4"/>
+            </Style>
+
         </ResourceDictionary>
     </Application.Resources>
 </Application>

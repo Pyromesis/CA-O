@@ -3,23 +3,35 @@ using CAO.Shared;
 
 namespace CAO.Core.Optimizations.Gaming;
 
+/// <summary>
+/// Disables automatic Game Bar launch when Alt+Z is pressed (gaming scenarios).
+/// Modifies HKCU\Software\Microsoft\GameBar registry settings.
+/// </summary>
 public sealed class DisableGameBarAutoLaunch : RegistryOptimizationBase
 {
     protected override IReadOnlyList<ValueTarget> Targets { get; } =
-        new[] { new ValueTarget(RegistryHive2.CurrentUser, @"Software\CA-O\disable-game-bar-auto-launch", "Enabled", 1) };
+        new[]
+        {
+            new ValueTarget(
+                RegistryHive2.CurrentUser,
+                @"Software\Microsoft\GameBar",
+                "AllowAutoGameMode",
+                0, // 0 = Disabled, 1 = Enabled
+                RegistryValueKind2.DWord)
+        };
 
     public override OptimizationDefinition Definition => new()
     {
         Id = "disable-game-bar-auto-launch",
-        NameEs = "Evitar inicio automatico de Game Bar",
-        NameEn = "Evitar inicio automatico de Game Bar",
-        DescriptionEs = "Evita lanzamiento automatico sin eliminar funcionalidad. Beneficio: segun workload, ver evidencia.",
-        DescriptionEn = "Evita lanzamiento automatico sin eliminar funcionalidad.",
-        TooltipEs = "disable-game-bar-auto-launch via registry. Reversible via snapshot.",
+        NameEs = "Deshabilitar lanzamiento automático de Game Bar",
+        NameEn = "Disable automatic Game Bar launch",
+        DescriptionEs = "Evita el lanzamiento automático de Game Bar cuando se presiona Alt+Z en juegos. La funcionalidad sigue disponible manualmente.",
+        DescriptionEn = "Prevents automatic Game Bar launch on Alt+Z in games. Functionality remains available manually.",
+        TooltipEs = "Modifica HKCU\\Software\\Microsoft\\GameBar\\AllowAutoGameMode. Reversible via snapshot.",
         Category = OptimizationCategory.Gaming,
         ExpectedImpact = PerformanceImpact.Tiny,
         Evidence = EvidenceLevel.Official,
-        Confidence = Confidence.Medium,
+        Confidence = Confidence.High,
         AntiCheatImpact = AntiCheatImpact.None,
         Risk = RiskLevel.Safe,
         Compatibility = CompatibilityStatus.Compatible,
@@ -30,6 +42,6 @@ public sealed class DisableGameBarAutoLaunch : RegistryOptimizationBase
     public override Task<OperationResult> ApplyAsync(OptimizationContext context, CancellationToken ct = default)
     {
         WriteTargets(context);
-        return Task.FromResult(OperationResult.Ok("Evitar inicio automatico de Game Bar aplicado."));
+        return Task.FromResult(OperationResult.Ok("Lanzamiento automático de Game Bar deshabilitado."));
     }
 }

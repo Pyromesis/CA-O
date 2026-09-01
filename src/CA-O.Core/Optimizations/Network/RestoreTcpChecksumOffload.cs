@@ -3,6 +3,7 @@ using CAO.Shared;
 
 namespace CAO.Core.Optimizations.Network;
 
+/// <summary>Restores TCP checksum offloading for network performance on supported NICs.</summary>
 public sealed class RestoreTcpChecksumOffload : RegistryOptimizationBase
 {
     protected override IReadOnlyList<ValueTarget> Targets { get; } =

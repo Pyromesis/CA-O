@@ -30,4 +30,4 @@ $qc = sc.exe qc $serviceName 2>&1 | Out-String
 $qfail = sc.exe qfailure $serviceName 2>&1 | Out-String
 if ($qc -notmatch 'DEMAND_START') { throw "sc qc fallo: $qc" }
 if ($qfail -notmatch '86400') { throw "sc qfailure fallo: $qfail" }
-Write-Host "Installed $serviceName (verificado). Start it explicitly with: sc.exe start $serviceName"
+Write-Host "Installed $serviceName (verificado). Start it explicitly with: sc.exe start $serviceName" -ForegroundColor Green

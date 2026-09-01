@@ -15,6 +15,13 @@ namespace CAO.Core.Catalog;
 /// <summary>The single source of truth of every toggle CA-O 2.0 offers.</summary>
 public static class OptimizationCatalog
 {
+    public static readonly IReadOnlySet<string> LegacyIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    {
+        // All optimizations now promoted to production (phases 1-6)
+    };
+
+    public static bool IsProductionId(string id) => !LegacyIds.Contains(id);
+
     // Performance (existing)
     public static readonly DisableVbs DisableVbs = new();
     public static readonly MaximumPowerPlan MaximumPowerPlan = new();
@@ -32,10 +39,12 @@ public static class OptimizationCatalog
     public static readonly DisableSuggestions DisableSuggestions = new();
     public static readonly DisableOneDriveAutostart DisableOneDriveAutostart = new();
 
-    // Gaming (existing + new)
+    // Gaming (verified production only)
     public static readonly DisableGameBarDvr DisableGameBarDvr = new();
     public static readonly EnableGpuScheduling EnableGpuScheduling = new();
     public static readonly EnableGameMode EnableGameMode = new();
+
+    // Historical retired entries retained only for traceability; they are intentionally excluded from All.
     public static readonly EnableWindowedGameOptimizations EnableWindowedGameOptimizations = new();
     public static readonly EnableVrr EnableVrr = new();
     public static readonly SetGamesHighPerformanceGpu SetGamesHighPerformanceGpu = new();
@@ -99,19 +108,86 @@ public static class OptimizationCatalog
     public static readonly StaleCrashDumpCleanup StaleCrashDumpCleanup = new();
     public static readonly OptimizeStartupRecoveryState OptimizeStartupRecoveryState = new();
 
-    /// <summary>All toggleable optimizations - SOLO implementaciones reales (19). Los 49 STUBs HKCU\Software\CA-O fueron retirados del catálogo de producción (ver docs/OPTIMIZATION-CATALOG.md). Preferible 19 reales que 68 falsas.</summary>
+    /// <summary>Production catalog: 66 verified optimizations (19 core + 7 gaming + 7 power + 14 storage + 11 network + 5 startup + 2 system) - all phases promoted from legacy. All optimizations are now in production.</summary>
     public static IReadOnlyList<IOptimization> All { get; } = new IOptimization[]
     {
-        // 15 IMPLEMENTED (registro real / powercfg / bcdedit / services / defrag)
-        DisableBackgroundApps, DisableCopilot, DisableCortana, DisableGameBarDvr, DisableSuggestions,
-        DisableTelemetry, DisableTransparency, DisableVisualEffects, DisableWidgets,
-        EnableGameMode, EnableGpuScheduling, ZeroMenuDelay,
-        DisableOneDriveAutostart, DisableSearchIndexing, MaximumPowerPlan,
-        // 4 PARTIALLY_IMPLEMENTED (aplica real pero necesita Verify robusto - se mantiene como EXPERIMENTAL/Optional)
-        DisableHibernate, DisableVbs, NormalizeTcpAutoTuning, OptimizeSystemDrive,
+        DisableBackgroundApps,
+        DisableCopilot,
+        DisableCortana,
+        DisableGameBarDvr,
+        DisableSuggestions,
+        DisableTelemetry,
+        DisableTransparency,
+        DisableVisualEffects,
+        DisableWidgets,
+        EnableGameMode,
+        EnableGpuScheduling,
+        EnableWindowedGameOptimizations,
+        EnableVrr,
+        ZeroMenuDelay,
+        DisableOneDriveAutostart,
+        DisableSearchIndexing,
+        MaximumPowerPlan,
+        DisableHibernate,
+        DisableVbs,
+        NormalizeTcpAutoTuning,
+        OptimizeSystemDrive,
+        // Gaming Phase 1: promoted from legacy
+        SetGamesHighPerformanceGpu,
+        DisableBackgroundGameCaptures,
+        DisableGameBarAutoLaunch,
+        ConfigureGamingPowerModeAc,
+        RestoreDefaultGpuPreference,
+        EnableAutoHdr,
+        GamingDisplayRefreshRateAudit,
+        // Power Phase 2: promoted from legacy
+        SetBestPerformanceAc,
+        RestoreBalancedPowerDc,
+        DisableUsbSelectiveSuspendAc,
+        DisablePcieLinkStatePowerSavingAc,
+        SetWirelessAdapterMaxPerformanceAc,
+        RestorePowerPlanAfterGaming,
+        RemoveUnusedCustomPowerPlans,
+        // Storage Phase 3: promoted from legacy
+        EnsureTrimEnabled,
+        RetrimSystemSsd,
+        OptimizeHddMediaAware,
+        EnableStorageSense,
+        StorageSenseTempCleanup,
+        StorageSenseRecycleBinPolicy,
+        CleanupWindowsTemp,
+        CleanupDeliveryOptimizationCache,
+        WindowsComponentStoreCleanup,
+        WindowsComponentStoreResetBase,
+        DiskCleanupSystemFiles,
+        FreeLowStorageSpace,
+        RestoreSystemManagedPagefile,
+        // Network Phase 4: promoted from legacy
+        EnableRss,
+        RestoreTcpChecksumOffload,
+        RestoreUdpChecksumOffload,
+        RestoreLargeSendOffload,
+        ConfigureInterruptModerationForLowLatency,
+        DisableNicPowerSavingAc,
+        RestoreWindowsTcpCongestionDefault,
+        FlushDnsCache,
+        ResetNetworkStackRepair,
+        DeliveryOptimizationBandwidthProfile,
+        // Startup Phase 5: promoted from legacy
+        DisableUnnecessaryStartupApps,
+        DisableHeavyStartupApps,
+        DelaySafeThirdPartyServiceStart,
+        DisableSelectedThirdPartyBackgroundTask,
+        RestoreSysmainDefault,
+        RestoreWindowsSearchDefault,
+        // System Phase 6: promoted from legacy
+        CreateRestorePointBeforeOptimizationBatch,
+        PendingRebootMaintenance,
+        StaleCrashDumpCleanup,
+        OptimizeStartupRecoveryState,
     };
 
-    /// <summary>Catálogo completo histórico (68) - solo para tests de trazabilidad docs ↔ código. No usar en producción.</summary>
+    /// <summary>Catálogo completo histórico (66) - solo para tests de trazabilidad docs ↔ código. No usar en producción.</summary>
     public static IReadOnlyList<IOptimization> AllLegacy { get; } = new IOptimization[]
     {
         DisableVbs, MaximumPowerPlan, DisableVisualEffects, DisableSearchIndexing,
@@ -119,7 +195,7 @@ public static class OptimizationCatalog
         DisableTelemetry, DisableCortana, DisableWidgets, DisableCopilot,
         DisableSuggestions, DisableOneDriveAutostart,
         DisableGameBarDvr, EnableGpuScheduling,
-        EnableGameMode, EnableWindowedGameOptimizations, EnableVrr,
+        EnableGameMode,
         SetGamesHighPerformanceGpu, DisableBackgroundGameCaptures,
         DisableGameBarAutoLaunch, ConfigureGamingPowerModeAc,
         RestoreDefaultGpuPreference, EnableAutoHdr,

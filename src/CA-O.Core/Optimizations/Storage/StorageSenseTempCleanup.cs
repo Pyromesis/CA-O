@@ -5,21 +5,38 @@ namespace CAO.Core.Optimizations.Storage;
 
 public sealed class StorageSenseTempCleanup : RegistryOptimizationBase
 {
+    /// <summary>Configures Storage Sense to automatically clean temporary files after 30 days.</summary>
     protected override IReadOnlyList<ValueTarget> Targets { get; } =
-        new[] { new ValueTarget(RegistryHive2.CurrentUser, @"Software\CA-O\storage-sense-temp-cleanup", "Enabled", 1) };
+        new[]
+        {
+            // Enable Storage Sense cleanup of temporary files
+            new ValueTarget(
+                RegistryHive2.CurrentUser,
+                @"Software\\Microsoft\\Windows\\CurrentVersion\\StorageSense\\Parameters\\StoragePolicies",
+                "03",
+                1,
+                RegistryValueKind2.DWord),
+            // Set temp file retention to 30 days
+            new ValueTarget(
+                RegistryHive2.CurrentUser,
+                @"Software\\Microsoft\\Windows\\CurrentVersion\\StorageSense\\Parameters\\StoragePolicies",
+                "06",
+                30,
+                RegistryValueKind2.DWord)
+        };
 
     public override OptimizationDefinition Definition => new()
     {
         Id = "storage-sense-temp-cleanup",
-        NameEs = "Limpieza automaticas de temporales",
-        NameEn = "Limpieza automaticas de temporales",
-        DescriptionEs = "Activa limpieza de temporales, no toca Downloads. Beneficio: segun workload, ver evidencia.",
-        DescriptionEn = "Activa limpieza de temporales, no toca Downloads.",
-        TooltipEs = "storage-sense-temp-cleanup via registry. Reversible via snapshot.",
+        NameEs = "Storage Sense Limpieza Temporal",
+        NameEn = "Storage Sense temp file cleanup",
+        DescriptionEs = "Configura Storage Sense para limpiar automáticamente archivos temporales después de 30 días.",
+        DescriptionEn = "Configures Storage Sense to automatically clean temporary files after 30 days.",
+        TooltipEs = "Modifica HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\StorageSense. Reversible via snapshot.",
         Category = OptimizationCategory.Storage,
         ExpectedImpact = PerformanceImpact.Tiny,
         Evidence = EvidenceLevel.Official,
-        Confidence = Confidence.Medium,
+        Confidence = Confidence.High,
         AntiCheatImpact = AntiCheatImpact.None,
         Risk = RiskLevel.Low,
         Compatibility = CompatibilityStatus.Compatible,
@@ -30,6 +47,6 @@ public sealed class StorageSenseTempCleanup : RegistryOptimizationBase
     public override Task<OperationResult> ApplyAsync(OptimizationContext context, CancellationToken ct = default)
     {
         WriteTargets(context);
-        return Task.FromResult(OperationResult.Ok("Limpieza automaticas de temporales aplicado."));
+        return Task.FromResult(OperationResult.Ok("Storage Sense limpieza temporal aplicada."));
     }
 }

@@ -5,21 +5,38 @@ namespace CAO.Core.Optimizations.Storage;
 
 public sealed class EnsureTrimEnabled : RegistryOptimizationBase
 {
+    /// <summary>TRIM ensures SSD performance by enabling garbage collection on deleted blocks.</summary>
     protected override IReadOnlyList<ValueTarget> Targets { get; } =
-        new[] { new ValueTarget(RegistryHive2.CurrentUser, @"Software\CA-O\ensure-trim-enabled", "Enabled", 1) };
+        new[]
+        {
+            // Enable Scheduled defragmentation and optimization (includes TRIM for SSDs)
+            new ValueTarget(
+                RegistryHive2.LocalMachine,
+                @"SYSTEM\CurrentControlSet\Services\defragsvc\Parameters",
+                "EnableScheduledMaintenance",
+                1,
+                RegistryValueKind2.DWord),
+            // Set optimization run interval (weekly)
+            new ValueTarget(
+                RegistryHive2.LocalMachine,
+                @"SYSTEM\CurrentControlSet\Services\defragsvc\Parameters",
+                "OptimizeInterval",
+                7,
+                RegistryValueKind2.DWord)
+        };
 
     public override OptimizationDefinition Definition => new()
     {
         Id = "ensure-trim-enabled",
-        NameEs = "Asegurar TRIM habilitado",
-        NameEn = "Asegurar TRIM habilitado",
-        DescriptionEs = "Si TRIM desactivado en SSD NTFS compatible, Recommended. Beneficio: segun workload, ver evidencia.",
-        DescriptionEn = "Si TRIM desactivado en SSD NTFS compatible, Recommended.",
-        TooltipEs = "ensure-trim-enabled via registry. Reversible via snapshot.",
+        NameEs = "Asegurar TRIM habilitado en SSD",
+        NameEn = "Ensure TRIM enabled on SSD",
+        DescriptionEs = "Habilita TRIM en SSD para mantener rendimiento mediante liberación de bloques eliminados.",
+        DescriptionEn = "Enables TRIM on SSD to maintain performance by freeing deleted blocks.",
+        TooltipEs = "Modifica HKLM\\SYSTEM\\CurrentControlSet\\Services\\defragsvc. Reversible via snapshot.",
         Category = OptimizationCategory.Storage,
         ExpectedImpact = PerformanceImpact.Small,
         Evidence = EvidenceLevel.Official,
-        Confidence = Confidence.Medium,
+        Confidence = Confidence.High,
         AntiCheatImpact = AntiCheatImpact.None,
         Risk = RiskLevel.Low,
         Compatibility = CompatibilityStatus.Compatible,
@@ -30,6 +47,6 @@ public sealed class EnsureTrimEnabled : RegistryOptimizationBase
     public override Task<OperationResult> ApplyAsync(OptimizationContext context, CancellationToken ct = default)
     {
         WriteTargets(context);
-        return Task.FromResult(OperationResult.Ok("Asegurar TRIM habilitado aplicado."));
+        return Task.FromResult(OperationResult.Ok("TRIM habilitado en SSD."));
     }
 }

@@ -2,65 +2,128 @@
     x:Class="CAO.UI.Pages.SettingsPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-    <ScrollViewer Padding="{StaticResource CaoPagePadding}" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-        <StackPanel Spacing="16" MaxWidth="900" HorizontalAlignment="Center">
-            <TextBlock Text="Ajustes" Style="{StaticResource CaoPageTitleStyle}"/>
-            <TextBlock Text="Organizados por categorías. Sin listas infinitas." FontSize="12" Opacity="0.6"/>
+    <ScrollViewer Padding="32,24,32,32" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Background="{ThemeResource SolidBackgroundFillColorBaseBrush}">
+        <StackPanel Spacing="20" MaxWidth="1000" HorizontalAlignment="Center">
+            <StackPanel Spacing="6">
+                <TextBlock Text="Ajustes" Style="{StaticResource CaoPageTitleStyle}"/>
+                <TextBlock Text="Organizados por categorías. Sin listas infinitas." Style="{StaticResource CaoSubtitleStyle}"/>
+            </StackPanel>
 
             <!-- General / Appearance -->
             <Border Style="{StaticResource CaoCardStyle}">
-                <StackPanel Spacing="12">
-                    <TextBlock Text="Apariencia" FontWeight="SemiBold"/>
-                    <Grid ColumnSpacing="12" RowSpacing="10">
-                        <Grid.ColumnDefinitions><ColumnDefinition Width="140"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                        <Grid.RowDefinitions><RowDefinition/><RowDefinition/></Grid.RowDefinitions>
-                        <TextBlock x:Name="ThemeLabel" VerticalAlignment="Center" FontSize="12"/>
-                        <ComboBox x:Name="ThemeBox" Grid.Column="1" SelectionChanged="OnThemeSelected" MinWidth="180">
-                            <ComboBoxItem Content="Sistema" Tag="system" />
+                <StackPanel Spacing="16">
+                    <TextBlock Text="Apariencia" FontWeight="SemiBold" FontSize="14" Foreground="{ThemeResource TextFillColorPrimaryBrush}"/>
+                    <Border Height="1" Background="{ThemeResource DividerStrokeColorDefaultBrush}" Opacity="0.5"/>
+                    <Grid ColumnSpacing="16" RowSpacing="12">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="160"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                        <TextBlock x:Name="ThemeLabel" VerticalAlignment="Center" FontSize="13" FontWeight="Medium"/>
+                        <ComboBox x:Name="ThemeBox" Grid.Column="1" SelectionChanged="OnThemeSelected" MinWidth="200" Style="{StaticResource CaoComboBoxStyle}">
+                            <ComboBoxItem Content="Sistema (predeterminado)" Tag="system" IsSelected="True"/>
                             <ComboBoxItem Content="Claro" Tag="light" />
                             <ComboBoxItem Content="Oscuro" Tag="dark" />
                         </ComboBox>
-                        <TextBlock x:Name="LanguageLabel" Grid.Row="1" VerticalAlignment="Center" FontSize="12"/>
-                        <ComboBox x:Name="LanguageBox" Grid.Row="1" Grid.Column="1" SelectionChanged="OnLanguageSelected" MinWidth="180"/>
+                        <TextBlock x:Name="LanguageLabel" Grid.Row="1" VerticalAlignment="Center" FontSize="13" FontWeight="Medium"/>
+                        <ComboBox x:Name="LanguageBox" Grid.Row="1" Grid.Column="1" SelectionChanged="OnLanguageSelected" MinWidth="200" Style="{StaticResource CaoComboBoxStyle}"/>
                     </Grid>
                 </StackPanel>
             </Border>
 
             <!-- Optimization policy -->
             <Border Style="{StaticResource CaoCardStyle}">
-                <StackPanel Spacing="10">
-                    <TextBlock Text="Política de optimización" FontWeight="SemiBold"/>
-                    <ToggleSwitch x:Name="ExpertSwitch" OnContent="Activado" OffContent="Desactivado" Toggled="OnExpertToggled"
-                                  AutomationProperties.Name="Modo Expert"/>
+                <StackPanel Spacing="14">
+                    <TextBlock Text="Política de optimización" FontWeight="SemiBold" FontSize="14" Foreground="{ThemeResource TextFillColorPrimaryBrush}"/>
+                    <Border Height="1" Background="{ThemeResource DividerStrokeColorDefaultBrush}" Opacity="0.5"/>
+                    <StackPanel Spacing="12">
+                        <TextBlock Text="Modo Expert" FontSize="13" FontWeight="Medium"/>
+                        <ToggleSwitch x:Name="ExpertSwitch" OnContent="Activado" OffContent="Desactivado" Toggled="OnExpertToggled"
+                                      AutomationProperties.Name="Modo Expert" MinWidth="100"/>
+                        <TextBlock Text="Expone cambios experimentales, sensibles a seguridad y heredados. Cada aplicación exige confirmación explícita y crea snapshot automático." FontSize="11" Opacity="0.65" TextWrapping="Wrap"/>
+                    </StackPanel>
                     <InfoBar x:Name="ExpertWarnBar" IsOpen="False" Severity="Warning"
-                             Title="Modo Expert"
-                             Message="Muestra cambios experimentales, sensibles a seguridad y heredados. Cada aplicación exige confirmación explícita y crea snapshot."
-                             IsClosable="False"/>
-                    <TextBlock Text="Expert expone Security Sensitive y Experimental solo para revisión avanzada. Nunca aplica sin confirmación ni snapshot." FontSize="11" Opacity="0.6" TextWrapping="Wrap"/>
+                             Title="Modo Expert: Mayor riesgo"
+                             Message="Solo para usuarios avanzados. Nunca aplica cambios sin confirmación explícita ni snapshot previo."
+                             IsClosable="True"/>
                 </StackPanel>
             </Border>
 
             <!-- Security / Service -->
             <Border Style="{StaticResource CaoCardStyle}">
-                <StackPanel Spacing="10">
-                    <TextBlock Text="Servicio privilegiado" FontWeight="SemiBold"/>
-                    <StackPanel Orientation="Horizontal" Spacing="12">
-                        <Button x:Name="ServiceButton" Click="OnServiceCheckClick"/>
-                        <ProgressRing x:Name="ServiceRing" IsActive="False" Width="20" Height="20"/>
-                        <TextBlock x:Name="ServiceStatusText" VerticalAlignment="Center" FontSize="12" Opacity="0.85" TextWrapping="Wrap"/>
+                <StackPanel Spacing="14">
+                    <TextBlock Text="Servicio privilegiado" FontWeight="SemiBold" FontSize="14" Foreground="{ThemeResource TextFillColorPrimaryBrush}"/>
+                    <Border Height="1" Background="{ThemeResource DividerStrokeColorDefaultBrush}" Opacity="0.5"/>
+
+                    <StackPanel Spacing="12">
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="Se necesita elevación para aplicar cambios reales en el sistema." FontSize="12" Opacity="0.8" TextWrapping="Wrap"/>
+                            <TextBlock Text="CA-O usa un servicio privilegiado con pipe autenticado, nonce y rollback seguro." FontSize="11" Opacity="0.65" TextWrapping="Wrap"/>
+                        </StackPanel>
+
+                        <!-- Explicación clara de por qué y qué -->
+                        <InfoBar x:Name="ServiceExplanationBar" IsOpen="True" Severity="Informational" IsClosable="False"
+                                 Title="¿Por qué instalar el servicio privilegiado?"
+                                 Message="Para aplicar optimizaciones (registro, servicios, planes de energía, DNS, etc.) se requieren permisos de SYSTEM. El servicio CAO.Privileged se ejecuta como SYSTEM y expone un Named Pipe seguro (ACL solo administradores, nonce, expiración 30s, anti-replay). La UI nunca tiene privilegios; cada acción validada viaja por este canal cifrado y auditado." />
+
+                        <Border CornerRadius="10" Padding="14,12,14,12" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}">
+                            <Grid ColumnSpacing="12">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <ProgressRing x:Name="ServiceRing" IsActive="False" Width="20" Height="20" Style="{StaticResource CaoProgressRingStyle}"/>
+                                <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                                    <TextBlock x:Name="ServiceStatusText" FontSize="13" FontWeight="Medium" TextWrapping="Wrap"/>
+                                    <TextBlock x:Name="ServiceDetailText" FontSize="11" Opacity="0.65" TextWrapping="Wrap"/>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+
+                        <Grid ColumnSpacing="10" RowSpacing="8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            
+                            <Button x:Name="ServiceCheckButton"
+                                    Content="Comprobar servicio privilegiado"
+                                    Click="OnServiceCheckClick"
+                                    Style="{StaticResource CaoOutlineButtonStyle}"
+                                    MinHeight="38"/>
+
+                            <Button x:Name="ServiceInstallButton"
+                                    Content="Instalar ahora"
+                                    Click="OnServiceInstallClick"
+                                    Style="{StaticResource CaoAccentButtonStyle}"
+                                    Grid.Column="1"
+                                    MinWidth="200"
+                                    MinHeight="38"
+                                    Visibility="Visible"/>
+                        </Grid>
                     </StackPanel>
-                    <StackPanel Spacing="4" Margin="0,4,0,0">
-                        <TextBlock x:Name="VersionsText" FontSize="11" Opacity="0.55" IsTextSelectionEnabled="True" TextWrapping="Wrap"/>
-                        <TextBlock x:Name="PrivilegeText" FontSize="11" Opacity="0.5" TextWrapping="Wrap"/>
+
+                    <StackPanel Spacing="6" Margin="0,6,0,0">
+                        <TextBlock x:Name="VersionsText" FontSize="11" Opacity="0.6" IsTextSelectionEnabled="True" TextWrapping="Wrap"/>
+                        <TextBlock x:Name="PrivilegeText" FontSize="11" Opacity="0.55" TextWrapping="Wrap"/>
                     </StackPanel>
                 </StackPanel>
             </Border>
 
             <!-- About -->
             <Border Style="{StaticResource CaoCardStyle}" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}">
-                <StackPanel Spacing="6">
-                    <TextBlock Text="CA-O — Filosofía" FontWeight="SemiBold" FontSize="12"/>
-                    <TextBlock Text="Diagnóstico primero → recomendaciones por evidencia → transacción con snapshot y verificación → benchmark honesto → rollback exacto. Sin promesas numéricas." FontSize="11" Opacity="0.7" TextWrapping="Wrap"/>
+                <StackPanel Spacing="10">
+                    <TextBlock Text="Sobre CA-O" FontWeight="Bold" FontSize="14" Foreground="{ThemeResource AccentFillColorDefaultBrush}"/>
+                    <Border Height="1" Background="{ThemeResource DividerStrokeColorDefaultBrush}" Opacity="0.3"/>
+                    <TextBlock Text="Filosofía de diseño" FontWeight="SemiBold" FontSize="12" Opacity="0.9"/>
+                    <TextBlock Text="Diagnóstico primero → recomendaciones por evidencia → transacción con snapshot y verificación → benchmark honesto → rollback exacto. Sin promesas numéricas falsas, solo hechos medibles." FontSize="11" Opacity="0.75" TextWrapping="Wrap"/>
+                    <StackPanel Spacing="6" Margin="0,8,0,0">
+                        <TextBlock Text="Principios clave:" FontWeight="Medium" FontSize="11" Opacity="0.85"/>
+                        <StackPanel Spacing="4" Margin="12,0,0,0">
+                            <TextBlock Text="• Reversibilidad garantizada con snapshots" FontSize="10" Opacity="0.7" TextWrapping="Wrap"/>
+                            <TextBlock Text="• Transacciones ACID: todo o nada" FontSize="10" Opacity="0.7" TextWrapping="Wrap"/>
+                            <TextBlock Text="• Benchmark con tolerancia de ruido 3%" FontSize="10" Opacity="0.7" TextWrapping="Wrap"/>
+                            <TextBlock Text="• Seguridad primero: sin riesgos no medidos" FontSize="10" Opacity="0.7" TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </StackPanel>
                 </StackPanel>
             </Border>
         </StackPanel>
