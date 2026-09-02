@@ -20,6 +20,10 @@ public enum SystemCommandKey
     BcdEditHypervisorRestore,
     NetShTcpShowGlobal,
     NetShTcpAutotuningNormal,
+    NetShTcpCongestionDefault,
+    NetShTcpLargeSendOffload,
+    NetShTcpChecksumOffload,
+    NetShUdpChecksumOffload,
     NetShInterfaceIpShowDns,
     NetShInterfaceIpSetDnsPrimary,
     NetShInterfaceIpSetDnsSecondary,
@@ -113,6 +117,30 @@ public static partial class CommandPolicy
                 arguments[2] == "set" && arguments[3] == "global" &&
                 arguments[4].StartsWith("autotuninglevel=", StringComparison.Ordinal) &&
                 AutotuningLevels.Contains(arguments[4]["autotuninglevel=".Length..]) =>
+                Path.Combine(system32, "netsh.exe"),
+
+            SystemCommandKey.NetShTcpCongestionDefault when arguments.Count == 5 &&
+                arguments[0] == "int" && arguments[1] == "tcp" &&
+                arguments[2] == "set" && arguments[3] == "global" &&
+                arguments[4] == "congestionprovider=default" =>
+                Path.Combine(system32, "netsh.exe"),
+
+            SystemCommandKey.NetShTcpLargeSendOffload when arguments.Count == 5 &&
+                arguments[0] == "int" && arguments[1] == "tcp" &&
+                arguments[2] == "set" && arguments[3] == "global" &&
+                (arguments[4] == "large=enabled" || arguments[4] == "large=disabled") =>
+                Path.Combine(system32, "netsh.exe"),
+
+            SystemCommandKey.NetShTcpChecksumOffload when arguments.Count == 5 &&
+                arguments[0] == "int" && arguments[1] == "tcp" &&
+                arguments[2] == "set" && arguments[3] == "global" &&
+                (arguments[4] == "checksum=enabled" || arguments[4] == "checksum=disabled") =>
+                Path.Combine(system32, "netsh.exe"),
+
+            SystemCommandKey.NetShUdpChecksumOffload when arguments.Count == 5 &&
+                arguments[0] == "int" && arguments[1] == "udp" &&
+                arguments[2] == "set" && arguments[3] == "global" &&
+                (arguments[4] == "checksum=enabled" || arguments[4] == "checksum=disabled") =>
                 Path.Combine(system32, "netsh.exe"),
 
             SystemCommandKey.NetShInterfaceIpShowDns when Eq(arguments,
