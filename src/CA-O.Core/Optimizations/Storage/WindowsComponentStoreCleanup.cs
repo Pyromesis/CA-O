@@ -1,52 +1,66 @@
 using CAO.Core.Abstractions;
 using CAO.Shared;
+using CAO.Shared.Security;
 
 namespace CAO.Core.Optimizations.Storage;
 
-public sealed class WindowsComponentStoreCleanup : RegistryOptimizationBase
+/// <summary>Runs DISM component store cleanup (StartComponentCleanup).</summary>
+public sealed class WindowsComponentStoreCleanup : IOptimization
 {
-    /// <summary>Enables automatic cleanup of old Windows component store files to save disk space.</summary>
-    protected override IReadOnlyList<ValueTarget> Targets { get; } =
-        new[]
-        {
-            // Enable component store cleanup (old superseded packages)
-            new ValueTarget(
-                RegistryHive2.LocalMachine,
-                @"SYSTEM\CurrentControlSet\Services\TrustedInstaller\Parameters",
-                "AllowCleanupSupersededComponents",
-                1,
-                RegistryValueKind2.DWord),
-            // Set aggressive cleanup for unused components
-            new ValueTarget(
-                RegistryHive2.LocalMachine,
-                @"SYSTEM\CurrentControlSet\Services\WinDefend\Parameters",
-                "LastCleanupTime",
-                0,
-                RegistryValueKind2.DWord)
-        };
+    private int? _lastExitCode;
 
-    public override OptimizationDefinition Definition => new()
+    public OptimizationDefinition Definition => new()
     {
         Id = "windows-component-store-cleanup",
         NameEs = "Limpieza Component Store",
         NameEn = "Windows Component Store cleanup",
-        DescriptionEs = "Habilita limpieza automática de archivos antiguos en el Component Store para liberar espacio.",
-        DescriptionEn = "Enables automatic cleanup of old component store files to free disk space.",
-        TooltipEs = "Modifica HKLM\\SYSTEM\\CurrentControlSet. Reversible via snapshot.",
+        DescriptionEs = "Ejecuta DISM para limpiar componentes reemplazados de WinSxS. Puede tardar varios minutos.",
+        DescriptionEn = "Runs DISM to clean superseded WinSxS components. May take several minutes.",
+        TooltipEs = "Ejecuta DISM /Online /Cleanup-Image /StartComponentCleanup. Mantenimiento no reversible.",
         Category = OptimizationCategory.Storage,
         ExpectedImpact = PerformanceImpact.Small,
         Evidence = EvidenceLevel.Official,
         Confidence = Confidence.High,
         AntiCheatImpact = AntiCheatImpact.None,
-        Risk = RiskLevel.Low,
+        Risk = RiskLevel.Moderate,
         Compatibility = CompatibilityStatus.Compatible,
         SecurityImpact = SecurityImpact.None,
-        Impact = ImpactLevel.Low,
+        Impact = ImpactLevel.Medium,
+        Flags = OptimizationFlags.NotReversible,
     };
 
-    public override Task<OperationResult> ApplyAsync(OptimizationContext context, CancellationToken ct = default)
+    public OptimizationState Detect(IRegistryAccessor registry) => OptimizationState.Unknown;
+
+    public OptimizationSnapshot Capture(IRegistryAccessor registry) => new();
+
+    public async Task<OperationResult> ApplyAsync(OptimizationContext context, CancellationToken ct = default)
     {
-        WriteTargets(context);
-        return Task.FromResult(OperationResult.Ok("Limpieza Component Store habilitada."));
+        if (context.Executor is null)
+            return OperationResult.Fail("Ejecutor no disponible.", "CAO-SEC-010");
+
+        var result = await context.Executor.ExecuteAsync(
+            SystemCommandKey.DismStartComponentCleanup,
+            ["/Online", "/Cleanup-Image", "/StartComponentCleanup"], ct);
+        _lastExitCode = result.ExitCode;
+
+        return result.Success
+            ? OperationResult.Ok("Limpieza del Component Store completada.")
+            : OperationResult.Fail("DISM StartComponentCleanup falló.", result.StdErr);
+    }
+
+    public Task<OperationResult> RevertAsync(OptimizationContext context, OptimizationSnapshot snapshot, CancellationToken ct = default) =>
+        Task.FromResult(OperationResult.Ok("La limpieza del Component Store no se revierte (mantenimiento)."));
+
+    public Task<VerificationResult> VerifyAsync(OptimizationContext context, CancellationToken ct = default)
+    {
+        if (_lastExitCode is null)
+        {
+            return Task.FromResult(VerificationResult.Unknown(OptimizationState.Unknown,
+                "Sin evidencia de ejecución de DISM."));
+        }
+
+        return Task.FromResult(_lastExitCode == 0
+            ? VerificationResult.Passed(OptimizationState.Unknown, "DISM ejecutado con exit=0.")
+            : VerificationResult.Failed(OptimizationState.Unknown, $"DISM terminó con exit={_lastExitCode}."));
     }
 }

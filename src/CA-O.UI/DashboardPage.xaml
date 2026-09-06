@@ -15,9 +15,18 @@
             </VisualStateGroup>
         </VisualStateManager.VisualStateGroups>
         <ScrollViewer Padding="32,24,32,32" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-        <StackPanel Spacing="20" MaxWidth="1200" HorizontalAlignment="Center">
+        <StackPanel x:Name="PageContent" Spacing="20" MaxWidth="1200" HorizontalAlignment="Center">
             <!-- Hero: System Intelligence -->
             <Border Style="{StaticResource CaoHeroCardStyle}">
+                <Grid>
+                    <Border Opacity="0.14" CornerRadius="12" Margin="-20" IsHitTestVisible="False">
+                        <Border.Background>
+                            <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                <GradientStop Offset="0" Color="{ThemeResource SystemAccentColor}"/>
+                                <GradientStop Offset="1" Color="Transparent"/>
+                            </LinearGradientBrush>
+                        </Border.Background>
+                    </Border>
                 <Grid ColumnSpacing="20" RowSpacing="12">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
@@ -45,6 +54,7 @@
                     <TextBlock x:Name="NoClaimsNote" FontSize="11" Opacity="0.55" TextWrapping="Wrap" HorizontalAlignment="Center" TextAlignment="Center"/>
                 </StackPanel>
             </Grid>
+                </Grid>
         </Border>
 
             <!-- Service / Reboot / Recovery bars -->

@@ -2,6 +2,8 @@ using CAO.UI.Pages;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Xaml.Media.Animation;
+using Windows.Foundation;
 using CAO.Shared;
 using System.IO;
 
@@ -121,6 +123,7 @@ public sealed partial class MainWindow : Window
         ServiceDot.Fill = (svc is "connected" or "conectado")
             ? (Brush)Application.Current.Resources["SystemFillColorSuccessBrush"]
             : (svc is "rejected" or "rechazado" ? (Brush)Application.Current.Resources["SystemFillColorCautionBrush"] : (Brush)Application.Current.Resources["SystemFillColorCriticalBrush"]);
+        UpdateServicePulse(svc is "connected" or "conectado");
 
         // System health summary
         if (ctx is null)
@@ -144,6 +147,47 @@ public sealed partial class MainWindow : Window
             var rec = state.Recommendations.Count(r => r.Bucket == RecommendationBucket.Recommended);
             OperationTopText.Text = rec > 0 ? $"{rec} recomendadas" : "";
         }
+    }
+
+    private Storyboard? _servicePulse;
+
+    /// <summary>Pulso suave del punto verde mientras el servicio está conectado.</summary>
+    private void UpdateServicePulse(bool connected)
+    {
+        try
+        {
+            if (!Accessibility.ReducedMotion.ShouldAnimate) connected = false;
+            if (connected)
+            {
+                if (_servicePulse is not null) return;
+                ServiceDot.RenderTransformOrigin = new Point(0.5, 0.5);
+                var transform = new CompositeTransform();
+                ServiceDot.RenderTransform = transform;
+                var board = new Storyboard { RepeatBehavior = RepeatBehavior.Forever, AutoReverse = true };
+                var scaleX = new DoubleAnimation { From = 1.0, To = 1.35, Duration = TimeSpan.FromSeconds(1.1) };
+                var scaleY = new DoubleAnimation { From = 1.0, To = 1.35, Duration = TimeSpan.FromSeconds(1.1) };
+                var fade = new DoubleAnimation { From = 1.0, To = 0.65, Duration = TimeSpan.FromSeconds(1.1) };
+                Storyboard.SetTarget(scaleX, transform);
+                Storyboard.SetTargetProperty(scaleX, "ScaleX");
+                Storyboard.SetTarget(scaleY, transform);
+                Storyboard.SetTargetProperty(scaleY, "ScaleY");
+                Storyboard.SetTarget(fade, ServiceDot);
+                Storyboard.SetTargetProperty(fade, "Opacity");
+                board.Children.Add(scaleX);
+                board.Children.Add(scaleY);
+                board.Children.Add(fade);
+                _servicePulse = board;
+                board.Begin();
+            }
+            else if (_servicePulse is not null)
+            {
+                _servicePulse.Stop();
+                _servicePulse = null;
+                ServiceDot.RenderTransform = null;
+                ServiceDot.Opacity = 1;
+            }
+        }
+        catch { }
     }
 
     private static bool IsSignificantPendingReboot(SystemContext? ctx) =>

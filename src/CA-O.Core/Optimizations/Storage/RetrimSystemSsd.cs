@@ -1,38 +1,22 @@
 using CAO.Core.Abstractions;
 using CAO.Shared;
+using CAO.Shared.Security;
 
 namespace CAO.Core.Optimizations.Storage;
 
-public sealed class RetrimSystemSsd : RegistryOptimizationBase
+/// <summary>Runs an immediate ReTrim on the system drive (defrag C: /L).</summary>
+public sealed class RetrimSystemSsd : IOptimization
 {
-    /// <summary>Performs immediate TRIM on system SSD to optimize free space after deleting large files.</summary>
-    protected override IReadOnlyList<ValueTarget> Targets { get; } =
-        new[]
-        {
-            // Trigger immediate optimization for system drive (defrag/TRIM)
-            new ValueTarget(
-                RegistryHive2.LocalMachine,
-                @"SYSTEM\CurrentControlSet\Services\defragsvc\Parameters",
-                "LastOptimizeRun",
-                0,
-                RegistryValueKind2.DWord),
-            // Force next scheduled task to run optimization
-            new ValueTarget(
-                RegistryHive2.LocalMachine,
-                @"SYSTEM\CurrentControlSet\Services\defragsvc\Parameters",
-                "LastOptimizeRunTime",
-                0,
-                RegistryValueKind2.DWord)
-        };
+    private int? _lastExitCode;
 
-    public override OptimizationDefinition Definition => new()
+    public OptimizationDefinition Definition => new()
     {
         Id = "retrim-system-ssd",
         NameEs = "Retrim del SSD del sistema",
         NameEn = "Retrim system SSD",
-        DescriptionEs = "Ejecuta TRIM inmediato en el SSD del sistema para optimizar espacio libre después de eliminar archivos.",
-        DescriptionEn = "Performs immediate TRIM on system SSD to optimize free space after large file deletions.",
-        TooltipEs = "Modifica HKLM\\SYSTEM\\CurrentControlSet\\Services\\defragsvc. Reversible via snapshot.",
+        DescriptionEs = "Ejecuta ReTrim inmediato en la unidad C: para liberar bloques no usados del SSD.",
+        DescriptionEn = "Runs an immediate ReTrim on drive C: to free unused SSD blocks.",
+        TooltipEs = "Ejecuta defrag C: /L. Acción de mantenimiento no reversible; puede tardar.",
         Category = OptimizationCategory.Storage,
         ExpectedImpact = PerformanceImpact.Small,
         Evidence = EvidenceLevel.Official,
@@ -42,11 +26,40 @@ public sealed class RetrimSystemSsd : RegistryOptimizationBase
         Compatibility = CompatibilityStatus.Compatible,
         SecurityImpact = SecurityImpact.None,
         Impact = ImpactLevel.Low,
+        Flags = OptimizationFlags.NotReversible,
     };
 
-    public override Task<OperationResult> ApplyAsync(OptimizationContext context, CancellationToken ct = default)
+    public OptimizationState Detect(IRegistryAccessor registry) => OptimizationState.Unknown;
+
+    public OptimizationSnapshot Capture(IRegistryAccessor registry) => new();
+
+    public async Task<OperationResult> ApplyAsync(OptimizationContext context, CancellationToken ct = default)
     {
-        WriteTargets(context);
-        return Task.FromResult(OperationResult.Ok("TRIM del SSD del sistema ejecutado."));
+        if (context.Executor is null)
+            return OperationResult.Fail("Ejecutor no disponible.", "CAO-SEC-010");
+
+        var result = await context.Executor.ExecuteAsync(
+            SystemCommandKey.DefragRetrim, ["C:", "/L"], ct);
+        _lastExitCode = result.ExitCode;
+
+        return result.Success
+            ? OperationResult.Ok("ReTrim del SSD completado.")
+            : OperationResult.Fail("defrag /L falló.", result.StdErr);
+    }
+
+    public Task<OperationResult> RevertAsync(OptimizationContext context, OptimizationSnapshot snapshot, CancellationToken ct = default) =>
+        Task.FromResult(OperationResult.Ok("El ReTrim no se revierte (mantenimiento)."));
+
+    public Task<VerificationResult> VerifyAsync(OptimizationContext context, CancellationToken ct = default)
+    {
+        if (_lastExitCode is null)
+        {
+            return Task.FromResult(VerificationResult.Unknown(OptimizationState.Unknown,
+                "Sin evidencia de ejecución de defrag /L."));
+        }
+
+        return Task.FromResult(_lastExitCode == 0
+            ? VerificationResult.Passed(OptimizationState.Unknown, "defrag /L ejecutado con exit=0.")
+            : VerificationResult.Failed(OptimizationState.Unknown, $"defrag /L terminó con exit={_lastExitCode}."));
     }
 }

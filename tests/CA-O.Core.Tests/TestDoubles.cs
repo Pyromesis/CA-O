@@ -40,6 +40,8 @@ public sealed class MemoryRegistry : IRegistryAccessor
         Store.Remove(Key(hive, keyPath, valueName));
 
     public IReadOnlyList<string> GetValueNames(RegistryHive2 hive, string keyPath) => [];
+
+    public IReadOnlyList<string> GetSubKeyNames(RegistryHive2 hive, string keyPath) => [];
 }
 
 public sealed class MemorySnapshotStore : ISnapshotStore

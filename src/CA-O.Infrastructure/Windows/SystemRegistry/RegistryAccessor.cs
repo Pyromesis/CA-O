@@ -88,6 +88,12 @@ public sealed class RegistryAccessor : IRegistryAccessor
         return key?.GetValueNames() ?? Array.Empty<string>();
     }
 
+    public IReadOnlyList<string> GetSubKeyNames(RegistryHive2 hive, string keyPath)
+    {
+        using var key = OpenBase(hive).OpenSubKey(keyPath);
+        return key?.GetSubKeyNames() ?? Array.Empty<string>();
+    }
+
     private static RegistryValueKind2 MapFromWin(RegistryValueKind? kind) => kind switch
     {
         RegistryValueKind.String => RegistryValueKind2.String,

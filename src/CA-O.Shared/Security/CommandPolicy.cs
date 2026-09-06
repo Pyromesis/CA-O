@@ -21,9 +21,26 @@ public enum SystemCommandKey
     NetShTcpShowGlobal,
     NetShTcpAutotuningNormal,
     NetShTcpCongestionDefault,
+    NetShTcpCongestionCubic,
     NetShTcpLargeSendOffload,
     NetShTcpChecksumOffload,
     NetShUdpChecksumOffload,
+    NetShWinsockReset,
+    NetShIntIpReset,
+    DismStartComponentCleanup,
+    DismResetBase,
+    FsutilDisableDeleteNotifyOff,
+    FsutilDisableDeleteNotifyOn,
+    FsutilQueryDeleteNotify,
+    DefragRetrim,
+    PowerCfgListSchemes,
+    PowerCfgDeleteScheme,
+    PowerCfgSetActiveCurrent,
+    PowerCfgSetAcValueIndex,
+    PowerCfgQueryAcValueIndex,
+    SchTasksQuery,
+    SchTasksDisable,
+    SchTasksEnable,
     NetShInterfaceIpShowDns,
     NetShInterfaceIpSetDnsPrimary,
     NetShInterfaceIpSetDnsSecondary,
@@ -143,6 +160,77 @@ public static partial class CommandPolicy
                 (arguments[4] == "checksum=enabled" || arguments[4] == "checksum=disabled") =>
                 Path.Combine(system32, "netsh.exe"),
 
+            SystemCommandKey.NetShTcpCongestionCubic when Eq(arguments,
+                "int", "tcp", "set", "global", "congestionprovider=cubic") =>
+                Path.Combine(system32, "netsh.exe"),
+
+            SystemCommandKey.NetShWinsockReset when Eq(arguments,
+                "winsock", "reset") =>
+                Path.Combine(system32, "netsh.exe"),
+
+            SystemCommandKey.NetShIntIpReset when Eq(arguments,
+                "int", "ip", "reset") =>
+                Path.Combine(system32, "netsh.exe"),
+
+            SystemCommandKey.DismStartComponentCleanup when Eq(arguments,
+                "/Online", "/Cleanup-Image", "/StartComponentCleanup") =>
+                Path.Combine(system32, "dism.exe"),
+
+            SystemCommandKey.DismResetBase when Eq(arguments,
+                "/Online", "/Cleanup-Image", "/StartComponentCleanup", "/ResetBase") =>
+                Path.Combine(system32, "dism.exe"),
+
+            SystemCommandKey.FsutilDisableDeleteNotifyOff when Eq(arguments,
+                "behavior", "set", "DisableDeleteNotify", "0") =>
+                Path.Combine(system32, "fsutil.exe"),
+
+            SystemCommandKey.FsutilDisableDeleteNotifyOn when Eq(arguments,
+                "behavior", "set", "DisableDeleteNotify", "1") =>
+                Path.Combine(system32, "fsutil.exe"),
+
+            SystemCommandKey.FsutilQueryDeleteNotify when Eq(arguments,
+                "behavior", "query", "DisableDeleteNotify") =>
+                Path.Combine(system32, "fsutil.exe"),
+
+            SystemCommandKey.DefragRetrim when Eq(arguments, "C:", "/L") =>
+                Path.Combine(system32, "defrag.exe"),
+
+            SystemCommandKey.PowerCfgListSchemes when Eq(arguments, "/L") =>
+                Path.Combine(system32, "powercfg.exe"),
+
+            SystemCommandKey.PowerCfgDeleteScheme when arguments.Count == 2 &&
+                arguments[0] == "/delete" && IsPowerSchemeGuid(arguments[1]) =>
+                Path.Combine(system32, "powercfg.exe"),
+
+            SystemCommandKey.PowerCfgSetActiveCurrent when Eq(arguments,
+                "/setactive", "SCHEME_CURRENT") =>
+                Path.Combine(system32, "powercfg.exe"),
+
+            SystemCommandKey.PowerCfgSetAcValueIndex when arguments.Count == 5 &&
+                arguments[0] == "/setacvalueindex" && arguments[1] == "SCHEME_CURRENT" &&
+                IsAllowedPowerSetting(arguments[2], arguments[3]) &&
+                (arguments[4] is "0" or "1" or "2") =>
+                Path.Combine(system32, "powercfg.exe"),
+
+            SystemCommandKey.PowerCfgQueryAcValueIndex when arguments.Count == 4 &&
+                arguments[0] == "/q" && arguments[1] == "SCHEME_CURRENT" &&
+                IsAllowedPowerSetting(arguments[2], arguments[3]) =>
+                Path.Combine(system32, "powercfg.exe"),
+
+            SystemCommandKey.SchTasksQuery when Eq(arguments,
+                "/Query", "/FO", "CSV", "/V") =>
+                Path.Combine(system32, "schtasks.exe"),
+
+            SystemCommandKey.SchTasksDisable when arguments.Count == 4 &&
+                arguments[0] == "/Change" && arguments[1] == "/TN" &&
+                IsValidTaskName(arguments[2]) && arguments[3] == "/DISABLE" =>
+                Path.Combine(system32, "schtasks.exe"),
+
+            SystemCommandKey.SchTasksEnable when arguments.Count == 4 &&
+                arguments[0] == "/Change" && arguments[1] == "/TN" &&
+                IsValidTaskName(arguments[2]) && arguments[3] == "/ENABLE" =>
+                Path.Combine(system32, "schtasks.exe"),
+
             SystemCommandKey.NetShInterfaceIpShowDns when Eq(arguments,
                 "interface", "ip", "show", "dns") =>
                 Path.Combine(system32, "netsh.exe"),
@@ -200,6 +288,26 @@ public static partial class CommandPolicy
         RegexOptions.CultureInvariant);
 
     private static bool IsPowerSchemeGuid(string token) => GuidShape.IsMatch(token);
+
+    /// <summary>
+    /// Únicos pares (subgrupo, ajuste) de powercfg que CA-O puede tocar:
+    /// ahorro USB, PCIe Link State y adaptador Wi-Fi. Cualquier otro GUID se rechaza.
+    /// </summary>
+    private static bool IsAllowedPowerSetting(string subgroup, string setting) =>
+        (subgroup, setting) switch
+        {
+            // USB selective suspend: 0 = desactivado
+            ("2a737441-1930-4402-8d77-b2bebba308a3", "48e6b7a6-50f5-4782-a5d4-53bb8f07e226") => true,
+            // PCIe Link State Power Management: 0 = desactivado
+            ("501a4d13-42af-4429-9fd1-a8218c268e1d", "ee12f906-d277-4bcf-ad6c-e5a569d7c83d") => true,
+            // Wireless adapter power saving: 0 = máximo rendimiento
+            ("19cbb8fa-5279-450e-9fac-8a3d5fedd0c1", "12bbebe6-58d6-4636-95bb-3217ef867c1a") => true,
+            _ => false,
+        };
+
+    private static bool IsValidTaskName(string name) =>
+        !string.IsNullOrWhiteSpace(name) && name.Length <= 256 &&
+        name.StartsWith('\\') && !name.Contains("..") && SafeArg().IsMatch(name);
 
     private static bool IsValidInterfaceName(string name) =>
         !string.IsNullOrWhiteSpace(name) && name.Length <= 64 && SafeArg().IsMatch(name);

@@ -1,42 +1,21 @@
-using CAO.Core.Abstractions;
 using CAO.Shared;
 
 namespace CAO.Core.Optimizations.Power;
 
-/// <summary>
-/// Restores balanced power settings when on DC (battery) power.
-/// Reduces CPU speed, disk activity, and display brightness to save battery.
-/// Official Windows registry configuration (documented in MS-Windows-Power-Control).
-/// </summary>
-public sealed class RestoreBalancedPowerDc : RegistryOptimizationBase
+/// <summary>Activates the Balanced power plan to save battery.</summary>
+public sealed class RestoreBalancedPowerDc : PowerSchemeSwitchOptimization
 {
-    protected override IReadOnlyList<ValueTarget> Targets { get; } =
-        new[]
-        {
-            // Enable hard disk timeout on battery (saves power)
-            new ValueTarget(
-                RegistryHive2.CurrentUser,
-                @"Control Panel\PowerCfg\PowerPolicies\1",
-                "ConservationIdleTimeout",
-                600, // 600 seconds = 10 minutes
-                RegistryValueKind2.DWord),
-            // Enable monitor timeout on battery (saves power)
-            new ValueTarget(
-                RegistryHive2.CurrentUser,
-                @"Control Panel\PowerCfg\PowerPolicies\1",
-                "VideoTimeout",
-                300, // 300 seconds = 5 minutes
-                RegistryValueKind2.DWord)
-        };
+    protected override string TargetScheme => "SCHEME_BALANCED";
+    protected override string TargetLabel => "Equilibrado";
 
     public override OptimizationDefinition Definition => new()
     {
         Id = "restore-balanced-power-dc",
         NameEs = "Restaurar modo Equilibrado en batería",
-        NameEn = "Restore Balanced mode on battery power",
-        DescriptionEs = "Restaura suspensión de disco y pantalla en batería para ahorrar energía. Solo aplica en batería.",
-        DescriptionEn = "Restores disk and monitor suspension on battery to save power. Only applies on battery.",
-        TooltipEs = "Modifica HKCU\\Control Panel\\PowerCfg\\PowerPolicies. Reversible via snapshot.",
+        NameEn = "Restore Balanced mode on battery",
+        DescriptionEs = "Activa el plan Equilibrado con powercfg para ahorrar batería.",
+        DescriptionEn = "Activates the Balanced plan via powercfg to save battery.",
+        TooltipEs = "Ejecuta powercfg /setactive SCHEME_BALANCED y restaura el previo al revertir.",
         Category = OptimizationCategory.Performance,
         ExpectedImpact = PerformanceImpact.Small,
         Evidence = EvidenceLevel.Official,
@@ -47,10 +26,4 @@ public sealed class RestoreBalancedPowerDc : RegistryOptimizationBase
         SecurityImpact = SecurityImpact.None,
         Impact = ImpactLevel.Medium,
     };
-
-    public override Task<OperationResult> ApplyAsync(OptimizationContext context, CancellationToken ct = default)
-    {
-        WriteTargets(context);
-        return Task.FromResult(OperationResult.Ok("Modo Equilibrado restaurado en batería."));
-    }
 }

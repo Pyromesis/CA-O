@@ -1,35 +1,32 @@
-using CAO.Core.Abstractions;
 using CAO.Shared;
 
 namespace CAO.Core.Optimizations.Network;
 
-public sealed class RestoreLargeSendOffload : RegistryOptimizationBase
+/// <summary>Restores Large Send Offload (LSO) on physical NICs that expose it.</summary>
+public sealed class RestoreLargeSendOffload : NicAdvancedPropertyOptimization
 {
-    protected override IReadOnlyList<ValueTarget> Targets { get; } =
-        new[] { new ValueTarget(RegistryHive2.CurrentUser, @"Software\CA-O\restore-large-send-offload", "Enabled", 1) };
+    protected override string[] PropertyNames { get; } =
+        ["*LsoV2IPv4", "*LsoV2IPv6"];
+
+    protected override string EnabledText => "1";
+    protected override string DisabledText => "0";
 
     public override OptimizationDefinition Definition => new()
     {
         Id = "restore-large-send-offload",
         NameEs = "Restaurar Large Send Offload",
-        NameEn = "Restaurar Large Send Offload",
-        DescriptionEs = "Cuando NIC soporta. Beneficio: segun workload, ver evidencia.",
-        DescriptionEn = "Cuando NIC soporta.",
-        TooltipEs = "restore-large-send-offload via registry. Reversible via snapshot.",
+        NameEn = "Restore Large Send Offload",
+        DescriptionEs = "Activa LSOv2 en adaptadores físicos que lo soportan. Mejora el envío de paquetes grandes.",
+        DescriptionEn = "Enables LSOv2 on physical NICs that support it. Improves large packet sends.",
+        TooltipEs = "Modifica *LsoV2IPv4/*LsoV2IPv6 solo en adaptadores físicos que ya exponen la propiedad. Reversible exacto.",
         Category = OptimizationCategory.Network,
-        ExpectedImpact = PerformanceImpact.Small,
+        ExpectedImpact = PerformanceImpact.Tiny,
         Evidence = EvidenceLevel.Vendor,
-        Confidence = Confidence.Medium,
+        Confidence = Confidence.High,
         AntiCheatImpact = AntiCheatImpact.None,
         Risk = RiskLevel.Low,
         Compatibility = CompatibilityStatus.Conditional,
         SecurityImpact = SecurityImpact.None,
         Impact = ImpactLevel.Low,
     };
-
-    public override Task<OperationResult> ApplyAsync(OptimizationContext context, CancellationToken ct = default)
-    {
-        WriteTargets(context);
-        return Task.FromResult(OperationResult.Ok("Restaurar Large Send Offload aplicado."));
-    }
 }

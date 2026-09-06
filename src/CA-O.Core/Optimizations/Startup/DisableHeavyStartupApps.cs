@@ -1,35 +1,36 @@
-using CAO.Core.Abstractions;
 using CAO.Shared;
 
 namespace CAO.Core.Optimizations.Startup;
 
-public sealed class DisableHeavyStartupApps : RegistryOptimizationBase
+/// <summary>Disables heavyweight startup entries (updaters, launchers, chat/music clients).</summary>
+public sealed class DisableHeavyStartupApps : StartupRunKeyOptimization
 {
-    protected override IReadOnlyList<ValueTarget> Targets { get; } =
-        new[] { new ValueTarget(RegistryHive2.CurrentUser, @"Software\CA-O\disable-heavy-startup-apps", "Enabled", 1) };
+    private static readonly string[] HeavyKeywords =
+        ["update", "updater", "launcher", "helper", "tray", "agent", "discord", "spotify",
+         "teams", "steam", "adobe", "creative", "electron", "slack", "zoom", "skype", "dropbox"];
+
+    protected override bool ShouldDisable(string name, string command, string? company)
+    {
+        var haystack = (name + " " + command).ToLowerInvariant();
+        return HeavyKeywords.Any(k => haystack.Contains(k));
+    }
 
     public override OptimizationDefinition Definition => new()
     {
         Id = "disable-heavy-startup-apps",
         NameEs = "Desactivar apps inicio pesadas",
-        NameEn = "Desactivar apps inicio pesadas",
-        DescriptionEs = "Impacto High, requiere seleccion usuario, excluye AV/drivers. Beneficio: segun workload, ver evidencia.",
-        DescriptionEn = "Impacto High, requiere seleccion usuario, excluye AV/drivers.",
-        TooltipEs = "disable-heavy-startup-apps via registry. Reversible via snapshot.",
+        NameEn = "Disable heavy startup apps",
+        DescriptionEs = "Desactiva actualizadores, lanzadores y clientes pesados del inicio. Excluye antivirus y drivers.",
+        DescriptionEn = "Disables updaters, launchers and heavy clients at startup. Excludes antivirus and drivers.",
+        TooltipEs = "Elimina valores en HKCU/HKLM Run que coinciden con patrones pesados. Reversible exacto.",
         Category = OptimizationCategory.Performance,
         ExpectedImpact = PerformanceImpact.Small,
-        Evidence = EvidenceLevel.Official,
+        Evidence = EvidenceLevel.Empirical,
         Confidence = Confidence.Medium,
         AntiCheatImpact = AntiCheatImpact.None,
         Risk = RiskLevel.Moderate,
         Compatibility = CompatibilityStatus.Compatible,
         SecurityImpact = SecurityImpact.None,
-        Impact = ImpactLevel.Low,
+        Impact = ImpactLevel.Medium,
     };
-
-    public override Task<OperationResult> ApplyAsync(OptimizationContext context, CancellationToken ct = default)
-    {
-        WriteTargets(context);
-        return Task.FromResult(OperationResult.Ok("Desactivar apps inicio pesadas aplicado."));
-    }
 }

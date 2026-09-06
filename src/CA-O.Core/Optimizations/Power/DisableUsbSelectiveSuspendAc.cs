@@ -1,34 +1,22 @@
-using CAO.Core.Abstractions;
 using CAO.Shared;
 
 namespace CAO.Core.Optimizations.Power;
 
-/// <summary>
-/// Disables USB Selective Suspend on AC power to prevent USB devices from suspending.
-/// Critical for gaming mice, keyboards, and controllers on AC power.
-/// Modifies HKLM registry for USB hub configuration.
-/// </summary>
-public sealed class DisableUsbSelectiveSuspendAc : RegistryOptimizationBase
+/// <summary>Disables USB selective suspend on AC via the active power scheme.</summary>
+public sealed class DisableUsbSelectiveSuspendAc : PowerAcSettingOptimization
 {
-    protected override IReadOnlyList<ValueTarget> Targets { get; } =
-        new[]
-        {
-            new ValueTarget(
-                RegistryHive2.LocalMachine,
-                @"SYSTEM\CurrentControlSet\Services\usbhub\Parameters",
-                "DisableSelectiveSuspend",
-                1, // 1 = Disabled, 0 = Enabled
-                RegistryValueKind2.DWord)
-        };
+    protected override string SubGuid => "2a737441-1930-4402-8d77-b2bebba308a3";
+    protected override string SettingGuid => "48e6b7a6-50f5-4782-a5d4-53bb8f07e226";
+    protected override string TargetIndex => "0";
 
     public override OptimizationDefinition Definition => new()
     {
         Id = "disable-usb-selective-suspend-ac",
         NameEs = "Deshabilitar suspensión selectiva USB en AC",
-        NameEn = "Disable USB Selective Suspend on AC",
-        DescriptionEs = "Deshabilita la suspensión selectiva de USB cuando está en AC. Previene que ratones, teclados y controles se suspendan durante el juego.",
-        DescriptionEn = "Disables USB Selective Suspend on AC power. Prevents gaming mice, keyboards, and controllers from suspending.",
-        TooltipEs = "Modifica HKLM\\SYSTEM\\CurrentControlSet\\Services\\usbhub\\Parameters. Reversible via snapshot.",
+        NameEn = "Disable USB selective suspend on AC",
+        DescriptionEs = "Deshabilita la suspensión selectiva USB en AC. Evita que ratones y teclados se duerman.",
+        DescriptionEn = "Disables USB selective suspend on AC. Keeps mice and keyboards awake.",
+        TooltipEs = "powercfg /setacvalueindex USB + activación del plan. Solo AC. Reversible exacto.",
         Category = OptimizationCategory.Performance,
         ExpectedImpact = PerformanceImpact.WorkloadDependent,
         Evidence = EvidenceLevel.Official,
@@ -39,10 +27,4 @@ public sealed class DisableUsbSelectiveSuspendAc : RegistryOptimizationBase
         SecurityImpact = SecurityImpact.None,
         Impact = ImpactLevel.Medium,
     };
-
-    public override Task<OperationResult> ApplyAsync(OptimizationContext context, CancellationToken ct = default)
-    {
-        WriteTargets(context);
-        return Task.FromResult(OperationResult.Ok("Suspensión selectiva USB deshabilitada en AC."));
-    }
 }

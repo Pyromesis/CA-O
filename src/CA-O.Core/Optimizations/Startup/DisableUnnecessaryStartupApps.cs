@@ -1,24 +1,28 @@
-using CAO.Core.Abstractions;
 using CAO.Shared;
 
 namespace CAO.Core.Optimizations.Startup;
 
-public sealed class DisableUnnecessaryStartupApps : RegistryOptimizationBase
+/// <summary>Disables non-essential third-party startup entries (Run keys).</summary>
+public sealed class DisableUnnecessaryStartupApps : StartupRunKeyOptimization
 {
-    protected override IReadOnlyList<ValueTarget> Targets { get; } =
-        new[] { new ValueTarget(RegistryHive2.CurrentUser, @"Software\CA-O\disable-unnecessary-startup-apps", "Enabled", 1) };
+    protected override bool ShouldDisable(string name, string command, string? company)
+    {
+        // Todo lo no protegido es innecesario por defecto; la base ya excluyó
+        // antivirus, drivers, Microsoft y componentes del sistema.
+        return true;
+    }
 
     public override OptimizationDefinition Definition => new()
     {
         Id = "disable-unnecessary-startup-apps",
         NameEs = "Desactivar apps inicio innecesarias",
-        NameEn = "Desactivar apps inicio innecesarias",
-        DescriptionEs = "Clasifica Essential/Recommended/Optional/Unknown con publisher. Beneficio: segun workload, ver evidencia.",
-        DescriptionEn = "Clasifica Essential/Recommended/Optional/Unknown con publisher.",
-        TooltipEs = "disable-unnecessary-startup-apps via registry. Reversible via snapshot.",
+        NameEn = "Disable unnecessary startup apps",
+        DescriptionEs = "Desactiva entradas de inicio de terceros no esenciales. Excluye antivirus, drivers y Microsoft.",
+        DescriptionEn = "Disables non-essential third-party startup entries. Excludes antivirus, drivers and Microsoft.",
+        TooltipEs = "Elimina valores en HKCU/HKLM Run tras clasificar publicador. Reversible exacto.",
         Category = OptimizationCategory.Performance,
         ExpectedImpact = PerformanceImpact.Small,
-        Evidence = EvidenceLevel.Official,
+        Evidence = EvidenceLevel.Empirical,
         Confidence = Confidence.Medium,
         AntiCheatImpact = AntiCheatImpact.None,
         Risk = RiskLevel.Low,
@@ -26,10 +30,4 @@ public sealed class DisableUnnecessaryStartupApps : RegistryOptimizationBase
         SecurityImpact = SecurityImpact.None,
         Impact = ImpactLevel.Low,
     };
-
-    public override Task<OperationResult> ApplyAsync(OptimizationContext context, CancellationToken ct = default)
-    {
-        WriteTargets(context);
-        return Task.FromResult(OperationResult.Ok("Desactivar apps inicio innecesarias aplicado."));
-    }
 }

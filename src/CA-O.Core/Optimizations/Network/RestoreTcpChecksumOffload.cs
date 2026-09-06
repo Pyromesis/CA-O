@@ -1,36 +1,32 @@
-using CAO.Core.Abstractions;
 using CAO.Shared;
 
 namespace CAO.Core.Optimizations.Network;
 
-/// <summary>Restores TCP checksum offloading for network performance on supported NICs.</summary>
-public sealed class RestoreTcpChecksumOffload : RegistryOptimizationBase
+/// <summary>Restores TCP checksum offloading on physical NICs that expose it.</summary>
+public sealed class RestoreTcpChecksumOffload : NicAdvancedPropertyOptimization
 {
-    protected override IReadOnlyList<ValueTarget> Targets { get; } =
-        new[] { new ValueTarget(RegistryHive2.CurrentUser, @"Software\CA-O\restore-tcp-checksum-offload", "Enabled", 1) };
+    protected override string[] PropertyNames { get; } =
+        ["*TCPChecksumOffloadIPv4", "*TCPChecksumOffloadIPv6"];
+
+    protected override string EnabledText => "1";
+    protected override string DisabledText => "0";
 
     public override OptimizationDefinition Definition => new()
     {
         Id = "restore-tcp-checksum-offload",
         NameEs = "Restaurar TCP checksum offload",
-        NameEn = "Restaurar TCP checksum offload",
-        DescriptionEs = "Restaura a estado soportado por driver. Beneficio: segun workload, ver evidencia.",
-        DescriptionEn = "Restaura a estado soportado por driver.",
-        TooltipEs = "restore-tcp-checksum-offload via registry. Reversible via snapshot.",
+        NameEn = "Restore TCP checksum offload",
+        DescriptionEs = "Activa el cálculo de checksum TCP en la NIC en adaptadores físicos que lo soportan. Descarga a la CPU.",
+        DescriptionEn = "Enables TCP checksum offload on physical NICs that support it. Offloads the CPU.",
+        TooltipEs = "Modifica *TCPChecksumOffloadIPv4/IPv6 solo en adaptadores físicos que ya exponen la propiedad. Reversible exacto.",
         Category = OptimizationCategory.Network,
-        ExpectedImpact = PerformanceImpact.Small,
+        ExpectedImpact = PerformanceImpact.Tiny,
         Evidence = EvidenceLevel.Vendor,
-        Confidence = Confidence.Medium,
+        Confidence = Confidence.High,
         AntiCheatImpact = AntiCheatImpact.None,
         Risk = RiskLevel.Low,
         Compatibility = CompatibilityStatus.Conditional,
         SecurityImpact = SecurityImpact.None,
         Impact = ImpactLevel.Low,
     };
-
-    public override Task<OperationResult> ApplyAsync(OptimizationContext context, CancellationToken ct = default)
-    {
-        WriteTargets(context);
-        return Task.FromResult(OperationResult.Ok("Restaurar TCP checksum offload aplicado."));
-    }
 }

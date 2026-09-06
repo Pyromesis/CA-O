@@ -35,6 +35,8 @@ public sealed class PreviewRegistry : IRegistryAccessor
         Values.Remove(K(hive, keyPath, valueName));
 
     public IReadOnlyList<string> GetValueNames(RegistryHive2 hive, string keyPath) => [];
+
+    public IReadOnlyList<string> GetSubKeyNames(RegistryHive2 hive, string keyPath) => [];
 }
 
 /// <summary>

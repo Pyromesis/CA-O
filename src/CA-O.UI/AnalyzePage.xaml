@@ -12,7 +12,7 @@
             </VisualStateGroup>
         </VisualStateManager.VisualStateGroups>
         <ScrollViewer Padding="32,24,32,32" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalAlignment="Stretch">
-        <StackPanel Spacing="20" MaxWidth="1200" HorizontalAlignment="Center">
+        <StackPanel x:Name="PageContent" Spacing="20" MaxWidth="1200" HorizontalAlignment="Center">
             <StackPanel Spacing="6">
                 <TextBlock Text="Analizar sistema" Style="{StaticResource CaoPageTitleStyle}"/>
                 <TextBlock Text="Escaneo completo: CPU, GPU, memoria, disco, velocidades, red, seguridad, drivers, térmica e input. Nada aquí modifica el sistema." Style="{StaticResource CaoSubtitleStyle}"/>

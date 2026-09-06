@@ -1,36 +1,32 @@
-using CAO.Core.Abstractions;
 using CAO.Shared;
 
 namespace CAO.Core.Optimizations.Network;
 
-/// <summary>Restores UDP checksum offloading for network performance on supported NICs.</summary>
-public sealed class RestoreUdpChecksumOffload : RegistryOptimizationBase
+/// <summary>Restores UDP checksum offloading on physical NICs that expose it.</summary>
+public sealed class RestoreUdpChecksumOffload : NicAdvancedPropertyOptimization
 {
-    protected override IReadOnlyList<ValueTarget> Targets { get; } =
-        new[] { new ValueTarget(RegistryHive2.CurrentUser, @"Software\CA-O\restore-udp-checksum-offload", "Enabled", 1) };
+    protected override string[] PropertyNames { get; } =
+        ["*UDPChecksumOffloadIPv4", "*UDPChecksumOffloadIPv6"];
+
+    protected override string EnabledText => "1";
+    protected override string DisabledText => "0";
 
     public override OptimizationDefinition Definition => new()
     {
         Id = "restore-udp-checksum-offload",
         NameEs = "Restaurar UDP checksum offload",
-        NameEn = "Restaurar UDP checksum offload",
-        DescriptionEs = "Restaura a estado soportado. Beneficio: segun workload, ver evidencia.",
-        DescriptionEn = "Restaura a estado soportado.",
-        TooltipEs = "restore-udp-checksum-offload via registry. Reversible via snapshot.",
+        NameEn = "Restore UDP checksum offload",
+        DescriptionEs = "Activa el cálculo de checksum UDP en la NIC en adaptadores físicos que lo soportan.",
+        DescriptionEn = "Enables UDP checksum offload on physical NICs that support it.",
+        TooltipEs = "Modifica *UDPChecksumOffloadIPv4/IPv6 solo en adaptadores físicos que ya exponen la propiedad. Reversible exacto.",
         Category = OptimizationCategory.Network,
-        ExpectedImpact = PerformanceImpact.Small,
+        ExpectedImpact = PerformanceImpact.Tiny,
         Evidence = EvidenceLevel.Vendor,
-        Confidence = Confidence.Medium,
+        Confidence = Confidence.High,
         AntiCheatImpact = AntiCheatImpact.None,
         Risk = RiskLevel.Low,
         Compatibility = CompatibilityStatus.Conditional,
         SecurityImpact = SecurityImpact.None,
         Impact = ImpactLevel.Low,
     };
-
-    public override Task<OperationResult> ApplyAsync(OptimizationContext context, CancellationToken ct = default)
-    {
-        WriteTargets(context);
-        return Task.FromResult(OperationResult.Ok("Restaurar UDP checksum offload aplicado."));
-    }
 }

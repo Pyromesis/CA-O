@@ -1,23 +1,31 @@
+using System.Text.RegularExpressions;
 using CAO.Core.Abstractions;
 using CAO.Shared;
+using CAO.Shared.Security;
 
 namespace CAO.Core.Optimizations.Power;
 
-/// <summary>
-/// Detects and removes unused custom power plans that clutter the system.
-/// Audits HKLM registry to identify orphaned power schemes.
-/// Uses PowerCfg.exe via privileged gateway to delete unused plans.
-/// </summary>
+/// <summary>Deletes custom power schemes that are not active via powercfg.</summary>
 public sealed class RemoveUnusedCustomPowerPlans : IOptimization
 {
+    private static readonly HashSet<string> BuiltInSchemes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "381b4222-f694-41f0-9685-ff5bb260df2e",
+        "8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c",
+        "e9a42b02-d5df-448d-aa00-03f14749eb61",
+        "a1841308-28f1-11db-8644-0011d68c8b18",
+    };
+
+    private int? _lastDeleted;
+
     public OptimizationDefinition Definition => new()
     {
         Id = "remove-unused-custom-power-plans",
         NameEs = "Eliminar planes de energía personalizados no usados",
         NameEn = "Remove unused custom power plans",
-        DescriptionEs = "Detecta y elimina planes de energía personalizados que no se usan. Limpia configuraciones huérfanas del sistema.",
-        DescriptionEn = "Detects and removes unused custom power plans that clutter the system. Cleans up orphaned configurations.",
-        TooltipEs = "Audita HKLM\\SYSTEM\\CurrentControlSet\\Control\\Power y elimina via PowerCfg.exe. Reversible si se conserva el snapshot.",
+        DescriptionEs = "Detecta planes personalizados inactivos con powercfg y los elimina.",
+        DescriptionEn = "Detects inactive custom plans with powercfg and deletes them.",
+        TooltipEs = "Ejecuta powercfg /L y /delete solo en GUIDs personalizados inactivos. No reversible.",
         Category = OptimizationCategory.Performance,
         ExpectedImpact = PerformanceImpact.Tiny,
         Evidence = EvidenceLevel.Official,
@@ -27,54 +35,75 @@ public sealed class RemoveUnusedCustomPowerPlans : IOptimization
         Compatibility = CompatibilityStatus.Compatible,
         SecurityImpact = SecurityImpact.None,
         Impact = ImpactLevel.Low,
+        Flags = OptimizationFlags.NotReversible,
     };
 
-    public OptimizationState Detect(IRegistryAccessor registry)
-    {
-        // Query power schemes registry to check for custom plans
-        var powerSchemes = registry.GetValue(RegistryHive2.LocalMachine,
-            @"SYSTEM\CurrentControlSet\Control\Power\User\PowerSchemes",
-            "Count");
-
-        // If only 3 default schemes exist (High Performance, Balanced, Power Saver), it's already optimal
-        if (powerSchemes is int count && count <= 3)
-        {
-            return OptimizationState.AppliedByCao;
-        }
-
-        return OptimizationState.NotApplied;
-    }
+    public OptimizationState Detect(IRegistryAccessor registry) => OptimizationState.NotApplied;
 
     public OptimizationSnapshot Capture(IRegistryAccessor registry)
     {
         var snapshot = new OptimizationSnapshot();
-        
-        // Snapshot all power scheme entries for potential restoration
-        var schemesCount = registry.GetValueRaw(RegistryHive2.LocalMachine,
-            @"SYSTEM\CurrentControlSet\Control\Power\User\PowerSchemes",
-            "Count", out var kind);
-
-        snapshot.Registry.Add(new RegistrySnapshotEntry(
-            RegistryHive2.LocalMachine.ToString(),
-            @"SYSTEM\CurrentControlSet\Control\Power\User\PowerSchemes",
-            "Count",
-            schemesCount,
-            Existed: schemesCount is not null)
-        { Kind = kind });
-
+        snapshot.RawNotes.Add("power-plan-cleanup=requested");
         return snapshot;
     }
 
-    public Task<OperationResult> ApplyAsync(OptimizationContext context, CancellationToken ct = default)
+    private static IReadOnlyList<(string Guid, bool Active)> ParseSchemes(string output)
     {
-        // This would require iterating through power schemes and deleting custom ones
-        // Since it's complex and requires multiple PowerCfg calls, log detection only
-        return Task.FromResult(OperationResult.Ok(
-            "Planes de energía personalizados auditados. Se recomienda revisar y eliminar manualmente via Configuración > Energía."));
+        var found = new List<(string, bool)>();
+        foreach (Match match in Regex.Matches(output,
+            @"Power Scheme GUID:\s*([0-9a-fA-F-]{36})\s*(\([^)]*\))?\s*(\*)?",
+            RegexOptions.IgnoreCase))
+        {
+            found.Add((match.Groups[1].Value, match.Groups[3].Success));
+        }
+        return found;
     }
 
-    public Task<OperationResult> RevertAsync(OptimizationContext context, OptimizationSnapshot snapshot, CancellationToken ct = default)
+    public async Task<OperationResult> ApplyAsync(OptimizationContext context, CancellationToken ct = default)
     {
-        return Task.FromResult(OperationResult.Ok("No hay cambios que revertir en esta auditoría."));
+        if (context.Executor is null)
+            return OperationResult.Fail("Ejecutor no disponible.", "CAO-SEC-010");
+
+        var list = await context.Executor.ExecuteAsync(
+            SystemCommandKey.PowerCfgListSchemes, ["/L"], ct);
+        if (!list.Success)
+            return OperationResult.Fail("No se pudieron enumerar los planes.", list.StdErr);
+
+        var targets = ParseSchemes(list.StdOut)
+            .Where(s => !s.Active && !BuiltInSchemes.Contains(s.Guid))
+            .Select(s => s.Guid)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (targets.Count == 0)
+            return OperationResult.Ok("No quedaban planes personalizados inactivos.");
+
+        var deleted = 0;
+        foreach (var guid in targets)
+        {
+            var del = await context.Executor.ExecuteAsync(
+                SystemCommandKey.PowerCfgDeleteScheme, ["/delete", guid], ct);
+            if (del.Success) deleted++;
+        }
+
+        _lastDeleted = deleted;
+        return deleted > 0
+            ? OperationResult.Ok($"Planes personalizados eliminados: {deleted}.")
+            : OperationResult.Fail("No se pudo eliminar ningún plan.", "apply-failed");
+    }
+
+    public Task<OperationResult> RevertAsync(OptimizationContext context, OptimizationSnapshot snapshot, CancellationToken ct = default) =>
+        Task.FromResult(OperationResult.Ok("Los planes eliminados no se restauran (mantenimiento)."));
+
+    public Task<VerificationResult> VerifyAsync(OptimizationContext context, CancellationToken ct = default)
+    {
+        if (_lastDeleted is null)
+        {
+            return Task.FromResult(VerificationResult.Unknown(OptimizationState.Unknown,
+                "Sin evidencia de ejecución en esta sesión."));
+        }
+
+        return Task.FromResult(VerificationResult.Passed(OptimizationState.AppliedByCao,
+            $"Verificado: {_lastDeleted} plan(es) eliminados con powercfg."));
     }
 }

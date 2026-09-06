@@ -21,6 +21,7 @@ file sealed class StubRegistry : IRegistryAccessor
     public void SetValueRaw(RegistryHive2 h, string p, string n, object v, CAO.Core.Abstractions.RegistryValueKind2 k) { }
     public bool DeleteValue(RegistryHive2 h, string p, string n) => false;
     public IReadOnlyList<string> GetValueNames(RegistryHive2 h, string p) => Array.Empty<string>();
+    public IReadOnlyList<string> GetSubKeyNames(RegistryHive2 h, string p) => Array.Empty<string>();
 }
 
 /// <summary>ViewModels (§96): recommendation, health, scoring, cancellation contracts.</summary>

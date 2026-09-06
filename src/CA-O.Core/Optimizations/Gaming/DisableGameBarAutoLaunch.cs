@@ -4,8 +4,9 @@ using CAO.Shared;
 namespace CAO.Core.Optimizations.Gaming;
 
 /// <summary>
-/// Disables automatic Game Bar launch when Alt+Z is pressed (gaming scenarios).
-/// Modifies HKCU\Software\Microsoft\GameBar registry settings.
+/// Disables the Xbox Game Bar overlay background activity so it does not
+/// auto-launch. Uses the per-app background access key (documented Settings
+/// mechanism), not the Auto Game Mode value.
 /// </summary>
 public sealed class DisableGameBarAutoLaunch : RegistryOptimizationBase
 {
@@ -14,9 +15,9 @@ public sealed class DisableGameBarAutoLaunch : RegistryOptimizationBase
         {
             new ValueTarget(
                 RegistryHive2.CurrentUser,
-                @"Software\Microsoft\GameBar",
-                "AllowAutoGameMode",
-                0, // 0 = Disabled, 1 = Enabled
+                @"Software\Microsoft\Windows\CurrentVersion\BackgroundAccessApplications\Microsoft.XboxGamingOverlay_8wekyb3d8bbwe",
+                "Disabled",
+                1,
                 RegistryValueKind2.DWord)
         };
 
@@ -25,9 +26,9 @@ public sealed class DisableGameBarAutoLaunch : RegistryOptimizationBase
         Id = "disable-game-bar-auto-launch",
         NameEs = "Deshabilitar lanzamiento automático de Game Bar",
         NameEn = "Disable automatic Game Bar launch",
-        DescriptionEs = "Evita el lanzamiento automático de Game Bar cuando se presiona Alt+Z en juegos. La funcionalidad sigue disponible manualmente.",
-        DescriptionEn = "Prevents automatic Game Bar launch on Alt+Z in games. Functionality remains available manually.",
-        TooltipEs = "Modifica HKCU\\Software\\Microsoft\\GameBar\\AllowAutoGameMode. Reversible via snapshot.",
+        DescriptionEs = "Impide que Game Bar se ejecute en segundo plano y se lance sola. Sigue disponible manualmente.",
+        DescriptionEn = "Stops Game Bar from running in the background and auto-launching. Still available manually.",
+        TooltipEs = "Establece Disabled=1 en la clave de segundo plano de XboxGamingOverlay. Reversible via snapshot.",
         Category = OptimizationCategory.Gaming,
         ExpectedImpact = PerformanceImpact.Tiny,
         Evidence = EvidenceLevel.Official,

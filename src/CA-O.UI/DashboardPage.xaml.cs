@@ -39,6 +39,7 @@ public sealed partial class DashboardPage : Page
         Loaded += async (_, __) =>
         {
             // Perceived startup <500ms: UI primero, diagnóstico pesado después (§87-88)
+            Helpers.UiAnimations.PlayEntrance(PageContent);
             RenderState();
             if (uiState.Context is null)
             {
@@ -82,11 +83,11 @@ public sealed partial class DashboardPage : Page
 
         var uiState = AppHost.Resolve<ViewModels.UiState>();
         var recommendations = uiState.Recommendations;
-        RecommendedCount.Text = recommendations.Count(r => r.Bucket == RecommendationBucket.Recommended).ToString();
-        OptionalCount.Text = recommendations.Count(r => r.Bucket == RecommendationBucket.Optional).ToString();
-        ExperimentalCount.Text = recommendations.Count(r => r.Bucket == RecommendationBucket.Experimental).ToString();
-        SecurityCount.Text = recommendations.Count(r => r.Bucket == RecommendationBucket.SecuritySensitive).ToString();
-        NotApplicableCount.Text = recommendations.Count(r => r.Bucket == RecommendationBucket.NotApplicable).ToString();
+        Helpers.UiAnimations.CountUp(RecommendedCount, recommendations.Count(r => r.Bucket == RecommendationBucket.Recommended));
+        Helpers.UiAnimations.CountUp(OptionalCount, recommendations.Count(r => r.Bucket == RecommendationBucket.Optional));
+        Helpers.UiAnimations.CountUp(ExperimentalCount, recommendations.Count(r => r.Bucket == RecommendationBucket.Experimental));
+        Helpers.UiAnimations.CountUp(SecurityCount, recommendations.Count(r => r.Bucket == RecommendationBucket.SecuritySensitive));
+        Helpers.UiAnimations.CountUp(NotApplicableCount, recommendations.Count(r => r.Bucket == RecommendationBucket.NotApplicable));
 
         if (recommendations.Count == 0)
             NextStepText.Text = "Ejecute “Analizar sistema” para generar recomendaciones clasificadas por evidencia y riesgo.";

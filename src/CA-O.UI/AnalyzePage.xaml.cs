@@ -74,6 +74,7 @@ public sealed partial class AnalyzePage : Page
         }
         ApplyTexts();
         UpdateFreshnessBanner();
+        CAO.UI.Helpers.UiAnimations.PlayEntrance(PageContent);
     }
 
     private void UpdateFreshnessBanner()

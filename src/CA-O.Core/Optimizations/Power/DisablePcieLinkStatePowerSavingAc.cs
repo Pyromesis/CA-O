@@ -1,34 +1,22 @@
-using CAO.Core.Abstractions;
 using CAO.Shared;
 
 namespace CAO.Core.Optimizations.Power;
 
-/// <summary>
-/// Disables PCIe Link State Power Management on AC power.
-/// Prevents GPUs and PCIe devices from reducing speed during gaming.
-/// Modifies HKLM registry for PCI controller configuration.
-/// </summary>
-public sealed class DisablePcieLinkStatePowerSavingAc : RegistryOptimizationBase
+/// <summary>Disables PCIe Link State Power Management on AC via the active power scheme.</summary>
+public sealed class DisablePcieLinkStatePowerSavingAc : PowerAcSettingOptimization
 {
-    protected override IReadOnlyList<ValueTarget> Targets { get; } =
-        new[]
-        {
-            new ValueTarget(
-                RegistryHive2.LocalMachine,
-                @"SYSTEM\CurrentControlSet\Services\pci\Parameters",
-                "DisableLinkStateThrottling",
-                1, // 1 = Disabled throttling, 0 = Enabled
-                RegistryValueKind2.DWord)
-        };
+    protected override string SubGuid => "501a4d13-42af-4429-9fd1-a8218c268e1d";
+    protected override string SettingGuid => "ee12f906-d277-4bcf-ad6c-e5a569d7c83d";
+    protected override string TargetIndex => "0";
 
     public override OptimizationDefinition Definition => new()
     {
         Id = "disable-pcie-link-state-power-saving-ac",
         NameEs = "Deshabilitar ahorro de energía en PCIe en AC",
         NameEn = "Disable PCIe Link State Power Saving on AC",
-        DescriptionEs = "Deshabilita la gestión de energía del estado de enlace PCIe en AC. Previene que GPUs y dispositivos PCIe reduzcan velocidad durante gaming.",
-        DescriptionEn = "Disables PCIe Link State Power Management on AC. Prevents GPUs and PCIe devices from reducing speed during gaming.",
-        TooltipEs = "Modifica HKLM\\SYSTEM\\CurrentControlSet\\Services\\pci\\Parameters. Reversible via snapshot.",
+        DescriptionEs = "Deshabilita el ahorro de enlace PCIe en AC. Evita que la GPU reduzca velocidad.",
+        DescriptionEn = "Disables PCIe Link State saving on AC. Keeps the GPU at full speed.",
+        TooltipEs = "powercfg /setacvalueindex PCIEXPRESS + activación del plan. Solo AC. Reversible exacto.",
         Category = OptimizationCategory.Performance,
         ExpectedImpact = PerformanceImpact.Small,
         Evidence = EvidenceLevel.Official,
@@ -39,10 +27,4 @@ public sealed class DisablePcieLinkStatePowerSavingAc : RegistryOptimizationBase
         SecurityImpact = SecurityImpact.None,
         Impact = ImpactLevel.Medium,
     };
-
-    public override Task<OperationResult> ApplyAsync(OptimizationContext context, CancellationToken ct = default)
-    {
-        WriteTargets(context);
-        return Task.FromResult(OperationResult.Ok("Gestión de energía PCIe deshabilitada en AC."));
-    }
 }

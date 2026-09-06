@@ -105,6 +105,7 @@ public sealed partial class SettingsPage : Page
         ApplyTexts();
         SyncViewModelFromSharedState();
         RenderServiceState();
+        Helpers.UiAnimations.PlayEntrance(PageContent);
         // Si aún no hay verificación en memoria, comprobar una sola vez al entrar (sin pedir clic).
         _ = AutoCheckServiceIfNeededAsync();
     }

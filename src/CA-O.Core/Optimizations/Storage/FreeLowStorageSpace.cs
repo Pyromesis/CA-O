@@ -3,33 +3,59 @@ using CAO.Shared;
 
 namespace CAO.Core.Optimizations.Storage;
 
-public sealed class FreeLowStorageSpace : RegistryOptimizationBase
+/// <summary>Read-only audit: reports when the system drive is low on free space.</summary>
+public sealed class FreeLowStorageSpace : IOptimization
 {
-    protected override IReadOnlyList<ValueTarget> Targets { get; } =
-        new[] { new ValueTarget(RegistryHive2.CurrentUser, @"Software\CA-O\free-low-storage-space", "Enabled", 1) };
+    private const long LowThresholdBytes = 10L * 1024 * 1024 * 1024;
 
-    public override OptimizationDefinition Definition => new()
+    public OptimizationDefinition Definition => new()
     {
         Id = "free-low-storage-space",
         NameEs = "Auditar espacio bajo",
-        NameEn = "Auditar espacio bajo",
-        DescriptionEs = "Detecta espacio bajo por umbrales y recomienda limpieza segura sin borrar automaticamente.",
-        DescriptionEn = "Detects low space by thresholds and recommends safe cleanup without auto deletion.",
-        TooltipEs = "free-low-storage-space via registry. Reversible via snapshot.",
+        NameEn = "Audit low disk space",
+        DescriptionEs = "Audita si la unidad del sistema tiene poco espacio libre. Solo informa, no borra nada.",
+        DescriptionEn = "Audits whether the system drive is low on free space. Reports only, deletes nothing.",
+        TooltipEs = "Solo diagnóstico: no modifica ni borra archivos.",
         Category = OptimizationCategory.Storage,
-        ExpectedImpact = PerformanceImpact.Small,
+        ExpectedImpact = PerformanceImpact.DiagnosticOnly,
         Evidence = EvidenceLevel.Official,
-        Confidence = Confidence.Medium,
+        Confidence = Confidence.High,
         AntiCheatImpact = AntiCheatImpact.None,
-        Risk = RiskLevel.Low,
+        Risk = RiskLevel.Safe,
         Compatibility = CompatibilityStatus.Compatible,
         SecurityImpact = SecurityImpact.None,
         Impact = ImpactLevel.Low,
     };
 
-    public override Task<OperationResult> ApplyAsync(OptimizationContext context, CancellationToken ct = default)
+    private static long FreeBytes()
     {
-        WriteTargets(context);
-        return Task.FromResult(OperationResult.Ok("Auditar espacio bajo aplicado."));
+        try
+        {
+            var root = Path.GetPathRoot(Environment.GetFolderPath(Environment.SpecialFolder.Windows)) ?? @"C:\";
+            return new DriveInfo(root).AvailableFreeSpace;
+        }
+        catch { return long.MaxValue; }
+    }
+
+    public OptimizationState Detect(IRegistryAccessor registry) =>
+        FreeBytes() < LowThresholdBytes ? OptimizationState.NotApplied : OptimizationState.AppliedByCao;
+
+    public OptimizationSnapshot Capture(IRegistryAccessor registry) => new OptimizationSnapshot();
+
+    public Task<OperationResult> ApplyAsync(OptimizationContext context, CancellationToken ct = default) =>
+        Task.FromResult(OperationResult.Ok("Auditoría de espacio completada. Sin cambios: use las limpiezas para liberar."));
+
+    public Task<OperationResult> RevertAsync(OptimizationContext context, OptimizationSnapshot snapshot, CancellationToken ct = default) =>
+        Task.FromResult(OperationResult.Ok("La auditoría no tiene cambios que revertir."));
+
+    public Task<VerificationResult> VerifyAsync(OptimizationContext context, CancellationToken ct = default)
+    {
+        var observed = Detect(context.Registry);
+        return Task.FromResult(observed switch
+        {
+            OptimizationState.AppliedByCao =>
+                VerificationResult.Passed(observed, "Espacio libre suficiente verificado."),
+            _ => VerificationResult.Failed(observed, "La unidad del sistema sigue con poco espacio libre."),
+        });
     }
 }

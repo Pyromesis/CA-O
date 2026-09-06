@@ -49,6 +49,7 @@ public sealed class E2EFlowsTests
         public void SetValueRaw(RegistryHive2 h, string p, string n, object v, RegistryValueKind2 k) { }
         public bool DeleteValue(RegistryHive2 h, string p, string n) => false;
         public IReadOnlyList<string> GetValueNames(RegistryHive2 h, string p) => Array.Empty<string>();
+        public IReadOnlyList<string> GetSubKeyNames(RegistryHive2 h, string p) => Array.Empty<string>();
     }
 
     private static string NewTempDir() => Directory.CreateTempSubdirectory($"cao-e2e-{Guid.NewGuid():N}").FullName;

@@ -92,6 +92,7 @@ public sealed partial class OptimizePage : Page
         base.OnNavigatedTo(e);
         ApplyTexts();
         Render();
+        CAO.UI.Helpers.UiAnimations.PlayEntrance(PageContent);
     }
 
     private void Render()
@@ -323,23 +324,26 @@ public sealed partial class OptimizePage : Page
 
     /// <summary>
     /// Única regla de bloqueo: bucket no-Recommended sin Modo Expert, hardware
-    /// incompatible o conflicto anti-cheat, o cambio ya aplicado. La comparten la
-    /// tarjeta, el diálogo de Detalles y el guard de Aplicar.
+    /// incompatible, conflicto anti-cheat, cambio ya aplicado o auditoría de solo
+    /// diagnóstico. La comparten la tarjeta, el diálogo de Detalles y el guard.
     /// </summary>
     private static (bool IsLocked, string LockReason) EvaluateLock(Recommendation recommendation, bool expertMode)
     {
         bool isLocked = recommendation.Bucket != RecommendationBucket.Recommended && !expertMode;
         if (recommendation.Compatibility == CompatibilityStatus.Incompatible) isLocked = true;
         if (recommendation.AntiCheatConflictRisk) isLocked = true;
-        string lockReason = recommendation.Bucket switch
-        {
-            RecommendationBucket.Optional => Localizer.Get("optimize.lockedOptional"),
-            RecommendationBucket.Experimental => Localizer.Get("optimize.lockedExperimental"),
-            RecommendationBucket.SecuritySensitive => Localizer.Get("optimize.lockedSecurity"),
-            _ when recommendation.AntiCheatConflictRisk => Localizer.Get("optimize.lockedAntiCheat"),
-            _ when recommendation.Compatibility == CompatibilityStatus.Incompatible => Localizer.Get("optimize.lockedIncompatible"),
-            _ => string.Empty
-        };
+        if (recommendation.ExpectedImpact == PerformanceImpact.DiagnosticOnly) isLocked = true;
+        string lockReason = recommendation.ExpectedImpact == PerformanceImpact.DiagnosticOnly
+            ? Localizer.Get("optimize.lockedDiagnostic")
+            : recommendation.Bucket switch
+            {
+                RecommendationBucket.Optional => Localizer.Get("optimize.lockedOptional"),
+                RecommendationBucket.Experimental => Localizer.Get("optimize.lockedExperimental"),
+                RecommendationBucket.SecuritySensitive => Localizer.Get("optimize.lockedSecurity"),
+                _ when recommendation.AntiCheatConflictRisk => Localizer.Get("optimize.lockedAntiCheat"),
+                _ when recommendation.Compatibility == CompatibilityStatus.Incompatible => Localizer.Get("optimize.lockedIncompatible"),
+                _ => string.Empty
+            };
         return (isLocked, lockReason);
     }
 

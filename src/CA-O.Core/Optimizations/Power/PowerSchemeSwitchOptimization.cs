@@ -3,34 +3,25 @@ using CAO.Core.Abstractions;
 using CAO.Shared;
 using CAO.Shared.Security;
 
-namespace CAO.Core.Optimizations.Gaming;
+namespace CAO.Core.Optimizations.Power;
 
 /// <summary>
-/// Activates the hidden Ultimate Performance plan for gaming on AC power,
-/// creating it first when missing. Captures the previous scheme for revert.
+/// Base para activar un plan de energía real (powercfg /setactive) capturando
+/// el esquema previo para restaurarlo exacto al revertir.
 /// </summary>
-public sealed class ConfigureGamingPowerModeAc : IOptimization
+public abstract class PowerSchemeSwitchOptimization : IOptimization
 {
-    public const string UltimatePerformanceGuid = "e9a42b02-d5df-448d-aa00-03f14749eb61";
+    public abstract OptimizationDefinition Definition { get; }
 
-    public OptimizationDefinition Definition => new()
+    protected abstract string TargetScheme { get; }
+    protected abstract string TargetLabel { get; }
+
+    private static string? ParseActiveScheme(string output)
     {
-        Id = "configure-gaming-power-mode-ac",
-        NameEs = "Plan Rendimiento máximo en AC para juegos",
-        NameEn = "Ultimate Performance plan on AC for gaming",
-        DescriptionEs = "Activa el plan oculto Rendimiento máximo con powercfg en AC. Nunca se aplica en batería.",
-        DescriptionEn = "Activates the hidden Ultimate Performance plan via powercfg on AC. Never on battery.",
-        TooltipEs = "Duplica el esquema Ultimate si falta y lo activa. Guarda el previo para revertir.",
-        Category = OptimizationCategory.Gaming,
-        ExpectedImpact = PerformanceImpact.WorkloadDependent,
-        Evidence = EvidenceLevel.Official,
-        Confidence = Confidence.High,
-        AntiCheatImpact = AntiCheatImpact.None,
-        Risk = RiskLevel.Low,
-        Compatibility = CompatibilityStatus.Compatible,
-        SecurityImpact = SecurityImpact.None,
-        Impact = ImpactLevel.Medium,
-    };
+        var match = Regex.Match(output,
+            @"Power Scheme GUID:\s*([0-9a-fA-F-]{36})", RegexOptions.IgnoreCase);
+        return match.Success ? match.Groups[1].Value : null;
+    }
 
     public OptimizationState Detect(IRegistryAccessor registry) => OptimizationState.NotApplied;
 
@@ -43,17 +34,14 @@ public sealed class ConfigureGamingPowerModeAc : IOptimization
 
         var current = await context.Executor.ExecuteAsync(
             SystemCommandKey.PowerCfgQueryActiveScheme, ["/getactivescheme"], ct);
-        _lastPrevious = current.Success ? ParseScheme(current.StdOut) : null;
-
-        await context.Executor.ExecuteAsync(
-            SystemCommandKey.PowerCfgDuplicateScheme, ["/duplicatescheme", UltimatePerformanceGuid], ct);
+        _lastPrevious = current.Success ? ParseActiveScheme(current.StdOut) : null;
 
         var set = await context.Executor.ExecuteAsync(
-            SystemCommandKey.PowerCfgSetActiveScheme, ["/setactive", UltimatePerformanceGuid], ct);
+            SystemCommandKey.PowerCfgSetActiveScheme, ["/setactive", TargetScheme], ct);
         if (!set.Success)
-            return OperationResult.Fail("No se pudo activar el plan Rendimiento máximo.", set.StdErr);
+            return OperationResult.Fail($"No se pudo activar el plan {TargetLabel}.", set.StdErr);
 
-        return OperationResult.Ok("Plan Rendimiento máximo activado para gaming en AC.");
+        return OperationResult.Ok($"Plan {TargetLabel} activado.");
     }
 
     public async Task<OperationResult> RevertAsync(OptimizationContext context, OptimizationSnapshot snapshot, CancellationToken ct = default)
@@ -83,15 +71,13 @@ public sealed class ConfigureGamingPowerModeAc : IOptimization
         if (!query.Success)
             return VerificationResult.Unknown(OptimizationState.Unknown, "No se pudo consultar el plan: " + query.StdErr);
 
-        return query.StdOut.Contains(UltimatePerformanceGuid, StringComparison.OrdinalIgnoreCase)
-            ? VerificationResult.Passed(OptimizationState.AppliedByCao, "Plan Rendimiento máximo verificado activo.")
-            : VerificationResult.Failed(OptimizationState.NotApplied, "El plan activo no es Rendimiento máximo.");
+        return query.StdOut.Contains(TargetScheme, StringComparison.OrdinalIgnoreCase)
+            ? VerificationResult.Passed(OptimizationState.AppliedByCao, $"Plan {TargetLabel} verificado activo.")
+            : VerificationResult.Failed(OptimizationState.NotApplied, "El plan activo no coincide tras aplicar.");
     }
 
-    public Task<PreconditionResult> CheckPreconditionsAsync(SystemContext context, CancellationToken ct = default) =>
-        Task.FromResult(context.OnBattery
-            ? PreconditionResult.Fail("Solo con alimentación AC.")
-            : PreconditionResult.Ok("Con alimentación AC."));
+    public virtual Task<PreconditionResult> CheckPreconditionsAsync(SystemContext context, CancellationToken ct = default) =>
+        Task.FromResult(PreconditionResult.Ok("Sin precondiciones específicas."));
 
     public Task<OptimizationPreview> PreviewAsync(IRegistryAccessor registry, CancellationToken ct = default) =>
         Task.FromResult(new OptimizationPreview
@@ -102,22 +88,15 @@ public sealed class ConfigureGamingPowerModeAc : IOptimization
                 new PreviewLine
                 {
                     Kind = "PowerCfg",
-                    Target = $"powercfg /setactive {UltimatePerformanceGuid}",
+                    Target = $"powercfg /setactive {TargetScheme}",
                     Before = "plan actual",
-                    After = "Rendimiento máximo",
+                    After = TargetLabel,
                 },
             ],
             Risk = Definition.Risk,
             SecurityImpact = Definition.SecurityImpact,
             Flags = Definition.Flags,
         });
-
-    private static string? ParseScheme(string output)
-    {
-        var match = Regex.Match(output,
-            @"Power Scheme GUID:\s*([0-9a-fA-F-]{36})", RegexOptions.IgnoreCase);
-        return match.Success ? match.Groups[1].Value : null;
-    }
 
     private string? _lastPrevious;
 }

@@ -1,35 +1,33 @@
-using CAO.Core.Abstractions;
+using CAO.Core.Optimizations.Storage;
 using CAO.Shared;
 
 namespace CAO.Core.Optimizations.System;
 
-public sealed class StaleCrashDumpCleanup : RegistryOptimizationBase
+/// <summary>Deletes crash dumps older than 30 days from the system Minidump folder.</summary>
+public sealed class StaleCrashDumpCleanup : TempFileCleanupOptimization
 {
-    protected override IReadOnlyList<ValueTarget> Targets { get; } =
-        new[] { new ValueTarget(RegistryHive2.CurrentUser, @"Software\CA-O\stale-crash-dump-cleanup", "Enabled", 1) };
+    protected override IReadOnlyList<(string Directory, string Pattern, int OlderThanDays)> Targets { get; } =
+    [
+        (@"%SystemRoot%\Minidump", "*.dmp", 30),
+    ];
 
     public override OptimizationDefinition Definition => new()
     {
         Id = "stale-crash-dump-cleanup",
-        NameEs = "Limpiar dumps antiguos",
-        NameEn = "Limpiar dumps antiguos",
-        DescriptionEs = "Minidump/Memory.dmp >30 dias, muestra tamano. Beneficio: segun workload, ver evidencia.",
-        DescriptionEn = "Minidump/Memory.dmp >30 dias, muestra tamano.",
-        TooltipEs = "stale-crash-dump-cleanup via registry. Reversible via snapshot.",
+        NameEs = "Limpiar minidumps antiguos",
+        NameEn = "Cleanup stale crash dumps",
+        DescriptionEs = "Borra minivolcados de más de 30 días en la carpeta Minidump del sistema.",
+        DescriptionEn = "Deletes dumps older than 30 days from the system Minidump folder.",
+        TooltipEs = "Solo *.dmp con más de 30 días. Mantenimiento no reversible.",
         Category = OptimizationCategory.Storage,
         ExpectedImpact = PerformanceImpact.Tiny,
-        Evidence = EvidenceLevel.Heuristic,
-        Confidence = Confidence.Medium,
+        Evidence = EvidenceLevel.Official,
+        Confidence = Confidence.High,
         AntiCheatImpact = AntiCheatImpact.None,
         Risk = RiskLevel.Low,
         Compatibility = CompatibilityStatus.Compatible,
         SecurityImpact = SecurityImpact.None,
         Impact = ImpactLevel.Low,
+        Flags = OptimizationFlags.NotReversible,
     };
-
-    public override Task<OperationResult> ApplyAsync(OptimizationContext context, CancellationToken ct = default)
-    {
-        WriteTargets(context);
-        return Task.FromResult(OperationResult.Ok("Limpiar dumps antiguos aplicado."));
-    }
 }

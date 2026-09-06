@@ -1,38 +1,24 @@
-using CAO.Core.Abstractions;
 using CAO.Shared;
 
 namespace CAO.Core.Optimizations.Storage;
 
-public sealed class CleanupWindowsTemp : RegistryOptimizationBase
+/// <summary>Deletes system temp files older than 1 day (Windows Temp + service TEMP).</summary>
+public sealed class CleanupWindowsTemp : TempFileCleanupOptimization
 {
-    /// <summary>Configures automatic cleanup of Windows temporary files via registry policies.</summary>
-    protected override IReadOnlyList<ValueTarget> Targets { get; } =
-        new[]
-        {
-            // Enable temp file cleanup on exit
-            new ValueTarget(
-                RegistryHive2.CurrentUser,
-                @"Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer",
-                "CleanupWizardRunOnBoot",
-                1,
-                RegistryValueKind2.DWord),
-            // Enable disk cleanup suggestions
-            new ValueTarget(
-                RegistryHive2.CurrentUser,
-                @"Software\\Microsoft\\Windows\\CurrentVersion\\Explorer",
-                "EnableAutoTray",
-                0,
-                RegistryValueKind2.DWord)
-        };
+    protected override IReadOnlyList<(string Directory, string Pattern, int OlderThanDays)> Targets { get; } =
+    [
+        (@"%SystemRoot%\Temp", "*.*", 1),
+        (@"%TEMP%", "*.*", 1),
+    ];
 
     public override OptimizationDefinition Definition => new()
     {
         Id = "cleanup-windows-temp",
         NameEs = "Limpiar archivos temporales de Windows",
         NameEn = "Cleanup Windows temporary files",
-        DescriptionEs = "Configura limpieza automática de archivos temporales de Windows mediante políticas de registro.",
-        DescriptionEn = "Configures automatic cleanup of Windows temporary files via registry policies.",
-        TooltipEs = "Modifica HKCU\\Software\\Microsoft\\Windows\\CurrentVersion. Reversible via snapshot.",
+        DescriptionEs = "Borra ficheros temporales del sistema con más de un día. Omite los que estén en uso.",
+        DescriptionEn = "Deletes system temp files older than one day. Skips files in use.",
+        TooltipEs = "Borra en la carpeta Temp de Windows y TEMP del servicio. Mantenimiento no reversible.",
         Category = OptimizationCategory.Storage,
         ExpectedImpact = PerformanceImpact.Small,
         Evidence = EvidenceLevel.Official,
@@ -42,11 +28,6 @@ public sealed class CleanupWindowsTemp : RegistryOptimizationBase
         Compatibility = CompatibilityStatus.Compatible,
         SecurityImpact = SecurityImpact.None,
         Impact = ImpactLevel.Low,
+        Flags = OptimizationFlags.NotReversible,
     };
-
-    public override Task<OperationResult> ApplyAsync(OptimizationContext context, CancellationToken ct = default)
-    {
-        WriteTargets(context);
-        return Task.FromResult(OperationResult.Ok("Limpieza de archivos temporales configurada."));
-    }
 }

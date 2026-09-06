@@ -68,8 +68,34 @@ public sealed class EnableWindowedGameOptimizations : IOptimization
 
     public Task<OperationResult> ApplyAsync(OptimizationContext context, CancellationToken ct = default)
     {
-        context.Registry.SetValue(RegistryHive2.CurrentUser, KeyPath, ValueName, EnabledValue, RegistryValueKind2.String);
+        var current = context.Registry.GetValue(RegistryHive2.CurrentUser, KeyPath, ValueName) as string;
+        context.Registry.SetValue(RegistryHive2.CurrentUser, KeyPath, ValueName, MergeEnabled(current), RegistryValueKind2.String);
         return Task.FromResult(OperationResult.Ok("Optimizaciones para juegos en ventana activadas. Reinicie el juego para que surta efecto."));
+    }
+
+    /// <summary>
+    /// Activa SwapEffectUpgradeEnable conservando el resto del valor combinado
+    /// (VRR, preferencia de GPU). Nunca destruye ajustes coexistentes.
+    /// </summary>
+    private static string MergeEnabled(string? currentValue)
+    {
+        if (string.IsNullOrWhiteSpace(currentValue))
+        {
+            return EnabledValue;
+        }
+
+        var match = Regex.Match(currentValue, @"SwapEffectUpgradeEnable\s*=\s*[01]", RegexOptions.IgnoreCase);
+        if (match.Success)
+        {
+            return Regex.Replace(currentValue, @"SwapEffectUpgradeEnable\s*=\s*[01]", "SwapEffectUpgradeEnable=1", RegexOptions.IgnoreCase);
+        }
+
+        var trimmed = currentValue.TrimEnd(';', ' ');
+        if (string.IsNullOrEmpty(trimmed))
+        {
+            return EnabledValue;
+        }
+        return trimmed + ";" + EnabledValue;
     }
 
     public async Task<OperationResult> RevertAsync(OptimizationContext context, OptimizationSnapshot snapshot, CancellationToken ct = default)

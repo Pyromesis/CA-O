@@ -1,34 +1,22 @@
-using CAO.Core.Abstractions;
 using CAO.Shared;
 
 namespace CAO.Core.Optimizations.Power;
 
-/// <summary>
-/// Sets wireless network adapter to maximum performance mode on AC power.
-/// Reduces WiFi latency and increases throughput for online gaming.
-/// Modifies HKLM registry for network adapter power configuration.
-/// </summary>
-public sealed class SetWirelessAdapterMaxPerformanceAc : RegistryOptimizationBase
+/// <summary>Sets the wireless adapter to maximum performance on AC via the active power scheme.</summary>
+public sealed class SetWirelessAdapterMaxPerformanceAc : PowerAcSettingOptimization
 {
-    protected override IReadOnlyList<ValueTarget> Targets { get; } =
-        new[]
-        {
-            new ValueTarget(
-                RegistryHive2.LocalMachine,
-                @"SYSTEM\CurrentControlSet\Services\NETwCx\Parameters",
-                "PowerSavingMode",
-                0, // 0 = Maximum Performance, 1 = Power Saving, 2 = Balanced
-                RegistryValueKind2.DWord)
-        };
+    protected override string SubGuid => "19cbb8fa-5279-450e-9fac-8a3d5fedd0c1";
+    protected override string SettingGuid => "12bbebe6-58d6-4636-95bb-3217ef867c1a";
+    protected override string TargetIndex => "0";
 
     public override OptimizationDefinition Definition => new()
     {
         Id = "set-wireless-adapter-max-performance-ac",
         NameEs = "Adaptador WiFi a máximo rendimiento en AC",
         NameEn = "Wireless adapter maximum performance on AC",
-        DescriptionEs = "Configura el adaptador WiFi a máximo rendimiento en AC. Reduce latencia WiFi e incrementa throughput para gaming en línea.",
-        DescriptionEn = "Sets wireless adapter to maximum performance on AC power. Reduces WiFi latency and increases throughput for online gaming.",
-        TooltipEs = "Modifica HKLM\\SYSTEM\\CurrentControlSet\\Services\\NETwCx\\Parameters. Reversible via snapshot.",
+        DescriptionEs = "Pone el adaptador WiFi a máximo rendimiento en AC. Reduce latencia en red inalámbrica.",
+        DescriptionEn = "Sets the wireless adapter to maximum performance on AC. Lowers wireless latency.",
+        TooltipEs = "powercfg /setacvalueindex wireless + activación del plan. Solo AC. Reversible exacto.",
         Category = OptimizationCategory.Performance,
         ExpectedImpact = PerformanceImpact.Small,
         Evidence = EvidenceLevel.Official,
@@ -39,10 +27,4 @@ public sealed class SetWirelessAdapterMaxPerformanceAc : RegistryOptimizationBas
         SecurityImpact = SecurityImpact.None,
         Impact = ImpactLevel.Low,
     };
-
-    public override Task<OperationResult> ApplyAsync(OptimizationContext context, CancellationToken ct = default)
-    {
-        WriteTargets(context);
-        return Task.FromResult(OperationResult.Ok("Adaptador WiFi configurado a máximo rendimiento en AC."));
-    }
 }

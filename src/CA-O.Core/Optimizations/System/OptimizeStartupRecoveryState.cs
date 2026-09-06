@@ -3,33 +3,61 @@ using CAO.Shared;
 
 namespace CAO.Core.Optimizations.System;
 
-public sealed class OptimizeStartupRecoveryState : RegistryOptimizationBase
+/// <summary>Read-only audit: checks automatic restart on system failure is enabled.</summary>
+public sealed class OptimizeStartupRecoveryState : IOptimization
 {
-    protected override IReadOnlyList<ValueTarget> Targets { get; } =
-        new[] { new ValueTarget(RegistryHive2.CurrentUser, @"Software\CA-O\optimize-startup-recovery-state", "Enabled", 1) };
+    private const string KeyPath = @"SYSTEM\CurrentControlSet\Control\CrashControl";
 
-    public override OptimizationDefinition Definition => new()
+    public OptimizationDefinition Definition => new()
     {
         Id = "optimize-startup-recovery-state",
         NameEs = "Auditar recuperacion de inicio",
-        NameEn = "Auditar recuperacion de inicio",
-        DescriptionEs = "Detecta timeout, entradas invalidas, solo Detect/Explain. Beneficio: segun workload, ver evidencia.",
-        DescriptionEn = "Detecta timeout, entradas invalidas, solo Detect/Explain.",
-        TooltipEs = "optimize-startup-recovery-state via registry. Reversible via snapshot.",
+        NameEn = "Audit startup recovery",
+        DescriptionEs = "Audita el reinicio automático ante fallo del sistema. Solo informa, no modifica nada.",
+        DescriptionEn = "Audits automatic restart on system failure. Reports only, changes nothing.",
+        TooltipEs = "Solo diagnóstico: lee CrashControl AutoReboot.",
         Category = OptimizationCategory.Storage,
-        ExpectedImpact = PerformanceImpact.None,
+        ExpectedImpact = PerformanceImpact.DiagnosticOnly,
         Evidence = EvidenceLevel.Official,
-        Confidence = Confidence.Medium,
+        Confidence = Confidence.High,
         AntiCheatImpact = AntiCheatImpact.None,
-        Risk = RiskLevel.Low,
+        Risk = RiskLevel.Safe,
         Compatibility = CompatibilityStatus.Compatible,
         SecurityImpact = SecurityImpact.None,
         Impact = ImpactLevel.Low,
     };
 
-    public override Task<OperationResult> ApplyAsync(OptimizationContext context, CancellationToken ct = default)
+    public OptimizationState Detect(IRegistryAccessor registry)
     {
-        WriteTargets(context);
-        return Task.FromResult(OperationResult.Ok("Auditar recuperacion de inicio aplicado."));
+        var autoReboot = registry.GetValue(RegistryHive2.LocalMachine, KeyPath, "AutoReboot");
+        return Normalize(autoReboot) == 1 ? OptimizationState.AppliedByCao : OptimizationState.NotApplied;
     }
+
+    public OptimizationSnapshot Capture(IRegistryAccessor registry) => new OptimizationSnapshot();
+
+    public Task<OperationResult> ApplyAsync(OptimizationContext context, CancellationToken ct = default) =>
+        Task.FromResult(OperationResult.Ok("Auditoría de recuperación completada. Sin cambios."));
+
+    public Task<OperationResult> RevertAsync(OptimizationContext context, OptimizationSnapshot snapshot, CancellationToken ct = default) =>
+        Task.FromResult(OperationResult.Ok("La auditoría no tiene cambios que revertir."));
+
+    public Task<VerificationResult> VerifyAsync(OptimizationContext context, CancellationToken ct = default)
+    {
+        var observed = Detect(context.Registry);
+        return Task.FromResult(observed switch
+        {
+            OptimizationState.AppliedByCao =>
+                VerificationResult.Passed(observed, "Reinicio automático ante fallo verificado activo."),
+            _ => VerificationResult.Failed(observed, "Reinicio automático ante fallo desactivado."),
+        });
+    }
+
+    private static long? Normalize(object? value) => value switch
+    {
+        int i => i,
+        uint u => u,
+        long l => l,
+        string s => long.TryParse(s.Trim(), out var parsed) ? parsed : null,
+        _ => null,
+    };
 }

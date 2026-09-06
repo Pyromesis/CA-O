@@ -1,21 +1,23 @@
-using CAO.Core.Abstractions;
 using CAO.Shared;
 
 namespace CAO.Core.Optimizations.Network;
 
-public sealed class ConfigureInterruptModerationForLowLatency : RegistryOptimizationBase
+/// <summary>Disables interrupt moderation on physical NICs that expose the setting.</summary>
+public sealed class ConfigureInterruptModerationForLowLatency : NicAdvancedPropertyOptimization
 {
-    protected override IReadOnlyList<ValueTarget> Targets { get; } =
-        new[] { new ValueTarget(RegistryHive2.CurrentUser, @"Software\CA-O\configure-interrupt-moderation-for-low-latency", "Enabled", 1) };
+    protected override string[] PropertyNames { get; } = ["*InterruptModeration"];
+
+    protected override string EnabledText => "0";
+    protected override string DisabledText => "1";
 
     public override OptimizationDefinition Definition => new()
     {
         Id = "configure-interrupt-moderation-for-low-latency",
         NameEs = "Moderar interrupciones para baja latencia",
-        NameEn = "Moderar interrupciones para baja latencia",
-        DescriptionEs = "Solo Competitive/LowLatency, muestra CPU Tradeoff. Beneficio: segun workload, ver evidencia.",
-        DescriptionEn = "Solo Competitive/LowLatency, muestra CPU Tradeoff.",
-        TooltipEs = "configure-interrupt-moderation-for-low-latency via registry. Reversible via snapshot.",
+        NameEn = "Set interrupt moderation for low latency",
+        DescriptionEs = "Desactiva la moderación de interrupciones en NICs físicas que exponen el ajuste. Aumenta uso de CPU.",
+        DescriptionEn = "Disables interrupt moderation on physical NICs exposing the setting. Increases CPU usage.",
+        TooltipEs = "Modifica *InterruptModeration=0 solo donde ya existe. Reversible exacto. Solo perfil Competitive.",
         Category = OptimizationCategory.Network,
         ExpectedImpact = PerformanceImpact.WorkloadDependent,
         Evidence = EvidenceLevel.Vendor,
@@ -26,10 +28,4 @@ public sealed class ConfigureInterruptModerationForLowLatency : RegistryOptimiza
         SecurityImpact = SecurityImpact.None,
         Impact = ImpactLevel.Low,
     };
-
-    public override Task<OperationResult> ApplyAsync(OptimizationContext context, CancellationToken ct = default)
-    {
-        WriteTargets(context);
-        return Task.FromResult(OperationResult.Ok("Moderar interrupciones para baja latencia aplicado."));
-    }
 }

@@ -34,6 +34,9 @@ public interface IRegistryAccessor
 
     /// <summary>Returns all value names under a key (empty when the key is missing).</summary>
     IReadOnlyList<string> GetValueNames(RegistryHive2 hive, string keyPath);
+
+    /// <summary>Returns all subkey names under a key (empty when the key is missing).</summary>
+    IReadOnlyList<string> GetSubKeyNames(RegistryHive2 hive, string keyPath);
 }
 
 /// <summary>Hive abstraction (maps to Microsoft.Win32.RegistryHive).</summary>

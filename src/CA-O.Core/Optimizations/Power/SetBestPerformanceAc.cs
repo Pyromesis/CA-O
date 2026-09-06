@@ -3,40 +3,20 @@ using CAO.Shared;
 
 namespace CAO.Core.Optimizations.Power;
 
-/// <summary>
-/// Sets Windows to prioritize High Performance mode settings on AC power.
-/// Modifies HKCU registry to disable power savings on AC.
-/// Official Windows registry configuration (documented in MS-Windows-Power-Control).
-/// </summary>
-public sealed class SetBestPerformanceAc : RegistryOptimizationBase
+/// <summary>Activates the High Performance power plan on AC power.</summary>
+public sealed class SetBestPerformanceAc : PowerSchemeSwitchOptimization
 {
-    protected override IReadOnlyList<ValueTarget> Targets { get; } =
-        new[]
-        {
-            // Disable hard disk timeout on AC (keeps disk active)
-            new ValueTarget(
-                RegistryHive2.CurrentUser,
-                @"Control Panel\PowerCfg\PowerPolicies\0",
-                "ConservationIdleTimeout",
-                0, // 0 = Never timeout
-                RegistryValueKind2.DWord),
-            // Disable monitor timeout on AC
-            new ValueTarget(
-                RegistryHive2.CurrentUser,
-                @"Control Panel\PowerCfg\PowerPolicies\0",
-                "VideoTimeout",
-                0, // 0 = Never timeout
-                RegistryValueKind2.DWord)
-        };
+    protected override string TargetScheme => "SCHEME_MAX";
+    protected override string TargetLabel => "Alto rendimiento";
 
     public override OptimizationDefinition Definition => new()
     {
         Id = "set-best-performance-ac",
         NameEs = "Modo Alto Rendimiento en AC",
         NameEn = "High Performance mode on AC power",
-        DescriptionEs = "Deshabilita suspensión de disco y pantalla en AC para máximo rendimiento. Solo aplica cuando está conectado.",
-        DescriptionEn = "Disables disk and monitor suspension on AC for maximum performance. Only applies when plugged in.",
-        TooltipEs = "Modifica HKCU\\Control Panel\\PowerCfg\\PowerPolicies. Reversible via snapshot.",
+        DescriptionEs = "Activa el plan Alto rendimiento con powercfg. Solo aplica cuando está conectado.",
+        DescriptionEn = "Activates the High performance plan via powercfg. Only applies when plugged in.",
+        TooltipEs = "Ejecuta powercfg /setactive SCHEME_MAX y restaura el previo al revertir.",
         Category = OptimizationCategory.Performance,
         ExpectedImpact = PerformanceImpact.Small,
         Evidence = EvidenceLevel.Official,
@@ -48,9 +28,8 @@ public sealed class SetBestPerformanceAc : RegistryOptimizationBase
         Impact = ImpactLevel.Medium,
     };
 
-    public override Task<OperationResult> ApplyAsync(OptimizationContext context, CancellationToken ct = default)
-    {
-        WriteTargets(context);
-        return Task.FromResult(OperationResult.Ok("Modo Alto Rendimiento configurado en AC."));
-    }
+    public override Task<PreconditionResult> CheckPreconditionsAsync(SystemContext context, CancellationToken ct = default) =>
+        Task.FromResult(context.OnBattery
+            ? PreconditionResult.Fail("Solo con alimentación AC.")
+            : PreconditionResult.Ok("Con alimentación AC."));
 }

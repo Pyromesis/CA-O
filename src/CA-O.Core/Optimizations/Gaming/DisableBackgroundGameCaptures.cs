@@ -4,8 +4,7 @@ using CAO.Shared;
 namespace CAO.Core.Optimizations.Gaming;
 
 /// <summary>
-/// Disables background Game DVR captures to reduce memory/CPU overhead.
-/// Modifies HKCU\Software\Microsoft\GameBar registry settings.
+/// Disables Game DVR background recording (historical capture) switches.
 /// </summary>
 public sealed class DisableBackgroundGameCaptures : RegistryOptimizationBase
 {
@@ -14,9 +13,15 @@ public sealed class DisableBackgroundGameCaptures : RegistryOptimizationBase
         {
             new ValueTarget(
                 RegistryHive2.CurrentUser,
-                @"Software\Microsoft\GameBar",
-                "UseNativeRuntime",
-                0, // 0 = Disabled, 1 = Enabled
+                @"Software\Microsoft\Windows\CurrentVersion\GameDVR",
+                "HistoricalCaptureEnabled",
+                0,
+                RegistryValueKind2.DWord),
+            new ValueTarget(
+                RegistryHive2.CurrentUser,
+                @"Software\Microsoft\Windows\CurrentVersion\GameDVR",
+                "HistoricalCaptureOnBattery",
+                0,
                 RegistryValueKind2.DWord)
         };
 
@@ -25,9 +30,9 @@ public sealed class DisableBackgroundGameCaptures : RegistryOptimizationBase
         Id = "disable-background-game-captures",
         NameEs = "Desactivar capturas en segundo plano de Game DVR",
         NameEn = "Disable background Game DVR captures",
-        DescriptionEs = "Deshabilita capturas automáticas en segundo plano de Game DVR. Reduce overhead de memoria y CPU si no usa grabación.",
-        DescriptionEn = "Disables automatic background Game DVR captures. Reduces memory and CPU overhead if not recording.",
-        TooltipEs = "Modifica HKCU\\Software\\Microsoft\\GameBar\\UseNativeRuntime. Reversible via snapshot.",
+        DescriptionEs = "Deshabilita la grabación histórica en segundo plano de Game DVR. Reduce overhead si no graba.",
+        DescriptionEn = "Disables Game DVR background historical recording. Reduces overhead when not recording.",
+        TooltipEs = "Establece HistoricalCaptureEnabled=0 e HistoricalCaptureOnBattery=0. Reversible via snapshot.",
         Category = OptimizationCategory.Gaming,
         ExpectedImpact = PerformanceImpact.Small,
         Evidence = EvidenceLevel.Vendor,

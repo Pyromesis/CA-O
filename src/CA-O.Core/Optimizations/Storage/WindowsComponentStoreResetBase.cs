@@ -1,35 +1,72 @@
 using CAO.Core.Abstractions;
 using CAO.Shared;
+using CAO.Shared.Security;
 
 namespace CAO.Core.Optimizations.Storage;
 
-public sealed class WindowsComponentStoreResetBase : RegistryOptimizationBase
+/// <summary>Runs DISM ResetBase. Expert-only, irreversible, removes update uninstall data.</summary>
+public sealed class WindowsComponentStoreResetBase : IOptimization
 {
-    protected override IReadOnlyList<ValueTarget> Targets { get; } =
-        new[] { new ValueTarget(RegistryHive2.CurrentUser, @"Software\CA-O\windows-component-store-resetbase", "Enabled", 1) };
+    private int? _lastExitCode;
 
-    public override OptimizationDefinition Definition => new()
+    public OptimizationDefinition Definition => new()
     {
         Id = "windows-component-store-resetbase",
         NameEs = "ResetBase Component Store",
         NameEn = "ResetBase Component Store",
-        DescriptionEs = "DISM /ResetBase, Expert, Irreversible, HighImpact. Beneficio: segun workload, ver evidencia.",
-        DescriptionEn = "DISM /ResetBase, Expert, Irreversible, HighImpact.",
-        TooltipEs = "windows-component-store-resetbase via registry. Reversible via snapshot.",
+        DescriptionEs = "Ejecuta DISM ResetBase y elimina la base de reversión de actualizaciones. Solo expertos.",
+        DescriptionEn = "Runs DISM ResetBase and removes update rollback data. Experts only.",
+        TooltipEs = "Ejecuta DISM /Online /Cleanup-Image /StartComponentCleanup /ResetBase. Irreversible: tras esto no se pueden desinstalar actualizaciones.",
         Category = OptimizationCategory.Storage,
         ExpectedImpact = PerformanceImpact.Moderate,
         Evidence = EvidenceLevel.Official,
-        Confidence = Confidence.Medium,
+        Confidence = Confidence.High,
         AntiCheatImpact = AntiCheatImpact.None,
         Risk = RiskLevel.High,
         Compatibility = CompatibilityStatus.Compatible,
         SecurityImpact = SecurityImpact.None,
-        Impact = ImpactLevel.Low,
+        Impact = ImpactLevel.Medium,
+        Reversible = false,
+        Flags = OptimizationFlags.NotReversible | OptimizationFlags.ExpertOnly,
     };
 
-    public override Task<OperationResult> ApplyAsync(OptimizationContext context, CancellationToken ct = default)
+    public OptimizationState Detect(IRegistryAccessor registry) => OptimizationState.NotApplied;
+
+    public OptimizationSnapshot Capture(IRegistryAccessor registry) => new OptimizationSnapshot();
+
+    public async Task<OperationResult> ApplyAsync(OptimizationContext context, CancellationToken ct = default)
     {
-        WriteTargets(context);
-        return Task.FromResult(OperationResult.Ok("ResetBase Component Store aplicado."));
+        if (context.Executor is null)
+            return OperationResult.Fail("Ejecutor no disponible.", "CAO-SEC-010");
+
+        var result = await context.Executor.ExecuteAsync(
+            SystemCommandKey.DismResetBase,
+            ["/Online", "/Cleanup-Image", "/StartComponentCleanup", "/ResetBase"], ct);
+        _lastExitCode = result.ExitCode;
+
+        return result.Success
+            ? OperationResult.Ok("ResetBase completado. Ya no se podrán desinstalar actualizaciones previas.")
+            : OperationResult.Fail("DISM ResetBase falló.", result.StdErr);
     }
+
+    public Task<OperationResult> RevertAsync(OptimizationContext context, OptimizationSnapshot snapshot, CancellationToken ct = default) =>
+        Task.FromResult(OperationResult.Fail(
+            "ResetBase no es reversible.",
+            "not-reversible"));
+
+    public Task<VerificationResult> VerifyAsync(OptimizationContext context, CancellationToken ct = default)
+    {
+        if (_lastExitCode is null)
+        {
+            return Task.FromResult(VerificationResult.Unknown(OptimizationState.Unknown,
+                "Sin evidencia de ejecución de DISM ResetBase."));
+        }
+
+        return Task.FromResult(_lastExitCode == 0
+            ? VerificationResult.Passed(OptimizationState.Unknown, "DISM ResetBase ejecutado con exit=0.")
+            : VerificationResult.Failed(OptimizationState.Unknown, $"DISM ResetBase terminó con exit={_lastExitCode}."));
+    }
+
+    public Task<PreconditionResult> CheckPreconditionsAsync(SystemContext context, CancellationToken ct = default) =>
+        Task.FromResult(PreconditionResult.Ok("Solo Modo Expert."));
 }
