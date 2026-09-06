@@ -62,6 +62,8 @@ public sealed partial class MainWindow : Window
         Nav.SelectedItem = Nav.MenuItems[0];
         // Kick off background service probe without blocking first frame (Fase 25).
         _ = ProbeServiceAsync();
+        // Chequeo de actualización en segundo plano: solo avisa, nunca descarga solo.
+        _ = CheckForUpdatesAsync();
     }
 
     private void ApplyLocalization()
@@ -203,6 +205,21 @@ public sealed partial class MainWindow : Window
         {
             var iconPath = Path.Combine(AppContext.BaseDirectory, "Assets", "app-icon.ico");
             if (File.Exists(iconPath)) AppWindow.SetIcon(iconPath);
+        }
+        catch { }
+    }
+
+    private async Task CheckForUpdatesAsync()
+    {
+        try
+        {
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(25));
+            var release = await Helpers.AppUpdater.CheckAsync(cts.Token);
+            if (release is null) return;
+            var uiState = AppHost.Resolve<ViewModels.UiState>();
+            uiState.LatestVersion = release.Tag;
+            uiState.LatestAssetUrl = release.ZipUrl ?? string.Empty;
+            uiState.UpdateAvailable = true;
         }
         catch { }
     }

@@ -18,11 +18,23 @@ public sealed partial class MainWindow : Window
     private readonly CancellationTokenSource _installCts = new();
     private readonly HttpClient _httpClient;
 
+    private readonly bool _autoUpdate;
+    private readonly string? _payloadOverrideDir;
+
     public MainWindow()
     {
         InitializeComponent();
         ExtendsContentIntoTitleBar = true;
         TrySetWindowIcon();
+        var args = Environment.GetCommandLineArgs();
+        _autoUpdate = args.Any(a => a.Equals("--auto-update", StringComparison.OrdinalIgnoreCase));
+        _payloadOverrideDir = args
+            .FirstOrDefault(a => a.StartsWith("--payload-dir=", StringComparison.OrdinalIgnoreCase))?
+            .Substring("--payload-dir=".Length).Trim('"');
+        if (_autoUpdate)
+        {
+            Loaded += (_, _) => _ = InstallAsync();
+        }
         var productVersion = CAO.Shared.Constants.BuildConstants.ProductVersion;
         Title = $"CA-O {productVersion} Setup";
         HeaderTitleText.Text = $"CA-O {productVersion} Setup";
@@ -107,8 +119,13 @@ private async Task InstallAsync()
             // Single-file: AppContext.BaseDirectory es temp de extracción, usar ProcessPath real
             var baseDir = Path.GetDirectoryName(Environment.ProcessPath ?? AppContext.BaseDirectory) ?? AppContext.BaseDirectory;
             var exeDir = AppContext.BaseDirectory;
-            var payloadUi = Path.Combine(baseDir, "ui", "CA-O.UI.exe");
-            var payloadService = Path.Combine(baseDir, "service", "CA-O.Privileged.exe");
+            // Auto-update: payload explícito del actualizador (carpeta con ui/ + service/).
+            var payloadUi = _payloadOverrideDir is not null
+                ? Path.Combine(_payloadOverrideDir, "ui", "CA-O.UI.exe")
+                : Path.Combine(baseDir, "ui", "CA-O.UI.exe");
+            var payloadService = _payloadOverrideDir is not null
+                ? Path.Combine(_payloadOverrideDir, "service", "CA-O.Privileged.exe")
+                : Path.Combine(baseDir, "service", "CA-O.Privileged.exe");
             // Fallbacks para layout de build local
             if (!File.Exists(payloadUi))
                 payloadUi = Path.Combine(exeDir, "ui", "CA-O.UI.exe");

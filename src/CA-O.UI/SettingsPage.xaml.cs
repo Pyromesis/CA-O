@@ -63,6 +63,9 @@ public sealed partial class SettingsPage : Page
                         SyncViewModelFromSharedState();
                         RenderServiceState();
                     });
+                if (e.PropertyName == nameof(ViewModels.UiState.UpdateAvailable) ||
+                    e.PropertyName == nameof(ViewModels.UiState.LatestVersion))
+                    DispatcherQueue.TryEnqueue(RenderUpdateState);
             };
 
             _uiState.LanguageChanged += (_, __) => DispatcherQueue.TryEnqueue(ApplyTexts);
@@ -105,6 +108,7 @@ public sealed partial class SettingsPage : Page
         ApplyTexts();
         SyncViewModelFromSharedState();
         RenderServiceState();
+        RenderUpdateState();
         Helpers.UiAnimations.PlayEntrance(PageContent);
         // Si aún no hay verificación en memoria, comprobar una sola vez al entrar (sin pedir clic).
         _ = AutoCheckServiceIfNeededAsync();
@@ -297,6 +301,142 @@ public sealed partial class SettingsPage : Page
             ServiceInstallButton.IsEnabled = true;
             ServiceCheckButton.IsEnabled = true;
         }
+    }
+
+    private void RenderUpdateState()
+    {
+        if (UpdateStatusText is null || _uiState is null) return;
+        var current = Helpers.AppUpdater.CurrentVersion;
+        if (_uiState.UpdateAvailable && !string.IsNullOrWhiteSpace(_uiState.LatestVersion))
+        {
+            UpdateStatusText.Text = $"Nueva versión disponible: {_uiState.LatestVersion} (instalada: {current})";
+            if (UpdateDownloadButton != null) UpdateDownloadButton.Visibility = Visibility.Visible;
+        }
+        else
+        {
+            UpdateStatusText.Text = $"Versión instalada: {current} (al día)";
+            if (UpdateDownloadButton != null && UpdateProgressBar.Visibility != Visibility.Visible)
+                UpdateDownloadButton.Visibility = Visibility.Collapsed;
+        }
+    }
+
+    private async void OnUpdateCheckClick(object sender, RoutedEventArgs e)
+    {
+        if (_uiState is null) return;
+        UpdateCheckButton.IsEnabled = false;
+        UpdateDetailText.Text = "Buscando actualizaciones...";
+        try
+        {
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(25));
+            var release = await Helpers.AppUpdater.CheckAsync(cts.Token);
+            if (release is null)
+            {
+                _uiState.UpdateAvailable = false;
+                UpdateDetailText.Text = "Ya tienes la última versión.";
+            }
+            else
+            {
+                _uiState.LatestVersion = release.Tag;
+                _uiState.LatestAssetUrl = release.ZipUrl ?? string.Empty;
+                _uiState.UpdateAvailable = true;
+                UpdateDetailText.Text = string.IsNullOrWhiteSpace(release.ZipUrl)
+                    ? $"Disponible {release.Tag}, pero sin paquete descargable: ábrelo en GitHub."
+                    : $"Disponible {release.Tag}. Pulsa Descargar e instalar.";
+            }
+            RenderUpdateState();
+        }
+        catch (Exception ex)
+        {
+            UpdateDetailText.Text = $"No se pudo comprobar: {ex.Message}";
+        }
+        finally { UpdateCheckButton.IsEnabled = true; }
+    }
+
+    private async void OnUpdateDownloadClick(object sender, RoutedEventArgs e)
+    {
+        if (_uiState is null) return;
+        if (!_uiState.UpdateAvailable || string.IsNullOrWhiteSpace(_uiState.LatestAssetUrl))
+        {
+            UpdateDetailText.Text = "No hay paquete descargable para esta versión.";
+            return;
+        }
+
+        var dialog = new ContentDialog
+        {
+            Title = $"Instalar {_uiState.LatestVersion}",
+            Content = "Se descargará el paquete completo, se abrirá el instalador (pide UAC) y esta app se cerrará. ¿Continuar?",
+            PrimaryButtonText = "Descargar e instalar",
+            CloseButtonText = "Cancelar",
+            DefaultButton = ContentDialogButton.Close,
+            XamlRoot = Content.XamlRoot,
+        };
+        if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
+
+        if (!IsInstalledLocation())
+        {
+            // Modo portable: abrir la release en el navegador para descarga manual.
+            Process.Start(new ProcessStartInfo($"https://github.com/Pyromesis/CA-O/releases/tag/{_uiState.LatestVersion}") { UseShellExecute = true });
+            UpdateDetailText.Text = "Modo portable: descarga el ZIP desde el navegador.";
+            return;
+        }
+
+        UpdateCheckButton.IsEnabled = false;
+        UpdateDownloadButton.IsEnabled = false;
+        UpdateProgressBar.Visibility = Visibility.Visible;
+        UpdateProgressBar.Value = 0;
+        UpdateDetailText.Text = "Descargando...";
+
+        try
+        {
+            var updateDir = Path.Combine(Path.GetTempPath(), "CA-O-update");
+            Directory.CreateDirectory(updateDir);
+            var zipPath = Path.Combine(updateDir, $"CA-O-{_uiState.LatestVersion}-win-x64.zip");
+            var progress = new Progress<double>(v => DispatcherQueue.TryEnqueue(() => UpdateProgressBar.Value = v * 100));
+            using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(30));
+            await Helpers.AppUpdater.DownloadAsync(_uiState.LatestAssetUrl, zipPath, progress, cts.Token);
+
+            UpdateDetailText.Text = "Extrayendo paquete...";
+            var payloadDir = Path.Combine(updateDir, "payload");
+            if (Directory.Exists(payloadDir)) Directory.Delete(payloadDir, recursive: true);
+            await Task.Run(() => System.IO.Compression.ZipFile.ExtractToDirectory(zipPath, payloadDir), cts.Token);
+
+            var installer = Path.Combine(payloadDir, "gui-installer", "CA-O.InstallerGui.exe");
+            if (!File.Exists(installer))
+            {
+                UpdateDetailText.Text = "El paquete no trae instalador.";
+                return;
+            }
+
+            UpdateDetailText.Text = "Abriendo instalador...";
+            Process.Start(new ProcessStartInfo(installer)
+            {
+                UseShellExecute = true,
+                Arguments = $"--auto-update --payload-dir=\"{payloadDir}\"",
+                WorkingDirectory = Path.GetDirectoryName(installer)!,
+            });
+            Application.Current.Exit();
+        }
+        catch (Exception ex)
+        {
+            UpdateDetailText.Text = $"Falló la actualización: {ex.Message}";
+            System.Diagnostics.Debug.WriteLine($"Update failed: {ex}");
+        }
+        finally
+        {
+            UpdateProgressBar.Visibility = Visibility.Collapsed;
+            UpdateCheckButton.IsEnabled = true;
+            UpdateDownloadButton.IsEnabled = true;
+        }
+    }
+
+    private static bool IsInstalledLocation()
+    {
+        try
+        {
+            var programFiles = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
+            return AppContext.BaseDirectory.StartsWith(programFiles, StringComparison.OrdinalIgnoreCase);
+        }
+        catch { return true; }
     }
 
     private async Task<string?> CreateInstallWrapperScriptAsync()

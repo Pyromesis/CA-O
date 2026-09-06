@@ -30,7 +30,7 @@ public sealed partial class DashboardPage : Page
         var uiState = AppHost.Resolve<ViewModels.UiState>();
         uiState.PropertyChanged += (_, e) =>
         {
-            if (e.PropertyName is null or nameof(ViewModels.UiState.Context) or nameof(ViewModels.UiState.Recommendations) or nameof(ViewModels.UiState.LastAnalysisUtc) or nameof(ViewModels.UiState.ServiceStatus))
+            if (e.PropertyName is null or nameof(ViewModels.UiState.Context) or nameof(ViewModels.UiState.Recommendations) or nameof(ViewModels.UiState.LastAnalysisUtc) or nameof(ViewModels.UiState.ServiceStatus) or nameof(ViewModels.UiState.UpdateAvailable) or nameof(ViewModels.UiState.LatestVersion))
                 DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Normal, RenderHub);
         };
         Loaded += async (_, __) =>
@@ -108,6 +108,9 @@ public sealed partial class DashboardPage : Page
             PendingRebootBar.Message = "Reinicio pendiente por: " + string.Join(", ", context!.PendingRebootReasons) + ".";
         RecoveryBar.IsOpen = uiState.RecoveryCandidates.Count > 0;
         ServiceInfoBar.IsOpen = !connected;
+        UpdateBar.IsOpen = uiState.UpdateAvailable && !string.IsNullOrWhiteSpace(uiState.LatestVersion);
+        if (UpdateBar.IsOpen)
+            UpdateBar.Message = $"Hay una versión nueva de CA-O ({uiState.LatestVersion}).";
     }
 
     private async void OnAnalyzeClick(object sender, RoutedEventArgs e)
@@ -154,6 +157,16 @@ public sealed partial class DashboardPage : Page
         {
             var nav = AppHost.Resolve<Navigation.INavigationService>();
             nav.Select("optimize");
+        }
+    }
+
+    private void OnGoUpdateClick(object sender, RoutedEventArgs e)
+    {
+        if (MainWindow.Current != null) MainWindow.Current.SelectRoute("settings");
+        else
+        {
+            var nav = AppHost.Resolve<Navigation.INavigationService>();
+            nav.Select("settings");
         }
     }
 }

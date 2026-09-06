@@ -108,6 +108,45 @@
                 </StackPanel>
             </Border>
 
+            <!-- Actualizaciones -->
+            <Border Style="{StaticResource CaoCardStyle}">
+                <StackPanel Spacing="14">
+                    <TextBlock Text="Actualizaciones" FontWeight="SemiBold" FontSize="14" Foreground="{ThemeResource TextFillColorPrimaryBrush}"/>
+                    <Border Height="1" Background="{ThemeResource DividerStrokeColorDefaultBrush}" Opacity="0.5"/>
+
+                    <StackPanel Spacing="12">
+                        <StackPanel Spacing="4">
+                            <TextBlock x:Name="UpdateStatusText" FontSize="13" FontWeight="Medium" TextWrapping="Wrap" Text="Versión instalada: —"/>
+                            <TextBlock x:Name="UpdateDetailText" FontSize="11" Opacity="0.65" TextWrapping="Wrap" Text="Comprueba si hay una versión nueva en GitHub Releases."/>
+                        </StackPanel>
+
+                        <ProgressBar x:Name="UpdateProgressBar" Minimum="0" Maximum="100" Value="0" Visibility="Collapsed"/>
+
+                        <Grid ColumnSpacing="10" RowSpacing="8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <Button x:Name="UpdateCheckButton"
+                                    Content="Buscar actualizaciones"
+                                    Click="OnUpdateCheckClick"
+                                    Style="{StaticResource CaoOutlineButtonStyle}"
+                                    MinHeight="38"/>
+
+                            <Button x:Name="UpdateDownloadButton"
+                                    Content="Descargar e instalar"
+                                    Click="OnUpdateDownloadClick"
+                                    Style="{StaticResource CaoAccentButtonStyle}"
+                                    Grid.Column="1"
+                                    MinWidth="200"
+                                    MinHeight="38"
+                                    Visibility="Collapsed"/>
+                        </Grid>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
             <!-- About -->
             <Border Style="{StaticResource CaoCardStyle}" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}">
                 <StackPanel Spacing="10">

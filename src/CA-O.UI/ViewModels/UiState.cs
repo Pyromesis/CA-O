@@ -65,6 +65,31 @@ public sealed class UiState : ObservableObject
         set => SetProperty(ref _serviceStatus, value);
     }
 
+    private bool _updateAvailable;
+    private string _latestVersion = string.Empty;
+    private string _latestAssetUrl = string.Empty;
+
+    /// <summary>Hay un release más nuevo que la versión instalada.</summary>
+    public bool UpdateAvailable
+    {
+        get => _updateAvailable;
+        set => SetProperty(ref _updateAvailable, value);
+    }
+
+    /// <summary>Tag del último release (p. ej. "v2.1.6").</summary>
+    public string LatestVersion
+    {
+        get => _latestVersion;
+        set => SetProperty(ref _latestVersion, value);
+    }
+
+    /// <summary>URL del ZIP completo del último release.</summary>
+    public string LatestAssetUrl
+    {
+        get => _latestAssetUrl;
+        set => SetProperty(ref _latestAssetUrl, value);
+    }
+
     /// <summary>
     /// Última vez que se verificó el servicio privilegiado (UTC).
     /// Memoria de sesión: evita pedir al usuario que pulse "Comprobar" en cada página.
