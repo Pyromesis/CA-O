@@ -8,6 +8,7 @@ using CAO.Core.Optimizations.PrivacySecurity;
 using CAO.Core.Optimizations.Startup;
 using CAO.Core.Optimizations.Storage;
 using CAO.Core.Optimizations.System;
+using CAO.Core.Optimizations.Troubleshoot;
 using CAO.Shared;
 
 namespace CAO.Core.Catalog;
@@ -108,6 +109,15 @@ public static class OptimizationCatalog
     public static readonly StaleCrashDumpCleanup StaleCrashDumpCleanup = new();
     public static readonly OptimizeStartupRecoveryState OptimizeStartupRecoveryState = new();
 
+    // Troubleshoot (solucionadores con efecto real)
+    public static readonly RestartWindowsAudioServices RestartWindowsAudioServices = new();
+    public static readonly DisableBluetoothAbsoluteVolume DisableBluetoothAbsoluteVolume = new();
+    public static readonly FixMicrophoneAccess FixMicrophoneAccess = new();
+    public static readonly RestartDesktopCompositor RestartDesktopCompositor = new();
+    public static readonly ClearIconThumbnailCache ClearIconThumbnailCache = new();
+    public static readonly RepairWindowsUpdate RepairWindowsUpdate = new();
+    public static readonly ResyncSystemClock ResyncSystemClock = new();
+
     /// <summary>Production catalog: 66 verified optimizations (19 core + 7 gaming + 7 power + 14 storage + 11 network + 5 startup + 2 system) - all phases promoted from legacy. All optimizations are now in production.</summary>
     public static IReadOnlyList<IOptimization> All { get; } = new IOptimization[]
     {
@@ -185,6 +195,14 @@ public static class OptimizationCatalog
         PendingRebootMaintenance,
         StaleCrashDumpCleanup,
         OptimizeStartupRecoveryState,
+        // Troubleshoot
+        RestartWindowsAudioServices,
+        DisableBluetoothAbsoluteVolume,
+        FixMicrophoneAccess,
+        RestartDesktopCompositor,
+        ClearIconThumbnailCache,
+        RepairWindowsUpdate,
+        ResyncSystemClock,
     };
 
     /// <summary>Catálogo completo histórico (66) - solo para tests de trazabilidad docs ↔ código. No usar en producción.</summary>

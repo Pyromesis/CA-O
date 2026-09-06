@@ -41,6 +41,8 @@ public enum SystemCommandKey
     SchTasksQuery,
     SchTasksDisable,
     SchTasksEnable,
+    TaskKillDwm,
+    W32tmResync,
     NetShInterfaceIpShowDns,
     NetShInterfaceIpSetDnsPrimary,
     NetShInterfaceIpSetDnsSecondary,
@@ -230,6 +232,13 @@ public static partial class CommandPolicy
                 arguments[0] == "/Change" && arguments[1] == "/TN" &&
                 IsValidTaskName(arguments[2]) && arguments[3] == "/ENABLE" =>
                 Path.Combine(system32, "schtasks.exe"),
+
+            SystemCommandKey.TaskKillDwm when Eq(arguments,
+                "/F", "/IM", "dwm.exe") =>
+                Path.Combine(system32, "taskkill.exe"),
+
+            SystemCommandKey.W32tmResync when Eq(arguments, "/resync") =>
+                Path.Combine(system32, "w32tm.exe"),
 
             SystemCommandKey.NetShInterfaceIpShowDns when Eq(arguments,
                 "interface", "ip", "show", "dns") =>

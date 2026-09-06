@@ -81,6 +81,7 @@
                         <FontIcon Glyph="&#xE74D;" />
                     </NavigationViewItem.Icon>
                 </NavigationViewItem>
+                <NavigationViewItem Content="Solucionar" Tag="solucionar" Icon="Help" ToolTipService.ToolTip="Solucionar — audio, video y sistema"/>
                 <NavigationViewItem Content="Gaming" Tag="gaming" Visibility="Collapsed" ToolTipService.ToolTip="Gaming — ahora dentro de Analizar">
                     <NavigationViewItem.Icon>
                         <FontIcon Glyph="&#xE7FC;" />

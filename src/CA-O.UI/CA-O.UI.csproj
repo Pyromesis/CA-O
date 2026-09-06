@@ -32,6 +32,7 @@
     <Page Include="RestorePage.xaml" />
     <Page Include="HistoryPage.xaml" />
     <Page Include="LimpiezaPage.xaml" />
+    <Page Include="SolucionarPage.xaml" />
     <Page Include="SettingsPage.xaml" />
     <Page Include="Resources\DesignTokens.xaml" />
   </ItemGroup>

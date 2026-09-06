@@ -19,13 +19,14 @@ public static class RouteTable
             ["restore"] = typeof(Pages.RestorePage),
             ["history"] = typeof(Pages.HistoryPage),
             ["cleanup"] = typeof(Pages.LimpiezaPage),
+            ["solucionar"] = typeof(Pages.SolucionarPage),
             ["settings"] = typeof(Pages.SettingsPage),
         };
 
     /// <summary>Ordered tags as shown in the NavigationView.</summary>
     public static readonly IReadOnlyList<string> Order = new[]
     {
-        "dashboard", "analyze", "optimize", "cleanup", "gaming",
+        "dashboard", "analyze", "optimize", "cleanup", "solucionar", "gaming",
         "benchmark", "restore", "history", "settings",
     };
 
