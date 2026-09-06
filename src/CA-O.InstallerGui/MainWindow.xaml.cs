@@ -33,7 +33,7 @@ public sealed partial class MainWindow : Window
             .Substring("--payload-dir=".Length).Trim('"');
         if (_autoUpdate)
         {
-            Loaded += (_, _) => _ = InstallAsync();
+            Activated += OnAutoUpdateActivated;
         }
         var productVersion = CAO.Shared.Constants.BuildConstants.ProductVersion;
         Title = $"CA-O {productVersion} Setup";
@@ -53,6 +53,12 @@ public sealed partial class MainWindow : Window
             if (File.Exists(iconPath)) AppWindow.SetIcon(iconPath);
         }
         catch { }
+    }
+
+    private void OnAutoUpdateActivated(object sender, WindowActivatedEventArgs args)
+    {
+        Activated -= OnAutoUpdateActivated;
+        _ = InstallAsync();
     }
 
 private async Task LoadPreviousAnalysisAsync()
