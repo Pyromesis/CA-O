@@ -7,6 +7,7 @@
             <StackPanel Style="{StaticResource CaoPageHeaderStyle}">
                 <TextBlock Text="Solucionar problemas" TextAlignment="Center" Style="{StaticResource CaoPageTitleStyle}"/>
                 <TextBlock Text="Soluciones directas para fallos comunes. Cada una actúa de verdad y confirma antes de cambios delicados." TextAlignment="Center" Style="{StaticResource CaoSubtitleStyle}"/>
+                <Border Style="{StaticResource CaoHeaderAccentBarStyle}"/>
             </StackPanel>
 
             <!-- Audio -->

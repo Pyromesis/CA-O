@@ -7,6 +7,7 @@
             <StackPanel Style="{StaticResource CaoPageHeaderStyle}">
                 <TextBlock Text="Ajustes" TextAlignment="Center" Style="{StaticResource CaoPageTitleStyle}"/>
                 <TextBlock Text="Organizados por categorías. Sin listas infinitas." TextAlignment="Center" Style="{StaticResource CaoSubtitleStyle}"/>
+                <Border Style="{StaticResource CaoHeaderAccentBarStyle}"/>
             </StackPanel>
 
             <!-- General / Appearance -->

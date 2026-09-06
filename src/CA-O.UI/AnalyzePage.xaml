@@ -16,6 +16,7 @@
             <StackPanel Style="{StaticResource CaoPageHeaderStyle}">
                 <TextBlock Text="Analizar sistema" TextAlignment="Center" Style="{StaticResource CaoPageTitleStyle}"/>
                 <TextBlock Text="Escaneo completo: CPU, GPU, memoria, disco, velocidades, red, seguridad, drivers, térmica e input. Nada aquí modifica el sistema." TextAlignment="Center" Style="{StaticResource CaoSubtitleStyle}"/>
+                <Border Style="{StaticResource CaoHeaderAccentBarStyle}"/>
             </StackPanel>
 
             <StackPanel Orientation="Horizontal" Spacing="12" Margin="0,4,0,0" HorizontalAlignment="Center">

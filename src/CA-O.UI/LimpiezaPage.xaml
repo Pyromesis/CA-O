@@ -7,6 +7,7 @@
             <StackPanel Style="{StaticResource CaoPageHeaderStyle}">
                 <TextBlock Text="Limpieza" TextAlignment="Center" Style="{StaticResource CaoPageTitleStyle}"/>
                 <TextBlock Text="Acciones rápidas y seguras: temporales, papelera, DNS y timer. Cada limpieza usa snapshots donde aplica." TextAlignment="Center" Style="{StaticResource CaoSubtitleStyle}"/>
+                <Border Style="{StaticResource CaoHeaderAccentBarStyle}"/>
             </StackPanel>
 
             <!-- Archivos temporales -->

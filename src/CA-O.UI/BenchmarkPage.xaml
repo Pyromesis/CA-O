@@ -7,6 +7,7 @@
             <StackPanel Style="{StaticResource CaoPageHeaderStyle}">
                 <TextBlock Text="Benchmark" TextAlignment="Center" Style="{StaticResource CaoPageTitleStyle}"/>
                 <TextBlock Text="Metodología honesta: cargas fijas y reproducibles (CPU/memoria/disco). Veredicto con suelo de ruido 3%." TextAlignment="Center" Style="{StaticResource CaoSubtitleStyle}"/>
+                <Border Style="{StaticResource CaoHeaderAccentBarStyle}"/>
             </StackPanel>
             <InfoBar IsOpen="True" Severity="Informational" IsClosable="False"
                      Title="Metodología honesta"

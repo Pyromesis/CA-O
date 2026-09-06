@@ -7,6 +7,7 @@
             <StackPanel Style="{StaticResource CaoPageHeaderStyle}">
                 <TextBlock Text="Historial" TextAlignment="Center" Style="{StaticResource CaoPageTitleStyle}"/>
                 <TextBlock Text="Timeline auditable con TransactionId, operación, verificación y cadena hash. La corrupción genera alerta explícita." TextAlignment="Center" Style="{StaticResource CaoSubtitleStyle}"/>
+                <Border Style="{StaticResource CaoHeaderAccentBarStyle}"/>
             </StackPanel>
             <StackPanel Orientation="Horizontal" Spacing="12" Margin="0,4,0,0" HorizontalAlignment="Center">
                 <Button Content="Actualizar" Click="OnRefreshClick" Style="{StaticResource CaoAccentButtonStyle}"/>

@@ -94,6 +94,27 @@
         <Setter Property="TextWrapping" Value="Wrap"/>
     </Style>
 
+    <!-- Signature accent bar under every page header: follows the system accent color -->
+    <LinearGradientBrush x:Key="CaoAccentBarBrush" StartPoint="0,0" EndPoint="1,0">
+        <GradientStop Offset="0" Color="{ThemeResource SystemAccentColorLight2}"/>
+        <GradientStop Offset="0.5" Color="{ThemeResource SystemAccentColor}"/>
+        <GradientStop Offset="1" Color="{ThemeResource SystemAccentColorDark1}"/>
+    </LinearGradientBrush>
+
+    <Style x:Key="CaoHeaderAccentBarStyle" TargetType="Border">
+        <Setter Property="Height" Value="4"/>
+        <Setter Property="Width" Value="72"/>
+        <Setter Property="CornerRadius" Value="2"/>
+        <Setter Property="HorizontalAlignment" Value="Center"/>
+        <Setter Property="Margin" Value="0,10,0,2"/>
+        <Setter Property="Background" Value="{StaticResource CaoAccentBarBrush}"/>
+    </Style>
+
+    <!-- Accent-tinted glyphs for dashboard tiles -->
+    <Style x:Key="CaoTileIconStyle" TargetType="FontIcon">
+        <Setter Property="Foreground" Value="{ThemeResource AccentFillColorDefaultBrush}"/>
+    </Style>
+
     <Style x:Key="CaoCaptionStyle" TargetType="TextBlock">
         <Setter Property="FontSize" Value="{StaticResource CaoFontSizeCaption}"/>
         <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}"/>

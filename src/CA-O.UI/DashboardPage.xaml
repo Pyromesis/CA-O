@@ -8,7 +8,7 @@
             <!-- Hero: centro de la app -->
             <Border Style="{StaticResource CaoHeroCardStyle}">
                 <Grid>
-                    <Border Opacity="0.14" CornerRadius="12" Margin="-20" IsHitTestVisible="False">
+                    <Border Opacity="0.26" CornerRadius="12" Margin="-20" IsHitTestVisible="False">
                         <Border.Background>
                             <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
                                 <GradientStop Offset="0" Color="{ThemeResource SystemAccentColor}"/>
@@ -24,6 +24,7 @@
                     <StackPanel Spacing="8">
                         <TextBlock x:Name="TitleText" TextAlignment="Center" Style="{StaticResource CaoPageTitleStyle}"/>
                         <TextBlock Text="Tu centro de control: analiza, optimiza, limpia y soluciona desde aquí." TextAlignment="Center" Style="{StaticResource CaoSubtitleStyle}"/>
+                        <Border Style="{StaticResource CaoHeaderAccentBarStyle}"/>
                         <TextBlock x:Name="ProgramInfoText" FontSize="12" Opacity="0.7" TextWrapping="Wrap" IsTextSelectionEnabled="True" Margin="0,6,0,0" FontWeight="Medium" TextAlignment="Center"/>
                         <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,8,0,0" HorizontalAlignment="Center">
                             <Border x:Name="ServiceBadge" Style="{StaticResource CaoStatusIndicatorStyle}" Background="{ThemeResource SystemFillColorNeutralBrush}">
@@ -77,56 +78,56 @@
                 </Grid.RowDefinitions>
                 <Button Grid.Row="0" Grid.Column="0" Tag="analyze" Click="OnTileClick" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Padding="14">
                     <StackPanel Spacing="4">
-                        <FontIcon Glyph="&#xE71E;" FontSize="18" Opacity="0.8"/>
+                        <FontIcon Glyph="&#xE71E;" FontSize="18" Opacity="0.8" Foreground="{ThemeResource AccentFillColorDefaultBrush}"/>
                         <TextBlock Text="Analizar" FontWeight="SemiBold" FontSize="13"/>
                         <TextBlock Text="Diagnóstico completo" FontSize="11" Opacity="0.6"/>
                     </StackPanel>
                 </Button>
                 <Button Grid.Row="0" Grid.Column="1" Tag="optimize" Click="OnTileClick" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Padding="14">
                     <StackPanel Spacing="4">
-                        <FontIcon Glyph="&#xE90F;" FontSize="18" Opacity="0.8"/>
+                        <FontIcon Glyph="&#xE90F;" FontSize="18" Opacity="0.8" Foreground="{ThemeResource AccentFillColorDefaultBrush}"/>
                         <TextBlock Text="Optimizar" FontWeight="SemiBold" FontSize="13"/>
                         <TextBlock x:Name="TileOptimizeSub" Text="Sin recomendaciones" FontSize="11" Opacity="0.6"/>
                     </StackPanel>
                 </Button>
                 <Button Grid.Row="0" Grid.Column="2" Tag="cleanup" Click="OnTileClick" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Padding="14">
                     <StackPanel Spacing="4">
-                        <FontIcon Glyph="&#xE74D;" FontSize="18" Opacity="0.8"/>
+                        <FontIcon Glyph="&#xE74D;" FontSize="18" Opacity="0.8" Foreground="{ThemeResource AccentFillColorDefaultBrush}"/>
                         <TextBlock Text="Limpieza" FontWeight="SemiBold" FontSize="13"/>
                         <TextBlock Text="Temporales y timer" FontSize="11" Opacity="0.6"/>
                     </StackPanel>
                 </Button>
                 <Button Grid.Row="0" Grid.Column="3" Tag="solucionar" Click="OnTileClick" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Padding="14">
                     <StackPanel Spacing="4">
-                        <FontIcon Glyph="&#xE897;" FontSize="18" Opacity="0.8"/>
+                        <FontIcon Glyph="&#xE897;" FontSize="18" Opacity="0.8" Foreground="{ThemeResource AccentFillColorDefaultBrush}"/>
                         <TextBlock Text="Solucionar" FontWeight="SemiBold" FontSize="13"/>
                         <TextBlock Text="Audio, video, sistema" FontSize="11" Opacity="0.6"/>
                     </StackPanel>
                 </Button>
                 <Button Grid.Row="1" Grid.Column="0" Tag="benchmark" Click="OnTileClick" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Padding="14">
                     <StackPanel Spacing="4">
-                        <FontIcon Glyph="&#xE9D2;" FontSize="18" Opacity="0.8"/>
+                        <FontIcon Glyph="&#xE9D2;" FontSize="18" Opacity="0.8" Foreground="{ThemeResource AccentFillColorDefaultBrush}"/>
                         <TextBlock Text="Benchmark" FontWeight="SemiBold" FontSize="13"/>
                         <TextBlock Text="Medir antes y después" FontSize="11" Opacity="0.6"/>
                     </StackPanel>
                 </Button>
                 <Button Grid.Row="1" Grid.Column="1" Tag="restore" Click="OnTileClick" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Padding="14">
                     <StackPanel Spacing="4">
-                        <FontIcon Glyph="&#xE7A7;" FontSize="18" Opacity="0.8"/>
+                        <FontIcon Glyph="&#xE7A7;" FontSize="18" Opacity="0.8" Foreground="{ThemeResource AccentFillColorDefaultBrush}"/>
                         <TextBlock Text="Restaurar" FontWeight="SemiBold" FontSize="13"/>
                         <TextBlock Text="Snapshots y reversión" FontSize="11" Opacity="0.6"/>
                     </StackPanel>
                 </Button>
                 <Button Grid.Row="1" Grid.Column="2" Tag="history" Click="OnTileClick" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Padding="14">
                     <StackPanel Spacing="4">
-                        <FontIcon Glyph="&#xE81C;" FontSize="18" Opacity="0.8"/>
+                        <FontIcon Glyph="&#xE81C;" FontSize="18" Opacity="0.8" Foreground="{ThemeResource AccentFillColorDefaultBrush}"/>
                         <TextBlock Text="Historial" FontWeight="SemiBold" FontSize="13"/>
                         <TextBlock Text="Línea auditable" FontSize="11" Opacity="0.6"/>
                     </StackPanel>
                 </Button>
                 <Button Grid.Row="1" Grid.Column="3" Tag="settings" Click="OnTileClick" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Padding="14">
                     <StackPanel Spacing="4">
-                        <FontIcon Glyph="&#xE713;" FontSize="18" Opacity="0.8"/>
+                        <FontIcon Glyph="&#xE713;" FontSize="18" Opacity="0.8" Foreground="{ThemeResource AccentFillColorDefaultBrush}"/>
                         <TextBlock Text="Ajustes" FontWeight="SemiBold" FontSize="13"/>
                         <TextBlock Text="Tema, idioma, servicio" FontSize="11" Opacity="0.6"/>
                     </StackPanel>

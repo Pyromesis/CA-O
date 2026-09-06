@@ -7,10 +7,11 @@
             <StackPanel Style="{StaticResource CaoPageHeaderStyle}">
                 <TextBlock Text="Gaming" TextAlignment="Center" Style="{StaticResource CaoPageTitleStyle}"/>
                 <TextBlock Text="Centro gaming: juegos detectados, anti-cheat, perfil recomendado y cambios seguros." TextAlignment="Center" Style="{StaticResource CaoSubtitleStyle}"/>
+                <Border Style="{StaticResource CaoHeaderAccentBarStyle}"/>
             </StackPanel>
 
             <StackPanel Orientation="Horizontal" Spacing="12" HorizontalAlignment="Center">
-                <Button x:Name="ScanButton" Content="Escanear sistema gaming" Click="OnScanClick" Style="{StaticResource AccentButtonStyle}"/>
+                <Button x:Name="ScanButton" Content="Escanear sistema gaming" Click="OnScanClick" Style="{StaticResource CaoAccentButtonStyle}"/>
                 <ProgressRing x:Name="Ring" IsActive="False" Width="22" Height="22"/>
                 <TextBlock x:Name="GamingStatusText" FontSize="12" Opacity="0.6" VerticalAlignment="Center"/>
             </StackPanel>

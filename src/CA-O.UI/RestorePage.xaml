@@ -7,6 +7,7 @@
             <StackPanel Style="{StaticResource CaoPageHeaderStyle}">
                 <TextBlock Text="Restaurar" TextAlignment="Center" Style="{StaticResource CaoPageTitleStyle}"/>
                 <TextBlock Text="Centro de restauración — snapshots por TransactionId, no por OptimizationId. Cada reversión se verifica exactamente." TextAlignment="Center" Style="{StaticResource CaoSubtitleStyle}"/>
+                <Border Style="{StaticResource CaoHeaderAccentBarStyle}"/>
             </StackPanel>
             <InfoBar x:Name="NoteBar" IsOpen="True" Severity="Informational" IsClosable="False"
                      Title="Reversibilidad garantizada"

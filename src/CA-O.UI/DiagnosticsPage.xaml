@@ -7,9 +7,10 @@
             <StackPanel Style="{StaticResource CaoPageHeaderStyle}">
                 <TextBlock Text="Diagnóstico" TextAlignment="Center" Style="{StaticResource CaoPageTitleStyle}"/>
                 <TextBlock Text="Módulos con estado actual, métricas brutas, interpretación y confianza. Sin telemetría externa." TextAlignment="Center" Style="{StaticResource CaoSubtitleStyle}"/>
+                <Border Style="{StaticResource CaoHeaderAccentBarStyle}"/>
             </StackPanel>
             <StackPanel Orientation="Horizontal" Spacing="12" HorizontalAlignment="Center">
-                <Button x:Name="RunButton" Content="Ejecutar diagnósticos completos" Click="OnRunClick" Style="{StaticResource AccentButtonStyle}"
+                <Button x:Name="RunButton" Content="Ejecutar diagnósticos completos" Click="OnRunClick" Style="{StaticResource CaoAccentButtonStyle}"
                         AutomationProperties.Name="Ejecutar diagnósticos"/>
                 <ProgressRing x:Name="Ring" IsActive="False" Width="22" Height="22"/>
                 <TextBlock x:Name="StatusText" FontSize="12" Opacity="0.6" VerticalAlignment="Center"/>

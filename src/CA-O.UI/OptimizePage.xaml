@@ -8,6 +8,7 @@
             <StackPanel Style="{StaticResource CaoPageHeaderStyle}">
                 <TextBlock Text="Optimizar" TextAlignment="Center" Style="{StaticResource CaoPageTitleStyle}"/>
                 <TextBlock Text="Cada tarjeta muestra diff real, riesgo, seguridad, compatibilidad y reversibilidad. Solo Recomendadas se aplican sin Modo Expert." TextAlignment="Center" Style="{StaticResource CaoSubtitleStyle}"/>
+                <Border Style="{StaticResource CaoHeaderAccentBarStyle}"/>
             </StackPanel>
 
             <StackPanel Orientation="Horizontal" Spacing="12" Margin="0,4,0,0" HorizontalAlignment="Center">
