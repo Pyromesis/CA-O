@@ -1,0 +1,71 @@
+<Page
+    x:Class="CAO.UI.Pages.LimpiezaPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <ScrollViewer Padding="32,24,32,32" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Background="{ThemeResource SolidBackgroundFillColorBaseBrush}">
+        <StackPanel x:Name="PageContent" Spacing="20" MaxWidth="1000" HorizontalAlignment="Center">
+            <StackPanel Spacing="6">
+                <TextBlock Text="Limpieza" Style="{StaticResource CaoPageTitleStyle}"/>
+                <TextBlock Text="Acciones rápidas y seguras: temporales, papelera, DNS y timer. Cada limpieza usa snapshots donde aplica." Style="{StaticResource CaoSubtitleStyle}"/>
+            </StackPanel>
+
+            <!-- Archivos temporales -->
+            <Border Style="{StaticResource CaoCardStyle}">
+                <StackPanel Spacing="12">
+                    <TextBlock Text="Archivos temporales" FontWeight="SemiBold" FontSize="14" Foreground="{ThemeResource TextFillColorPrimaryBrush}"/>
+                    <Border Height="1" Background="{ThemeResource DividerStrokeColorDefaultBrush}" Opacity="0.5"/>
+                    <TextBlock Text="Borra solo ficheros antiguos o cachés regenerables. Omite lo que esté en uso." FontSize="11" Opacity="0.65" TextWrapping="Wrap"/>
+                    <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,2,0,0">
+                        <Button Content="Temporales Windows" Tag="cleanup-windows-temp" Click="OnCleanClick" FontSize="12"/>
+                        <Button Content="Caché Delivery Optimization" Tag="cleanup-delivery-optimization-cache" Click="OnCleanClick" FontSize="12"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button Content="Archivos del sistema" Tag="disk-cleanup-system-files" Click="OnCleanClick" FontSize="12"/>
+                        <Button Content="Minidumps antiguos" Tag="stale-crash-dump-cleanup" Click="OnCleanClick" FontSize="12"/>
+                    </StackPanel>
+                    <Button x:Name="CleanAllButton" Content="Ejecutar todo" Click="OnCleanAllClick" Style="{StaticResource CaoAccentButtonStyle}" MinHeight="38" HorizontalAlignment="Left"/>
+                    <TextBlock x:Name="CleanupStatusText" FontSize="11" Opacity="0.7" TextWrapping="Wrap"/>
+                </StackPanel>
+            </Border>
+
+            <!-- Red -->
+            <Border Style="{StaticResource CaoCardStyle}">
+                <StackPanel Spacing="12">
+                    <TextBlock Text="Red" FontWeight="SemiBold" FontSize="14" Foreground="{ThemeResource TextFillColorPrimaryBrush}"/>
+                    <Border Height="1" Background="{ThemeResource DividerStrokeColorDefaultBrush}" Opacity="0.5"/>
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button Content="Vaciar caché DNS" Tag="flush-dns-cache" Click="OnCleanClick" FontSize="12"/>
+                    </StackPanel>
+                    <TextBlock x:Name="NetworkStatusText" FontSize="11" Opacity="0.7" TextWrapping="Wrap"/>
+                </StackPanel>
+            </Border>
+
+            <!-- Papelera -->
+            <Border Style="{StaticResource CaoCardStyle}">
+                <StackPanel Spacing="12">
+                    <TextBlock Text="Papelera de reciclaje" FontWeight="SemiBold" FontSize="14" Foreground="{ThemeResource TextFillColorPrimaryBrush}"/>
+                    <Border Height="1" Background="{ThemeResource DividerStrokeColorDefaultBrush}" Opacity="0.5"/>
+                    <TextBlock Text="Vacía todas las papeleras. Pide confirmación y no se puede deshacer." FontSize="11" Opacity="0.65" TextWrapping="Wrap"/>
+                    <Button Content="Vaciar papelera" Click="OnEmptyRecycleBinClick" FontSize="12" MinHeight="38" HorizontalAlignment="Left"/>
+                    <TextBlock x:Name="RecycleStatusText" FontSize="11" Opacity="0.7" TextWrapping="Wrap"/>
+                </StackPanel>
+            </Border>
+
+            <!-- Timer resolution -->
+            <Border Style="{StaticResource CaoCardStyle}">
+                <StackPanel Spacing="12">
+                    <TextBlock Text="Timer resolution" FontWeight="SemiBold" FontSize="14" Foreground="{ThemeResource TextFillColorPrimaryBrush}"/>
+                    <Border Height="1" Background="{ThemeResource DividerStrokeColorDefaultBrush}" Opacity="0.5"/>
+                    <TextBlock Text="Resolución del temporizador del sistema. Valores bajos reducen latencia en juegos y audio a costa de más consumo. Se mantiene mientras el servicio privilegiado corre." FontSize="11" Opacity="0.65" TextWrapping="Wrap"/>
+                    <TextBlock x:Name="TimerCurrentText" FontSize="13" FontWeight="Medium" Text="Actual: —"/>
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button Content="0,5 ms (mínimo)" Tag="5000" Click="OnTimerClick" FontSize="12"/>
+                        <Button Content="1,0 ms" Tag="10000" Click="OnTimerClick" FontSize="12"/>
+                        <Button Content="Predeterminado" Tag="156250" Click="OnTimerClick" FontSize="12"/>
+                    </StackPanel>
+                    <TextBlock x:Name="TimerStatusText" FontSize="11" Opacity="0.7" TextWrapping="Wrap"/>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</Page>

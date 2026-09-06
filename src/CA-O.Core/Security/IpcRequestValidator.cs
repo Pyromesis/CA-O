@@ -86,6 +86,22 @@ public static class IpcRequestValidator
             error = string.Empty;
             return true;
         }
+        if (request.Operation is PrivilegedOperationKind.SetTimerResolution)
+        {
+            if (request.Payload is not global::CAO.Shared.IPC.SetTimerResolutionPayload timer)
+            {
+                errorCode = ErrorCodes.IpcPayloadSchemaInvalid;
+                error = "Payload de SetTimerResolution inválido.";
+                return false;
+            }
+            if (timer.Resolution100Ns is < 1000 or > 156250)
+            {
+                error = "SetTimerResolution fuera de rango (1000..156250).";
+                return false;
+            }
+            error = string.Empty;
+            return true;
+        }
 
         if (request.Payload is not global::CAO.Shared.IPC.IOptimizationIdPayload target)
         {

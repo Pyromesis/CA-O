@@ -17,7 +17,7 @@ public static class IpcProtocol
     public static readonly TimeSpan MaxAge = TimeSpan.FromSeconds(30);
 }
 
-/// <summary>The seven privileged operations; each carries exactly one typed payload.</summary>
+/// <summary>The nine privileged operations; each carries exactly one typed payload.</summary>
 public enum PrivilegedOperationKind
 {
     ApplyOptimization,
@@ -28,6 +28,7 @@ public enum PrivilegedOperationKind
     Ping,
     GetServiceStatus,
     SetDns,
+    SetTimerResolution,
 }
 
 /// <summary>
@@ -49,6 +50,7 @@ public interface IOptimizationIdPayload : ITypedPayload
 [JsonDerivedType(typeof(PingPayload), "ping")]
 [JsonDerivedType(typeof(GetServiceStatusPayload), "status")]
 [JsonDerivedType(typeof(SetDnsPayload), "setdns")]
+[JsonDerivedType(typeof(SetTimerResolutionPayload), "settimer")]
 public interface ITypedPayload
 {
 }
@@ -68,6 +70,9 @@ public sealed record PingPayload() : ITypedPayload;
 public sealed record GetServiceStatusPayload() : ITypedPayload;
 
 public sealed record SetDnsPayload(string InterfaceName, string DnsIp) : ITypedPayload;
+
+/// <summary>Desired system timer resolution in 100-ns units (5000 = 0.5 ms, 156250 = default).</summary>
+public sealed record SetTimerResolutionPayload(uint Resolution100Ns) : ITypedPayload;
 
 public sealed record PingResponse(string ServiceVersion, int ProtocolVersion, int ProcessId, bool IsSystem, string Status);
 public sealed record ServiceStatusResponse(string ServiceVersion, int ProtocolVersion, int ProcessId, bool IsSystem, string Status, IReadOnlyList<string> Capabilities);

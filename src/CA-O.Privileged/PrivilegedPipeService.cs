@@ -210,6 +210,21 @@ catch (Exception ex)
                 }
             }
 
+            if (request.Operation == PrivilegedOperationKind.SetTimerResolution && request.Payload is SetTimerResolutionPayload timer)
+            {
+                if (!TimerResolution.TrySet(timer.Resolution100Ns, out var actual, out var timerError))
+                {
+                    return IpcResponse.Rejected(ErrorCodes.TxnApplyFailed, timerError);
+                }
+                logger.LogInformation("Timer resolution ajustado a {Actual} (pedido {Pedido}).", actual, timer.Resolution100Ns);
+                return IpcResponse.Ok(JsonSerializer.Serialize(new
+                {
+                    requested = timer.Resolution100Ns,
+                    applied = actual,
+                    appliedMs = TimerResolution.FormatMs(actual),
+                }, JsonOptions));
+            }
+
             var optimizationId = ((IOptimizationIdPayload)request.Payload).OptimizationId;
 
         try

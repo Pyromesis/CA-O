@@ -12,7 +12,7 @@ CA-O manipula configuración crítica de Windows. Las superficies relevantes son
 - Validación `IpcRequestValidator` (§10): `ProtocolVersion==2`, `RequestId!=Empty`, `Nonce` 1..128 sin control chars, `CreatedAtUtc` ±30s/ +1m futuro, `Operation` enum, `Payload` polimórfico exacto, `OptimizationId` regex `[a-z0-9-]{1,80}`.
 - **Ping / GetServiceStatus** (§10): operaciones sin `OptimizationId` para health check (`ServiceVersion, ProtocolVersion, ProcessId, IsSystem, Status, Capabilities`) — no usan optimización real como ping.
 - Protección replay `ReplayCache` con reloj inyectable + `MaxAge 30s` + tamaño 64KB/256KB; timeout 15s por conexión.
-- **Allowlist 7 operaciones**: `Apply/Revert/Detect/Verify/CaptureSnapshot/Ping/GetServiceStatus` — no hay “ejecutar comando”.
+- **Allowlist 9 operaciones**: `Apply/Revert/Detect/Verify/CaptureSnapshot/Ping/GetServiceStatus/SetDns/SetTimerResolution` — no hay “ejecutar comando”. `SetTimerResolution` valida rango 1000..156250 y fija el valor con `NtSetTimerResolution` en el proceso del servicio.
 - Auditoría: `requestedBy SID/Name → executedBy SYSTEM, op, accepted, code`.
 
 ### Ejecución externa

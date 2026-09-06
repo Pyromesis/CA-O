@@ -21,32 +21,11 @@ public sealed class PrivilegedPipeClient
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
     };
 
-    public async Task<IpcResponse?> SendAsync(
+    public Task<IpcResponse?> SendAsync(
         PrivilegedOperationKind operation,
         string optimizationId,
         CancellationToken ct = default)
     {
-        await using var pipe = new NamedPipeClientStream(
-            ".", IpcConstants.PipeName, PipeDirection.InOut, PipeOptions.Asynchronous);
-        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        timeout.CancelAfter(CallTimeout);
-        try
-        {
-            await pipe.ConnectAsync(timeout.Token);
-        }
-        catch (OperationCanceledException) when (timeout.IsCancellationRequested && !ct.IsCancellationRequested)
-        {
-            return IpcResponse.Rejected(ErrorCodes.IpcTimeout, "Servicio no disponible: tiempo de espera agotado (CAO-IPC-004). Verifique que CA-O Privileged Service esté instalado e iniciado.");
-        }
-        catch (IOException)
-        {
-            return IpcResponse.Rejected(ErrorCodes.IpcPipeNotFound, "Servicio no disponible: pipe no encontrado (CAO-IPC-004). Instale/inicie el servicio privilegiado con scripts/install-privileged-service.ps1.");
-        }
-        catch (TimeoutException)
-        {
-            return IpcResponse.Rejected(ErrorCodes.IpcTimeout, "Servicio no disponible: timeout al conectar (CAO-IPC-004).");
-        }
-
         // Soporte SetDns con payload tipado SetDnsPayload
         ITypedPayload payload;
         if (operation == PrivilegedOperationKind.SetDns)
@@ -70,6 +49,38 @@ public sealed class PrivilegedPipeClient
                 PrivilegedOperationKind.GetServiceStatus => new GetServiceStatusPayload(),
                 _ => throw new ArgumentOutOfRangeException(nameof(operation)),
             };
+        }
+
+        return SendPayloadAsync(operation, payload, ct);
+    }
+
+    public Task<IpcResponse?> SetTimerResolutionAsync(uint resolution100Ns, CancellationToken ct = default) =>
+        SendPayloadAsync(PrivilegedOperationKind.SetTimerResolution, new SetTimerResolutionPayload(resolution100Ns), ct);
+
+    public async Task<IpcResponse?> SendPayloadAsync(
+        PrivilegedOperationKind operation,
+        ITypedPayload payload,
+        CancellationToken ct = default)
+    {
+        await using var pipe = new NamedPipeClientStream(
+            ".", IpcConstants.PipeName, PipeDirection.InOut, PipeOptions.Asynchronous);
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        timeout.CancelAfter(CallTimeout);
+        try
+        {
+            await pipe.ConnectAsync(timeout.Token);
+        }
+        catch (OperationCanceledException) when (timeout.IsCancellationRequested && !ct.IsCancellationRequested)
+        {
+            return IpcResponse.Rejected(ErrorCodes.IpcTimeout, "Servicio no disponible: tiempo de espera agotado (CAO-IPC-004). Verifique que CA-O Privileged Service esté instalado e iniciado.");
+        }
+        catch (IOException)
+        {
+            return IpcResponse.Rejected(ErrorCodes.IpcPipeNotFound, "Servicio no disponible: pipe no encontrado (CAO-IPC-004). Instale/inicie el servicio privilegiado con scripts/install-privileged-service.ps1.");
+        }
+        catch (TimeoutException)
+        {
+            return IpcResponse.Rejected(ErrorCodes.IpcTimeout, "Servicio no disponible: timeout al conectar (CAO-IPC-004).");
         }
 
         var request = new IpcRequest(

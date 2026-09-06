@@ -74,6 +74,51 @@ public sealed class PrivilegedIpcSecurityTests
         Assert.Equal(ErrorCodes.IpcPayloadSchemaInvalid, code);
     }
 
+    [Theory]
+    [InlineData(5000u)]
+    [InlineData(10000u)]
+    [InlineData(156250u)]
+    public void AcceptsWellFormedTimerResolution(uint resolution)
+    {
+        var request = ValidRequest(r => r with
+        {
+            Operation = PrivilegedOperationKind.SetTimerResolution,
+            Payload = new SetTimerResolutionPayload(resolution),
+        });
+
+        Assert.True(IpcRequestValidator.TryValidate(request, out _, out _));
+    }
+
+    [Theory]
+    [InlineData(0u)]
+    [InlineData(999u)]
+    [InlineData(156251u)]
+    [InlineData(1000000u)]
+    public void RejectsTimerResolutionOutOfRange(uint resolution)
+    {
+        var request = ValidRequest(r => r with
+        {
+            Operation = PrivilegedOperationKind.SetTimerResolution,
+            Payload = new SetTimerResolutionPayload(resolution),
+        });
+
+        Assert.False(IpcRequestValidator.TryValidate(request, out _, out _));
+    }
+
+    [Fact]
+    public void RejectsTimerResolutionWithWrongPayload()
+    {
+        var request = ValidRequest(r => r with
+        {
+            Operation = PrivilegedOperationKind.SetTimerResolution,
+            Payload = new PingPayload(),
+        });
+
+        Assert.False(IpcRequestValidator.TryValidate(
+            request, out var code, out var detail));
+        Assert.Equal(ErrorCodes.IpcPayloadSchemaInvalid, code);
+    }
+
     // ---------------- Authorization policy ----------------
 
     [Fact]

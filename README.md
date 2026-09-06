@@ -108,7 +108,7 @@ La UI **siempre eleva** (`app.manifest` `requireAdministrator` → UAC en cada i
 ```
 
 - **UI siempre elevada** pero **toda escritura cruza el pipe** aun elevada → modelo de privilegio mínimo auditado
-- **Servicio valida:** versión protocolo (must = 2), identidad cliente (`GetImpersonationUserName` vía `RunAsClient()`), GUID único + nonce (replay), esquema `OperationParameters`, solo 7 operaciones allowlist
+- **Servicio valida:** versión protocolo (must = 2), identidad cliente (`GetImpersonationUserName` vía `RunAsClient()`), GUID único + nonce (replay), esquema `OperationParameters`, solo 9 operaciones allowlist
 - **Sin HTTP**, sin ejecución de cadenas arbitrarias, sin PowerShell en el path de ejecución (solo `CommandPolicy` con rutas absolutas `%SystemRoot%\System32`)
 
 ### Capas de código
@@ -235,8 +235,8 @@ Named Pipe  \\.\pipe\CA-O.Privileged.v1  — ACL: SYSTEM Full, Administrators R/
    │  (conectar ≠ autorizar) → GetCallerIdentity() via RunAsClient() — SID real + nombre + SessionId + elevación
    │  IpcRequestValidator + ReplayCache + AdministratorsOnlyAuthorizer
    ▼
-CA-O.Privileged (SYSTEM) — solo 7 operaciones tipadas:
-   ApplyOptimization / RevertOptimization / DetectOptimization / VerifyOptimization / CaptureSnapshot / Ping / GetServiceStatus
+CA-O.Privileged (SYSTEM) — solo 9 operaciones tipadas:
+   ApplyOptimization / RevertOptimization / DetectOptimization / VerifyOptimization / CaptureSnapshot / Ping / GetServiceStatus / SetDns / SetTimerResolution
    → Catalogo estatico CommandPolicy — UseShellExecute=false, timeout 60 s, rutas absolutas %SystemRoot%\System32
 ```
 
