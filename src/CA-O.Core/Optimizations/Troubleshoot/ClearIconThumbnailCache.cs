@@ -31,7 +31,10 @@ public sealed class ClearIconThumbnailCache : IOptimization
     private IReadOnlyList<string> CacheFiles(IRegistryAccessor registry)
     {
         var found = new List<string>();
-        foreach (var sid in registry.GetSubKeyNames(RegistryHive2.LocalMachine, ProfileListKey))
+        IReadOnlyList<string> sids;
+        try { sids = registry.GetSubKeyNames(RegistryHive2.LocalMachine, ProfileListKey); }
+        catch { return found; }
+        foreach (var sid in sids)
         {
             var profilePath = registry.GetValue(
                 RegistryHive2.LocalMachine, $@"{ProfileListKey}\{sid}", "ProfileImagePath") as string;

@@ -37,6 +37,39 @@ public sealed class RecommendationEngineTests
         Flags = flags,
     };
 
+    private sealed class ThrowingDetectOptimization(OptimizationDefinition definition) : IOptimization
+    {
+        public OptimizationDefinition Definition { get; } = definition;
+
+        public OptimizationState Detect(IRegistryAccessor registry) =>
+            throw new System.Security.SecurityException("Requested registry access is not allowed.");
+
+        public OptimizationSnapshot Capture(IRegistryAccessor registry) => new();
+
+        public Task<OperationResult> ApplyAsync(OptimizationContext context, CancellationToken ct = default) =>
+            Task.FromResult(OperationResult.Fail("no", "no"));
+
+        public Task<OperationResult> RevertAsync(
+            OptimizationContext context, OptimizationSnapshot snapshot, CancellationToken ct = default) =>
+            Task.FromResult(OperationResult.Ok("revertido"));
+    }
+
+    [Fact]
+    public void ThrowingDetectDegradesToUnknownWithoutEmptyingList()
+    {
+        var catalog = new IOptimization[]
+        {
+            new ThrowingDetectOptimization(Definition("throwing-detect")),
+            new SimpleOptimization(Definition("healthy-sibling")),
+        };
+
+        var recommendations = RecommendationEngine.BuildAll(catalog, _registry, SystemContextFactory.Default());
+
+        Assert.Equal(2, recommendations.Count);
+        Assert.Equal(OptimizationState.Unknown, recommendations[0].CurrentState);
+        Assert.Equal(OptimizationState.NotApplied, recommendations[1].CurrentState);
+    }
+
     private sealed class SimpleOptimization(OptimizationDefinition definition) : IOptimization
     {
         public OptimizationDefinition Definition { get; } = definition;

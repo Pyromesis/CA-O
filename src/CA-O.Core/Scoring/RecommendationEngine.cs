@@ -33,7 +33,18 @@ public static class RecommendationEngine
         SystemContext context)
     {
         var definition = optimization.Definition;
-        var currentState = optimization.Detect(registry);
+        // Un Detect que lanza (p. ej. HKLM denegado sin elevación) no puede
+        // anular la lista entera: se degrada a Unknown y sigue con el resto.
+        OptimizationState currentState;
+        try
+        {
+            currentState = optimization.Detect(registry);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Detect '{definition.Id}' falló: {ex.Message}");
+            currentState = OptimizationState.Unknown;
+        }
         var guardReason = AntiCheatGuard.Evaluate(definition, context);
 
         var (bucket, reason) = Classify(definition, context, currentState, guardReason);

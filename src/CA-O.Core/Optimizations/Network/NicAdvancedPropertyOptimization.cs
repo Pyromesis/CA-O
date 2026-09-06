@@ -29,7 +29,10 @@ public abstract class NicAdvancedPropertyOptimization : IOptimization
     protected IReadOnlyList<(string InstanceKey, string Property)> TargetsOf(IRegistryAccessor registry)
     {
         var found = new List<(string, string)>();
-        foreach (var instance in registry.GetSubKeyNames(RegistryHive2.LocalMachine, NetClassKey))
+        IReadOnlyList<string> instances;
+        try { instances = registry.GetSubKeyNames(RegistryHive2.LocalMachine, NetClassKey); }
+        catch { return found; }
+        foreach (var instance in instances)
         {
             var instanceKey = $@"{NetClassKey}\{instance}";
             if (!IsPhysicalAdapter(registry, instanceKey)) continue;
