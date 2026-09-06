@@ -16,7 +16,13 @@
     <SelfContained>true</SelfContained>
     <PublishTrimmed>false</PublishTrimmed>
     <EnableMsixTooling>true</EnableMsixTooling>
+    <ApplicationIcon>..\..\assets\app-icon-minimal.ico</ApplicationIcon>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Content Include="..\..\assets\app-icon-minimal.ico" Link="Assets\app-icon.ico" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\assets\app-icon-minimal.png" Link="Assets\app-icon.png" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.WindowsAppSDK" />

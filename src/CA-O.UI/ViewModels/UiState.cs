@@ -17,6 +17,7 @@ public sealed class UiState : ObservableObject
     private string _language = "es-ES";
     private DateTime? _lastAnalysisUtc;
     private string _serviceStatus = "unknown";
+    private DateTime? _serviceCheckedUtc;
     private IReadOnlyList<string> _recoveryCandidates = Array.Empty<string>();
     private string _freshnessLabel = string.Empty;
     private string _staleReason = string.Empty;
@@ -62,6 +63,16 @@ public sealed class UiState : ObservableObject
     {
         get => _serviceStatus;
         set => SetProperty(ref _serviceStatus, value);
+    }
+
+    /// <summary>
+    /// Última vez que se verificó el servicio privilegiado (UTC).
+    /// Memoria de sesión: evita pedir al usuario que pulse "Comprobar" en cada página.
+    /// </summary>
+    public DateTime? ServiceCheckedUtc
+    {
+        get => _serviceCheckedUtc;
+        set => SetProperty(ref _serviceCheckedUtc, value);
     }
 
     /// <summary>Optimization ids left Incomplete by a previous crash (spec 13).</summary>

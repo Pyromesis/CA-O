@@ -17,13 +17,14 @@
         </Grid.ColumnDefinitions>
 
         <Image Grid.Column="0"
-               Source="Assets/ca-o-logo.png"
+               Source="Assets/app-icon.png"
                Width="28" Height="28"
                Margin="12,0,0,0"
                VerticalAlignment="Center"/>
 
         <TextBlock Grid.Column="1"
-                   Text="CA-O 2.0 Setup"
+                   x:Name="TitleText"
+                   Text="CA-O Setup"
                    VerticalAlignment="Center"
                    Margin="8,0,0,0"
                    FontSize="12"

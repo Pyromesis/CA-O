@@ -2,6 +2,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using System.Diagnostics;
+using System.IO;
 
 namespace CAO.Uninstaller;
 
@@ -11,6 +12,12 @@ public sealed partial class MainWindow : Window
     {
         InitializeComponent();
         ExtendsContentIntoTitleBar = true;
+        TrySetWindowIcon();
+        var productVersion = typeof(MainWindow).Assembly.GetName().Version?.ToString(3) ?? string.Empty;
+        var versionSuffix = string.IsNullOrEmpty(productVersion) ? string.Empty : $" {productVersion}";
+        Title = $"CA-O Desinstalador{versionSuffix}";
+        HeaderTitleText.Text = $"Desinstalar CA-O{versionSuffix}";
+        InfoBar.Title = $"Desinstalador CA-O{versionSuffix}";
         if (!UninstallService.IsAdmin())
         {
             InfoBar.Severity = InfoBarSeverity.Warning;
@@ -67,7 +74,7 @@ public sealed partial class MainWindow : Window
             var dialog = new ContentDialog
             {
                 Title = "CA-O desinstalado",
-                Content = new TextBlock { Text = "CA-O 2.0 se ha desinstalado correctamente.\n\nSe ha eliminado el servicio, archivos y accesos directos." + (deleteHistory ? "\nHistorial también borrado." : "\nHistorial conservado en %ProgramData%\\CA-O."), TextWrapping = TextWrapping.Wrap },
+                Content = new TextBlock { Text = "CA-O se ha desinstalado correctamente.\n\nSe ha eliminado el servicio, archivos y accesos directos." + (deleteHistory ? "\nHistorial también borrado." : "\nHistorial conservado en %ProgramData%\\CA-O."), TextWrapping = TextWrapping.Wrap },
                 PrimaryButtonText = "Cerrar",
                 DefaultButton = ContentDialogButton.Primary,
                 XamlRoot = Content.XamlRoot
@@ -135,5 +142,15 @@ public sealed partial class MainWindow : Window
             XamlRoot = Content.XamlRoot
         };
         await dialog.ShowAsync();
+    }
+
+    private void TrySetWindowIcon()
+    {
+        try
+        {
+            var iconPath = Path.Combine(AppContext.BaseDirectory, "Assets", "app-icon.ico");
+            if (File.Exists(iconPath)) AppWindow.SetIcon(iconPath);
+        }
+        catch { }
     }
 }

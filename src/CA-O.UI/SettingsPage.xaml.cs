@@ -10,6 +10,8 @@ namespace CAO.UI.Pages;
 public sealed partial class SettingsPage : Page
 {
     private readonly ViewModels.SettingsViewModel _vm;
+    private ViewModels.UiState? _uiState;
+    private bool _autoCheckAttempted;
 
     public SettingsPage()
     {
@@ -36,11 +38,10 @@ public sealed partial class SettingsPage : Page
             Select(ThemeBox, _vm.Theme);
             Select(LanguageBox, _vm.Language);
             
-            // Inicializar estado del servicio
-            ServiceStatusText.Text = $"Estado: {_vm.ServiceStatus}";
-            ServiceDetailText.Text = _vm.ServiceStatus == "conectado" 
-                ? "El servicio está funcionando correctamente."
-                : "Haz clic en 'Instalar ahora' para configurar el servicio.";
+            _uiState = AppHost.Resolve<ViewModels.UiState>();
+            // El estado verificado vive en UiState (memoria de sesión): la página lo refleja sin pedir otro clic.
+            SyncViewModelFromSharedState();
+            RenderServiceState();
             
             VersionsText.Text = $"CA-O UI {CAO.Shared.AppVersion.Semantic} · Protocolo v{CAO.Shared.IPC.IpcProtocol.Version} · Settings: {CAO.Shared.CaOPaths.SettingsFile}";
             bool isAdmin = IsAdmin();
@@ -49,18 +50,22 @@ public sealed partial class SettingsPage : Page
                 : "UI sin privilegios — toda escritura via Named Pipe tipado con ACL, nonce, expiración 30s y anti-replay. Ver docs/SECURITY.md.";
             _vm.PropertyChanged += (_, e) =>
             {
-                if (e.PropertyName == nameof(ViewModels.SettingsViewModel.ServiceStatus))
-                    DispatcherQueue.TryEnqueue(() => 
+                if (e.PropertyName == nameof(ViewModels.SettingsViewModel.ServiceStatus) ||
+                    e.PropertyName == nameof(ViewModels.SettingsViewModel.ServiceCheckedUtc))
+                    DispatcherQueue.TryEnqueue(RenderServiceState);
+            };
+            _uiState.PropertyChanged += (_, e) =>
+            {
+                if (e.PropertyName == nameof(ViewModels.UiState.ServiceStatus) ||
+                    e.PropertyName == nameof(ViewModels.UiState.ServiceCheckedUtc))
+                    DispatcherQueue.TryEnqueue(() =>
                     {
-                        ServiceStatusText.Text = $"Estado: {_vm.ServiceStatus}";
-                        ServiceDetailText.Text = _vm.ServiceStatus == "conectado" 
-                            ? "El servicio está funcionando correctamente."
-                            : "Haz clic en 'Instalar ahora' para configurar el servicio.";
+                        SyncViewModelFromSharedState();
+                        RenderServiceState();
                     });
             };
-            
-            var uiState = AppHost.Resolve<ViewModels.UiState>();
-            uiState.LanguageChanged += (_, __) => DispatcherQueue.TryEnqueue(ApplyTexts);
+
+            _uiState.LanguageChanged += (_, __) => DispatcherQueue.TryEnqueue(ApplyTexts);
             
             DispatcherQueue.TryEnqueue(ApplyTexts);
         }
@@ -79,7 +84,6 @@ public sealed partial class SettingsPage : Page
             if (LanguageLabel != null) LanguageLabel.Text = Localizer.Get("settings.language") ?? "Idioma";
             if (ExpertSwitch != null) ExpertSwitch.Header = Localizer.Get("settings.expertMode") ?? "Modo Expert";
             if (ExpertWarnBar != null) ExpertWarnBar.Message = Localizer.Get("optimize.expertWarning") ?? "Modo Expert habilitado";
-            if (ServiceCheckButton != null) ServiceCheckButton.Content = Localizer.Get("settings.serviceCheck") ?? "Verificar servicio";
             if (ServiceInstallButton != null) ServiceInstallButton.Content = Localizer.Get("settings.serviceInstall") ?? "Instalar ahora";
             if (ServiceExplanationBar != null)
             {
@@ -87,6 +91,7 @@ public sealed partial class SettingsPage : Page
                 ServiceExplanationBar.Message = Localizer.Get("settings.serviceExplanationMessage") ?? "";
             }
             try { LocalizationHelper.LocalizeTree(this.Content as DependencyObject ?? this); } catch { }
+            RenderServiceState();
         }
         catch (Exception ex)
         {
@@ -98,6 +103,94 @@ public sealed partial class SettingsPage : Page
     {
         base.OnNavigatedTo(e);
         ApplyTexts();
+        SyncViewModelFromSharedState();
+        RenderServiceState();
+        // Si aún no hay verificación en memoria, comprobar una sola vez al entrar (sin pedir clic).
+        _ = AutoCheckServiceIfNeededAsync();
+    }
+
+    private void SyncViewModelFromSharedState()
+    {
+        if (_vm is null || _uiState is null) return;
+        if (_vm.ServiceStatus != _uiState.ServiceStatus)
+            _vm.ServiceStatus = _uiState.ServiceStatus;
+        if (_vm.ServiceCheckedUtc != _uiState.ServiceCheckedUtc)
+            _vm.ServiceCheckedUtc = _uiState.ServiceCheckedUtc;
+    }
+
+    private static bool IsConnected(string? status) =>
+        status is "connected" or "conectado";
+
+    private static bool NeedsVerification(string? status) =>
+        status is null or "unknown" or "unavailable" or "no disponible";
+
+    private void RenderServiceState()
+    {
+        if (ServiceStatusText is null || ServiceDetailText is null) return;
+        var status = _uiState?.ServiceStatus ?? _vm?.ServiceStatus ?? "unknown";
+        var checkedUtc = _uiState?.ServiceCheckedUtc ?? _vm?.ServiceCheckedUtc;
+        var lastCheck = checkedUtc.HasValue
+            ? Localizer.Format("settings.serviceLastChecked", checkedUtc.Value.ToLocalTime().ToString("g"))
+            : string.Empty;
+
+        if (IsConnected(status))
+        {
+            ServiceStatusText.Text = "✓ Servicio activo y conectado";
+            ServiceDetailText.Text = string.IsNullOrEmpty(lastCheck)
+                ? "El servicio privilegiado está funcionando correctamente."
+                : $"El servicio privilegiado está funcionando correctamente. {lastCheck}";
+            if (ServiceInstallButton != null) ServiceInstallButton.Visibility = Visibility.Collapsed;
+            if (ServiceCheckButton != null) ServiceCheckButton.Content = Localizer.Get("settings.serviceStateOk");
+        }
+        else
+        {
+            ServiceStatusText.Text = "⚠ Servicio no disponible";
+            ServiceDetailText.Text = string.IsNullOrEmpty(lastCheck)
+                ? "Haz clic en 'Instalar ahora' para configurar el servicio."
+                : $"Haz clic en 'Instalar ahora' para configurar el servicio. {lastCheck}";
+            if (ServiceInstallButton != null) ServiceInstallButton.Visibility = Visibility.Visible;
+            if (ServiceCheckButton != null) ServiceCheckButton.Content = Localizer.Get("settings.serviceCheck");
+        }
+    }
+
+    private async Task AutoCheckServiceIfNeededAsync()
+    {
+        try
+        {
+            if (_autoCheckAttempted || _vm is null || _uiState is null) return;
+            if (_vm.IsCheckingService) return;
+            if (!NeedsVerification(_uiState.ServiceStatus)) return;
+            if (_uiState.ServiceCheckedUtc.HasValue &&
+                DateTime.UtcNow - _uiState.ServiceCheckedUtc.Value < TimeSpan.FromMinutes(5))
+                return;
+            _autoCheckAttempted = true;
+            await RefreshServiceStatusAsync();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"AutoCheckServiceIfNeededAsync failed: {ex}");
+        }
+    }
+
+    private async Task RefreshServiceStatusAsync()
+    {
+        if (_vm is null) return;
+        ServiceRing.IsActive = true;
+        ServiceStatusText.Text = "Verificando servicio...";
+        ServiceDetailText.Text = "";
+        try
+        {
+            await _vm.CheckServiceCommand.ExecuteAsync(null);
+            SyncViewModelFromSharedState();
+            RenderServiceState();
+        }
+        catch (Exception ex)
+        {
+            ServiceStatusText.Text = "⚠ No se pudo verificar el servicio";
+            ServiceDetailText.Text = $"Error: {ex.Message}";
+            if (ServiceInstallButton != null) ServiceInstallButton.Visibility = Visibility.Visible;
+        }
+        finally { ServiceRing.IsActive = false; }
     }
 
     private void OnExpertToggled(object sender, RoutedEventArgs e)
@@ -127,35 +220,8 @@ public sealed partial class SettingsPage : Page
 
     private async void OnServiceCheckClick(object sender, RoutedEventArgs e)
     {
-        ServiceRing.IsActive = true;
-        ServiceStatusText.Text = "Verificando servicio...";
-        ServiceDetailText.Text = "";
-        
-        try
-        {
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-            await _vm.CheckServiceCommand.ExecuteAsync(null);
-
-            if (_vm.ServiceStatus == "conectado")
-            {
-                ServiceStatusText.Text = "✓ Servicio activo y conectado";
-                ServiceDetailText.Text = "El servicio privilegiado está funcionando correctamente.";
-                ServiceInstallButton.Visibility = Visibility.Collapsed;
-                ServiceCheckButton.Content = "Estado OK";
-                return;
-            }
-
-            ServiceStatusText.Text = "⚠ Servicio no disponible";
-            ServiceDetailText.Text = "Haz clic en 'Instalar ahora' para configurar el servicio.";
-            ServiceInstallButton.Visibility = Visibility.Visible;
-        }
-        catch (Exception ex)
-        {
-            ServiceStatusText.Text = "⚠ No se pudo verificar el servicio";
-            ServiceDetailText.Text = $"Error: {ex.Message}";
-            ServiceInstallButton.Visibility = Visibility.Visible;
-        }
-        finally { ServiceRing.IsActive = false; }
+        _autoCheckAttempted = true;
+        await RefreshServiceStatusAsync();
     }
 
     private async void OnServiceInstallClick(object sender, RoutedEventArgs e)
@@ -208,7 +274,7 @@ public sealed partial class SettingsPage : Page
             // Verificar si se instaló correctamente
             await VerifyServiceInstalledAsync();
 
-            if (_vm.ServiceStatus == "conectado")
+            if (IsConnected(_vm.ServiceStatus))
             {
                 ServiceStatusText.Text = "✓ ¡Instalación completada!";
                 ServiceDetailText.Text = "El servicio está listo. Reiniciando aplicación...";

@@ -50,7 +50,7 @@ public sealed partial class DashboardPage : Page
                 }
                 catch (Exception ex) { App.WriteCrashLog(ex); }
             }
-            ServiceInfoBar.IsOpen = uiState.ServiceStatus is "unavailable" or "unknown";
+            ServiceInfoBar.IsOpen = uiState.ServiceStatus is not ("connected" or "conectado");
         };
     }
 
@@ -105,7 +105,7 @@ public sealed partial class DashboardPage : Page
         else if (context?.PendingReboot == true)
             PendingRebootBar.IsOpen = false; // file rename solo -> silenciar banner, sigue en contexto para gating
         RecoveryBar.IsOpen = uiState.RecoveryCandidates.Count > 0;
-        ServiceInfoBar.IsOpen = uiState.ServiceStatus is "unavailable" or "unknown";
+        ServiceInfoBar.IsOpen = uiState.ServiceStatus is not ("connected" or "conectado");
         // Freshness banner (weekly recommendation)
         try
         {

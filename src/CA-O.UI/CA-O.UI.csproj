@@ -13,7 +13,13 @@
     <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
     <EnableDefaultPageItems>false</EnableDefaultPageItems>
     <EnableDefaultApplicationDefinition>true</EnableDefaultApplicationDefinition>
+    <ApplicationIcon>..\..\assets\app-icon-minimal.ico</ApplicationIcon>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Content Include="..\..\assets\app-icon-minimal.ico" Link="Assets\app-icon.ico" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\assets\app-icon-minimal.png" Link="Assets\app-icon.png" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 
   <ItemGroup>
     <Page Include="MainWindow.xaml" />

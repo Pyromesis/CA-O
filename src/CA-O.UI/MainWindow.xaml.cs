@@ -3,6 +3,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using CAO.Shared;
+using System.IO;
 
 namespace CAO.UI;
 
@@ -32,6 +33,7 @@ public sealed partial class MainWindow : Window
         Current = this;
         InitializeComponent();
         SystemBackdrop = new MicaBackdrop();
+        TrySetWindowIcon();
         var uiState = AppHost.Resolve<ViewModels.UiState>();
         uiState.LanguageChanged += (_, language) => ApplyLocalization();
         uiState.PropertyChanged += (_, e) =>
@@ -110,6 +112,7 @@ public sealed partial class MainWindow : Window
         var svcLabel = svc switch
         {
             "connected" or "conectado" => Localizer.Get("common.connected"),
+            "rejected" or "rechazado" => Localizer.Get("common.rejected"),
             "unavailable" or "no disponible" or "unknown" => Localizer.Get("common.disconnected"),
             _ => svc
         };
@@ -117,7 +120,7 @@ public sealed partial class MainWindow : Window
         SidebarServiceStatus.Text = ServiceTopText.Text;
         ServiceDot.Fill = (svc is "connected" or "conectado")
             ? (Brush)Application.Current.Resources["SystemFillColorSuccessBrush"]
-            : (svc is "rejected" ? (Brush)Application.Current.Resources["SystemFillColorCautionBrush"] : (Brush)Application.Current.Resources["SystemFillColorCriticalBrush"]);
+            : (svc is "rejected" or "rechazado" ? (Brush)Application.Current.Resources["SystemFillColorCautionBrush"] : (Brush)Application.Current.Resources["SystemFillColorCriticalBrush"]);
 
         // System health summary
         if (ctx is null)
@@ -128,7 +131,9 @@ public sealed partial class MainWindow : Window
         else
         {
             var thermal = ctx.ThermalState == ThermalState.Throttling ? Localizer.Get("common.warning") : Localizer.Get("common.healthy");
-            var reboot = ctx.PendingReboot ? $" · {Localizer.Get("common.warning")}: reinicio pendiente" : "";
+            // Solo aviso de reinicio cuando es significativo (Windows Update o CBS).
+            // Un rename benigno aislado no debe dejar "Atención: reinicio pendiente" permanente.
+            var reboot = IsSignificantPendingReboot(ctx) ? $" · {Localizer.Get("common.warning")}: reinicio pendiente" : "";
             SystemTopText.Text = $"{Localizer.Get("common.systemStatus")}: {thermal}{reboot}";
             SidebarSystemStatus.Text = SystemTopText.Text;
         }
@@ -141,18 +146,36 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    private static bool IsSignificantPendingReboot(SystemContext? ctx) =>
+        ctx?.PendingReboot == true && ctx.PendingRebootReasons.Any(r =>
+            r.Contains("Windows Update", StringComparison.OrdinalIgnoreCase) ||
+            r.Contains("Component Based Servicing", StringComparison.OrdinalIgnoreCase));
+
+    private void TrySetWindowIcon()
+    {
+        try
+        {
+            var iconPath = Path.Combine(AppContext.BaseDirectory, "Assets", "app-icon.ico");
+            if (File.Exists(iconPath)) AppWindow.SetIcon(iconPath);
+        }
+        catch { }
+    }
+
     private async Task ProbeServiceAsync()
     {
         var uiState = AppHost.Resolve<ViewModels.UiState>();
         var pipe = AppHost.Resolve<PrivilegedPipeClient>();
         try
         {
-            var resp = await pipe.DetectAsync("disable-transparency");
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            var resp = await pipe.DetectAsync("disable-transparency", cts.Token);
             uiState.ServiceStatus = resp is { Accepted: true } ? "connected" : "rejected";
+            uiState.ServiceCheckedUtc = DateTime.UtcNow;
         }
         catch
         {
             uiState.ServiceStatus = "unavailable";
+            uiState.ServiceCheckedUtc = DateTime.UtcNow;
         }
         DispatcherQueue.TryEnqueue(RefreshChrome);
     }

@@ -6,7 +6,8 @@ var logFile = Path.Combine(Path.GetTempPath(), "CA-O-Setup.log");
 try { File.AppendAllText(logFile, $"\n[{DateTime.Now:O}] Setup iniciado\n"); } catch { }
 void Log(string msg) { Console.WriteLine(msg); try { File.AppendAllText(logFile, msg + "\n"); } catch { } }
 
-Console.WriteLine("CA-O 2.0 Setup — Instalador con UAC (requireAdministrator)");
+var productVersion = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "2.1.5";
+Console.WriteLine($"CA-O {productVersion} Setup — Instalador con UAC (requireAdministrator)");
 Console.WriteLine("==========================================================");
 Log($"Log: {logFile}");
 
@@ -142,18 +143,18 @@ try
     var svcExe = Path.Combine(destSvc, "CA-O.Privileged.exe");
     Run("sc.exe", $"create {serviceName} binPath= \"{svcExe}\" start= demand DisplayName= \"CA-O Privileged Service\"");
     Run("sc.exe", $"failure {serviceName} reset= 86400 actions= restart/5000/restart/10000/reboot/60000");
-    Run("sc.exe", $"description {serviceName} \"CA-O 2.0 servicio privilegiado — IPC Named Pipe con ACL + replay guard\"");
+    Run("sc.exe", $"description {serviceName} \"CA-O {productVersion} servicio privilegiado — IPC Named Pipe con ACL + replay guard\"");
 
     Log("[3/5] Creando accesos directos...");
     var startMenu = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonStartMenu), "Programs", "CA-O.lnk");
-    CreateShortcut(startMenu, installedExe, "CA-O 2.0 — Optimizador Windows 11", Path.GetDirectoryName(installedExe)!);
+    CreateShortcut(startMenu, installedExe, $"CA-O {productVersion} — Optimizador Windows 11", Path.GetDirectoryName(installedExe)!);
     // Escritorio: intentar Common Desktop y como fallback User Desktop
     var commonDesktop = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonDesktopDirectory), "CA-O.lnk");
     var userDesktop = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "CA-O.lnk");
     bool desktopOk = false;
     foreach (var desktop in new[] { commonDesktop, userDesktop })
     {
-        try { CreateShortcut(desktop, installedExe, "CA-O 2.0", Path.GetDirectoryName(installedExe)!); Log($"  Atajo creado en escritorio: {desktop}"); desktopOk = true; }
+        try { CreateShortcut(desktop, installedExe, $"CA-O {productVersion}", Path.GetDirectoryName(installedExe)!); Log($"  Atajo creado en escritorio: {desktop}"); desktopOk = true; }
         catch (Exception ex) { Log($"  No se pudo crear atajo en {desktop}: {ex.Message}"); }
     }
     if (!desktopOk) Log("  ADVERTENCIA: No se pudo crear atajo en ningún escritorio.");
@@ -182,7 +183,7 @@ try
     try { if (File.Exists(legacyRoot)) File.Delete(legacyRoot); } catch { }
     var legacyPs1 = Path.Combine(installDir, "uninstall.ps1");
     try { if (File.Exists(legacyPs1)) File.Delete(legacyPs1); } catch { }
-    CreateUninstallRegistryEntry(installDir, uninstallDestExe, installedExe);
+    CreateUninstallRegistryEntry(installDir, uninstallDestExe, installedExe, productVersion);
 
     Console.WriteLine("[4/5] Iniciando servicio...");
     Run("sc.exe", $"start {serviceName}", ignoreError: true);
@@ -192,11 +193,11 @@ try
     if (!qc.Contains("CA-O.Privileged.exe")) Console.WriteLine("  WARN: sc qc no contiene exe esperado: " + qc);
 
     Console.ForegroundColor = ConsoleColor.Green;
-    var successMsg = $"✓ CA-O 2.0 instalado correctamente.\n\nCarpeta: {installDir}\nEjecutable: {installedExe}\nAtajos: Escritorio y Menú Inicio > CA-O\nServicio: {serviceName} (demand start)\n\nPara desinstalar: sc.exe stop {serviceName} && sc.exe delete {serviceName} && rmdir /s \"{installDir}\"";
+    var successMsg = $"✓ CA-O {productVersion} instalado correctamente.\n\nCarpeta: {installDir}\nEjecutable: {installedExe}\nAtajos: Escritorio y Menú Inicio > CA-O\nServicio: {serviceName} (demand start)\n\nPara desinstalar: sc.exe stop {serviceName} && sc.exe delete {serviceName} && rmdir /s \"{installDir}\"";
     Console.WriteLine("\n" + successMsg);
     Log(successMsg);
     Console.ResetColor();
-    ShowMessage(successMsg, "CA-O 2.0 — Instalación completada");
+    ShowMessage(successMsg, $"CA-O {productVersion} — Instalación completada");
     Log("Presione cualquier tecla para lanzar CA-O...");
     Console.WriteLine("\nPresione cualquier tecla para lanzar CA-O...");
     Console.WriteLine($"Log guardado en: {logFile}");
@@ -285,15 +286,15 @@ static string FindUninstallerPayload(string exeDir)
     }
     return Path.Combine(exeDir, "uninstall", "CA-O.Uninstaller.exe");
 }
-static void CreateUninstallRegistryEntry(string installDir, string uninstallExe, string mainExe)
+static void CreateUninstallRegistryEntry(string installDir, string uninstallExe, string mainExe, string productVersion)
 {
     try
     {
         var keyPath = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\CA-O";
         using var key = Registry.LocalMachine.CreateSubKey(keyPath);
         if (key == null) throw new InvalidOperationException("No se pudo crear clave de registro");
-        key.SetValue("DisplayName", "CA-O 2.0", RegistryValueKind.String);
-        key.SetValue("DisplayVersion", "2.0.1", RegistryValueKind.String);
+        key.SetValue("DisplayName", $"CA-O {productVersion}", RegistryValueKind.String);
+        key.SetValue("DisplayVersion", productVersion, RegistryValueKind.String);
         key.SetValue("Publisher", "CA-O", RegistryValueKind.String);
         key.SetValue("InstallLocation", installDir, RegistryValueKind.String);
         key.SetValue("DisplayIcon", mainExe, RegistryValueKind.String);

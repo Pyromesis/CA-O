@@ -22,10 +22,25 @@ public sealed partial class MainWindow : Window
     {
         InitializeComponent();
         ExtendsContentIntoTitleBar = true;
+        TrySetWindowIcon();
+        var productVersion = CAO.Shared.Constants.BuildConstants.ProductVersion;
+        Title = $"CA-O {productVersion} Setup";
+        HeaderTitleText.Text = $"CA-O {productVersion} Setup";
+        InfoBar.Title = $"Instalador CA-O {productVersion}";
         _httpClient = new HttpClient() { Timeout = TimeSpan.FromMinutes(15) };
-        _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("CA-O-Installer/2.0.17");
+        _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd($"CA-O-Installer/{productVersion}");
         _httpClient.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github.v3+json");
         _httpClient.DefaultRequestHeaders.AcceptEncoding.ParseAdd("gzip");
+    }
+
+    private void TrySetWindowIcon()
+    {
+        try
+        {
+            var iconPath = Path.Combine(AppContext.BaseDirectory, "Assets", "app-icon.ico");
+            if (File.Exists(iconPath)) AppWindow.SetIcon(iconPath);
+        }
+        catch { }
     }
 
 private async Task LoadPreviousAnalysisAsync()
@@ -206,13 +221,13 @@ private async Task InstallAsync()
             }
             Run("sc.exe", $"create {serviceName} binPath= \"{Path.Combine(destSvc, "CA-O.Privileged.exe")}\" start= demand DisplayName= \"CA-O Privileged Service\"");
             Run("sc.exe", $"failure {serviceName} reset= 86400 actions= restart/5000/restart/10000/reboot/60000");
-            Run("sc.exe", $"description {serviceName} \"CA-O 2.0 servicio privilegiado - IPC Named Pipe con ACL + replay guard\"");
+            Run("sc.exe", $"description {serviceName} \"CA-O {CAO.Shared.Constants.BuildConstants.ProductVersion} servicio privilegiado - IPC Named Pipe con ACL + replay guard\"");
 
             UpdateProgress(80, "Creando accesos directos...", "Creando atajos en Menu Inicio y Escritorio");
             if (StartMenuShortcutCheck.IsChecked == true)
             {
                 var start = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonStartMenu), "Programs", "CA-O.lnk");
-                CreateShortcut(start, installedExe, "CA-O 2.0", Path.GetDirectoryName(installedExe)!);
+                CreateShortcut(start, installedExe, $"CA-O {CAO.Shared.Constants.BuildConstants.ProductVersion}", Path.GetDirectoryName(installedExe)!);
                 Log($"  Inicio: {start}");
             }
             if (DesktopShortcutCheck.IsChecked == true)
@@ -222,7 +237,7 @@ private async Task InstallAsync()
                 bool ok = false;
                 foreach (var d in new[] { common, user })
                 {
-                    try { CreateShortcut(d, installedExe, "CA-O 2.0", Path.GetDirectoryName(installedExe)!); Log($"  Escritorio: {d}"); ok = true; } catch (Exception ex) { Log($"  No {d}: {ex.Message}"); }
+                    try { CreateShortcut(d, installedExe, $"CA-O {CAO.Shared.Constants.BuildConstants.ProductVersion}", Path.GetDirectoryName(installedExe)!); Log($"  Escritorio: {d}"); ok = true; } catch (Exception ex) { Log($"  No {d}: {ex.Message}"); }
                 }
                 if (!ok) Log("  WARN: ningun atajo de escritorio creado");
             }
@@ -463,10 +478,10 @@ internal void OnCancelClick(object sender, RoutedEventArgs e)
     {
         var dialog = new ContentDialog
         {
-            Title = "CA-O 2.0 instalado correctamente",
+            Title = $"CA-O {CAO.Shared.Constants.BuildConstants.ProductVersion} instalado correctamente",
             Content = new TextBlock
             {
-                Text = $"CA-O 2.0 se ha instalado correctamente.\n\nCarpeta: {Path.GetDirectoryName(installedExe)!}\nEjecutable: {Path.GetFileName(installedExe)}\nEscritorio: {(DesktopShortcutCheck.IsChecked == true ? "Si" : "No")}\n\nPulsa Aceptar para abrir CA-O.",
+                Text = $"CA-O {CAO.Shared.Constants.BuildConstants.ProductVersion} se ha instalado correctamente.\n\nCarpeta: {Path.GetDirectoryName(installedExe)!}\nEjecutable: {Path.GetFileName(installedExe)}\nEscritorio: {(DesktopShortcutCheck.IsChecked == true ? "Si" : "No")}\n\nPulsa Aceptar para abrir CA-O.",
                 TextWrapping = TextWrapping.Wrap,
             },
             PrimaryButtonText = "Abrir CA-O",
@@ -520,10 +535,8 @@ internal void OnCancelClick(object sender, RoutedEventArgs e)
             var keyPath = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\CA-O";
             using var key = Registry.LocalMachine.CreateSubKey(keyPath);
             if (key == null) throw new InvalidOperationException("No se pudo crear clave de registro");
-            key.SetValue("DisplayName", "CA-O 2.0", RegistryValueKind.String);
-            var version = typeof(MainWindow).Assembly.GetName().Version?.ToString(3) ?? "2.1.0";
-            // Normalizar a 3 partes
-            if (version == "2.0.0.0") version = "2.1.0";
+            key.SetValue("DisplayName", $"CA-O {CAO.Shared.Constants.BuildConstants.ProductVersion}", RegistryValueKind.String);
+            var version = CAO.Shared.Constants.BuildConstants.ProductVersion;
             key.SetValue("DisplayVersion", version, RegistryValueKind.String);
             key.SetValue("Publisher", "CA-O", RegistryValueKind.String);
             key.SetValue("InstallLocation", installDir, RegistryValueKind.String);

@@ -25,10 +25,14 @@ public sealed class PendingRebootProvider
         var fileRename = GetPendingFileRenameEntries();
         if (fileRename.Count > 0)
         {
-            // Filtrar entradas benignas conocidas (EdgeUpdate, TEMP) que dejan la clave siempre presente
-            // y solo reportar si queda al menos una entrada significativa tras el filtro.
+            // Filtrar entradas benignas conocidas (EdgeUpdate, GamingServices/Xbox, TEMP) que dejan
+            // la clave presente sin exigir reinicio del sistema; solo reportar si queda al menos
+            // una entrada significativa tras el filtro.
             var significant = fileRename.Where(e =>
                 !e.Contains("EdgeUpdate", StringComparison.OrdinalIgnoreCase) &&
+                !e.Contains("GamingServices", StringComparison.OrdinalIgnoreCase) &&
+                !e.Contains("gamingservicesproxy", StringComparison.OrdinalIgnoreCase) &&
+                !e.Contains("Xbox", StringComparison.OrdinalIgnoreCase) &&
                 !e.Contains(@"\Temp\", StringComparison.OrdinalIgnoreCase) &&
                 !e.StartsWith(@"\??\C:\Windows\Temp", StringComparison.OrdinalIgnoreCase)).ToList();
             // Si solo hay entradas benignas, no considerar como reinicio pendiente del sistema
