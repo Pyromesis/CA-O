@@ -224,6 +224,9 @@ private async Task InstallAsync()
             Run("sc.exe", $"description {serviceName} \"CA-O {CAO.Shared.Constants.BuildConstants.ProductVersion} servicio privilegiado - IPC Named Pipe con ACL + replay guard\"");
 
             UpdateProgress(80, "Creando accesos directos...", "Creando atajos en Menu Inicio y Escritorio");
+            // Reemplazar, no duplicar: en reinstalación/actualización se borran los atajos
+            // existentes y se recrean según las casillas marcadas.
+            DeleteExistingShortcuts();
             if (StartMenuShortcutCheck.IsChecked == true)
             {
                 var start = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonStartMenu), "Programs", "CA-O.lnk");
@@ -237,7 +240,7 @@ private async Task InstallAsync()
                 bool ok = false;
                 foreach (var d in new[] { common, user })
                 {
-                    try { CreateShortcut(d, installedExe, $"CA-O {CAO.Shared.Constants.BuildConstants.ProductVersion}", Path.GetDirectoryName(installedExe)!); Log($"  Escritorio: {d}"); ok = true; } catch (Exception ex) { Log($"  No {d}: {ex.Message}"); }
+                    try { CreateShortcut(d, installedExe, $"CA-O {CAO.Shared.Constants.BuildConstants.ProductVersion}", Path.GetDirectoryName(installedExe)!); Log($"  Escritorio: {d}"); ok = true; break; } catch (Exception ex) { Log($"  No {d}: {ex.Message}"); }
                 }
                 if (!ok) Log("  WARN: ningun atajo de escritorio creado");
             }
@@ -283,8 +286,27 @@ private async Task InstallAsync()
 
             UpdateProgress(100, "Instalacion completada", null);
             Log($"Instalado en {installDir}");
-            await ShowSuccessDialogAsync(installedExe);
-            try { Process.Start(new ProcessStartInfo(installedExe) { UseShellExecute = true }); } catch { }
+            // La casilla "Iniciar CA-O" manda: si está marcada se abre directo sin
+            // ventana extra; si no, se muestra el diálogo final (cuyo botón Abrir sí abre).
+            bool autoLaunch = AutoLaunchCheck.IsChecked == true;
+            if (autoLaunch)
+            {
+                Log("Apertura automática de CA-O (casilla marcada).");
+                try { Process.Start(new ProcessStartInfo(installedExe) { UseShellExecute = true }); }
+                catch (Exception ex)
+                {
+                    Log($"  No se pudo abrir CA-O automáticamente: {ex.Message}");
+                    await ShowSuccessDialogAsync(installedExe);
+                }
+            }
+            else
+            {
+                var choice = await ShowSuccessDialogAsync(installedExe);
+                if (choice == ContentDialogResult.Primary)
+                {
+                    try { Process.Start(new ProcessStartInfo(installedExe) { UseShellExecute = true }); } catch (Exception ex) { Log($"  No se pudo abrir CA-O: {ex.Message}"); }
+                }
+            }
             Close();
         }
         catch (OperationCanceledException)
@@ -428,6 +450,19 @@ internal void OnCancelClick(object sender, RoutedEventArgs e)
         return null;
     }
 
+    private void DeleteExistingShortcuts()
+    {
+        foreach (var lnk in new[]
+        {
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonStartMenu), "Programs", "CA-O.lnk"),
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonDesktopDirectory), "CA-O.lnk"),
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "CA-O.lnk"),
+        })
+        {
+            try { if (File.Exists(lnk)) { File.Delete(lnk); Log($"  Atajo anterior eliminado: {lnk}"); } } catch (Exception ex) { Log($"  No se pudo eliminar {lnk}: {ex.Message}"); }
+        }
+    }
+
     private static void CopyDirectory(string src, string dst, Action<int>? progress)
     {
         var files = Directory.GetFiles(src, "*", SearchOption.AllDirectories);
@@ -481,7 +516,7 @@ internal void OnCancelClick(object sender, RoutedEventArgs e)
             Title = $"CA-O {CAO.Shared.Constants.BuildConstants.ProductVersion} instalado correctamente",
             Content = new TextBlock
             {
-                Text = $"CA-O {CAO.Shared.Constants.BuildConstants.ProductVersion} se ha instalado correctamente.\n\nCarpeta: {Path.GetDirectoryName(installedExe)!}\nEjecutable: {Path.GetFileName(installedExe)}\nEscritorio: {(DesktopShortcutCheck.IsChecked == true ? "Si" : "No")}\n\nPulsa Aceptar para abrir CA-O.",
+                Text = $"CA-O {CAO.Shared.Constants.BuildConstants.ProductVersion} se ha instalado correctamente.\n\nCarpeta: {Path.GetDirectoryName(installedExe)!}\nEjecutable: {Path.GetFileName(installedExe)}\nEscritorio: {(DesktopShortcutCheck.IsChecked == true ? "Si" : "No")}\n\nPulsa Abrir CA-O para abrirla ahora o Cerrar para salir.",
                 TextWrapping = TextWrapping.Wrap,
             },
             PrimaryButtonText = "Abrir CA-O",
