@@ -6,7 +6,7 @@
 [![.NET 10](https://img.shields.io/badge/.NET%2010-512BD4?style=flat-square&logo=dotnet&logoColor=white)](global.json)
 [![WinUI 3](https://img.shields.io/badge/WinUI%203-00B7C3?style=flat-square&logo=windows&logoColor=white)](https://microsoft.github.io/microsoft-ui-xaml/)
 [![Build](https://img.shields.io/badge/build-passing-brightgreen?style=flat-square)](https://github.com/Pyromesis/CA-O/actions)
-[![Tests](https://img.shields.io/badge/tests-500%20passed-brightgreen?style=flat-square)](#-pruebas)
+[![Tests](https://img.shields.io/badge/tests-540%20passed-brightgreen?style=flat-square)](#-pruebas)
 [![Release](https://img.shields.io/badge/release-v2.1.5-blue?style=flat-square)](https://github.com/Pyromesis/CA-O/releases/tag/v2.1.5)
 [![License](https://img.shields.io/badge/license-privado-lightgrey?style=flat-square)](#licencia)
 
@@ -22,7 +22,7 @@
 4. [Arquitectura profunda](#arquitectura-profunda)
 5. [Estructura del repositorio](#estructura-del-repositorio)
 6. [Modelo de seguridad](#modelo-de-seguridad)
-7. [Catálogo completo de optimizaciones (66)](#catálogo-completo-de-optimizaciones-66)
+7. [Catálogo completo de optimizaciones (75)](#catálogo-completo-de-optimizaciones-75)
 8. [Cómo funciona la app — viaje del usuario](#cómo-funciona-la-app--viaje-del-usuario)
 9. [Motores internos](#motores-internos)
 10. [Persistencia y rutas de datos](#persistencia-y-rutas-de-datos)
@@ -47,9 +47,9 @@
 La UI **siempre eleva** (`app.manifest` `requireAdministrator` → UAC en cada inicio) pero **toda mutación privilegiada cruza** al servicio Windows `CAO.Privileged` (SYSTEM) vía **Named Pipe autenticado** con ACL restrictiva, validación de esquema tipado, ventana de 30 s, nonce y protección anti-replay. Sin el servicio, la app opera en **modo solo lectura** (diagnóstico + benchmark disponibles).
 
 **En números:**
-- **66 optimizaciones** verificadas y reversibles (transaccionales) + `AllLegacy` para trazabilidad
-- **8 páginas** WinUI 3 con Mica, `NavigationView`, `VisualState` responsive, i18n `es-ES`/`en-US` instantáneo
-- **500+ tests** en 7 suites (Core 361 · Integration 48 · Security 63 · Infra 17 · Benchmark 7 · UI 8 · App)
+- **75 optimizaciones** con efecto real verificado (transaccionales) + `AllLegacy` para trazabilidad
+- **11 páginas** WinUI 3 con Mica, `NavigationView`, animaciones de entrada, i18n `es-ES`/`en-US` instantáneo
+- **540 tests** en 6 suites (Core 389 · Integration 48 · Security 71 · Infra 17 · Benchmark 7 · UI 8)
 - **0 telemetría externa**, 0 dependencias web, 0 comandos arbitrarios
 
 ---
@@ -79,7 +79,7 @@ La UI **siempre eleva** (`app.manifest` `requireAdministrator` → UAC en cada i
 | **Perf** | System.Diagnostics.PerformanceCounter | **10.0.0** | `% DPC Time` / `% Interrupt Time` |
 | **Servicios** | System.ServiceProcess.ServiceController | **8.0.1** | `CAO.Privileged` como `BackgroundService` |
 | **Build** | `Directory.Packages.props` + `Directory.Build.props` + `Version.props` (single source `2.1.5`) | Centralizado | Un lugar para bump de versión/paquetes |
-| **Tests** | xUnit 2.9.2 + Microsoft.NET.Test.Sdk 17.11.1 | — | 500+ tests en Release |
+| **Tests** | xUnit 2.9.2 + Microsoft.NET.Test.Sdk 17.11.1 | — | 540 tests en Release |
 | **Seguridad** | CodeQL + `dotnet audit` + Dependabot + CycloneDX SBOM | CI | Cadena de suministro auditada |
 
 > **Self-contained:** los artefactos de release no requieren runtime instalado. El instalador es `self-contained` sin `single-file` (requisito WinUI 3).
@@ -116,10 +116,10 @@ La UI **siempre eleva** (`app.manifest` `requireAdministrator` → UAC en cada i
 | Proyecto | Responsabilidad | Depende de |
 |---|---|---|
 | `CA-O.Shared` | DTOs, contratos IPC v2 (`IpcProtocol` v2, `Ping`, `GetServiceStatus`), `CaOPaths`, `ErrorCodes CAO-XXX-nnn`, `AppVersion 2.1.5`, `BuildConstants`, `Constants/IpcConstants` | — |
-| `CA-O.Core` | `OptimizationCatalog` (66), `OptimizationEngine` transaccional, `RecommendationEngine` + `OptimizationScoreCalculator` (0-100), `GameCompatibilityPolicy` (matriz SAFE/CAUTION/BLOCKED `CAO-GAME-001`), `HealthEngine`, `KnownIssueMatcher`, `CrashRecoveryService`, `Rollback/*` | Shared |
+| `CA-O.Core` | `OptimizationCatalog` (75), `OptimizationEngine` transaccional, `RecommendationEngine` + `OptimizationScoreCalculator` (0-100), `GameCompatibilityPolicy` (matriz SAFE/CAUTION/BLOCKED `CAO-GAME-001`), `HealthEngine`, `KnownIssueMatcher`, `CrashRecoveryService`, `Rollback/*` | Shared |
 | `CA-O.Infrastructure` | WMI 5 s timeout + `SystemAnalysisService` + `AnalysisStateStore` (atómico, 24 h TTL) + `SnapshotRepository`/`FileSnapshotStore` (TX identity + SHA-256) + `JsonHistoryLogger` (hash-chain) + `SystemBenchmarkRunner` + `Gaming/*` + `Networking/*` + `Storage/*` + `Security/*` + `Windows/*` | Core, Shared |
 | `CA-O.Privileged` | Servicio `SYSTEM` + `PrivilegedPipeService` (Named Pipe `CA-O.Privileged.v1`, ACL + `ReplayCache` 30 s, timeout 15 s/conn) + `OptimizationEngine` hosteado + `AdministratorsOnlyAuthorizer` | Core, Infrastructure, Shared |
-| `CA-O.UI` | WinUI 3 Mica + 8 ViewModels DI (`AppHost` + `UiState`) + `Controls` (`MetricCard`/`RiskBadge`/`ScoreRing`/`Diagnostic*`) + `PrivilegedPipeClient` + `ErrorTranslator` + `Helpers/LocalizationHelper` + 8 páginas con `VisualState` | Core, Infrastructure, Shared |
+| `CA-O.UI` | WinUI 3 Mica + ViewModels DI (`AppHost` + `UiState`) + `Controls` (`MetricCard`/`RiskBadge`/`ScoreRing`/`Diagnostic*`) + `PrivilegedPipeClient` + `ErrorTranslator` + `Helpers/{LocalizationHelper,UiAnimations}` + 11 páginas con `VisualState` y animaciones | Core, Infrastructure, Shared |
 | `CA-O.InstallerGui` | Instalador gráfico **680×620**, Mica, progress, `requireAdministrator`, registro servicio + atajos | — |
 | `CA-O.Setup` | Instalador consola fallback, `requireAdministrator` | — |
 | `CA-O.Uninstaller` | Desinstalador + entrada ARP (`Programs and Features`), `UninstallService` | — |
@@ -155,21 +155,22 @@ CA-O.sln  (.NET 10 · LangVersion 13 · WinUI 3)
 ├── src/
 │   ├── CA-O.Shared/                 # Contratos puros, sin IO
 │   │   ├── Constants/               # AppVersion (2.1.5), BuildConstants, CaOPaths, IpcConstants
-│   │   ├── IPC/                     # IpcProtocol v2, IpcRequest/Response, Payloads (7 ops)
+│   │   ├── IPC/                     # IpcProtocol v2, IpcRequest/Response, Payloads (9 ops)
 │   │   ├── Security/                # CommandPolicy, ErrorCodes, CallerIdentity
 │   │   ├── Enums/                   # RecommendationBucket, RiskLevel, EvidenceLevel, etc.
 │   │   └── DTO/                     # OptimizationDefinition, SystemContext, HealthScore
 │   ├── CA-O.Core/                   # Lógica de negocio, sin WMI
-│   │   ├── Optimization/            # OptimizationCatalog (66), RegistryOptimizationBase, Engine
-│   │   ├── Optimizations/           # 66 clases por carpeta:
+│   │   ├── Optimization/            # OptimizationCatalog (75), RegistryOptimizationBase, Engine
+│   │   ├── Optimizations/           # 75 clases por carpeta (+ bases compartidas):
 │   │   │   ├── Performance/         # DisableVbs, MaximumPowerPlan, DisableVisualEffects…
-│   │   │   ├── Power/               # SetBestPerformanceAc, DisablePcieLink…
-│   │   │   ├── Storage/             # DisableHibernate, OptimizeSystemDrive…
-│   │   │   ├── Network/             # NormalizeTcpAutoTuning, EnableRss…
+│   │   │   ├── Power/               # powercfg real + bases PowerAcSetting/PowerSchemeSwitch…
+│   │   │   ├── Storage/             # borrado real + base TempFileCleanup…
+│   │   │   ├── Network/             # netsh real + base NicAdvancedProperty…
 │   │   │   ├── Gaming/              # EnableGameMode, DisableGameBarDvr…
 │   │   │   ├── PrivacySecurity/     # DisableTelemetry, DisableCopilot…
-│   │   │   ├── Startup/             # DisableHeavyStartupApps…
-│   │   │   └── System/              # PendingRebootMaintenance…
+│   │   │   ├── Startup/             # base StartupRunKey + servicios + schtasks…
+│   │   │   ├── System/              # restore-point WMI, auditorías DiagnosticOnly…
+│   │   │   └── Troubleshoot/        # audio, video, WU, reloj (7 solucionadores)
 │   │   ├── Scoring/                 # RecommendationEngine, OptimizationScoreCalculator
 │   │   ├── Gaming/                  # GameCompatibilityPolicy (24 entradas)
 │   │   ├── Diagnostics/             # HealthEngine, CaoHealthCheck
@@ -189,23 +190,24 @@ CA-O.sln  (.NET 10 · LangVersion 13 · WinUI 3)
 │   │   └── Services/                # SystemAnalysisService (WhenAll, 5s timeout)
 │   ├── CA-O.Privileged/             # Servicio SYSTEM
 │   │   ├── Program.cs               # Host.CreateDefaultBuilder().UseWindowsService()
-│   │   └── PrivilegedPipeService.cs # NamedPipeServerStreamAcl + ValidateAndDispatchAsync
+│   │   ├── PrivilegedPipeService.cs # NamedPipeServerStreamAcl + ValidateAndDispatchAsync
+│   │   └── TimerResolution.cs       # NtSetTimerResolution sostenido por el servicio
 │   ├── CA-O.UI/                     # WinUI 3
 │   │   ├── App.xaml / MainWindow.xaml
-│   │   ├── Pages/                   # Dashboard, Analyze, Optimize, Gaming, Diagnostics, Benchmark, Restore, History, Settings
-│   │   ├── ViewModels/              # 8 VMs (Dashboard, Analyze, Optimize, Gaming, Diagnostics, Benchmark, Restore, History, Settings) + UiState
+│   │   ├── Pages/                   # Dashboard, Analyze, Optimize, Limpieza, Solucionar, Gaming, Diagnostics, Benchmark, Restore, History, Settings
+│   │   ├── ViewModels/              # VMs por página + UiState (estado compartido en memoria)
 │   │   ├── Controls/                # MetricCard, RiskBadge, ScoreRing, Diagnostic*
 │   │   ├── Resources/               # DesignTokens.xaml, Localizer (es-ES/en-US)
 │   │   ├── Navigation/              # ShellNavigationService, RouteTable
-│   │   ├── Helpers/                 # LocalizationHelper, ErrorTranslator
+│   │   ├── Helpers/                 # LocalizationHelper, UiAnimations, ErrorTranslator
 │   │   └── PrivilegedPipeClient.cs  # NamedPipeClientStream + nonce + 10s timeout
 │   ├── CA-O.InstallerGui/           # 680×620 GUI installer (WinUI 3, requireAdministrator)
 │   ├── CA-O.Setup/                  # Consola fallback (sc.exe create/start)
 │   └── CA-O.Uninstaller/            # ARP uninstaller (sc stop/delete + rmdir)
-├── tests/                           # 500+ tests, Release
-│   ├── CA-O.Core.Tests/             # 361: catalog, AnalysisStateStore, GameCompatibility, transacciones
+├── tests/                           # 540 tests, Release
+│   ├── CA-O.Core.Tests/             # 389: catalog (75), AnalysisStateStore, GameCompatibility, transacciones
 │   ├── CA-O.Integration.Tests/      # 48: E2E 10 flujos + TransactionJournalRecovery
-│   ├── CA-O.Security.Tests/         # 63: IpcValidator, ReplayCache, CommandPolicy
+│   ├── CA-O.Security.Tests/         # 71: IpcValidator (+timer), ReplayCache, CommandPolicy
 │   ├── CA-O.Infrastructure.Tests/   # 17: HistoryRobustness, SnapshotRepository
 │   ├── CA-O.Benchmark.Tests/        # 7:  suelo 3%, mediana
 │   ├── CA-O.UI.Tests/               # 8:  ViewModels
@@ -267,11 +269,11 @@ Ver detalles completos en [docs/SECURITY.md](docs/SECURITY.md) y [docs/THREAT-MO
 
 ---
 
-## Catálogo completo de optimizaciones (66)
+## Catálogo completo de optimizaciones (75)
 
 > **Calidad sobre cantidad.** Cada entrada responde *qué cambia*, *por qué*, *con qué evidencia*, *qué riesgo/seguridad afecta*, *si es reversible* y *cómo se verifica*. Todas implementan `IOptimization` (`Definition` + `Detect` + `Capture` + `ApplyAsync` + `RevertAsync` + `PreviewAsync` + `VerifyAsync` cuando aplica).
 
-### Tabla maestra (66) — `OptimizationCatalog.All`
+### Tabla maestra (75) — `OptimizationCatalog.All`
 
 | # | Id | Categoría | Impacto | Evidencia | Riesgo | Compat. | Reversible | Flags | Qué hace |
 |---|---|---|---|---|---|---|---|---|---|
@@ -341,8 +343,15 @@ Ver detalles completos en [docs/SECURITY.md](docs/SECURITY.md) y [docs/THREAT-MO
 | 64 | `restore-windows-search-default` | Startup | Tiny | Official | Low | Compatible | ✅ | — | Windows Search default |
 | 65 | `create-restore-point-before-optimization-batch` | System | None | Official | Safe | Compatible | ✅ | — | `SRSetRestorePoint` antes de batch |
 | 66 | `pending-reboot-maintenance` | System | None | Official | Safe | Compatible | ✅ | DiagnosticOnly | Detecta reboot pendiente |
-| — | `stale-crash-dump-cleanup` | System | Tiny | Official | Low | Compatible | ✅ | — | Limpia dumps antiguos |
-| — | `optimize-startup-recovery-state` | System | None | Official | Safe | Compatible | ✅ | — | Audita estado boot/recovery |
+| — | `stale-crash-dump-cleanup` | System | Tiny | Official | Low | Compatible | ✅ | — | Borra *.dmp +30d en Minidump |
+| — | `optimize-startup-recovery-state` | System | None | Official | Safe | Compatible | ✅ | DiagnosticOnly | Audita CrashControl AutoReboot |
+| 67 | `restart-windows-audio-services` | Troubleshoot | Small | Official | Low | Compatible | ✅ | — | Reinicia Audiosrv + EndpointBuilder |
+| 68 | `disable-bluetooth-absolute-volume` | Troubleshoot | Tiny | Official | Low | Conditional | ✅ | — | AVRCP DisableAbsoluteVolume=1 |
+| 69 | `fix-microphone-access` | Troubleshoot | Tiny | Official | Low | Compatible | ✅ | — | ConsentStore microphone=Allow |
+| 70 | `restart-desktop-compositor` | Troubleshoot | Small | Official | Moderate | Compatible | ❌ | NotReversible | taskkill dwm (se recompone solo) |
+| 71 | `clear-icon-thumbnail-cache` | Troubleshoot | Tiny | Official | Low | Compatible | ❌ | NotReversible | iconcache/thumbcache por perfil |
+| 72 | `repair-windows-update` | Troubleshoot | Small | Official | Moderate | Compatible | ✅ | — | Renombra SoftwareDistribution/Catroot2 |
+| 73 | `resync-system-clock` | Troubleshoot | Tiny | Official | Low | Compatible | ❌ | NotReversible | w32tm /resync |
 
 > **Nota:** `optimize-system-drive` y `windows-component-store-resetbase` son **no reversibles** (`NotReversible`) — se auditan como `VerificationStatus.NotApplicable` y no eliminan snapshot tras éxito.
 
@@ -426,7 +435,7 @@ Descarga ZIP → Descomprime → gui-installer/CA-O.InstallerGui.exe (UAC)
 ### 2. Primer inicio
 
 - `App.xaml.cs` → `AppHost` DI → `AnalysisStateStore.Load()` → si existe y `fresh` (≤7 d) hidrata `UiState` (no re-analiza)
-- `MainWindow` (Mica) → `NavigationView` 8 páginas → `DashboardPage` muestra health, último análisis, conteo buckets, SecureBoot/VBS/HVCI, juegos, `ServiceStatus: connected/rejected` (InfoBar "Modo solo lectura" si no hay servicio)
+- `MainWindow` (Mica) → `NavigationView` 11 páginas → `DashboardPage` muestra health, último análisis, conteo buckets, SecureBoot/VBS/HVCI, juegos, `ServiceStatus: connected/rejected` (InfoBar "Modo solo lectura" si no hay servicio)
 
 ### 3. Analizar
 
@@ -550,9 +559,15 @@ Cada perfil es **dinámico** — no es lista fija. Ej. `maximum-power-plan` solo
 | **Benchmark** | `BenchmarkPage.xaml` | Flujo 5 pasos + `Baseline/After/Comparison/Verdict` + suelo 3 % |
 | **Restaurar** | `RestorePage.xaml` | `snapshots/{txid}/` por fecha, `TxId`, conteo, build, `[Revertir]` + verificación |
 | **Historial** | `HistoryPage.xaml` | `history.jsonl` timeline + hash-chain verify + filtros + `corruptedCount` warning |
+| **Limpieza** | `LimpiezaPage.xaml` | Temporales por optimización + `Ejecutar todo`, papelera con confirmación, DNS y **timer resolution** (0,5/1,0 ms) vía IPC |
+| **Solucionar** | `SolucionarPage.xaml` | Audio (reinicio pila, micro, BT), video (compositor, iconos) y sistema (Windows Update, reloj) con efecto real |
 | **Ajustes** | `SettingsPage.xaml` | Tema (Sistema/Claro/Oscuro), idioma (es-ES/en-US), `ExpertMode` + `InfoBar` warning, **Servicio privilegiado** con `InfoBar` explicativo + `ProgressRing` + `ServiceCheck` + `Instalar ahora` (auto-eleva, wrapper PS1, start service, verify, restart app) + `VersionsText` + `PrivilegeText` |
 
 **Controles custom:** `MetricCard`, `RiskBadge`, `ScoreRing`, `Diagnostic*Card`, `DesignTokens.xaml` (Mica, `CaoCardStyle`, `CaoAccentButtonStyle`).
+
+**Vida visual:** `Helpers/UiAnimations` — entrada escalonada por página, contadores animados, pulso en el punto de servicio, héroe con degradado de acento. Todo respeta `ReducedMotion` (si el sistema desactiva animaciones, se aplican valores finales al instante).
+
+**Servicio memorizado:** `UiState` guarda `ServiceStatus` + `ServiceCheckedUtc`; el probe de arranque lo rellena y Ajustes lo refleja con "Última verificación" + auto-chequeo al entrar. El aviso de reinicio solo aparece si es significativo (Windows Update o CBS).
 
 **i18n:** `Localizer` diccionario tipado `es-ES`/`en-US` (`settings.serviceExplanationTitle` etc.) → `ApplyTexts()` + `LocalizationHelper.LocalizeTree()`. Migración a `.resw` planificada sin cambiar `Localizer.Get(key)`.
 
@@ -652,18 +667,17 @@ powershell -ExecutionPolicy Bypass -File scripts/harden-data-acls.ps1
 
 ## Pruebas
 
-**500+ pruebas en 7 suites, todas en Release:**
+**540 pruebas en 6 suites, todas en Release:**
 
 | Suite | Cubre | Cant. |
 |---|---|---|
-| `CA-O.Core.Tests` | Contratos catálogo, `AnalysisStateStore` (save/load/corrupt/schema), `GameCompatibility` (VBS bloqueado), `OptimizationTransaction` (snapshot/apply/verify/rollback), `RecommendationEngine`, `KnownIssueMatcher`, `HealthEngine`, 66 definiciones `IOptimization` | **361** |
-| `CA-O.Security.Tests` | `IpcRequestValidator` (version/nonce/freshness/size/schema), `ReplayCache` (30 s, single-use), `CommandPolicy` (allowlist, PATH-hijacking, injection), `WindowsCallerInspector` (SID/SessionId/elevación), `PrivilegedIpcSecurityTests` (oversized/malformed/flood) | **63** |
+| `CA-O.Core.Tests` | Contratos catálogo (75), `AnalysisStateStore` (save/load/corrupt/schema), `GameCompatibility` (VBS bloqueado), `OptimizationTransaction` (snapshot/apply/verify/rollback), `RecommendationEngine`, `KnownIssueMatcher`, `HealthEngine`, 75 definiciones `IOptimization` | **389** |
+| `CA-O.Security.Tests` | `IpcRequestValidator` (version/nonce/freshness/size/schema, timer), `ReplayCache` (30 s, single-use), `CommandPolicy` (allowlist, PATH-hijacking, injection), `WindowsCallerInspector` (SID/SessionId/elevación), `PrivilegedIpcSecurityTests` (oversized/malformed/flood) | **71** |
 | `CA-O.Integration.Tests` | `E2EFlowsTests` 10 flujos (Abrir→Analizar→Persistir→Vanguard→Restore→Benchmark→History→Cancel→Recovery), `TransactionJournalRecovery` (Incomplete→RollbackRequired), `ArchitectureDependencyTests` | **48** |
 | `CA-O.Infrastructure.Tests` | `HistoryRobustness` (líneas malformadas), `SnapshotRepository` (TX identity), `SystemContextCache` dual-TTL, `DnsBenchmark` | **17** |
 | `CA-O.Benchmark.Tests` | `SystemBenchmarkRunner` (suelo 3 %, mediana, trials) | **7** |
 | `CA-O.UI.Tests` | `ViewModelTests` (Analyze/Dashboard con `SystemAnalysisService` + `CorrelationId`), `LocalizerTests` | **8** |
-| `CA-O.App.Tests` | Smoke `AppHost` | — |
-| **Total** | **Gates 1-5 `verify.ps1` + `build-release` con `gui-installer`** | **~504** |
+| **Total** | **Gates 1-5 `verify.ps1` + `build-release` con `gui-installer`** | **540** |
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts/test.ps1
@@ -737,7 +751,7 @@ Consulta [CONTRIBUTING.md](CONTRIBUTING.md).
 2. Tests que **fallen sin el parche** (TDD)
 3. Toda optimización nueva implementa `IOptimization` con `Definition` completa + reversibilidad exacta + `PreviewAsync`
 4. Si usa comando externo → patrón exacto en `CommandPolicy` + test en `CommandPolicyTests` (anti-inyección)
-5. `scripts/verify.ps1` en verde (5 gates + 500+ tests)
+5. `scripts/verify.ps1` en verde (5 gates + 540 tests)
 6. PR con evidencia, impacto seguridad/compatibilidad, captura `OptimizePage` Before/After
 
 ---
