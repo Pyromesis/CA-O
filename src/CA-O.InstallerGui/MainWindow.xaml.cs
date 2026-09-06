@@ -357,10 +357,11 @@ internal void OnCancelClick(object sender, RoutedEventArgs e)
 
     private async Task<(string uiExe, string svcExe)> DownloadPayloadAsync(CancellationToken ct)
     {
-        UpdateProgress(5, "Descargando payload (451 MB)...", "Descargando desde GitHub Release v2.1.5");
-        var zipUrl = "https://github.com/Pyromesis/CA-O/releases/download/v2.1.5/CA-O-2.1.5-win-x64.zip";
-        var fallbackUrl = "https://github.com/Pyromesis/CA-O/releases/latest/download/CA-O-2.1.5-win-x64.zip";
-        var fallbackOld = "https://github.com/Pyromesis/CA-O/releases/download/v2.1.4/CA-O-2.1.4-win-x64.zip";
+        var payloadVersion = CAO.Shared.Constants.BuildConstants.ProductVersion;
+        UpdateProgress(5, "Descargando payload (451 MB)...", $"Descargando desde GitHub Release v{payloadVersion}");
+        var zipUrl = $"https://github.com/Pyromesis/CA-O/releases/download/v{payloadVersion}/CA-O-{payloadVersion}-win-x64.zip";
+        var fallbackUrl = $"https://github.com/Pyromesis/CA-O/releases/latest/download/CA-O-{payloadVersion}-win-x64.zip";
+        var fallbackOld = "https://github.com/Pyromesis/CA-O/releases/download/v2.1.5/CA-O-2.1.5-win-x64.zip";
         var tmpZip = Path.Combine(Path.GetTempPath(), "CA-O-payload.zip");
         var tmpDir = Path.Combine(Path.GetTempPath(), "CA-O-payload-gui");
 
@@ -422,7 +423,7 @@ internal void OnCancelClick(object sender, RoutedEventArgs e)
                     }
                     catch (Exception ex2)
                     {
-                        throw new InvalidOperationException($"No se pudo descargar payload (todas las URLs 404). Último error: {ex2.Message}. Descarga manualmente CA-O-2.1.5-win-x64.zip o usa el ZIP completo offline.", ex2);
+                        throw new InvalidOperationException($"No se pudo descargar payload (todas las URLs 404). Último error: {ex2.Message}. Descarga manualmente CA-O-{CAO.Shared.Constants.BuildConstants.ProductVersion}-win-x64.zip o usa el ZIP completo offline.", ex2);
                     }
                 }
             }
