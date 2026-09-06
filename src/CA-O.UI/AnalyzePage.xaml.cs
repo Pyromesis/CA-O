@@ -2,6 +2,8 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Media;
+using CAO.Core.Diagnostics;
 using CAO.Infrastructure.Networking;
 using CAO.Infrastructure.Security;
 using CAO.Infrastructure.Storage;
@@ -14,6 +16,8 @@ namespace CAO.UI.Pages;
 /// <summary>Diagnostics-first page ( §6-10, §8 WhenAll ): mide en paralelo con estado por módulo y cancelación.</summary>
 public sealed partial class AnalyzePage : Page
 {
+    private sealed record FindingRow(string SeverityLabel, string MessageEs, Brush SeverityBrush);
+
     private readonly AnalyzeViewModel _viewModel;
     private readonly ViewModels.DiagnosticsViewModel _diagnosticsVm;
     private CancellationTokenSource? _cts;
@@ -152,6 +156,122 @@ public sealed partial class AnalyzePage : Page
         StatusText.Text = state.LastAnalysisUtc is null ? "Datos del último análisis cargados." : $"Datos del {state.LastAnalysisUtc.Value.ToLocalTime():g} cargados.";
         UpdateFreshnessBanner();
         RenderDiagnostics();
+        RenderHealth();
+    }
+
+    /// <summary>Salud del sistema + hardware + hallazgos (vive aquí, se refresca con cada análisis).</summary>
+    private void RenderHealth()
+    {
+        var uiState = AppHost.Resolve<ViewModels.UiState>();
+        var context = uiState.Context;
+        var health = _viewModel.Health ??
+            (context is null ? null : HealthEngine.Evaluate(context));
+
+        if (context is null)
+        {
+            SystemHealthText.Text = "Sistema: sin datos";
+            SystemHealthBadge.Background = (Brush)Application.Current.Resources["SystemFillColorNeutralBrush"];
+            HealthScoresText.Text = "";
+            WhyScoresButton.Visibility = Visibility.Collapsed;
+            CpuNameText.Text = "—";
+            CpuDetailText.Text = "Ejecute el análisis";
+            GpuNameText.Text = "—";
+            GpuDetailText.Text = "";
+            GpuDriverText.Text = "";
+            RamText.Text = "—";
+            RamDetailText.Text = "";
+            StorageSummaryText.Text = "";
+            SecurityPosturePanel.Children.Clear();
+            AntiCheatText.Text = "Anti-cheats: —";
+            SystemSummary.Text = "Sin datos de sistema aún — pulse Analizar.";
+            EmptyFindingsState.Visibility = Visibility.Visible;
+            FindingsList.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        // Hardware
+        CpuNameText.Text = string.IsNullOrWhiteSpace(context.CpuName) ? "CPU desconocida" : context.CpuName;
+        CpuDetailText.Text = $"{context.CpuCores} núcleos / {context.CpuLogicalProcessors} hilos · {context.Architecture} · {(context.IsLaptop ? "Portátil" : "Sobremesa")}";
+        GpuNameText.Text = string.IsNullOrWhiteSpace(context.GpuName) ? "GPU no detectada" : context.GpuName;
+        GpuDetailText.Text = context.HasSsd ? "SSD detectado" : "SSD no detectado";
+        GpuDriverText.Text = string.IsNullOrWhiteSpace(context.GpuDriverVersion) ? "" : $"Driver {context.GpuDriverVersion}";
+        RamText.Text = $"{context.RamGb} GB";
+        RamDetailText.Text = $"Windows {context.WindowsEdition} build {context.WindowsBuild}";
+        StorageSummaryText.Text = context.IsLaptop ? "Modo portátil" : "Modo sobremesa";
+        SystemSummary.Text = $"{context.WindowsEdition} build {context.WindowsBuild} ({context.Architecture})";
+
+        // Postura de seguridad
+        SecurityPosturePanel.Children.Clear();
+        void AddPosture(string label, bool? enabled)
+        {
+            var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
+            var dot = new Microsoft.UI.Xaml.Shapes.Ellipse { Width = 7, Height = 7, VerticalAlignment = VerticalAlignment.Center };
+            dot.Fill = enabled == true ? (Brush)Application.Current.Resources["SystemFillColorSuccessBrush"] : enabled == false ? (Brush)Application.Current.Resources["SystemFillColorCriticalBrush"] : (Brush)Application.Current.Resources["SystemFillColorNeutralBrush"];
+            row.Children.Add(dot);
+            row.Children.Add(new TextBlock { Text = $"{label}: {(enabled is null ? "desconocido" : enabled.Value ? "activado" : "desactivado")}", FontSize = 11, Opacity = 0.85 });
+            SecurityPosturePanel.Children.Add(row);
+        }
+        AddPosture("Secure Boot", context.SecureBootEnabled);
+        AddPosture("VBS", context.VbsEnabled);
+        AddPosture("HVCI", context.HvciEnabled);
+        AntiCheatText.Text = context.AntiCheats.Count == 0 ? "Anti-cheats: ninguno" : $"Anti-cheats: {string.Join(", ", context.AntiCheats.Select(a => a.Kind))}";
+
+        // Scores + hallazgos
+        if (health is null)
+        {
+            HealthScoresText.Text = "";
+            WhyScoresButton.Visibility = Visibility.Collapsed;
+            EmptyFindingsState.Visibility = Visibility.Visible;
+            FindingsList.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        var measured = health.Scores.Where(score => score.IsMeasured && score.Score is not null).ToList();
+        HealthScoresText.Text = measured.Count == 0
+            ? "Sin puntuación — faltan mediciones."
+            : string.Join("  ·  ", measured.Select(score => $"{score.Dimension}: {score.Score}/100"));
+        WhyScoresButton.Visibility = string.IsNullOrWhiteSpace(HealthScoresText.Text) ? Visibility.Collapsed : Visibility.Visible;
+        var findings = health.Findings.Select(f => new FindingRow(f.Severity.ToString(), f.MessageEs, BrushFor(f.Severity.ToString()))).ToList();
+        FindingsList.ItemsSource = findings;
+        FindingsList.Visibility = findings.Count == 0 ? Visibility.Collapsed : Visibility.Visible;
+        EmptyFindingsState.Visibility = findings.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        SystemHealthText.Text = DeriveSystemStatus(health);
+        SystemHealthBadge.Background = BrushForStatus(SystemHealthText.Text);
+    }
+
+    private static Brush BrushFor(string severity) => severity.ToLowerInvariant() switch
+    {
+        "error" or "critical" => (Brush)Application.Current.Resources["SystemFillColorCriticalBrush"],
+        "warning" => (Brush)Application.Current.Resources["SystemFillColorCautionBrush"],
+        _ => (Brush)Application.Current.Resources["SystemFillColorSuccessBrush"]
+    };
+
+    private static Brush BrushForStatus(string status) => status.Contains("Atención") || status.Contains("Attention")
+        ? (Brush)Application.Current.Resources["SystemFillColorCautionBrush"]
+        : status.Contains("Correcto") || status.Contains("Healthy")
+        ? (Brush)Application.Current.Resources["SystemFillColorSuccessBrush"]
+        : (Brush)Application.Current.Resources["SystemFillColorNeutralBrush"];
+
+    private static string DeriveSystemStatus(SystemDiagnosticReport report)
+    {
+        if (report.Findings.Any(f => f.Severity.ToString().Equals("Error", StringComparison.OrdinalIgnoreCase))) return "Sistema: Atención";
+        if (report.Findings.Any(f => f.Severity.ToString().Equals("Warning", StringComparison.OrdinalIgnoreCase))) return "Sistema: Correcto con avisos";
+        return "Sistema: Correcto";
+    }
+
+    private async void OnWhyScoresClick(object sender, RoutedEventArgs e)
+    {
+        if (_viewModel.Health is null) return;
+        var detail = string.Join("\n", _viewModel.Health.Scores.Where(s => s.IsMeasured).Select(s => $"• {s.Dimension}: {s.Score}/100 — {s.ReasonEs}"));
+        if (string.IsNullOrWhiteSpace(detail)) detail = "No hay dimensiones medidas suficientes para un score. Ejecute más diagnósticos.";
+        var dialog = new ContentDialog
+        {
+            Title = "Desglose de salud del sistema",
+            Content = new ScrollViewer { MaxHeight = 380, Content = new TextBlock { Text = detail, TextWrapping = TextWrapping.Wrap, IsTextSelectionEnabled = true } },
+            CloseButtonText = "Cerrar",
+            XamlRoot = Content.XamlRoot,
+        };
+        await dialog.ShowAsync();
     }
 
     private void RenderDiagnostics()
@@ -163,6 +283,14 @@ public sealed partial class AnalyzePage : Page
 
     private async void OnRunClick(object sender, RoutedEventArgs e)
     {
+        if (!RunButton.IsEnabled) return;
+        await RunFullAnalysisAsync();
+    }
+
+    /// <summary>Ejecuta el análisis completo (llamable desde el Panel).</summary>
+    public async Task RunFullAnalysisAsync()
+    {
+        if (!RunButton.IsEnabled) return;
         _cts?.Cancel();
         _cts?.Dispose();
         _cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));

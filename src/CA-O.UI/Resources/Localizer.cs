@@ -157,6 +157,8 @@ public static class Localizer
         ["dashboard.whyState"] = "¿Por qué este estado?",
         ["dashboard.noFindingsDesc"] = "No se detectaron problemas. Ejecute un análisis completo para refrescar.",
         ["dashboard.goOptimize"] = "Revisar en Optimizar →",
+        ["dashboard.shortcuts"] = "Accesos",
+        ["dashboard.status"] = "Estado y programa",
         // Diagnostics
         ["diagnostics.title"] = "Diagnóstico",
         ["diagnostics.subtitle"] = "Módulos con estado actual, métricas brutas, interpretación y confianza. Sin telemetría externa.",
@@ -335,6 +337,8 @@ public static class Localizer
         ["dashboard.whyState"] = "Why this state?",
         ["dashboard.noFindingsDesc"] = "No issues detected. Run a full analysis to refresh.",
         ["dashboard.goOptimize"] = "Review in Optimize →",
+        ["dashboard.shortcuts"] = "Shortcuts",
+        ["dashboard.status"] = "Status and program",
         ["diagnostics.title"] = "Diagnostics",
         ["diagnostics.subtitle"] = "Modules with current state, raw metrics, interpretation and confidence. No external telemetry.",
         ["diagnostics.runAll"] = "Run full diagnostics",

@@ -27,7 +27,6 @@ public sealed partial class DashboardViewModel : ObservableObject
 
     [ObservableProperty] private bool _isLoading;
     [ObservableProperty] private string _serviceStatus = "unknown";
-    [ObservableProperty] private SystemDiagnosticReport? _health;
     [ObservableProperty] private string _statusMessage = string.Empty;
     [ObservableProperty] private IReadOnlyList<Recommendation> _recommendations = Array.Empty<Recommendation>();
 
@@ -49,7 +48,6 @@ public sealed partial class DashboardViewModel : ObservableObject
                 _state.Context = persisted.Context;
                 _state.Recommendations = persisted.Recommendations ?? Array.Empty<Recommendation>();
                 _state.LastAnalysisUtc = persisted.TimestampUtc;
-                Health = persisted.Health ?? Core.Diagnostics.HealthEngine.Evaluate(persisted.Context);
                 Recommendations = _state.Recommendations;
                 StatusMessage = _store.GetStatusLabel(persisted);
             }
@@ -57,7 +55,6 @@ public sealed partial class DashboardViewModel : ObservableObject
             {
                 var context = _state.Context ?? await _contextProvider.GetAsync(ct);
                 _state.Context = context;
-                Health = Core.Diagnostics.HealthEngine.Evaluate(context);
                 Recommendations = _state.Recommendations;
             }
             ServiceStatus = _state.ServiceStatus;
@@ -82,7 +79,6 @@ public sealed partial class DashboardViewModel : ObservableObject
             if (result.Context != null) _state.Context = result.Context;
             _state.Recommendations = result.Recommendations;
             Recommendations = result.Recommendations;
-            Health = result.Health;
             _state.LastAnalysisUtc = DateTime.UtcNow;
             StatusMessage = result.AnalysisState == "Completed" ? "Análisis completo."
                 : result.AnalysisState == "CompletedWithWarnings" ? $"Completado con advertencias ({result.Warnings.Count})"

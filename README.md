@@ -551,8 +551,8 @@ Cada perfil es **dinámico** — no es lista fija. Ej. `maximum-power-plan` solo
 
 | Página | Ruta | Qué muestra |
 |---|---|---|
-| **Panel** | `DashboardPage.xaml` | Health 0-100 por dimensión, último análisis + freshness, conteo buckets, SecureBoot/VBS/HVCI, juegos, `ServiceStatus` + `InfoBar` modo solo lectura |
-| **Analizar** | `AnalyzePage.xaml` | `SystemAnalysisService` 9 providers en paralelo, `AnalysisState` + `Warnings`, botón "Ejecutar análisis completo" (10-30 s), DPC sampler 5 s, DNS `Apply` si servicio |
+| **Panel** | `DashboardPage.xaml` | Centro: info del programa (versión, protocolo, optimizaciones), accesos a las 10 pestañas, próximo paso, servicio y avisos globales |
+| **Analizar** | `AnalyzePage.xaml` | Análisis completo + salud 0-100 por dimensión, tarjetas CPU/GPU/RAM/seguridad, hallazgos con refresco, freshness, DPC sampler 5 s, DNS `Apply` si servicio |
 | **Optimizar** | `OptimizePage.xaml` | Tarjetas con bucket/evidencia/riesgo/seguridad/compat, diff Before/After, `ProgressRing` + `TxText` (`Precheck…Commit`), filtros `Todas/Recomendadas/Opcionales/Experimentales`, `Aplicar recomendadas` (batch) |
 | **Gaming** | `GamingPage.xaml` | Juegos detectados + anti-cheats + matriz `SAFE/CAUTION/BLOCKED` + guidance Reflex/Anti-Lag + contadores `bloqueadas/permitidas/en revisión` |
 | **Diagnóstico** | `DiagnosticsPage.xaml` | 6 dimensiones paralelas con interpretación natural ("CPU Normal", "GPU RTX 4070 12 GB driver 551.61") — "no disponible" si API ausente |

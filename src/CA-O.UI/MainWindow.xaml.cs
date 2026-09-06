@@ -238,6 +238,16 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    /// <summary>Navega a Analizar y ejecuta allí el análisis completo.</summary>
+    public async Task GoAnalyzeAndRunAsync()
+    {
+        SelectRoute("analyze");
+        for (int i = 0; i < 20 && ContentFrame.Content is not Pages.AnalyzePage; i++)
+            await Task.Delay(100);
+        if (ContentFrame.Content is Pages.AnalyzePage page)
+            await page.RunFullAnalysisAsync();
+    }
+
     private void OnNavigationSelectionChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args)
     {
         if (args.SelectedItem is not NavigationViewItem item || item.Tag is not string tag)

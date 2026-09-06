@@ -49,6 +49,7 @@ public sealed partial class AnalyzeViewModel : ObservableObject
 
     [ObservableProperty] private bool _isRunning;
     [ObservableProperty] private string _overallStatus = "Inactivo";
+    [ObservableProperty] private CAO.Shared.SystemDiagnosticReport? _health;
     [ObservableProperty] private AnalysisModuleResult? _networkResult;
     [ObservableProperty] private AnalysisModuleResult? _securityResult;
     [ObservableProperty] private AnalysisModuleResult? _storageResult;
@@ -93,9 +94,18 @@ public sealed partial class AnalyzeViewModel : ObservableObject
         }
     }
 
+    public void RefreshHealth()
+    {
+        var context = _uiState.Context;
+        Health = context is null
+            ? null
+            : CAO.Core.Diagnostics.HealthEngine.Evaluate(context);
+    }
+
     public void HydrateFromPersistedAnalysis(CAO.Infrastructure.Persistence.AnalysisStateStore.PersistedAnalysis? persisted)
     {
         if (persisted?.Context == null) return;
+        RefreshHealth();
         OverallStatus = persisted.AnalysisState == "CompletedWithWarnings" ? "Análisis completado con advertencias" : "Análisis completo";
         // Populate module placeholders as Completed from persisted health
         NetworkResult = new AnalysisModuleResult("Network", AnalysisModuleStatus.Completed, persisted.Duration, "persistido", null, null, Array.Empty<string>());
@@ -143,6 +153,7 @@ public sealed partial class AnalyzeViewModel : ObservableObject
             }
 
             // Actualizar UiState global desde el servicio (§4 persistencia ya hecha en el servicio)
+            Health = result.Health ?? (result.Context != null ? CAO.Core.Diagnostics.HealthEngine.Evaluate(result.Context) : null);
             if (result.Context != null) _uiState.Context = result.Context;
             if (result.Recommendations.Count > 0) _uiState.Recommendations = result.Recommendations;
             _uiState.LastAnalysisUtc = DateTime.UtcNow;
