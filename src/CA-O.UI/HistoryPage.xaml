@@ -4,11 +4,11 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <ScrollViewer Padding="32,24,32,32" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Background="{ThemeResource SolidBackgroundFillColorBaseBrush}">
         <StackPanel Spacing="20" MaxWidth="1200" HorizontalAlignment="Center">
-            <StackPanel Spacing="6">
-                <TextBlock Text="Historial" Style="{StaticResource CaoPageTitleStyle}"/>
-                <TextBlock Text="Timeline auditable con TransactionId, operación, verificación y cadena hash. La corrupción genera alerta explícita." Style="{StaticResource CaoSubtitleStyle}"/>
+            <StackPanel Style="{StaticResource CaoPageHeaderStyle}">
+                <TextBlock Text="Historial" TextAlignment="Center" Style="{StaticResource CaoPageTitleStyle}"/>
+                <TextBlock Text="Timeline auditable con TransactionId, operación, verificación y cadena hash. La corrupción genera alerta explícita." TextAlignment="Center" Style="{StaticResource CaoSubtitleStyle}"/>
             </StackPanel>
-            <StackPanel Orientation="Horizontal" Spacing="12" Margin="0,4,0,0">
+            <StackPanel Orientation="Horizontal" Spacing="12" Margin="0,4,0,0" HorizontalAlignment="Center">
                 <Button Content="Actualizar" Click="OnRefreshClick" Style="{StaticResource CaoAccentButtonStyle}"/>
                 <ComboBox x:Name="FilterBox" SelectionChanged="OnFilterChanged" MinWidth="180" PlaceholderText="Filtrar: Todo">
                     <ComboBoxItem Content="Todo" Tag="all" IsSelected="True"/>

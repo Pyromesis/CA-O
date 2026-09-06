@@ -4,9 +4,9 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <ScrollViewer Padding="32,24,32,32" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Background="{ThemeResource SolidBackgroundFillColorBaseBrush}">
         <StackPanel Spacing="20" MaxWidth="1200" HorizontalAlignment="Center">
-            <StackPanel Spacing="6">
-                <TextBlock Text="Benchmark" Style="{StaticResource CaoPageTitleStyle}"/>
-                <TextBlock Text="Metodología honesta: cargas fijas y reproducibles (CPU/memoria/disco). Veredicto con suelo de ruido 3%." Style="{StaticResource CaoSubtitleStyle}"/>
+            <StackPanel Style="{StaticResource CaoPageHeaderStyle}">
+                <TextBlock Text="Benchmark" TextAlignment="Center" Style="{StaticResource CaoPageTitleStyle}"/>
+                <TextBlock Text="Metodología honesta: cargas fijas y reproducibles (CPU/memoria/disco). Veredicto con suelo de ruido 3%." TextAlignment="Center" Style="{StaticResource CaoSubtitleStyle}"/>
             </StackPanel>
             <InfoBar IsOpen="True" Severity="Informational" IsClosable="False"
                      Title="Metodología honesta"

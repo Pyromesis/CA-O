@@ -23,7 +23,7 @@
 
     <Thickness x:Key="CaoCardPadding">16,16,16,16</Thickness>
     <Thickness x:Key="CaoCardPaddingCompact">12,12,12,12</Thickness>
-    <Thickness x:Key="CaoPagePadding">28,20,28,20</Thickness>
+    <Thickness x:Key="CaoPagePadding">32,24,32,32</Thickness>
     <Thickness x:Key="CaoSectionMargin">0,16,0,0</Thickness>
 
     <Style x:Key="CaoCardStyle" TargetType="Border">
@@ -69,6 +69,14 @@
         <Setter Property="FontSize" Value="{StaticResource CaoFontSizeSection}"/>
         <Setter Property="FontWeight" Value="SemiBold"/>
         <Setter Property="Margin" Value="{StaticResource CaoSectionMargin}"/>
+        <Setter Property="HorizontalAlignment" Value="Center"/>
+        <Setter Property="TextAlignment" Value="Center"/>
+    </Style>
+
+    <!-- Centered page header container: title + subtitle, used by every page -->
+    <Style x:Key="CaoPageHeaderStyle" TargetType="StackPanel">
+        <Setter Property="Spacing" Value="6"/>
+        <Setter Property="HorizontalAlignment" Value="Center"/>
     </Style>
 
     <Style x:Key="CaoPageTitleStyle" TargetType="TextBlock">

@@ -4,14 +4,14 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <ScrollViewer Padding="32,24,32,32" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Background="{ThemeResource SolidBackgroundFillColorBaseBrush}">
         <StackPanel Spacing="20" MaxWidth="1200" HorizontalAlignment="Center">
-            <StackPanel Spacing="6">
-                <TextBlock Text="Restaurar" Style="{StaticResource CaoPageTitleStyle}"/>
-                <TextBlock Text="Centro de restauración — snapshots por TransactionId, no por OptimizationId. Cada reversión se verifica exactamente." Style="{StaticResource CaoSubtitleStyle}"/>
+            <StackPanel Style="{StaticResource CaoPageHeaderStyle}">
+                <TextBlock Text="Restaurar" TextAlignment="Center" Style="{StaticResource CaoPageTitleStyle}"/>
+                <TextBlock Text="Centro de restauración — snapshots por TransactionId, no por OptimizationId. Cada reversión se verifica exactamente." TextAlignment="Center" Style="{StaticResource CaoSubtitleStyle}"/>
             </StackPanel>
             <InfoBar x:Name="NoteBar" IsOpen="True" Severity="Informational" IsClosable="False"
                      Title="Reversibilidad garantizada"
                      Message="CA-O crea snapshots propios antes de cada cambio; el punto de restauración de Windows se solicita una vez por sesión cuando el sistema lo permite. Irreversibles se marcan explícitamente."/>
-            <StackPanel Orientation="Horizontal" Spacing="12">
+            <StackPanel Orientation="Horizontal" Spacing="12" HorizontalAlignment="Center">
                 <Button Content="Actualizar lista" Click="OnRefreshClick"/>
                 <Button x:Name="OpenHistoryButton" Content="Ver historial" Click="OnGoHistoryClick" Opacity="0.9"/>
             </StackPanel>

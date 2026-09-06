@@ -22,10 +22,10 @@
                         <ColumnDefinition Width="Auto" MinWidth="240"/>
                     </Grid.ColumnDefinitions>
                     <StackPanel Spacing="8">
-                        <TextBlock x:Name="TitleText" Style="{StaticResource CaoPageTitleStyle}"/>
-                        <TextBlock Text="Tu centro de control: analiza, optimiza, limpia y soluciona desde aquí." Style="{StaticResource CaoSubtitleStyle}"/>
-                        <TextBlock x:Name="ProgramInfoText" FontSize="12" Opacity="0.7" TextWrapping="Wrap" IsTextSelectionEnabled="True" Margin="0,6,0,0" FontWeight="Medium"/>
-                        <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,8,0,0">
+                        <TextBlock x:Name="TitleText" TextAlignment="Center" Style="{StaticResource CaoPageTitleStyle}"/>
+                        <TextBlock Text="Tu centro de control: analiza, optimiza, limpia y soluciona desde aquí." TextAlignment="Center" Style="{StaticResource CaoSubtitleStyle}"/>
+                        <TextBlock x:Name="ProgramInfoText" FontSize="12" Opacity="0.7" TextWrapping="Wrap" IsTextSelectionEnabled="True" Margin="0,6,0,0" FontWeight="Medium" TextAlignment="Center"/>
+                        <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,8,0,0" HorizontalAlignment="Center">
                             <Border x:Name="ServiceBadge" Style="{StaticResource CaoStatusIndicatorStyle}" Background="{ThemeResource SystemFillColorNeutralBrush}">
                                 <TextBlock x:Name="ServiceBadgeText" Text="Servicio: —" FontSize="12" FontWeight="SemiBold" Foreground="White"/>
                             </Border>
