@@ -1,4 +1,4 @@
-# CA-O 2.1.6 — Plataforma nativa de rendimiento, diagnóstico y optimización para Windows 11
+# CA-O 2.1.7 — Plataforma nativa de rendimiento, diagnóstico y optimización para Windows 11
 
 > **Principio operativo:** diagnosticar primero → recomendar con evidencia → aplicar en transacción → verificar → revertir si falla. Sin promesas numéricas falsas, solo hechos medibles.
 
@@ -7,10 +7,10 @@
 [![WinUI 3](https://img.shields.io/badge/WinUI%203-00B7C3?style=flat-square&logo=windows&logoColor=white)](https://microsoft.github.io/microsoft-ui-xaml/)
 [![Build](https://img.shields.io/badge/build-passing-brightgreen?style=flat-square)](https://github.com/Pyromesis/CA-O/actions)
 [![Tests](https://img.shields.io/badge/tests-540%20passed-brightgreen?style=flat-square)](#-pruebas)
-[![Release](https://img.shields.io/badge/release-v2.1.6-blue?style=flat-square)](https://github.com/Pyromesis/CA-O/releases/tag/v2.1.6)
+[![Release](https://img.shields.io/badge/release-v2.1.7-blue?style=flat-square)](https://github.com/Pyromesis/CA-O/releases/tag/v2.1.7)
 [![License](https://img.shields.io/badge/license-privado-lightgrey?style=flat-square)](#licencia)
 
-**Descargas v2.1.6:** [CA-O-Setup-GUI-x64.zip (92 MB, instalador GUI)](https://github.com/Pyromesis/CA-O/releases/download/v2.1.6/CA-O-Setup-GUI-x64.zip) | [CA-O-2.1.6-win-x64.zip (394 MB, paquete completo offline)](https://github.com/Pyromesis/CA-O/releases/download/v2.1.6/CA-O-2.1.6-win-x64.zip) | [Notas de la versión](https://github.com/Pyromesis/CA-O/releases/tag/v2.1.6) | [Documentación](docs/ARCHITECTURE.md)
+**Descargas v2.1.7:** [CA-O-Setup-GUI-x64.zip (92 MB, instalador GUI)](https://github.com/Pyromesis/CA-O/releases/download/v2.1.7/CA-O-Setup-GUI-x64.zip) | [CA-O-2.1.7-win-x64.zip (394 MB, paquete completo offline)](https://github.com/Pyromesis/CA-O/releases/download/v2.1.7/CA-O-2.1.7-win-x64.zip) | [Notas de la versión](https://github.com/Pyromesis/CA-O/releases/tag/v2.1.7) | [Documentación](docs/ARCHITECTURE.md)
 
 ---
 
@@ -42,7 +42,7 @@
 
 ## Resumen ejecutivo
 
-**CA-O 2.1.6** es una aplicación **100% nativa Windows** escrita en **.NET 10 + WinUI 3 (Windows App SDK 2.4)**. No es una colección de tweaks: **mide** hardware, térmicas, red, almacenamiento, drivers y postura de seguridad **antes** de recomendar. Cada cambio pertenece a un **bucket analizado-primero** (`Recommended` / `Optional` / `Experimental` / `SecuritySensitive` / `NotApplicable` / `Blocked`) y se ejecuta bajo el flujo transaccional `PRECHECK → SNAPSHOT → APPLY → VERIFY → COMMIT` con **rollback automático y verificación post-reversión**.
+**CA-O 2.1.7** es una aplicación **100% nativa Windows** escrita en **.NET 10 + WinUI 3 (Windows App SDK 2.4)**. No es una colección de tweaks: **mide** hardware, térmicas, red, almacenamiento, drivers y postura de seguridad **antes** de recomendar. Cada cambio pertenece a un **bucket analizado-primero** (`Recommended` / `Optional` / `Experimental` / `SecuritySensitive` / `NotApplicable` / `Blocked`) y se ejecuta bajo el flujo transaccional `PRECHECK → SNAPSHOT → APPLY → VERIFY → COMMIT` con **rollback automático y verificación post-reversión**.
 
 La UI **siempre eleva** (`app.manifest` `requireAdministrator` → UAC en cada inicio) pero **toda mutación privilegiada cruza** al servicio Windows `CAO.Privileged` (SYSTEM) vía **Named Pipe autenticado** con ACL restrictiva, validación de esquema tipado, ventana de 30 s, nonce y protección anti-replay. Sin el servicio, la app opera en **modo solo lectura** (diagnóstico + benchmark disponibles).
 
@@ -78,7 +78,7 @@ La UI **siempre eleva** (`app.manifest` `requireAdministrator` → UAC en cada i
 | **WMI** | System.Management | **10.0.0** | Lectura hardware/termal/batería |
 | **Perf** | System.Diagnostics.PerformanceCounter | **10.0.0** | `% DPC Time` / `% Interrupt Time` |
 | **Servicios** | System.ServiceProcess.ServiceController | **8.0.1** | `CAO.Privileged` como `BackgroundService` |
-| **Build** | `Directory.Packages.props` + `Directory.Build.props` + `Version.props` (single source `2.1.6`) | Centralizado | Un lugar para bump de versión/paquetes |
+| **Build** | `Directory.Packages.props` + `Directory.Build.props` + `Version.props` (single source `2.1.7`) | Centralizado | Un lugar para bump de versión/paquetes |
 | **Tests** | xUnit 2.9.2 + Microsoft.NET.Test.Sdk 17.11.1 | — | 540 tests en Release |
 | **Seguridad** | CodeQL + `dotnet audit` + Dependabot + CycloneDX SBOM | CI | Cadena de suministro auditada |
 
@@ -115,7 +115,7 @@ La UI **siempre eleva** (`app.manifest` `requireAdministrator` → UAC en cada i
 
 | Proyecto | Responsabilidad | Depende de |
 |---|---|---|
-| `CA-O.Shared` | DTOs, contratos IPC v2 (`IpcProtocol` v2, `Ping`, `GetServiceStatus`), `CaOPaths`, `ErrorCodes CAO-XXX-nnn`, `AppVersion 2.1.6`, `BuildConstants`, `Constants/IpcConstants` | — |
+| `CA-O.Shared` | DTOs, contratos IPC v2 (`IpcProtocol` v2, `Ping`, `GetServiceStatus`), `CaOPaths`, `ErrorCodes CAO-XXX-nnn`, `AppVersion 2.1.7`, `BuildConstants`, `Constants/IpcConstants` | — |
 | `CA-O.Core` | `OptimizationCatalog` (75), `OptimizationEngine` transaccional, `RecommendationEngine` + `OptimizationScoreCalculator` (0-100), `GameCompatibilityPolicy` (matriz SAFE/CAUTION/BLOCKED `CAO-GAME-001`), `HealthEngine`, `KnownIssueMatcher`, `CrashRecoveryService`, `Rollback/*` | Shared |
 | `CA-O.Infrastructure` | WMI 5 s timeout + `SystemAnalysisService` + `AnalysisStateStore` (atómico, 24 h TTL) + `SnapshotRepository`/`FileSnapshotStore` (TX identity + SHA-256) + `JsonHistoryLogger` (hash-chain) + `SystemBenchmarkRunner` + `Gaming/*` + `Networking/*` + `Storage/*` + `Security/*` + `Windows/*` | Core, Shared |
 | `CA-O.Privileged` | Servicio `SYSTEM` + `PrivilegedPipeService` (Named Pipe `CA-O.Privileged.v1`, ACL + `ReplayCache` 30 s, timeout 15 s/conn) + `OptimizationEngine` hosteado + `AdministratorsOnlyAuthorizer` | Core, Infrastructure, Shared |
@@ -154,7 +154,7 @@ BENCHMARK → post-commit, fallo no invalida commit   // eventos separados
 CA-O.sln  (.NET 10 · LangVersion 13 · WinUI 3)
 ├── src/
 │   ├── CA-O.Shared/                 # Contratos puros, sin IO
-│   │   ├── Constants/               # AppVersion (2.1.6), BuildConstants, CaOPaths, IpcConstants
+│   │   ├── Constants/               # AppVersion (2.1.7), BuildConstants, CaOPaths, IpcConstants
 │   │   ├── IPC/                     # IpcProtocol v2, IpcRequest/Response, Payloads (9 ops)
 │   │   ├── Security/                # CommandPolicy, ErrorCodes, CallerIdentity
 │   │   ├── Enums/                   # RecommendationBucket, RiskLevel, EvidenceLevel, etc.
@@ -217,7 +217,7 @@ CA-O.sln  (.NET 10 · LangVersion 13 · WinUI 3)
 ├── .github/workflows/ci.yml         # build + test + CodeQL + dotnet audit
 ├── Directory.Packages.props         # Versiones centralizadas
 ├── Directory.Build.props            # Propiedades MSBuild comunes
-├── Version.props                    # Single source 2.1.6
+├── Version.props                    # Single source 2.1.7
 ├── global.json                      # SDK 10.0.400
 └── CA-O.sln
 ```
@@ -588,7 +588,7 @@ Cada perfil es **dinámico** — no es lista fija. Ej. `maximum-power-plan` solo
 
 ### Opción A — Instalador GUI (recomendado, offline)
 
-1. Descarga [CA-O-2.1.6-win-x64.zip (394 MB)](https://github.com/Pyromesis/CA-O/releases/download/v2.1.6/CA-O-2.1.6-win-x64.zip)
+1. Descarga [CA-O-2.1.7-win-x64.zip (394 MB)](https://github.com/Pyromesis/CA-O/releases/download/v2.1.7/CA-O-2.1.7-win-x64.zip)
 2. Descomprime (mantén `ui/`, `service/`, `gui-installer/`, `uninstall/`, `setup/`)
 3. Entra en `gui-installer/` → clic derecho **Ejecutar como administrador** en `CA-O.InstallerGui.exe` → UAC Sí
 4. Elige destino (`C:\Program Files\CA-O`), atajos Escritorio/Inicio, progress → registra `CAO.Privileged` (`demand`, `failure 86400`) + ARP
@@ -598,9 +598,9 @@ Cada perfil es **dinámico** — no es lista fija. Ej. `maximum-power-plan` solo
 
 ### Opción B — Instalador GUI online (92 MB)
 
-1. Descarga [CA-O-Setup-GUI-x64.zip (92 MB)](https://github.com/Pyromesis/CA-O/releases/download/v2.1.6/CA-O-Setup-GUI-x64.zip)
+1. Descarga [CA-O-Setup-GUI-x64.zip (92 MB)](https://github.com/Pyromesis/CA-O/releases/download/v2.1.7/CA-O-Setup-GUI-x64.zip)
 2. Descomprime → `CA-O.InstallerGui.exe` como admin
-3. Si no hay payload local (`ui/`+`service/` adyacentes), descarga `CA-O-2.1.6-win-x64.zip` desde GitHub Releases (requiere internet) y continúa
+3. Si no hay payload local (`ui/`+`service/` adyacentes), descarga `CA-O-2.1.7-win-x64.zip` desde GitHub Releases (requiere internet) y continúa
 
 > El exe suelto de 295 KB fuera del ZIP **no inicia** (faltan DLLs WindowsAppSDK)
 
@@ -654,7 +654,7 @@ powershell -ExecutionPolicy Bypass -File scripts/build-release.ps1
 
 # Empaquetar
 powershell -ExecutionPolicy Bypass -File scripts/package.ps1
-# → artifacts/CA-O-2.1.6-win-x64.zip + .sha256
+# → artifacts/CA-O-2.1.7-win-x64.zip + .sha256
 
 # Endurecer ACLs de datos
 powershell -ExecutionPolicy Bypass -File scripts/harden-data-acls.ps1
@@ -694,15 +694,15 @@ dotnet test --filter "FullyQualifiedName~GameCompatibility"
 
 ## Release y verificación
 
-- **Versión actual:** **2.1.6** — [Releases](https://github.com/Pyromesis/CA-O/releases/tag/v2.1.6)
+- **Versión actual:** **2.1.7** — [Releases](https://github.com/Pyromesis/CA-O/releases/tag/v2.1.7)
 - **Artefactos:**
   - `CA-O-Setup-GUI-x64.zip` (92 MB, GUI online)
-  - `CA-O-2.1.6-win-x64.zip` (343 MB, paquete completo offline con `ui/`, `service/`, `gui-installer/`, `setup/`, `uninstall/`)
+  - `CA-O-2.1.7-win-x64.zip` (343 MB, paquete completo offline con `ui/`, `service/`, `gui-installer/`, `setup/`, `uninstall/`)
 - **Manifests:** `artifacts/release/SHA256SUMS.txt` + `artifacts/sbom/bom.json` (CycloneDX 1.7, 71 paquetes) cuando `CycloneDX` instalado (`dotnet tool install --global CycloneDX`)
 - **Empaquetado:** `scripts/package.ps1` genera ZIP versionado + hash SHA-256. `scripts/build-release.ps1` publica `ui` y `service` como self-contained y `gui-installer` como self-contained **sin single-file** (requisito WinUI 3)
 
 ```powershell
-Get-FileHash artifacts/CA-O-2.1.6-win-x64.zip -Algorithm SHA256
+Get-FileHash artifacts/CA-O-2.1.7-win-x64.zip -Algorithm SHA256
 Get-Content artifacts/release/SHA256SUMS.txt
 cat artifacts/sbom/bom.json | ConvertFrom-Json | select -ExpandProperty components | measure
 ```
@@ -716,7 +716,7 @@ cat artifacts/sbom/bom.json | ConvertFrom-Json | select -ExpandProperty componen
 | Síntoma | Causa | Solución |
 |---|---|---|
 | **App no abre / no muestra ventana** | Falta WindowsAppSDK o ejecución sin admin; `XAML parsing failed` | Verifica `%LOCALAPPDATA%\CA-O\logs\cao-ui-crash.log` y `cao-installer-crash.log`. Usa ZIP completo descomprimido, **Ejecutar como administrador**. Exe suelto 295 KB fuera de carpeta no inicia. `taskkill /F /IM CA-O.UI.exe` (elevado) si cuelgue |
-| **Error 404 al instalar con GUI** | URL obsoleta (v2.0.4 y anteriores `v2.0.1/CA-O-2.0.0-…`) | Corregido v2.1.6 con fallback a `latest`. Usa `CA-O-2.1.6-win-x64.zip` offline o `CA-O-Setup-GUI-x64.zip` con internet |
+| **Error 404 al instalar con GUI** | URL obsoleta (v2.0.4 y anteriores `v2.0.1/CA-O-2.0.0-…`) | Corregido v2.1.6 con fallback a `latest`. Usa `CA-O-2.1.7-win-x64.zip` offline o `CA-O-Setup-GUI-x64.zip` con internet |
 | **Servicio no disponible / `CAO-IPC-004`** | `CAO.Privileged` no instalado o detenido | `sc.exe query CAO.Privileged` → `STATE: 1 STOPPED` → `powershell -ExecutionPolicy Bypass -File scripts/install-privileged-service.ps1` (admin) → `sc.exe start CAO.Privileged`. O `Ajustes → Instalar ahora` |
 | **Access is denied al `sc.exe start`** | Falta elevación | Ejecuta `cmd`/`PowerShell` como admin. `CA-O.UI` ya pide UAC; el servicio requiere `LocalSystem` |
 | **`Build Release falla CA1806`** | `MessageBoxW` HRESULT ignorado | Corregido v2.1.4 con `_ = MessageBoxW(...)` |
@@ -763,4 +763,4 @@ Proyecto privado. Todos los derechos reservados. No se concede licencia de uso, 
 
 ---
 
-<p align="center"><i>CA-O 2.1.6 — Diagnóstico primero, evidencia después, transacción siempre. Sin promesas, solo hechos medibles.</i></p>
+<p align="center"><i>CA-O 2.1.7 — Diagnóstico primero, evidencia después, transacción siempre. Sin promesas, solo hechos medibles.</i></p>

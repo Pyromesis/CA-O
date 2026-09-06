@@ -12,6 +12,7 @@ public sealed partial class SettingsPage : Page
     private readonly ViewModels.SettingsViewModel _vm;
     private ViewModels.UiState? _uiState;
     private bool _autoCheckAttempted;
+    private bool _updateInProgress;
 
     public SettingsPage()
     {
@@ -338,6 +339,7 @@ public sealed partial class SettingsPage : Page
             {
                 _uiState.LatestVersion = release.Tag;
                 _uiState.LatestAssetUrl = release.ZipUrl ?? string.Empty;
+                _uiState.LatestAssetBytes = release.ZipBytes;
                 _uiState.UpdateAvailable = true;
                 UpdateDetailText.Text = string.IsNullOrWhiteSpace(release.ZipUrl)
                     ? $"Disponible {release.Tag}, pero sin paquete descargable: ábrelo en GitHub."
@@ -361,71 +363,99 @@ public sealed partial class SettingsPage : Page
             return;
         }
 
-        var dialog = new ContentDialog
-        {
-            Title = $"Instalar {_uiState.LatestVersion}",
-            Content = "Se descargará el paquete completo, se abrirá el instalador (pide UAC) y esta app se cerrará. ¿Continuar?",
-            PrimaryButtonText = "Descargar e instalar",
-            CloseButtonText = "Cancelar",
-            DefaultButton = ContentDialogButton.Close,
-            XamlRoot = Content.XamlRoot,
-        };
-        if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
-
-        if (!IsInstalledLocation())
-        {
-            // Modo portable: abrir la release en el navegador para descarga manual.
-            Process.Start(new ProcessStartInfo($"https://github.com/Pyromesis/CA-O/releases/tag/{_uiState.LatestVersion}") { UseShellExecute = true });
-            UpdateDetailText.Text = "Modo portable: descarga el ZIP desde el navegador.";
-            return;
-        }
-
-        UpdateCheckButton.IsEnabled = false;
-        UpdateDownloadButton.IsEnabled = false;
-        UpdateProgressBar.Visibility = Visibility.Visible;
-        UpdateProgressBar.Value = 0;
-        UpdateDetailText.Text = "Descargando...";
-
+        if (_updateInProgress) return;
+        _updateInProgress = true;
         try
         {
-            var updateDir = Path.Combine(Path.GetTempPath(), "CA-O-update");
-            Directory.CreateDirectory(updateDir);
-            var zipPath = Path.Combine(updateDir, $"CA-O-{_uiState.LatestVersion}-win-x64.zip");
-            var progress = new Progress<double>(v => DispatcherQueue.TryEnqueue(() => UpdateProgressBar.Value = v * 100));
-            using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(30));
-            await Helpers.AppUpdater.DownloadAsync(_uiState.LatestAssetUrl, zipPath, progress, cts.Token);
-
-            UpdateDetailText.Text = "Extrayendo paquete...";
-            var payloadDir = Path.Combine(updateDir, "payload");
-            if (Directory.Exists(payloadDir)) Directory.Delete(payloadDir, recursive: true);
-            await Task.Run(() => System.IO.Compression.ZipFile.ExtractToDirectory(zipPath, payloadDir), cts.Token);
-
-            var installer = Path.Combine(payloadDir, "gui-installer", "CA-O.InstallerGui.exe");
-            if (!File.Exists(installer))
+            var dialog = new ContentDialog
             {
-                UpdateDetailText.Text = "El paquete no trae instalador.";
+                Title = $"Instalar {_uiState.LatestVersion}",
+                Content = "Se descargará el paquete completo, se abrirá el instalador (pide UAC) y esta app se cerrará. ¿Continuar?",
+                PrimaryButtonText = "Descargar e instalar",
+                CloseButtonText = "Cancelar",
+                DefaultButton = ContentDialogButton.Close,
+                XamlRoot = Content.XamlRoot,
+            };
+            if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
+
+            if (!IsInstalledLocation())
+            {
+                // Modo portable: abrir la release en el navegador para descarga manual.
+                Process.Start(new ProcessStartInfo($"https://github.com/Pyromesis/CA-O/releases/tag/{_uiState.LatestVersion}") { UseShellExecute = true });
+                UpdateDetailText.Text = "Modo portable: descarga el ZIP desde el navegador.";
                 return;
             }
 
-            UpdateDetailText.Text = "Abriendo instalador...";
-            Process.Start(new ProcessStartInfo(installer)
+            UpdateCheckButton.IsEnabled = false;
+            UpdateDownloadButton.IsEnabled = false;
+            UpdateProgressBar.Visibility = Visibility.Visible;
+            UpdateProgressBar.IsIndeterminate = false;
+            UpdateProgressBar.Value = 0;
+            UpdateDetailText.Text = "Descargando...";
+
+            try
             {
-                UseShellExecute = true,
-                Arguments = $"--auto-update --payload-dir=\"{payloadDir}\"",
-                WorkingDirectory = Path.GetDirectoryName(installer)!,
-            });
-            Application.Current.Exit();
-        }
-        catch (Exception ex)
-        {
-            UpdateDetailText.Text = $"Falló la actualización: {ex.Message}";
-            System.Diagnostics.Debug.WriteLine($"Update failed: {ex}");
+                var updateDir = Path.Combine(Path.GetTempPath(), "CA-O-update");
+                Directory.CreateDirectory(updateDir);
+                var zipPath = Path.Combine(updateDir, $"CA-O-{_uiState.LatestVersion}-win-x64.zip");
+                var progress = new Progress<double>(v => DispatcherQueue.TryEnqueue(() => UpdateProgressBar.Value = v * 100));
+                using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(30));
+                await Helpers.AppUpdater.DownloadAsync(_uiState.LatestAssetUrl, zipPath, progress, cts.Token);
+
+                // Verifica integridad: el tamaño debe coincidir con el anunciado por el release.
+                var expectedBytes = _uiState.LatestAssetBytes;
+                var actualBytes = new FileInfo(zipPath).Length;
+                if (expectedBytes > 0 && actualBytes != expectedBytes)
+                {
+                    try { File.Delete(zipPath); } catch { }
+                    throw new InvalidOperationException($"Descarga incompleta ({actualBytes} de {expectedBytes} bytes). Reintenta.");
+                }
+
+                UpdateDetailText.Text = "Extrayendo paquete (puede tardar varios minutos)...";
+                DispatcherQueue.TryEnqueue(() => UpdateProgressBar.IsIndeterminate = true);
+                var payloadDir = Path.Combine(updateDir, "payload");
+                // Borrado + extracción fuera del hilo UI (450 MB congelaban la app) y con
+                // reintentos: el antivirus suele bloquear el ZIP recién descargado unos segundos.
+                await Task.Run(async () =>
+                {
+                    if (Directory.Exists(payloadDir)) Directory.Delete(payloadDir, recursive: true);
+                    await Helpers.AppUpdater.ExecuteWithRetryAsync(
+                        () => Task.Run(() => System.IO.Compression.ZipFile.ExtractToDirectory(zipPath, payloadDir), cts.Token),
+                        ct: cts.Token);
+                }, cts.Token);
+
+                var installer = Path.Combine(payloadDir, "gui-installer", "CA-O.InstallerGui.exe");
+                if (!File.Exists(installer))
+                {
+                    UpdateDetailText.Text = "El paquete no trae instalador.";
+                    return;
+                }
+
+                UpdateDetailText.Text = "Abriendo instalador...";
+                Process.Start(new ProcessStartInfo(installer)
+                {
+                    UseShellExecute = true,
+                    Arguments = $"--auto-update --payload-dir=\"{payloadDir}\"",
+                    WorkingDirectory = Path.GetDirectoryName(installer)!,
+                });
+                Application.Current.Exit();
+            }
+            catch (Exception ex)
+            {
+                UpdateDetailText.Text = $"Falló la actualización: {ex.Message}";
+                System.Diagnostics.Debug.WriteLine($"Update failed: {ex}");
+            }
+            finally
+            {
+                UpdateProgressBar.IsIndeterminate = false;
+                UpdateProgressBar.Visibility = Visibility.Collapsed;
+                UpdateCheckButton.IsEnabled = true;
+                UpdateDownloadButton.IsEnabled = true;
+            }
         }
         finally
         {
-            UpdateProgressBar.Visibility = Visibility.Collapsed;
-            UpdateCheckButton.IsEnabled = true;
-            UpdateDownloadButton.IsEnabled = true;
+            _updateInProgress = false;
         }
     }
 

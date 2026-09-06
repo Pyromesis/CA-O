@@ -113,6 +113,30 @@ public static class AppUpdater
         }
     }
 
+    /// <summary>
+    /// Reintenta una operación ante bloqueos transitorios del archivo (p. ej. el antivirus
+    /// escaneando el ZIP recién descargado). Solo reintenta IOException; cualquier otro
+    /// error se propaga de inmediato.
+    /// </summary>
+    public static async Task ExecuteWithRetryAsync(Func<Task> operation, int maxAttempts = 5, int baseDelayMs = 500, CancellationToken ct = default)
+    {
+        var attempt = 0;
+        while (true)
+        {
+            ct.ThrowIfCancellationRequested();
+            try
+            {
+                await operation().ConfigureAwait(false);
+                return;
+            }
+            catch (IOException) when (attempt < maxAttempts - 1)
+            {
+                attempt++;
+                await Task.Delay(baseDelayMs * attempt, ct).ConfigureAwait(false);
+            }
+        }
+    }
+
     private static HttpClient CreateClient()
     {
         var http = new HttpClient { Timeout = TimeSpan.FromMinutes(30) };

@@ -45,4 +45,50 @@ public sealed class AppUpdaterTests
 
         Assert.Null(AppUpdater.SelectFullPackageAsset(assets));
     }
+
+    [Fact]
+    public async Task ExecuteWithRetry_RetriesSharingViolationThenSucceeds()
+    {
+        var attempts = 0;
+
+        await AppUpdater.ExecuteWithRetryAsync(() =>
+        {
+            attempts++;
+            if (attempts < 3)
+                throw new IOException("being used by another process");
+            return Task.CompletedTask;
+        }, maxAttempts: 5, baseDelayMs: 1);
+
+        Assert.Equal(3, attempts);
+    }
+
+    [Fact]
+    public async Task ExecuteWithRetry_DoesNotRetryOtherErrors()
+    {
+        var attempts = 0;
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            AppUpdater.ExecuteWithRetryAsync(() =>
+            {
+                attempts++;
+                throw new InvalidOperationException("boom");
+            }, maxAttempts: 5, baseDelayMs: 1));
+
+        Assert.Equal(1, attempts);
+    }
+
+    [Fact]
+    public async Task ExecuteWithRetry_GivesUpAfterMaxAttempts()
+    {
+        var attempts = 0;
+
+        await Assert.ThrowsAsync<IOException>(() =>
+            AppUpdater.ExecuteWithRetryAsync(() =>
+            {
+                attempts++;
+                throw new IOException("locked");
+            }, maxAttempts: 3, baseDelayMs: 1));
+
+        Assert.Equal(3, attempts);
+    }
 }

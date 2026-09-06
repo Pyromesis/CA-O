@@ -90,6 +90,15 @@ public sealed class UiState : ObservableObject
         set => SetProperty(ref _latestAssetUrl, value);
     }
 
+    private long _latestAssetBytes;
+
+    /// <summary>Tamaño esperado del ZIP (0 si se desconoce); sirve para verificar la descarga.</summary>
+    public long LatestAssetBytes
+    {
+        get => _latestAssetBytes;
+        set => SetProperty(ref _latestAssetBytes, value);
+    }
+
     /// <summary>
     /// Última vez que se verificó el servicio privilegiado (UTC).
     /// Memoria de sesión: evita pedir al usuario que pulse "Comprobar" en cada página.
