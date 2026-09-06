@@ -115,18 +115,7 @@ public sealed partial class OptimizePage : Page
 
         var rows = filtered.Select(recommendation =>
             {
-                bool isLocked = recommendation.Bucket != RecommendationBucket.Recommended && !uiState.ExpertMode;
-                if (recommendation.Compatibility == CompatibilityStatus.Incompatible) isLocked = true;
-                if (recommendation.AntiCheatConflictRisk) isLocked = true;
-                string lockReason = recommendation.Bucket switch
-                {
-                    RecommendationBucket.Optional => Localizer.Get("optimize.lockedOptional"),
-                    RecommendationBucket.Experimental => Localizer.Get("optimize.lockedExperimental"),
-                    RecommendationBucket.SecuritySensitive => Localizer.Get("optimize.lockedSecurity"),
-                    _ when recommendation.AntiCheatConflictRisk => Localizer.Get("optimize.lockedAntiCheat"),
-                    _ when recommendation.Compatibility == CompatibilityStatus.Incompatible => Localizer.Get("optimize.lockedIncompatible"),
-                    _ => string.Empty
-                };
+                var (isLocked, lockReason) = EvaluateLock(recommendation, uiState.ExpertMode);
                 string benefit = GetBenefitDetail(recommendation.OptimizationId);
                 bool canApply = !isLocked && recommendation.CurrentState != OptimizationState.AppliedByCao;
                 return new RecommendationRow(
@@ -225,8 +214,39 @@ public sealed partial class OptimizePage : Page
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
             var registry = AppHost.Resolve<CAO.Infrastructure.Windows.SystemRegistry.RegistryAccessor>();
             var preview = await match.PreviewAsync(registry, cts.Token);
+            // El diálogo respeta los mismos bloqueos que la tarjeta: si está bloqueado
+            // o ya aplicado, no se ofrece "Aplicar este cambio".
+            var uiStatePreview = AppHost.Resolve<ViewModels.UiState>();
+            var previewRec = uiStatePreview.Recommendations.FirstOrDefault(r =>
+                r.OptimizationId.Equals(id, StringComparison.OrdinalIgnoreCase));
+            bool previewLocked = true;
+            string previewLockReason = "Sin análisis vigente: ejecute Analizar primero.";
+            bool previewApplied = false;
+            if (previewRec is not null)
+            {
+                (previewLocked, previewLockReason) = EvaluateLock(previewRec, uiStatePreview.ExpertMode);
+                previewApplied = previewRec.CurrentState == OptimizationState.AppliedByCao;
+            }
             // Real diff view (Fase 12): Before/After per target, not generic text.
             var diffPanel = new StackPanel { Spacing = 10 };
+            if (previewLocked || previewApplied)
+            {
+                diffPanel.Children.Add(new Border
+                {
+                    Background = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["CardBackgroundFillColorSecondaryBrush"],
+                    CornerRadius = new CornerRadius(8),
+                    Padding = new Thickness(12),
+                    Child = new TextBlock
+                    {
+                        Text = previewApplied && !previewLocked
+                            ? "Ya aplicado por CA-O — no se puede volver a aplicar. Use Revertir si desea restaurarlo."
+                            : $"Bloqueado — no se puede aplicar: {previewLockReason}",
+                        TextWrapping = TextWrapping.Wrap,
+                        FontSize = 12,
+                        FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                    },
+                });
+            }
             foreach (var line in preview.Lines)
             {
                 var card = new Border
@@ -258,19 +278,23 @@ public sealed partial class OptimizePage : Page
                 FontSize = 11, Opacity = 0.7, Margin = new Thickness(0, 8, 0, 0), TextWrapping = TextWrapping.Wrap
             });
 
+            bool offerApply = !previewLocked && !previewApplied;
+            bool offerRevert = !previewLocked && previewApplied;
             var dialog = new ContentDialog
             {
                 Title = $"Vista previa — {preview.OptimizationId}",
                 Content = new ScrollViewer { MaxHeight = 460, Content = diffPanel },
                 CloseButtonText = "Cerrar",
-                PrimaryButtonText = "Aplicar este cambio",
                 DefaultButton = ContentDialogButton.Close,
                 XamlRoot = Content.XamlRoot,
             };
+            if (offerApply) dialog.PrimaryButtonText = "Aplicar este cambio";
+            else if (offerRevert) dialog.PrimaryButtonText = "Revertir este cambio";
             var result = await dialog.ShowAsync();
             if (result == ContentDialogResult.Primary)
             {
-                await RunOperationAsync(PrivilegedOperationKind.ApplyOptimization, id);
+                if (offerRevert) await RunOperationAsync(PrivilegedOperationKind.RevertOptimization, id);
+                else if (offerApply) await RunOperationAsync(PrivilegedOperationKind.ApplyOptimization, id);
             }
         }
         catch (Exception ex)
@@ -297,11 +321,35 @@ public sealed partial class OptimizePage : Page
         await RunOperationAsync(PrivilegedOperationKind.RevertOptimization, id);
     }
 
+    /// <summary>
+    /// Única regla de bloqueo: bucket no-Recommended sin Modo Expert, hardware
+    /// incompatible o conflicto anti-cheat, o cambio ya aplicado. La comparten la
+    /// tarjeta, el diálogo de Detalles y el guard de Aplicar.
+    /// </summary>
+    private static (bool IsLocked, string LockReason) EvaluateLock(Recommendation recommendation, bool expertMode)
+    {
+        bool isLocked = recommendation.Bucket != RecommendationBucket.Recommended && !expertMode;
+        if (recommendation.Compatibility == CompatibilityStatus.Incompatible) isLocked = true;
+        if (recommendation.AntiCheatConflictRisk) isLocked = true;
+        string lockReason = recommendation.Bucket switch
+        {
+            RecommendationBucket.Optional => Localizer.Get("optimize.lockedOptional"),
+            RecommendationBucket.Experimental => Localizer.Get("optimize.lockedExperimental"),
+            RecommendationBucket.SecuritySensitive => Localizer.Get("optimize.lockedSecurity"),
+            _ when recommendation.AntiCheatConflictRisk => Localizer.Get("optimize.lockedAntiCheat"),
+            _ when recommendation.Compatibility == CompatibilityStatus.Incompatible => Localizer.Get("optimize.lockedIncompatible"),
+            _ => string.Empty
+        };
+        return (isLocked, lockReason);
+    }
+
     private bool CanOperate(string optimizationId) {
         var uiState = AppHost.Resolve<ViewModels.UiState>();
-        return uiState.Recommendations.Any(recommendation =>
-            recommendation.OptimizationId == optimizationId &&
-            (recommendation.Bucket == RecommendationBucket.Recommended || uiState.ExpertMode));
+        var recommendation = uiState.Recommendations.FirstOrDefault(r =>
+            r.OptimizationId.Equals(optimizationId, StringComparison.OrdinalIgnoreCase));
+        if (recommendation is null) return false;
+        var (isLocked, _) = EvaluateLock(recommendation, uiState.ExpertMode);
+        return !isLocked && recommendation.CurrentState != OptimizationState.AppliedByCao;
     }
 
     private async Task RunOperationAsync(PrivilegedOperationKind operation, string optimizationId)
