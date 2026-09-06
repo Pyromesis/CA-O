@@ -435,6 +435,7 @@ Descarga ZIP → Descomprime → gui-installer/CA-O.InstallerGui.exe (UAC)
 ### 2. Primer inicio
 
 - `App.xaml.cs` → `AppHost` DI → `AnalysisStateStore.Load()` → si existe y `fresh` (≤7 d) hidrata `UiState` (no re-analiza)
+- Usuario nuevo (sin ningún análisis): **análisis inicial obligatorio** — diálogo no descartable + navegación limitada a Panel/Analizar hasta completarlo
 - `MainWindow` (Mica) → `NavigationView` 11 páginas → `DashboardPage` muestra health, último análisis, conteo buckets, SecureBoot/VBS/HVCI, juegos, `ServiceStatus: connected/rejected` (InfoBar "Modo solo lectura" si no hay servicio)
 
 ### 3. Analizar

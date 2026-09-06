@@ -64,6 +64,49 @@ public sealed partial class MainWindow : Window
         _ = ProbeServiceAsync();
         // Chequeo de actualización en segundo plano: solo avisa, nunca descarga solo.
         _ = CheckForUpdatesAsync();
+        // Usuario nuevo: análisis inicial obligatorio antes de usar la app.
+        _ = EnsureInitialAnalysisAsync();
+    }
+
+    private static bool NeedsInitialAnalysis() =>
+        AppHost.Resolve<ViewModels.UiState>().LastAnalysisUtc is null;
+
+    private async Task EnsureInitialAnalysisAsync()
+    {
+        try
+        {
+            await Task.Delay(600); // dejar pintar el primer frame
+            if (!NeedsInitialAnalysis()) return;
+            SelectRoute("analyze");
+            await PromptInitialAnalysisAsync();
+        }
+        catch (Exception ex) { App.WriteCrashLog(ex); }
+    }
+
+    /// <summary>
+    /// Diálogo no descartable: la única salida es ejecutar el análisis.
+    /// Cualquier ejecución completa (aunque sea con advertencias) desbloquea.
+    /// </summary>
+    private async Task PromptInitialAnalysisAsync()
+    {
+        while (NeedsInitialAnalysis())
+        {
+            var dialog = new ContentDialog
+            {
+                Title = "Análisis inicial obligatorio",
+                Content = "Antes de usar CA-O necesitas un análisis completo: mide tu CPU, GPU, red y seguridad para generar recomendaciones con evidencia. No modifica nada del sistema.",
+                PrimaryButtonText = "Ejecutar análisis ahora",
+                DefaultButton = ContentDialogButton.Primary,
+                XamlRoot = Content.XamlRoot,
+            };
+            await dialog.ShowAsync();
+            try
+            {
+                if (ContentFrame.Content is Pages.AnalyzePage page)
+                    await page.RunFullAnalysisAsync();
+            }
+            catch (Exception ex) { App.WriteCrashLog(ex); }
+        }
     }
 
     private void ApplyLocalization()
@@ -269,6 +312,14 @@ public sealed partial class MainWindow : Window
     {
         if (args.SelectedItem is not NavigationViewItem item || item.Tag is not string tag)
         {
+            return;
+        }
+
+        // Puerta de entrada: sin primer análisis solo se puede estar en Panel o Analizar.
+        if (NeedsInitialAnalysis() && tag is not ("analyze" or "dashboard"))
+        {
+            SelectRoute("analyze");
+            _ = PromptInitialAnalysisAsync();
             return;
         }
 
