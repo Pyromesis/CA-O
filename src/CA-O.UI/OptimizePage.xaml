@@ -42,6 +42,7 @@
                     <Button x:Name="FilterRecommendedButton" Content="Recomendadas (0)" Click="OnFilterRecommendedClick" FontSize="12"/>
                     <Button x:Name="FilterOptionalButton" Content="Opcionales (0)" Click="OnFilterOptionalClick" FontSize="12"/>
                     <Button x:Name="FilterExperimentalButton" Content="Experimentales (0)" Click="OnFilterExperimentalClick" FontSize="12"/>
+                    <Button x:Name="FilterAppliedButton" Content="Activos (0)" Click="OnFilterAppliedClick" FontSize="12"/>
                 </StackPanel>
             </Border>
             <InfoBar x:Name="FilterInfoBar" IsOpen="False" Severity="Informational" IsClosable="False"/>

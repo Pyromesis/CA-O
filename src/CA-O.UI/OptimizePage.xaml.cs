@@ -35,6 +35,7 @@ public sealed partial class OptimizePage : Page
 
     private readonly ViewModels.OptimizeViewModel _vm;
     private RecommendationBucket? _activeFilter; // null = All
+    private bool _appliedOnly; // filtro "Activos"
 
     public OptimizePage()
     {
@@ -71,21 +72,25 @@ public sealed partial class OptimizePage : Page
         var rec = uiState.Recommendations.Count(r => r.Bucket == RecommendationBucket.Recommended);
         var opt = uiState.Recommendations.Count(r => r.Bucket == RecommendationBucket.Optional);
         var exp = uiState.Recommendations.Count(r => r.Bucket == RecommendationBucket.Experimental);
+        var applied = uiState.Recommendations.Count(r => r.CurrentState == OptimizationState.AppliedByCao);
         FilterAllButton.Content = $"{Localizer.Get("optimize.filterAll")} ({all})";
         FilterRecommendedButton.Content = $"{Localizer.Get("optimize.filterRecommended")} ({rec})";
         FilterOptionalButton.Content = $"{Localizer.Get("optimize.filterOptional")} ({opt})";
         FilterExperimentalButton.Content = $"{Localizer.Get("optimize.filterExperimental")} ({exp})";
+        FilterAppliedButton.Content = $"{Localizer.Get("optimize.filterApplied")} ({applied})";
         // highlight active
-        FilterAllButton.Style = _activeFilter == null ? (Microsoft.UI.Xaml.Style)Application.Current.Resources["AccentButtonStyle"] : (Microsoft.UI.Xaml.Style)Application.Current.Resources["DefaultButtonStyle"];
-        FilterRecommendedButton.Style = _activeFilter == RecommendationBucket.Recommended ? (Microsoft.UI.Xaml.Style)Application.Current.Resources["AccentButtonStyle"] : (Microsoft.UI.Xaml.Style)Application.Current.Resources["DefaultButtonStyle"];
-        FilterOptionalButton.Style = _activeFilter == RecommendationBucket.Optional ? (Microsoft.UI.Xaml.Style)Application.Current.Resources["AccentButtonStyle"] : (Microsoft.UI.Xaml.Style)Application.Current.Resources["DefaultButtonStyle"];
-        FilterExperimentalButton.Style = _activeFilter == RecommendationBucket.Experimental ? (Microsoft.UI.Xaml.Style)Application.Current.Resources["AccentButtonStyle"] : (Microsoft.UI.Xaml.Style)Application.Current.Resources["DefaultButtonStyle"];
+        FilterAllButton.Style = _activeFilter == null && !_appliedOnly ? (Microsoft.UI.Xaml.Style)Application.Current.Resources["AccentButtonStyle"] : (Microsoft.UI.Xaml.Style)Application.Current.Resources["DefaultButtonStyle"];
+        FilterRecommendedButton.Style = _activeFilter == RecommendationBucket.Recommended && !_appliedOnly ? (Microsoft.UI.Xaml.Style)Application.Current.Resources["AccentButtonStyle"] : (Microsoft.UI.Xaml.Style)Application.Current.Resources["DefaultButtonStyle"];
+        FilterOptionalButton.Style = _activeFilter == RecommendationBucket.Optional && !_appliedOnly ? (Microsoft.UI.Xaml.Style)Application.Current.Resources["AccentButtonStyle"] : (Microsoft.UI.Xaml.Style)Application.Current.Resources["DefaultButtonStyle"];
+        FilterExperimentalButton.Style = _activeFilter == RecommendationBucket.Experimental && !_appliedOnly ? (Microsoft.UI.Xaml.Style)Application.Current.Resources["AccentButtonStyle"] : (Microsoft.UI.Xaml.Style)Application.Current.Resources["DefaultButtonStyle"];
+        FilterAppliedButton.Style = _appliedOnly ? (Microsoft.UI.Xaml.Style)Application.Current.Resources["AccentButtonStyle"] : (Microsoft.UI.Xaml.Style)Application.Current.Resources["DefaultButtonStyle"];
     }
 
-    private void OnFilterAllClick(object sender, RoutedEventArgs e) { _activeFilter = null; Render(); }
-    private void OnFilterRecommendedClick(object sender, RoutedEventArgs e) { _activeFilter = RecommendationBucket.Recommended; Render(); }
-    private void OnFilterOptionalClick(object sender, RoutedEventArgs e) { _activeFilter = RecommendationBucket.Optional; Render(); }
-    private void OnFilterExperimentalClick(object sender, RoutedEventArgs e) { _activeFilter = RecommendationBucket.Experimental; Render(); }
+    private void OnFilterAllClick(object sender, RoutedEventArgs e) { _activeFilter = null; _appliedOnly = false; Render(); }
+    private void OnFilterRecommendedClick(object sender, RoutedEventArgs e) { _activeFilter = RecommendationBucket.Recommended; _appliedOnly = false; Render(); }
+    private void OnFilterOptionalClick(object sender, RoutedEventArgs e) { _activeFilter = RecommendationBucket.Optional; _appliedOnly = false; Render(); }
+    private void OnFilterExperimentalClick(object sender, RoutedEventArgs e) { _activeFilter = RecommendationBucket.Experimental; _appliedOnly = false; Render(); }
+    private void OnFilterAppliedClick(object sender, RoutedEventArgs e) { _appliedOnly = true; Render(); }
 
     protected override void OnNavigatedTo(Microsoft.UI.Xaml.Navigation.NavigationEventArgs e)
     {
@@ -101,8 +106,10 @@ public sealed partial class OptimizePage : Page
         ExpertBar.IsOpen = uiState.ExpertMode;
         UpdateFilterButtons();
 
+        // Los ya aplicados van siempre abajo; dentro, por bucket.
         var baseRows = uiState.Recommendations
-            .OrderBy(row => row.Bucket switch
+            .OrderBy(row => row.CurrentState == OptimizationState.AppliedByCao ? 1 : 0)
+            .ThenBy(row => row.Bucket switch
             {
                 RecommendationBucket.Recommended => 0,
                 RecommendationBucket.Optional => 1,
@@ -111,8 +118,10 @@ public sealed partial class OptimizePage : Page
                 _ => 4,
             });
 
-        // Filter by active bucket (spec 12)
-        IEnumerable<Recommendation> filtered = _activeFilter == null ? baseRows : baseRows.Where(r => r.Bucket == _activeFilter.Value);
+        // Filter by active bucket (spec 12) or applied-only view
+        IEnumerable<Recommendation> filtered = baseRows;
+        if (_appliedOnly) filtered = filtered.Where(r => r.CurrentState == OptimizationState.AppliedByCao);
+        else if (_activeFilter != null) filtered = filtered.Where(r => r.Bucket == _activeFilter.Value);
 
         var rows = filtered.Select(recommendation =>
             {
@@ -156,7 +165,8 @@ public sealed partial class OptimizePage : Page
         if (rows.Count == 0)
         {
             // Empty states per filter
-            var msg = _activeFilter switch
+            var msg = _appliedOnly ? Localizer.Get("optimize.noApplied")
+                : _activeFilter switch
             {
                 RecommendationBucket.Recommended => Localizer.Get("optimize.noRecommended"),
                 RecommendationBucket.Optional => Localizer.Get("optimize.noOptional"),
@@ -359,6 +369,17 @@ public sealed partial class OptimizePage : Page
     private async Task RunOperationAsync(PrivilegedOperationKind operation, string optimizationId)
     {
         var uiState = AppHost.Resolve<ViewModels.UiState>();
+        // Un cambio ya aplicado no se puede volver a aplicar: queda como activado.
+        if (operation == PrivilegedOperationKind.ApplyOptimization)
+        {
+            var current = uiState.Recommendations.FirstOrDefault(r =>
+                r.OptimizationId.Equals(optimizationId, StringComparison.OrdinalIgnoreCase));
+            if (current?.CurrentState == OptimizationState.AppliedByCao)
+            {
+                StatusText.Text = "Ya está aplicado — no se puede volver a aplicar. Use Revertir si desea restaurarlo.";
+                return;
+            }
+        }
         if (uiState.ExpertMode || operation == PrivilegedOperationKind.ApplyOptimization)
         {
             var dialog = new ContentDialog
