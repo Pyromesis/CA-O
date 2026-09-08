@@ -38,13 +38,27 @@ public sealed class ResyncSystemClock : IOptimization
         if (context.Executor is null)
             return OperationResult.Fail("Ejecutor no disponible.", "CAO-SEC-010");
 
+        // Mejor esfuerzo: el servicio de hora suele estar detenido (Manual).
+        if (context.Services is not null)
+        {
+            try { await context.Services.StartAsync("W32Time", ct); } catch { }
+        }
+
         var result = await context.Executor.ExecuteAsync(
             SystemCommandKey.W32tmResync, ["/resync"], ct);
         _lastExitCode = result.ExitCode;
 
-        return result.Success
-            ? OperationResult.Ok("Reloj sincronizado correctamente.")
-            : OperationResult.Fail("No se pudo sincronizar el reloj.", result.StdErr);
+        if (result.Success)
+        {
+            return OperationResult.Ok("Reloj sincronizado correctamente.");
+        }
+        var detail = string.Join(" ",
+            new[] { $"exit={result.ExitCode}", result.StdErr, result.StdOut }
+                .Where(s => !string.IsNullOrWhiteSpace(s))).Trim();
+        return OperationResult.Fail(
+            "No se pudo sincronizar el reloj." +
+            (string.IsNullOrEmpty(detail) ? " Verifique conexión y servicio de hora." : $" Detalle: {detail}"),
+            "w32tm-failed");
     }
 
     public Task<OperationResult> RevertAsync(OptimizationContext context, OptimizationSnapshot snapshot, CancellationToken ct = default) =>

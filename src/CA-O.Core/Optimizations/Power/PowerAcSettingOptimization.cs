@@ -38,6 +38,15 @@ public abstract class PowerAcSettingOptimization : IOptimization
             return OperationResult.Fail("Ejecutor no disponible.", "CAO-SEC-010");
 
         var previous = await QueryCurrentAsync(context.Executor, ct);
+        if (previous is null)
+        {
+            // El ajuste no se puede leer (sin hardware compatible o esquema
+            // sin ese subgrupo): fallar ANTES de mutar, no "éxito" seguido
+            // de Unknown + rollback de un cambio fantasma.
+            return OperationResult.Fail(
+                "Esta máquina no expone ese ajuste de energía (hardware no compatible).",
+                "not-supported");
+        }
         var set = await context.Executor.ExecuteAsync(
             SystemCommandKey.PowerCfgSetAcValueIndex,
             ["/setacvalueindex", "SCHEME_CURRENT", SubGuid, SettingGuid, TargetIndex], ct);

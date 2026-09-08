@@ -7,8 +7,9 @@ namespace CAO.Core.Tests;
 
 /// <summary>
 /// Proofs for the final hardening P0s:
-///   P0-5  irreversible optimizations ARE verified; Unknown never passes,
-///         and failure reports honestly WITHOUT automatic rollback.
+///   P0-5  irreversible optimizations ARE verified (con reintentos ante
+///         lecturas transitorias); Unknown persistente es éxito con aviso
+///         honesto SIN rollback (no hay nada que revertir y el Apply fue Ok).
 ///   P0-7  post-commit benchmark failure NEVER flips Success to false.
 /// </summary>
 public sealed class HardeningBehaviorTests
@@ -57,7 +58,7 @@ public sealed class HardeningBehaviorTests
     }
 
     [Fact]
-    public async Task IrreversibleUnknownIsVerifiedAndReportedFailedWithoutRollback()
+    public async Task IrreversibleUnknownAfterRetriesSucceedsWithWarningWithoutRollback()
     {
         var registry = new MemoryRegistry();
         var snapshots = new MemorySnapshotStore();
@@ -66,14 +67,16 @@ public sealed class HardeningBehaviorTests
         var report = await new OptimizationTransaction(
             stub, registry, Context, snapshots: snapshots).RunAsync();
 
-        // P0-5: verification RAN (not skipped).
-        Assert.Equal(1, stub.VerifyCalls);
+        // P0-5: verification RAN (not skipped): 1 intento + 2 reintentos.
+        Assert.Equal(3, stub.VerifyCalls);
 
-        // Unknown != Passed: transaction fails honestly...
-        Assert.False(report.Success);
-        Assert.Contains("CAO-VERIFY-002", report.Error);
+        // Unknown persistente en irreversible con Apply Ok: éxito con aviso
+        // honesto (el cambio SÍ ocurrió; "Rechazado" sería falso)...
+        Assert.True(report.Success);
+        Assert.Equal(TransactionPhase.Commit, report.FinalPhase);
+        Assert.Contains("concluyente", report.MessageEs, StringComparison.OrdinalIgnoreCase);
 
-        // ...and NO automatic rollback was attempted (impossible anyway).
+        // ...y NO se intentó rollback (imposible de todos modos).
         Assert.False(report.RolledBack);
         Assert.False(report.RollbackVerified);
     }

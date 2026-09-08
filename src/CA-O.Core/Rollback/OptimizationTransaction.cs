@@ -196,18 +196,42 @@ public sealed class OptimizationTransaction
         }
 
         // ---- VERIFY (ALWAYS — also for NotReversible, P0-5) ----
+        // Unknown (lectura no concluyente: WMI/powercfg transitorios) se
+        // reintenta antes de declararlo: no se revierte un cambio bueno por
+        // un hipo de lectura.
         VerificationResult verification;
         VerificationStatus status;
         try
         {
             verification = await _optimization.VerifyAsync(context, CancellationToken.None);
             status = verification.Status;
+            for (var attempt = 0; status == VerificationStatus.Unknown && attempt < 2; attempt++)
+            {
+                await Task.Delay(700, CancellationToken.None);
+                verification = await _optimization.VerifyAsync(context, CancellationToken.None);
+                status = verification.Status;
+            }
         }
         catch (Exception ex)
         {
             verification = VerificationResult.Unknown(OptimizationState.Unknown,
                 "Verificación interrumpida: " + ex.Message);
             status = VerificationStatus.Unknown;
+        }
+
+        if (status == VerificationStatus.Unknown && irreversible)
+        {
+            // Irreversible + verificación no concluyente tras reintentos: el
+            // cambio se aplicó (Apply Ok) y no hay nada que revertir.
+            // Éxito con aviso honesto, no "Rechazado" de un cambio real.
+            await lease.DisposeAsync();
+            Journal(TransactionPhase.Commit);
+            const string warning = "Aplicado, pero la verificación no fue concluyente (lectura no disponible).";
+            Log(definition.Id, "apply", true, definition.Id,
+                applyResult: "success",
+                verification: "unknown",
+                rollbackAvailable: false);
+            return Report(true, TransactionPhase.Commit, warning);
         }
 
         if (verification.Status is not (VerificationStatus.Passed or VerificationStatus.NotApplicable))
