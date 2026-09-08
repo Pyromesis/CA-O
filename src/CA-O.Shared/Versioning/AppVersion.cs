@@ -5,7 +5,7 @@ public static class AppVersion
 {
     public const string Major = "2";
     public const string Minor = "1";
-    public const string Patch = "7";
+    public const string Patch = "8";
 
     public const string Semantic = $"{Major}.{Minor}.{Patch}";
 
