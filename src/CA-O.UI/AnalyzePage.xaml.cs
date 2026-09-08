@@ -20,14 +20,17 @@ public sealed partial class AnalyzePage : Page
 
     private readonly AnalyzeViewModel _viewModel;
     private readonly ViewModels.DiagnosticsViewModel _diagnosticsVm;
+    private readonly ViewModels.GamingViewModel _gamingVm;
     private CancellationTokenSource? _cts;
     private DnsBenchmarkResult? _bestDns;
+    private DnsBenchmarkResult? _secondDns;
 
     public AnalyzePage()
     {
         InitializeComponent();
         _viewModel = AppHost.Resolve<AnalyzeViewModel>();
         _diagnosticsVm = AppHost.Resolve<ViewModels.DiagnosticsViewModel>();
+        _gamingVm = AppHost.Resolve<ViewModels.GamingViewModel>();
         DataContext = _viewModel;
         Loaded += (_, _) => LoadPersisted();
         _diagnosticsVm.PropertyChanged += (_, e) =>
@@ -129,11 +132,13 @@ public sealed partial class AnalyzePage : Page
     private void LoadPersisted()
     {
         var state = AppHost.Resolve<ViewModels.UiState>();
-        if (state.Context is not { } ctx) return;
+        if (state.Context is not { } ctx)
+        {
+            CollapseDataCards();
+            UpdateResultsVisibility();
+            return;
+        }
         // Datos persistentes: mostrar sin necesidad de re-ejecutar análisis
-        CpuText.Text = $"CPU: {ctx.CpuName} · {ctx.CpuCores} núcleos / {ctx.CpuLogicalProcessors} hilos";
-        GpuText.Text = string.IsNullOrWhiteSpace(ctx.GpuName) ? "GPU: no detectada" : $"GPU: {ctx.GpuName} ({ctx.GpuVendor}) · Driver {ctx.GpuDriverVersion} · {ctx.DisplayRefreshHz} Hz {(ctx.VrrSupported ? "VRR" : "")}";
-        MemoryText.Text = $"RAM: {ctx.RamGb} GB · {(ctx.HasSsd ? "SSD" : "HDD")} {(ctx.HasNvme ? "NVMe" : "")} · {(ctx.IsLaptop ? "Portátil" : "Sobremesa")} {(ctx.OnBattery ? "· Batería" : "")}";
         // Gaming bloqueos persistentes
         var recs = state.Recommendations;
         var blocked = recs.Where(r => r.AntiCheatConflictRisk || r.Bucket == RecommendationBucket.SecuritySensitive).ToList();
@@ -157,6 +162,8 @@ public sealed partial class AnalyzePage : Page
         UpdateFreshnessBanner();
         RenderDiagnostics();
         RenderHealth();
+        CollapseDataCards();
+        UpdateResultsVisibility();
     }
 
     /// <summary>Salud del sistema + hardware + hallazgos (vive aquí, se refresca con cada análisis).</summary>
@@ -173,48 +180,10 @@ public sealed partial class AnalyzePage : Page
             SystemHealthBadge.Background = (Brush)Application.Current.Resources["SystemFillColorNeutralBrush"];
             HealthScoresText.Text = "";
             WhyScoresButton.Visibility = Visibility.Collapsed;
-            CpuNameText.Text = "—";
-            CpuDetailText.Text = "Ejecute el análisis";
-            GpuNameText.Text = "—";
-            GpuDetailText.Text = "";
-            GpuDriverText.Text = "";
-            RamText.Text = "—";
-            RamDetailText.Text = "";
-            StorageSummaryText.Text = "";
-            SecurityPosturePanel.Children.Clear();
-            AntiCheatText.Text = "Anti-cheats: —";
-            SystemSummary.Text = "Sin datos de sistema aún — pulse Analizar.";
             EmptyFindingsState.Visibility = Visibility.Visible;
             FindingsList.Visibility = Visibility.Collapsed;
             return;
         }
-
-        // Hardware
-        CpuNameText.Text = string.IsNullOrWhiteSpace(context.CpuName) ? "CPU desconocida" : context.CpuName;
-        CpuDetailText.Text = $"{context.CpuCores} núcleos / {context.CpuLogicalProcessors} hilos · {context.Architecture} · {(context.IsLaptop ? "Portátil" : "Sobremesa")}";
-        GpuNameText.Text = string.IsNullOrWhiteSpace(context.GpuName) ? "GPU no detectada" : context.GpuName;
-        GpuDetailText.Text = context.HasSsd ? "SSD detectado" : "SSD no detectado";
-        GpuDriverText.Text = string.IsNullOrWhiteSpace(context.GpuDriverVersion) ? "" : $"Driver {context.GpuDriverVersion}";
-        RamText.Text = $"{context.RamGb} GB";
-        RamDetailText.Text = $"Windows {context.WindowsEdition} build {context.WindowsBuild}";
-        StorageSummaryText.Text = context.IsLaptop ? "Modo portátil" : "Modo sobremesa";
-        SystemSummary.Text = $"{context.WindowsEdition} build {context.WindowsBuild} ({context.Architecture})";
-
-        // Postura de seguridad
-        SecurityPosturePanel.Children.Clear();
-        void AddPosture(string label, bool? enabled)
-        {
-            var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
-            var dot = new Microsoft.UI.Xaml.Shapes.Ellipse { Width = 7, Height = 7, VerticalAlignment = VerticalAlignment.Center };
-            dot.Fill = enabled == true ? (Brush)Application.Current.Resources["SystemFillColorSuccessBrush"] : enabled == false ? (Brush)Application.Current.Resources["SystemFillColorCriticalBrush"] : (Brush)Application.Current.Resources["SystemFillColorNeutralBrush"];
-            row.Children.Add(dot);
-            row.Children.Add(new TextBlock { Text = $"{label}: {(enabled is null ? "desconocido" : enabled.Value ? "activado" : "desactivado")}", FontSize = 11, Opacity = 0.85 });
-            SecurityPosturePanel.Children.Add(row);
-        }
-        AddPosture("Secure Boot", context.SecureBootEnabled);
-        AddPosture("VBS", context.VbsEnabled);
-        AddPosture("HVCI", context.HvciEnabled);
-        AntiCheatText.Text = context.AntiCheats.Count == 0 ? "Anti-cheats: ninguno" : $"Anti-cheats: {string.Join(", ", context.AntiCheats.Select(a => a.Kind))}";
 
         // Scores + hallazgos
         if (health is null)
@@ -229,15 +198,52 @@ public sealed partial class AnalyzePage : Page
         var measured = health.Scores.Where(score => score.IsMeasured && score.Score is not null).ToList();
         HealthScoresText.Text = measured.Count == 0
             ? "Sin puntuación — faltan mediciones."
-            : string.Join("  ·  ", measured.Select(score => $"{score.Dimension}: {score.Score}/100"));
+            : string.Join("  ·  ", measured.Select(score => $"{DimensionEs(score.Dimension)}: {score.Score}/100"));
         WhyScoresButton.Visibility = string.IsNullOrWhiteSpace(HealthScoresText.Text) ? Visibility.Collapsed : Visibility.Visible;
         var findings = health.Findings.Select(f => new FindingRow(f.Severity.ToString(), f.MessageEs, BrushFor(f.Severity.ToString()))).ToList();
+        var critCount = findings.Count(f => f.SeverityLabel.Equals("Critical", StringComparison.OrdinalIgnoreCase));
+        var warnCount = findings.Count(f => f.SeverityLabel.Equals("Warning", StringComparison.OrdinalIgnoreCase));
+        FindingsCountText.Text = findings.Count == 0
+            ? "Sin hallazgos = sin problemas detectados."
+            : $"{critCount} críticas · {warnCount} avisos · {findings.Count} en total.";
         FindingsList.ItemsSource = findings;
         FindingsList.Visibility = findings.Count == 0 ? Visibility.Collapsed : Visibility.Visible;
         EmptyFindingsState.Visibility = findings.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         SystemHealthText.Text = DeriveSystemStatus(health);
         SystemHealthBadge.Background = BrushForStatus(SystemHealthText.Text);
+        UpdateAnalysisFooter();
     }
+
+    private void UpdateAnalysisFooter()
+    {
+        try
+        {
+            var uiState = AppHost.Resolve<ViewModels.UiState>();
+            if (uiState.LastAnalysisUtc is null)
+            {
+                AnalysisFooterText.Text = "Sin análisis registrado aún.";
+                return;
+            }
+            var when = uiState.LastAnalysisUtc.Value.ToLocalTime().ToString("g");
+            var rec = uiState.Recommendations.Count(r => r.Bucket == RecommendationBucket.Recommended);
+            AnalysisFooterText.Text = $"Último análisis: {when} · {rec} recomendadas · {uiState.Recommendations.Count} evaluadas";
+        }
+        catch { }
+    }
+
+    private static string DimensionEs(object dimension) => dimension.ToString() switch
+    {
+        "System" => "Sistema",
+        "Thermals" => "Térmica",
+        "Network" => "Red",
+        "Storage" => "Disco",
+        "Security" => "Seguridad",
+        "Input" => "Entrada",
+        "Gaming" => "Gaming",
+        "Startup" => "Inicio",
+        "Stability" => "Estabilidad",
+        _ => dimension.ToString() ?? "?",
+    };
 
     private static Brush BrushFor(string severity) => severity.ToLowerInvariant() switch
     {
@@ -254,7 +260,7 @@ public sealed partial class AnalyzePage : Page
 
     private static string DeriveSystemStatus(SystemDiagnosticReport report)
     {
-        if (report.Findings.Any(f => f.Severity.ToString().Equals("Error", StringComparison.OrdinalIgnoreCase))) return "Sistema: Atención";
+        if (report.Findings.Any(f => f.Severity.ToString().Equals("Critical", StringComparison.OrdinalIgnoreCase))) return "Sistema: Atención";
         if (report.Findings.Any(f => f.Severity.ToString().Equals("Warning", StringComparison.OrdinalIgnoreCase))) return "Sistema: Correcto con avisos";
         return "Sistema: Correcto";
     }
@@ -276,9 +282,39 @@ public sealed partial class AnalyzePage : Page
 
     private void RenderDiagnostics()
     {
-        DiagnInputText.Text = string.IsNullOrWhiteSpace(_diagnosticsVm.InputSummary) ? "Ejecuta análisis para medir entrada (HID, aceleración ratón)" : _diagnosticsVm.InputSummary;
-        DiagnThermalText.Text = string.IsNullOrWhiteSpace(_diagnosticsVm.ThermalSummary) ? "Ejecuta análisis para medir térmicas" : _diagnosticsVm.ThermalSummary;
-        DiagnPerfText.Text = string.IsNullOrWhiteSpace(_diagnosticsVm.PerformanceSummary) ? "Ejecuta análisis para medir rendimiento" : _diagnosticsVm.PerformanceSummary;
+        // Sin datos no hay tarjeta: nada de placeholders en blanco.
+        DiagnInputText.Text = _diagnosticsVm.InputSummary ?? "";
+        DiagnThermalText.Text = _diagnosticsVm.ThermalSummary ?? "";
+        DiagnPerfText.Text = _diagnosticsVm.PerformanceSummary ?? "";
+    }
+
+    /// <summary>Las secciones de resultados solo existen con análisis vigente o en curso.</summary>
+    private bool _forceResults;
+    private bool HasAnalysis() =>
+        AppHost.Resolve<ViewModels.UiState>().LastAnalysisUtc is not null;
+
+    private void UpdateResultsVisibility(bool running = false)
+    {
+        var show = running || _forceResults || HasAnalysis();
+        ResultsContent.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+        HowItWorksCard.Visibility = show ? Visibility.Collapsed : Visibility.Visible;
+    }
+
+    private static void CollapseIfEmpty(Border card, TextBlock text)
+    {
+        card.Visibility = string.IsNullOrWhiteSpace(text.Text) ? Visibility.Collapsed : Visibility.Visible;
+    }
+
+    private void CollapseDataCards()
+    {
+        CollapseIfEmpty(CardNetwork, NetworkText);
+        CollapseIfEmpty(CardSecurity, SecurityText);
+        CollapseIfEmpty(CardStorage, StorageText);
+        CollapseIfEmpty(CardDrivers, DriversText);
+        CollapseIfEmpty(CardInput, DiagnInputText);
+        CollapseIfEmpty(CardThermal, DiagnThermalText);
+        CollapseIfEmpty(CardPerf, DiagnPerfText);
+        CollapseIfEmpty(CardGaming, GamingBlockedText);
     }
 
     private async void OnRunClick(object sender, RoutedEventArgs e)
@@ -299,6 +335,7 @@ public sealed partial class AnalyzePage : Page
         Ring.IsActive = true;
         ProgressCard.Visibility = Visibility.Visible;
         StatusText.Text = "Midiendo…";
+        UpdateResultsVisibility(running: true);
         SetProgress(true);
         try
         {
@@ -312,6 +349,8 @@ public sealed partial class AnalyzePage : Page
             try { await _diagnosticsVm.RunCommand.ExecuteAsync(null); RenderDiagnostics(); } catch { }
             try { await RunDnsBenchmarkAuto(_cts.Token); } catch { }
             try { await RunDpcAuto(_cts.Token); } catch { }
+            // Escaneo gaming integrado (la pestaña Gaming vive aquí ahora)
+            try { await _gamingVm.ScanCommand.ExecuteAsync(null); RenderGamingScan(); } catch { }
 
             var failed = results.Count(r => r.Status == ViewModels.AnalysisModuleStatus.Failed);
             var cancelled = results.Count(r => r.Status == ViewModels.AnalysisModuleStatus.Cancelled);
@@ -330,7 +369,9 @@ public sealed partial class AnalyzePage : Page
                             $"{measurement.MedianLatencyMs:0.0} ms, jitter {measurement.JitterMs:0.0} ms, pérdida {measurement.Attempts - measurement.SuccessfulAttempts}/{measurement.Attempts}")));
                 NetStatusBadge.Visibility = Visibility.Visible;
                 NetStatusText.Text = network.Measurements.Any(m => m.MedianLatencyMs is not null) ? "Medido" : "Sin datos";
-                NetStatusBadge.Background = network.Measurements.Any(m => m.MedianLatencyMs is not null) ? (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["SystemFillColorSuccessBrush"] : (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["SystemFillColorNeutralBrush"];
+                SetSubtleBadge(NetStatusBadge, NetStatusText,
+                    network.Measurements.Any(m => m.MedianLatencyMs is not null) ? "CaoGreenSoftBrush" : "CaoSlateSoftBrush",
+                    network.Measurements.Any(m => m.MedianLatencyMs is not null) ? "CaoGreenSolidBrush" : "CaoNeutralBrush");
             }
         }
         catch (OperationCanceledException)
@@ -351,6 +392,8 @@ public sealed partial class AnalyzePage : Page
             RunButton.IsEnabled = true;
             CancelButton.Visibility = Visibility.Collapsed;
             SetProgress(false);
+            CollapseDataCards();
+            UpdateResultsVisibility();
             _viewModel.CancelCommand.NotifyCanExecuteChanged();
         }
     }
@@ -371,7 +414,7 @@ public sealed partial class AnalyzePage : Page
                 NetworkText.Text = $"Network: {net.Value} ({net.Duration.TotalMilliseconds:0} ms)";
                 NetStatusBadge.Visibility = Visibility.Visible;
                 NetStatusText.Text = "Medido";
-                NetStatusBadge.Background = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["SystemFillColorSuccessBrush"];
+                SetSubtleBadge(NetStatusBadge, NetStatusText, "CaoGreenSoftBrush", "CaoGreenSolidBrush");
             }
             else if (net.Status == ViewModels.AnalysisModuleStatus.Failed)
             {
@@ -391,11 +434,13 @@ public sealed partial class AnalyzePage : Page
             {
                 var security = new SecurityDiagnosticsProvider().Measure();
                 SecurityText.Text = string.Join("\n", security.Features.Select(feature =>
-                        $"• {feature.Name}: {(feature.Enabled is null ? "desconocido" : feature.Enabled.Value ? "activado" : "desactivado")} ({feature.Evidence})")) +
+                        $"• {feature.Name}: {(feature.Enabled is null ? "desconocido" : feature.Enabled.Value ? "activado" : "desactivado")}")) +
                     $"\nVanguard: {(security.VanguardDetected ? "detectado" : "no detectado")}";
                 SecStatusBadge.Visibility = Visibility.Visible;
                 SecStatusText.Text = security.VanguardDetected ? "Anti-cheat detectado" : "Sin anti-cheat";
-                SecStatusBadge.Background = security.VanguardDetected ? (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["SystemFillColorCautionBrush"] : (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["SystemFillColorSuccessBrush"];
+                SetSubtleBadge(SecStatusBadge, SecStatusText,
+                    security.VanguardDetected ? "CaoAmberSoftBrush" : "CaoGreenSoftBrush",
+                    security.VanguardDetected ? "CaoAmberSolidBrush" : "CaoGreenSolidBrush");
             }
             else if (sec.Status == ViewModels.AnalysisModuleStatus.Failed)
             {
@@ -411,6 +456,7 @@ public sealed partial class AnalyzePage : Page
                 var storage = new StorageDiagnosticsProvider().Measure();
                 StorageText.Text = string.Join("\n", storage.Volumes.Select(volume =>
                     $"• {volume.Name} {volume.FileSystem}: libre {volume.FreeBytes / gib:0.0} de {volume.TotalBytes / gib:0.0} GB{(volume.IsSystemVolume ? " [sistema]" : "")}"));
+                RenderStorageBars(storage.Volumes);
             }
         }
         // Drivers
@@ -422,7 +468,11 @@ public sealed partial class AnalyzePage : Page
                 {
                     var report = await new DriverDiagnosticsProvider().MeasureAsync(CancellationToken.None);
                     var problem = report.Drivers.Where(d => d.ProblemCode != 0 || d.IsSigned == false || (d.Status != null && !d.Status.Equals("OK", StringComparison.OrdinalIgnoreCase))).Take(8).ToList();
-                    if (problem.Count == 0)
+                    if (report.Drivers.Count == 0)
+                    {
+                        DriversText.Text = "Sin enumeración de drivers en este análisis.";
+                    }
+                    else if (problem.Count == 0)
                     {
                         DriversText.Text = $"Revisados {report.Drivers.Count} drivers — sin códigos de problema. Todos firmados y estado OK. Si un juego falla, verifica GPU/red/audio con el fabricante.";
                     }
@@ -441,6 +491,43 @@ public sealed partial class AnalyzePage : Page
                 DriversText.Text = $"{ErrorCodes.UiDiagnosticsFailed}: {drv.Message}\nQué hace: lista drivers con problema (código ConfigManager, sin firma, detenidos) para descartar causa de stutter/crashes.";
             }
         }
+    }
+
+    private static void SetSubtleBadge(Border badge, TextBlock label, string bgKey, string fgKey)
+    {
+        try
+        {
+            badge.Background = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources[bgKey];
+            label.Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources[fgKey];
+        }
+        catch { }
+    }
+
+    private void RenderStorageBars(System.Collections.Generic.IReadOnlyList<StorageVolumeReport> volumes)
+    {
+        try
+        {
+            StorageBarsPanel.Children.Clear();
+            foreach (var volume in volumes.Where(v => v.TotalBytes > 0).Take(4))
+            {
+                var usedPct = (1 - (double)volume.FreeBytes / volume.TotalBytes) * 100;
+                var row = new Grid { ColumnSpacing = 8 };
+                row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(110) });
+                row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                var name = new TextBlock { Text = volume.Name, FontSize = 11, FontFamily = new FontFamily("Consolas"), VerticalAlignment = VerticalAlignment.Center };
+                Grid.SetColumn(name, 0);
+                row.Children.Add(name);
+                var bar = new ProgressBar { Minimum = 0, Maximum = 100, Value = usedPct, VerticalAlignment = VerticalAlignment.Center };
+                Grid.SetColumn(bar, 1);
+                row.Children.Add(bar);
+                var pct = new TextBlock { Text = $"{volume.FreeBytes / 1024d / 1024 / 1024:0} GB libres", FontSize = 11, Opacity = 0.75, VerticalAlignment = VerticalAlignment.Center };
+                Grid.SetColumn(pct, 2);
+                row.Children.Add(pct);
+                StorageBarsPanel.Children.Add(row);
+            }
+        }
+        catch (Exception ex) { App.WriteCrashLog(ex); }
     }
 
     private static async Task<T> WithRing<T>(ProgressRing ring, Func<Task<T>> work)
@@ -474,15 +561,24 @@ public sealed partial class AnalyzePage : Page
             DnsBestText.Text = "Benchmark DNS en curso...";
             var results = await new DnsBenchmarkProvider().BenchmarkAsync(null, ct);
             var best = DnsBenchmarkProvider.PickBest(results);
+            // Secundario: segundo mejor con respuesta (el primario solo no basta).
+            var second = results
+                .Where(result => result.MedianLatencyMs is not null && result.Successes >= Math.Max(1, result.Attempts / 2))
+                .OrderBy(result => result.MedianLatencyMs)
+                .FirstOrDefault(result => best is null || !result.Resolver.Equals(best.Resolver, StringComparison.OrdinalIgnoreCase));
             _bestDns = best;
+            _secondDns = second?.Resolver == best?.Resolver ? null : second;
             NetworkText.Text = "DNS benchmark:\n" + string.Join("\n", results.Select(result =>
                 $"• {result.Resolver}: " +
                 (result.MedianLatencyMs is null ? "sin respuesta" : $"{result.MedianLatencyMs:0.0} ms") +
                 $", éxito {result.Successes}/{result.Attempts}")) +
                 (best is null ? "\nSin datos suficientes para recomendar." : $"\nMejor medido: {best.Resolver} (recomendación basada en medición).");
+            RenderDnsBars(results);
             if (best != null)
             {
-                DnsBestText.Text = $"Mejor DNS: {best.Resolver} ({best.MedianLatencyMs:0.0} ms) — pulsa de nuevo para aplicar";
+                DnsBestText.Text = _secondDns is null
+                    ? $"Mejor DNS: {best.Resolver} ({best.MedianLatencyMs:0.0} ms) — pulsa de nuevo para aplicar"
+                    : $"Primario: {best.Resolver} ({best.MedianLatencyMs:0.0} ms) · Secundario: {_secondDns.Resolver} ({_secondDns.MedianLatencyMs:0.0} ms) — pulsa de nuevo para aplicar ambos";
                 DnsActionButton.Content = $"Aplicar DNS {best.Resolver}";
             }
             else
@@ -499,13 +595,51 @@ public sealed partial class AnalyzePage : Page
         }
     }
 
+    private void RenderDnsBars(IReadOnlyList<DnsBenchmarkResult> results)
+    {
+        try
+        {
+            DnsBarsPanel.Children.Clear();
+            var ranked = results
+                .Where(r => r.MedianLatencyMs is not null)
+                .OrderBy(r => r.MedianLatencyMs)
+                .Take(4)
+                .ToList();
+            if (ranked.Count == 0) return;
+            var max = ranked.Max(r => r.MedianLatencyMs!.Value);
+            if (max <= 0) max = 1;
+            foreach (var r in ranked)
+            {
+                var row = new Grid { ColumnSpacing = 8 };
+                row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(110) });
+                row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                var name = new TextBlock { Text = r.Resolver, FontSize = 11, FontFamily = new FontFamily("Consolas"), VerticalAlignment = VerticalAlignment.Center };
+                Grid.SetColumn(name, 0);
+                row.Children.Add(name);
+                var bar = new ProgressBar { Minimum = 0, Maximum = max, Value = r.MedianLatencyMs!.Value, VerticalAlignment = VerticalAlignment.Center };
+                Grid.SetColumn(bar, 1);
+                row.Children.Add(bar);
+                var ms = new TextBlock { Text = $"{r.MedianLatencyMs:0.0} ms", FontSize = 11, Opacity = 0.75, VerticalAlignment = VerticalAlignment.Center };
+                Grid.SetColumn(ms, 2);
+                row.Children.Add(ms);
+                DnsBarsPanel.Children.Add(row);
+            }
+        }
+        catch (Exception ex) { App.WriteCrashLog(ex); }
+    }
+
     private async Task ApplyBestDnsAsync()
     {
         if (_bestDns == null) return;
+        var pair = _secondDns is null ? _bestDns.Resolver : $"{_bestDns.Resolver},{_secondDns.Resolver}";
+        var pairLabel = _secondDns is null
+            ? $"primario {_bestDns.Resolver}"
+            : $"primario {_bestDns.Resolver} y secundario {_secondDns.Resolver}";
         var confirm = new ContentDialog
         {
             Title = $"Aplicar DNS {_bestDns.Resolver}",
-            Content = new TextBlock { Text = $"Se configurará {_bestDns.Resolver} como DNS primario en la interfaz activa.\nBeneficio: -10-20 ms ping, menos jitter. Requiere privilegios.\n¿Continuar?", TextWrapping = TextWrapping.Wrap },
+            Content = new TextBlock { Text = $"Se configurará {pairLabel} en la interfaz activa.\nBeneficio: -10-20 ms ping, menos jitter. El secundario responde si el primario falla. Requiere privilegios.\n¿Continuar?", TextWrapping = TextWrapping.Wrap },
             PrimaryButtonText = "Aplicar",
             CloseButtonText = "Cancelar",
             XamlRoot = Content.XamlRoot
@@ -513,7 +647,7 @@ public sealed partial class AnalyzePage : Page
         if (await confirm.ShowAsync() != ContentDialogResult.Primary) return;
         try
         {
-            DnsBestText.Text = $"Aplicando DNS {_bestDns.Resolver}...";
+            DnsBestText.Text = $"Aplicando DNS {pairLabel}...";
             // Detectar interfaz activa (prioriza Ethernet/Wi-Fi física, ignora virtual/VPN)
             string iface = "Wi-Fi";
             try
@@ -554,11 +688,11 @@ public sealed partial class AnalyzePage : Page
             }
             var pipe = AppHost.Resolve<PrivilegedPipeClient>();
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
-            var resp = await pipe.SetDnsAsync(iface, _bestDns.Resolver, cts.Token);
+            var resp = await pipe.SetDnsAsync(iface, pair, cts.Token);
             if (resp is { Accepted: true })
             {
-                DnsBestText.Text = $"✓ DNS {_bestDns.Resolver} aplicado a {iface} — verificado";
-                var ok = new ContentDialog { Title = Localizer.Get("dns.applied"), Content = new TextBlock { Text = $"{Localizer.Get("dns.applied")} {iface}\n{Localizer.Get("dns.primary")}: {_bestDns.Resolver}\n{Localizer.Get("dns.verified")}", TextWrapping = TextWrapping.Wrap }, CloseButtonText = "Aceptar", XamlRoot = Content.XamlRoot };
+                DnsBestText.Text = $"✓ DNS {pairLabel} aplicado a {iface} — verificado";
+                var ok = new ContentDialog { Title = Localizer.Get("dns.applied"), Content = new TextBlock { Text = $"{Localizer.Get("dns.applied")} {iface}\n{Localizer.Get("dns.primary")}: {pair}\n{Localizer.Get("dns.verified")}", TextWrapping = TextWrapping.Wrap }, CloseButtonText = "Aceptar", XamlRoot = Content.XamlRoot };
                 await ok.ShowAsync();
             }
             else
@@ -578,7 +712,40 @@ public sealed partial class AnalyzePage : Page
 
     private async void OnDpcSampleClick(object sender, RoutedEventArgs e)
     {
+        // El muestreo es independiente del análisis: si aún no hay resultados, mostrarlos.
+        _forceResults = true;
+        UpdateResultsVisibility();
         await RunDpcAuto(CancellationToken.None);
+    }
+
+    private void RenderGamingScan()
+    {
+        try
+        {
+            var detail = $"{_gamingVm.Status} Bloqueadas: {_gamingVm.BlockedCount} · Permitidas: {_gamingVm.AllowedCount} · Revisión: {_gamingVm.ReviewCount}.";
+            if (!string.IsNullOrWhiteSpace(_gamingVm.VendorGuidance))
+                detail += $"\n{_gamingVm.VendorGuidance}";
+            GamingScanText.Text = detail;
+        }
+        catch { GamingScanText.Text = "Escaneo gaming no disponible."; }
+    }
+
+    private void MaybeAddDpcFinding(double maxPercent)
+    {
+        // Uso real del muestreo: presión alta => hallazgo con severidad que
+        // alimenta veredicto, puntuación y conteos (umbral del propio motor).
+        if (maxPercent < 10) return;
+        try
+        {
+            var health = _viewModel.Health;
+            if (health is null) return;
+            if (health.Findings.Any(f => f.Code == "dpc-pressure")) return;
+            var finding = new DiagnosticFinding(HealthDimension.Input, DiagnosticSeverity.Warning, "dpc-pressure",
+                $"Presión DPC elevada ({maxPercent:0.00}%): investigue drivers USB/red/audio.");
+            _viewModel.Health = new SystemDiagnosticReport(health.Scores, health.Findings.Append(finding).ToList());
+            RenderHealth();
+        }
+        catch (Exception ex) { App.WriteCrashLog(ex); }
     }
 
     private async Task RunDpcAuto(CancellationToken ct)
@@ -595,6 +762,7 @@ public sealed partial class AnalyzePage : Page
                 $"Interpretación: {(report.TotalMaxDpcPercent > 5 ? "Alto — posible driver con latencia, revisa drivers de red/audio/GPU." : "Normal — sin impacto en juegos.")}\n" +
                 "La atribución exacta por driver requiere trazas ETW (no incluida); esta medida indica severidad y si hay problema.";
             DpcStatusText.Text = $"Severidad: {report.SeverityEs}";
+            MaybeAddDpcFinding(report.TotalMaxDpcPercent);
         }
         catch (OperationCanceledException) { DpcStatusText.Text = "Cancelado"; }
         catch (Exception ex)

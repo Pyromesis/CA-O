@@ -121,7 +121,6 @@ public sealed partial class MainWindow : Window
             ("optimize", "nav.optimize"),
             ("cleanup", "nav.cleanup"),
             ("solucionar", "nav.solucionar"),
-            ("gaming", "nav.gaming"),
             ("benchmark", "nav.benchmark"),
             ("restore", "nav.restore"),
             ("history", "nav.history"),
@@ -194,6 +193,24 @@ public sealed partial class MainWindow : Window
             var rec = state.Recommendations.Count(r => r.Bucket == RecommendationBucket.Recommended);
             OperationTopText.Text = rec > 0 ? $"{rec} recomendadas" : "";
         }
+
+        // Insignia ops en Optimizar + versión + elevación UAC.
+        try
+        {
+            var badgeCount = state.Recommendations.Count(r => r.Bucket == RecommendationBucket.Recommended);
+            NavOptimizeBadge.Value = badgeCount;
+            NavOptimizeBadge.Visibility = badgeCount > 0 ? Visibility.Visible : Visibility.Collapsed;
+        }
+        catch { }
+        try { SidebarVersionText.Text = $"v{CAO.Shared.AppVersion.Semantic}"; } catch { }
+        try
+        {
+            using var identity = System.Security.Principal.WindowsIdentity.GetCurrent();
+            var elevated = new System.Security.Principal.WindowsPrincipal(identity)
+                .IsInRole(System.Security.Principal.WindowsBuiltInRole.Administrator);
+            UacStatusText.Text = elevated ? "Admin (Elevado)" : "Estándar";
+        }
+        catch { UacStatusText.Text = "Admin (Elevado)"; }
     }
 
     private Storyboard? _servicePulse;
@@ -256,6 +273,8 @@ public sealed partial class MainWindow : Window
     {
         try
         {
+            // Diferido: jamás compite con el pintado inicial ni con el análisis.
+            await Task.Delay(TimeSpan.FromSeconds(20));
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(25));
             var release = await Helpers.AppUpdater.CheckAsync(cts.Token);
             if (release is null) return;

@@ -8,6 +8,19 @@ public partial class App : Application
 {
     private Window? _window;
 
+    /// <summary>Cronómetro de arranque frío para diagnosticar lentitud.</summary>
+    internal static readonly System.Diagnostics.Stopwatch BootWatch = System.Diagnostics.Stopwatch.StartNew();
+
+    internal static void BootMark(string stage)
+    {
+        try
+        {
+            var logger = AppHost.Resolve<CAO.Infrastructure.Logging.StructuredLogger>();
+            logger.Info("Startup", $"[{BootWatch.ElapsedMilliseconds} ms] {stage}");
+        }
+        catch { }
+    }
+
     public App()
     {
         InitializeComponent();
@@ -41,7 +54,9 @@ public partial class App : Application
         }
         catch (Exception ex) { WriteCrashLog(ex); /* degraded: no previous analysis, don't block startup */ }
         _window = new MainWindow();
+        BootMark("MainWindow construida");
         _window.Activate();
+        BootMark("Ventana activada");
         }
         catch (Exception ex)
         {

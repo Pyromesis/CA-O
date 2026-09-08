@@ -9,6 +9,28 @@
                 <ResourceDictionary Source="Resources/DesignTokens.xaml" />
             </ResourceDictionary.MergedDictionaries>
 
+            <!-- Superficies ops solo en oscuro (el claro sigue nativo) -->
+            <ResourceDictionary.ThemeDictionaries>
+                <ResourceDictionary x:Key="Dark">
+                    <SolidColorBrush x:Key="SolidBackgroundFillColorBaseBrush" Color="#0B0F14"/>
+                    <SolidColorBrush x:Key="SolidBackgroundFillColorTertiaryBrush" Color="#0E141B"/>
+                    <SolidColorBrush x:Key="CardBackgroundFillColorDefaultBrush" Color="#131A22"/>
+                    <SolidColorBrush x:Key="CardBackgroundFillColorSecondaryBrush" Color="#1A232D"/>
+                    <SolidColorBrush x:Key="CardStrokeColorDefaultBrush" Color="#26313B"/>
+                    <SolidColorBrush x:Key="DividerStrokeColorDefaultBrush" Color="#232D36"/>
+                    <SolidColorBrush x:Key="LayerFillColorDefaultBrush" Color="#1A232D"/>
+                </ResourceDictionary>
+            </ResourceDictionary.ThemeDictionaries>
+
+            <!-- Marca ops: rampa cian como acento de la app (ambos temas) -->
+            <Color x:Key="SystemAccentColor">#00D3C0</Color>
+            <Color x:Key="SystemAccentColorLight1">#22E4D4</Color>
+            <Color x:Key="SystemAccentColorLight2">#5CEEDF</Color>
+            <Color x:Key="SystemAccentColorLight3">#A5F7EC</Color>
+            <Color x:Key="SystemAccentColorDark1">#00B39F</Color>
+            <Color x:Key="SystemAccentColorDark2">#00897A</Color>
+            <Color x:Key="SystemAccentColorDark3">#0B4F47</Color>
+
             <!-- Global Button Styles Override for consistency -->
             <Style TargetType="Button" BasedOn="{StaticResource DefaultButtonStyle}">
                 <Setter Property="FontWeight" Value="SemiBold"/>

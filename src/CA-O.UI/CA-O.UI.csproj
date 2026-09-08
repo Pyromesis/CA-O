@@ -26,7 +26,6 @@
     <Page Include="DashboardPage.xaml" />
     <Page Include="AnalyzePage.xaml" />
     <Page Include="OptimizePage.xaml" />
-    <Page Include="GamingPage.xaml" />
     <Page Include="DiagnosticsPage.xaml" />
     <Page Include="BenchmarkPage.xaml" />
     <Page Include="RestorePage.xaml" />
@@ -39,6 +38,7 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+    <PackageReference Include="System.Diagnostics.PerformanceCounter" />
     <PackageReference Include="Microsoft.WindowsAppSDK" />
     <PackageReference Include="CommunityToolkit.Mvvm" />
     <PackageReference Include="Microsoft.Extensions.Hosting" />

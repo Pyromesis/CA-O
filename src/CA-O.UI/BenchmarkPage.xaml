@@ -75,19 +75,19 @@
                     <Grid ColumnSpacing="10">
                         <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                         <StackPanel Spacing="6" HorizontalAlignment="Center">
-                            <Border Style="{StaticResource CaoStepCircleStyle}" HorizontalAlignment="Center"><TextBlock Text="1" Foreground="White" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
+                            <Border Style="{StaticResource CaoStepCircleStyle}" HorizontalAlignment="Center"><TextBlock Text="1" Foreground="{StaticResource CaoOpsCyanBrush}" FontWeight="SemiBold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
                             <TextBlock Text="Línea base" FontSize="11" FontWeight="SemiBold" TextAlignment="Center"/>
                         </StackPanel>
                         <StackPanel Grid.Column="1" Spacing="6" HorizontalAlignment="Center">
-                            <Border Style="{StaticResource CaoStepCircleStyle}" HorizontalAlignment="Center"><TextBlock Text="2" Foreground="White" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
+                            <Border Style="{StaticResource CaoStepCircleStyle}" HorizontalAlignment="Center"><TextBlock Text="2" Foreground="{StaticResource CaoOpsCyanBrush}" FontWeight="SemiBold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
                             <TextBlock Text="Aplicar cambio" FontSize="11" FontWeight="SemiBold" TextAlignment="Center"/>
                         </StackPanel>
                         <StackPanel Grid.Column="2" Spacing="6" HorizontalAlignment="Center">
-                            <Border Style="{StaticResource CaoStepCircleStyle}" HorizontalAlignment="Center"><TextBlock Text="3" Foreground="White" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
+                            <Border Style="{StaticResource CaoStepCircleStyle}" HorizontalAlignment="Center"><TextBlock Text="3" Foreground="{StaticResource CaoOpsCyanBrush}" FontWeight="SemiBold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
                             <TextBlock Text="Medir después" FontSize="11" FontWeight="SemiBold" TextAlignment="Center"/>
                         </StackPanel>
                         <StackPanel Grid.Column="3" Spacing="6" HorizontalAlignment="Center">
-                            <Border Style="{StaticResource CaoStepCircleStyle}" HorizontalAlignment="Center"><TextBlock Text="4" Foreground="White" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
+                            <Border Style="{StaticResource CaoStepCircleStyle}" HorizontalAlignment="Center"><TextBlock Text="4" Foreground="{StaticResource CaoOpsCyanBrush}" FontWeight="SemiBold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
                             <TextBlock Text="Comparar" FontSize="11" FontWeight="SemiBold" TextAlignment="Center"/>
                         </StackPanel>
                     </Grid>

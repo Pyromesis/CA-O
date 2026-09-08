@@ -49,19 +49,22 @@
                     </StackPanel>
                 </StackPanel>
 
-                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="20" VerticalAlignment="Center" HorizontalAlignment="Center">
-                    <StackPanel Orientation="Horizontal" Spacing="8">
-                        <Ellipse x:Name="ServiceDot" Width="10" Height="10" Fill="{ThemeResource SystemFillColorCautionBrush}"/>
-                        <TextBlock x:Name="ServiceTopText" FontSize="12" Opacity="0.85" VerticalAlignment="Center" Text="Servicio: comprobando…" FontWeight="SemiBold"/>
+                <Border Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center" CornerRadius="12" Padding="12,5,12,5"
+                        Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
+                    <StackPanel Orientation="Horizontal" Spacing="16" VerticalAlignment="Center">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Ellipse x:Name="ServiceDot" Width="10" Height="10" Fill="{ThemeResource SystemFillColorCautionBrush}"/>
+                            <TextBlock x:Name="ServiceTopText" FontSize="12" Opacity="0.85" VerticalAlignment="Center" Text="Servicio: comprobando…" FontWeight="SemiBold"/>
+                        </StackPanel>
+                        <Border x:Name="TopBarNarrowSeparator" Width="1" Height="16" Background="{ThemeResource DividerStrokeColorDefaultBrush}" Opacity="0.5" VerticalAlignment="Center"/>
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <FontIcon Glyph="&#xEC02;" FontSize="13" Opacity="0.75"/>
+                            <TextBlock x:Name="SystemTopText" FontSize="12" Opacity="0.85" VerticalAlignment="Center" Text="Sistema: —" FontWeight="SemiBold"/>
+                        </StackPanel>
+                        <Border x:Name="TopBarNarrowSeparator2" Width="1" Height="16" Background="{ThemeResource DividerStrokeColorDefaultBrush}" Opacity="0.5" VerticalAlignment="Center"/>
+                        <TextBlock x:Name="LastScanTopText" FontSize="12" Opacity="0.75" VerticalAlignment="Center" Text="Último análisis: nunca" FontWeight="Medium"/>
                     </StackPanel>
-                    <Border x:Name="TopBarNarrowSeparator" Width="1" Height="16" Background="{ThemeResource DividerStrokeColorDefaultBrush}" Opacity="0.5" VerticalAlignment="Center"/>
-                    <StackPanel Orientation="Horizontal" Spacing="8">
-                        <FontIcon Glyph="&#xEC02;" FontSize="13" Opacity="0.75"/>
-                        <TextBlock x:Name="SystemTopText" FontSize="12" Opacity="0.85" VerticalAlignment="Center" Text="Sistema: —" FontWeight="SemiBold"/>
-                    </StackPanel>
-                    <Border x:Name="TopBarNarrowSeparator2" Width="1" Height="16" Background="{ThemeResource DividerStrokeColorDefaultBrush}" Opacity="0.5" VerticalAlignment="Center"/>
-                    <TextBlock x:Name="LastScanTopText" FontSize="12" Opacity="0.75" VerticalAlignment="Center" Text="Último análisis: nunca" FontWeight="Medium"/>
-                </StackPanel>
+                </Border>
 
                 <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                     <TextBlock x:Name="OperationTopText" FontSize="11" Opacity="0.6" VerticalAlignment="Center" Visibility="Collapsed"/>
@@ -82,26 +85,40 @@
             IsSettingsVisible="False"
             Background="{ThemeResource SolidBackgroundFillColorBaseBrush}">
             <NavigationView.PaneHeader>
-                <StackPanel Margin="16,14,16,12" Spacing="3">
-                    <TextBlock Text="CA-O" FontWeight="Bold" FontSize="13" Opacity="0.9"/>
-                    <TextBlock Text="Optimización" FontSize="11" Opacity="0.65" TextWrapping="Wrap"/>
+                <StackPanel Margin="16,14,16,12" Spacing="10">
+                    <Border Style="{StaticResource CaoCardStyle}" Padding="10,8,10,8" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}">
+                        <Grid ColumnSpacing="8">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                            <FontIcon Glyph="&#xE72E;" FontSize="14" Foreground="{StaticResource CaoOpsCyanBrush}" VerticalAlignment="Center"/>
+                            <StackPanel Grid.Column="1" Spacing="0" VerticalAlignment="Center">
+                                <TextBlock Text="UAC TOKEN" FontSize="9" FontWeight="SemiBold" Opacity="0.65">
+                                    <TextBlock.CharacterSpacing>110</TextBlock.CharacterSpacing>
+                                </TextBlock>
+                                <TextBlock x:Name="UacStatusText" Text="Admin (Elevado)" FontWeight="SemiBold" FontSize="12"/>
+                            </StackPanel>
+                            <FontIcon Grid.Column="2" Glyph="&#xE930;" FontSize="13" Foreground="{StaticResource CaoOpsGreenBrush}" VerticalAlignment="Center"/>
+                        </Grid>
+                    </Border>
+                    <StackPanel Spacing="3">
+                        <TextBlock Text="CA-O" FontWeight="Bold" FontSize="13" Opacity="0.9"/>
+                        <TextBlock Text="Optimización" FontSize="11" Opacity="0.65" TextWrapping="Wrap"/>
+                    </StackPanel>
                 </StackPanel>
             </NavigationView.PaneHeader>
             <NavigationView.MenuItems>
                 <NavigationViewItem Content="Panel" Tag="dashboard" Icon="Home" ToolTipService.ToolTip="Panel — estado general"/>
                 <NavigationViewItem Content="Analizar" Tag="analyze" Icon="Zoom" ToolTipService.ToolTip="Analizar — diagnósticos por área"/>
-                <NavigationViewItem Content="Optimizar" Tag="optimize" Icon="Repair" ToolTipService.ToolTip="Optimizar — recomendaciones y cambios transaccionales"/>
+                <NavigationViewItem x:Name="NavOptimizeItem" Content="Optimizar" Tag="optimize" Icon="Repair" ToolTipService.ToolTip="Optimizar — recomendaciones y cambios transaccionales">
+                    <NavigationViewItem.InfoBadge>
+                        <InfoBadge x:Name="NavOptimizeBadge" Visibility="Collapsed"/>
+                    </NavigationViewItem.InfoBadge>
+                </NavigationViewItem>
                 <NavigationViewItem Content="Limpieza" Tag="cleanup" ToolTipService.ToolTip="Limpieza — temporales, papelera y timer">
                     <NavigationViewItem.Icon>
                         <FontIcon Glyph="&#xE74D;" />
                     </NavigationViewItem.Icon>
                 </NavigationViewItem>
                 <NavigationViewItem Content="Solucionar" Tag="solucionar" Icon="Help" ToolTipService.ToolTip="Solucionar — audio, video y sistema"/>
-                <NavigationViewItem Content="Gaming" Tag="gaming" ToolTipService.ToolTip="Gaming — juegos, anti-cheat y perfil seguro">
-                    <NavigationViewItem.Icon>
-                        <FontIcon Glyph="&#xE7FC;" />
-                    </NavigationViewItem.Icon>
-                </NavigationViewItem>
                 <NavigationViewItem Content="Benchmark" Tag="benchmark" ToolTipService.ToolTip="Benchmark — A/B honesto con suelo de ruido">
                     <NavigationViewItem.Icon>
                         <FontIcon Glyph="&#xE9D2;" />
@@ -125,6 +142,7 @@
                         <TextBlock x:Name="SidebarServiceStatus" Text="Servicio: comprobando" FontSize="11" Opacity="0.7"/>
                         <TextBlock x:Name="SidebarBuildText" FontSize="11" Opacity="0.7" IsTextSelectionEnabled="True"/>
                         <TextBlock x:Name="SidebarLastScan" FontSize="11" Opacity="0.7"/>
+                        <TextBlock x:Name="SidebarVersionText" FontSize="11" Opacity="0.7" FontFamily="Consolas"/>
                     </StackPanel>
                 </StackPanel>
             </NavigationView.PaneFooter>

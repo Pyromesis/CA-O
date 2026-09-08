@@ -6,7 +6,7 @@ using CAO.Shared;
 
 namespace CAO.UI.ViewModels;
 
-/// <summary>ViewModel para GamingPage (§5 MVVM real) — anti-cheat + perfiles por juego + estado térmico.</summary>
+/// <summary>ViewModel del escaneo gaming integrado en Analizar — anti-cheat + perfiles por juego + estado térmico.</summary>
 public sealed partial class GamingViewModel : ObservableObject
 {
     private readonly UiState _state;
