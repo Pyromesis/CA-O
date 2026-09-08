@@ -23,10 +23,10 @@
                         </StackPanel>
                     </StackPanel>
                     <Border Style="{StaticResource CaoDividerStyle}"/>
-                    <Button Content="Reiniciar servicios de audio" Tag="restart-windows-audio-services" Click="OnFixClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="320" AutomationProperties.Name="Reiniciar servicios de audio"/>
-                    <Button Content="Permitir acceso al micrófono" Tag="fix-microphone-access" Click="OnFixClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="320" AutomationProperties.Name="Permitir acceso al micrófono"/>
-                    <Button Content="Volumen independiente en Bluetooth" Tag="disable-bluetooth-absolute-volume" Click="OnFixClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="320" AutomationProperties.Name="Volumen independiente en Bluetooth"/>
-                    <Button Content="Reiniciar Bluetooth (no empareja)" Tag="restart-bluetooth-service" Click="OnFixConfirmClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="320" AutomationProperties.Name="Reiniciar servicio Bluetooth"/>
+                    <Button Content="Reiniciar servicios de audio" Tag="restart-windows-audio-services" Click="OnFixClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="320" AutomationProperties.Name="Reiniciar servicios de audio" ToolTipService.ToolTip="Reinicia Audiosrv y AudioEndpointBuilder. Solución habitual cuando no hay sonido. Unos segundos sin audio."/>
+                    <Button Content="Permitir acceso al micrófono" Tag="fix-microphone-access" Click="OnFixClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="320" AutomationProperties.Name="Permitir acceso al micrófono" ToolTipService.ToolTip="Pone el acceso al micrófono en Permitir (registro). Para apps que no captan audio."/>
+                    <Button Content="Volumen independiente en Bluetooth" Tag="disable-bluetooth-absolute-volume" Click="OnFixClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="320" AutomationProperties.Name="Volumen independiente en Bluetooth" ToolTipService.ToolTip="Separa el volumen de Windows y del dispositivo Bluetooth. Útil si el volumen va a saltos."/>
+                    <Button Content="Reiniciar Bluetooth (no empareja)" Tag="restart-bluetooth-service" Click="OnFixConfirmClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="320" AutomationProperties.Name="Reiniciar servicio Bluetooth" ToolTipService.ToolTip="Reinicia bthserv. Para Bluetooth que no empareja o desaparece. Se conservan los emparejados."/>
                     <TextBlock x:Name="AudioStatusText" FontSize="11" Opacity="0.75" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite"/>
                 </StackPanel>
             </Border>
@@ -44,8 +44,8 @@
                         </StackPanel>
                     </StackPanel>
                     <Border Style="{StaticResource CaoDividerStyle}"/>
-                    <Button Content="Reiniciar compositor (parpadeos)" Tag="restart-desktop-compositor" Click="OnFixConfirmClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="320" AutomationProperties.Name="Reiniciar compositor de escritorio"/>
-                    <Button Content="Limpiar caché de iconos" Tag="clear-icon-thumbnail-cache" Click="OnFixClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="320" AutomationProperties.Name="Limpiar caché de iconos"/>
+                    <Button Content="Reiniciar compositor (parpadeos)" Tag="restart-desktop-compositor" Click="OnFixConfirmClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="320" AutomationProperties.Name="Reiniciar compositor de escritorio" ToolTipService.ToolTip="Reinicia DWM: la pantalla parpadea unos segundos. Para parpadeos o negro. Vuelve solo."/>
+                    <Button Content="Limpiar caché de iconos" Tag="clear-icon-thumbnail-cache" Click="OnFixClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="320" AutomationProperties.Name="Limpiar caché de iconos" ToolTipService.ToolTip="Borra cachés de iconos y miniaturas dañadas. El sistema las regenera solo."/>
                     <TextBlock x:Name="VideoStatusText" FontSize="11" Opacity="0.75" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite"/>
                 </StackPanel>
             </Border>
@@ -63,8 +63,8 @@
                         </StackPanel>
                     </StackPanel>
                     <Border Style="{StaticResource CaoDividerStyle}"/>
-                    <Button Content="Vaciar caché DNS" Tag="flush-dns-cache" Click="OnFixClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="320" AutomationProperties.Name="Vaciar caché DNS"/>
-                    <Button Content="Reiniciar cliente DNS" Tag="restart-dns-client" Click="OnFixClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="320" AutomationProperties.Name="Reiniciar cliente DNS"/>
+                    <Button Content="Vaciar caché DNS" Tag="flush-dns-cache" Click="OnFixClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="320" AutomationProperties.Name="Vaciar caché DNS" ToolTipService.ToolTip="Ejecuta ipconfig /flushdns. Arregla webs que no cargan tras cambiar de red. Inmediato y repetible."/>
+                    <Button Content="Reiniciar cliente DNS" Tag="restart-dns-client" Click="OnFixClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="320" AutomationProperties.Name="Reiniciar cliente DNS" ToolTipService.ToolTip="Reinicia el cliente DNS (Dnscache). Para errores de resolución persistentes. Complementa vaciar la caché."/>
                     <TextBlock x:Name="NetworkStatusText" FontSize="11" Opacity="0.75" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite"/>
                 </StackPanel>
             </Border>
@@ -82,7 +82,7 @@
                         </StackPanel>
                     </StackPanel>
                     <Border Style="{StaticResource CaoDividerStyle}"/>
-                    <Button Content="Reiniciar cola de impresión" Tag="restart-print-spooler" Click="OnFixClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="320" AutomationProperties.Name="Reiniciar cola de impresión"/>
+                    <Button Content="Reiniciar cola de impresión" Tag="restart-print-spooler" Click="OnFixClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="320" AutomationProperties.Name="Reiniciar cola de impresión" ToolTipService.ToolTip="Reinicia la cola de impresión (Spooler). Para trabajos atascados que no salen ni cancelando."/>
                     <TextBlock x:Name="PrintStatusText" FontSize="11" Opacity="0.75" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite"/>
                 </StackPanel>
             </Border>
@@ -100,10 +100,10 @@
                         </StackPanel>
                     </StackPanel>
                     <Border Style="{StaticResource CaoDividerStyle}"/>
-                    <Button Content="Reparar Windows Update" Tag="repair-windows-update" Click="OnFixConfirmClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="320" AutomationProperties.Name="Reparar Windows Update"/>
-                    <Button Content="Resincronizar reloj" Tag="resync-system-clock" Click="OnFixClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="320" AutomationProperties.Name="Resincronizar reloj del sistema"/>
-                    <Button Content="Reiniciar Explorador (congelado)" Tag="restart-windows-explorer" Click="OnFixConfirmClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="320" AutomationProperties.Name="Reiniciar Explorador de Windows"/>
-                    <Button Content="Reiniciar búsqueda Windows" Tag="restart-windows-search" Click="OnFixClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="320" AutomationProperties.Name="Reiniciar búsqueda de Windows"/>
+                    <Button Content="Reparar Windows Update" Tag="repair-windows-update" Click="OnFixConfirmClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="320" AutomationProperties.Name="Reparar Windows Update" ToolTipService.ToolTip="Renueva SoftwareDistribution y catroot2, reanuda servicios. Para updates atascados con error. Tarda minutos."/>
+                    <Button Content="Resincronizar reloj" Tag="resync-system-clock" Click="OnFixClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="320" AutomationProperties.Name="Resincronizar reloj del sistema" ToolTipService.ToolTip="Sincroniza el reloj con el servidor horario (w32tm). Corrige desfases de hora."/>
+                    <Button Content="Reiniciar Explorador (congelado)" Tag="restart-windows-explorer" Click="OnFixConfirmClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="320" AutomationProperties.Name="Reiniciar Explorador de Windows" ToolTipService.ToolTip="Reinicia explorer.exe cuando la barra o el escritorio se congelan. La pantalla parpadea; vuelve solo."/>
+                    <Button Content="Reiniciar búsqueda Windows" Tag="restart-windows-search" Click="OnFixClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="320" AutomationProperties.Name="Reiniciar búsqueda de Windows" ToolTipService.ToolTip="Reinicia la búsqueda de Windows (WSearch). Para buscador sin resultados. No cambia la indexación."/>
                     <TextBlock x:Name="SystemStatusText" FontSize="11" Opacity="0.75" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite"/>
                 </StackPanel>
             </Border>
