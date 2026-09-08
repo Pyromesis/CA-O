@@ -96,7 +96,7 @@ public sealed partial class OptimizePage : Page
     private void OnFilterRecommendedClick(object sender, RoutedEventArgs e) { _activeFilter = RecommendationBucket.Recommended; _appliedOnly = false; Render(); }
     private void OnFilterOptionalClick(object sender, RoutedEventArgs e) { _activeFilter = RecommendationBucket.Optional; _appliedOnly = false; Render(); }
     private void OnFilterExperimentalClick(object sender, RoutedEventArgs e) { _activeFilter = RecommendationBucket.Experimental; _appliedOnly = false; Render(); }
-    private void OnFilterAppliedClick(object sender, RoutedEventArgs e) { _appliedOnly = true; Render(); }
+    private void OnFilterAppliedClick(object sender, RoutedEventArgs e) { _activeFilter = null; _appliedOnly = true; Render(); }
 
     protected override void OnNavigatedTo(Microsoft.UI.Xaml.Navigation.NavigationEventArgs e)
     {
@@ -161,8 +161,8 @@ public sealed partial class OptimizePage : Page
             })
             .ToList();
 
-        // Expert mode handling for Experimental filter
-        if (_activeFilter == RecommendationBucket.Experimental && !uiState.ExpertMode)
+        // Expert mode handling for Experimental filter (solo fuera de la vista Activos)
+        if (!_appliedOnly && _activeFilter == RecommendationBucket.Experimental && !uiState.ExpertMode)
         {
             FilterInfoBar.Message = Localizer.Get("optimize.expertRequired");
             FilterInfoBar.Severity = InfoBarSeverity.Warning;
