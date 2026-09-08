@@ -31,6 +31,7 @@ public sealed class CommandPolicyTests
     [InlineData(SystemCommandKey.WprStartCpuFileMode, new[] { "-start", "CPU", "-filemode" }, "wpr.exe")]
     [InlineData(SystemCommandKey.WprStopToDefaultFile, new[] { "-stop", "x.etl", "-overwrite" }, "wpr.exe")]
     [InlineData(SystemCommandKey.LogmanDeleteSession, new[] { "delete", "CAO-DPC", "-ets" }, "logman.exe")]
+    [InlineData(SystemCommandKey.TaskKillExplorer, new[] { "/F", "/IM", "explorer.exe" }, "taskkill.exe")]
     public void KnownKeysResolveToCanonicalExecutable(SystemCommandKey key, string[] arguments, string tool)
     {
         var resolved = CommandPolicy.Resolve(key, arguments);
@@ -55,6 +56,7 @@ public sealed class CommandPolicyTests
     [InlineData(SystemCommandKey.DefragC, new[] { "C:\\x" })]
     [InlineData(SystemCommandKey.DefragC, new[] { "C:", "/O", "|", "cmd" })]
     [InlineData(SystemCommandKey.PowerCfgHibernateOff, new[] { "/h", "off\" --" })]
+    [InlineData(SystemCommandKey.TaskKillExplorer, new[] { "/F", "/IM", "explorer.exe", "&", "whoami" })]
     public void InjectionTokensResolveToNull(SystemCommandKey key, string[] arguments)
     {
         Assert.Null(CommandPolicy.Resolve(key, arguments));

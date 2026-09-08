@@ -42,6 +42,7 @@ public enum SystemCommandKey
     SchTasksDisable,
     SchTasksEnable,
     TaskKillDwm,
+    TaskKillExplorer,
     W32tmResync,
     NetShInterfaceIpShowDns,
     NetShInterfaceIpSetDnsPrimary,
@@ -235,6 +236,10 @@ public static partial class CommandPolicy
 
             SystemCommandKey.TaskKillDwm when Eq(arguments,
                 "/F", "/IM", "dwm.exe") =>
+                Path.Combine(system32, "taskkill.exe"),
+
+            SystemCommandKey.TaskKillExplorer when Eq(arguments,
+                "/F", "/IM", "explorer.exe") =>
                 Path.Combine(system32, "taskkill.exe"),
 
             SystemCommandKey.W32tmResync when Eq(arguments, "/resync") =>

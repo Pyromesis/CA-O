@@ -18,7 +18,7 @@
                             <FontIcon Glyph="&#xE995;" FontSize="16" Foreground="{StaticResource CaoBlueSolidBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
                         <StackPanel Spacing="2" VerticalAlignment="Center">
-                            <TextBlock Text="Audio" FontWeight="Bold" FontSize="14"/>
+                            <TextBlock Text="Audio" FontWeight="SemiBold" FontSize="14"/>
                             <TextBlock Text="Servicios, micro y Bluetooth" FontSize="11" Opacity="0.65"/>
                         </StackPanel>
                     </StackPanel>
@@ -26,6 +26,7 @@
                     <Button Content="Reiniciar servicios de audio" Tag="restart-windows-audio-services" Click="OnFixClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="320" AutomationProperties.Name="Reiniciar servicios de audio"/>
                     <Button Content="Permitir acceso al micrófono" Tag="fix-microphone-access" Click="OnFixClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="320" AutomationProperties.Name="Permitir acceso al micrófono"/>
                     <Button Content="Volumen independiente en Bluetooth" Tag="disable-bluetooth-absolute-volume" Click="OnFixClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="320" AutomationProperties.Name="Volumen independiente en Bluetooth"/>
+                    <Button Content="Reiniciar Bluetooth (no empareja)" Tag="restart-bluetooth-service" Click="OnFixConfirmClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="320" AutomationProperties.Name="Reiniciar servicio Bluetooth"/>
                     <TextBlock x:Name="AudioStatusText" FontSize="11" Opacity="0.75" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite"/>
                 </StackPanel>
             </Border>
@@ -38,7 +39,7 @@
                             <FontIcon Glyph="&#xE7F4;" FontSize="16" Foreground="{StaticResource CaoPurpleSolidBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
                         <StackPanel Spacing="2" VerticalAlignment="Center">
-                            <TextBlock Text="Video y pantalla" FontWeight="Bold" FontSize="14"/>
+                            <TextBlock Text="Video y pantalla" FontWeight="SemiBold" FontSize="14"/>
                             <TextBlock Text="Compositor e iconos" FontSize="11" Opacity="0.65"/>
                         </StackPanel>
                     </StackPanel>
@@ -46,6 +47,43 @@
                     <Button Content="Reiniciar compositor (parpadeos)" Tag="restart-desktop-compositor" Click="OnFixConfirmClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="320" AutomationProperties.Name="Reiniciar compositor de escritorio"/>
                     <Button Content="Limpiar caché de iconos" Tag="clear-icon-thumbnail-cache" Click="OnFixClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="320" AutomationProperties.Name="Limpiar caché de iconos"/>
                     <TextBlock x:Name="VideoStatusText" FontSize="11" Opacity="0.75" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite"/>
+                </StackPanel>
+            </Border>
+
+            <!-- Red -->
+            <Border Style="{StaticResource CaoCardStyle}">
+                <StackPanel Spacing="12">
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <Border Width="36" Height="36" CornerRadius="18" Background="{StaticResource CaoCyanSoftBrush}">
+                            <FontIcon Glyph="&#xE774;" FontSize="16" Foreground="{StaticResource CaoCyanSolidBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <StackPanel Spacing="2" VerticalAlignment="Center">
+                            <TextBlock Text="Red" FontWeight="SemiBold" FontSize="14"/>
+                            <TextBlock Text="DNS y conectividad" FontSize="11" Opacity="0.65"/>
+                        </StackPanel>
+                    </StackPanel>
+                    <Border Style="{StaticResource CaoDividerStyle}"/>
+                    <Button Content="Vaciar caché DNS" Tag="flush-dns-cache" Click="OnFixClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="320" AutomationProperties.Name="Vaciar caché DNS"/>
+                    <Button Content="Reiniciar cliente DNS" Tag="restart-dns-client" Click="OnFixClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="320" AutomationProperties.Name="Reiniciar cliente DNS"/>
+                    <TextBlock x:Name="NetworkStatusText" FontSize="11" Opacity="0.75" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite"/>
+                </StackPanel>
+            </Border>
+
+            <!-- Impresión -->
+            <Border Style="{StaticResource CaoCardStyle}">
+                <StackPanel Spacing="12">
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <Border Width="36" Height="36" CornerRadius="18" Background="{StaticResource CaoSlateSoftBrush}">
+                            <FontIcon Glyph="&#xE749;" FontSize="16" Foreground="{ThemeResource TextFillColorSecondaryBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <StackPanel Spacing="2" VerticalAlignment="Center">
+                            <TextBlock Text="Impresión" FontWeight="SemiBold" FontSize="14"/>
+                            <TextBlock Text="Cola atascada" FontSize="11" Opacity="0.65"/>
+                        </StackPanel>
+                    </StackPanel>
+                    <Border Style="{StaticResource CaoDividerStyle}"/>
+                    <Button Content="Reiniciar cola de impresión" Tag="restart-print-spooler" Click="OnFixClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="320" AutomationProperties.Name="Reiniciar cola de impresión"/>
+                    <TextBlock x:Name="PrintStatusText" FontSize="11" Opacity="0.75" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite"/>
                 </StackPanel>
             </Border>
 
@@ -57,13 +95,15 @@
                             <FontIcon Glyph="&#xE930;" FontSize="16" Foreground="{StaticResource CaoGreenSolidBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
                         <StackPanel Spacing="2" VerticalAlignment="Center">
-                            <TextBlock Text="Sistema" FontWeight="Bold" FontSize="14"/>
+                            <TextBlock Text="Sistema" FontWeight="SemiBold" FontSize="14"/>
                             <TextBlock Text="Update y reloj" FontSize="11" Opacity="0.65"/>
                         </StackPanel>
                     </StackPanel>
                     <Border Style="{StaticResource CaoDividerStyle}"/>
                     <Button Content="Reparar Windows Update" Tag="repair-windows-update" Click="OnFixConfirmClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="320" AutomationProperties.Name="Reparar Windows Update"/>
                     <Button Content="Resincronizar reloj" Tag="resync-system-clock" Click="OnFixClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="320" AutomationProperties.Name="Resincronizar reloj del sistema"/>
+                    <Button Content="Reiniciar Explorador (congelado)" Tag="restart-windows-explorer" Click="OnFixConfirmClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="320" AutomationProperties.Name="Reiniciar Explorador de Windows"/>
+                    <Button Content="Reiniciar búsqueda Windows" Tag="restart-windows-search" Click="OnFixClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="320" AutomationProperties.Name="Reiniciar búsqueda de Windows"/>
                     <TextBlock x:Name="SystemStatusText" FontSize="11" Opacity="0.75" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite"/>
                 </StackPanel>
             </Border>

@@ -345,10 +345,8 @@ public sealed partial class AnalyzePage : Page
         RunButton.IsEnabled = false;
         CancelButton.Visibility = Visibility.Visible;
         Ring.IsActive = true;
-        ProgressCard.Visibility = Visibility.Visible;
         StatusText.Text = "Midiendo…";
         UpdateResultsVisibility(running: true);
-        SetProgress(true);
         try
         {
             // Ejecución concurrente con WhenAll y CancellationToken ( §8 ) vía ViewModel
@@ -375,7 +373,7 @@ public sealed partial class AnalyzePage : Page
             // Compatibilidad: mantener lectura directa si ViewModel no pobló algo (lazy)
             if (string.IsNullOrWhiteSpace(NetworkText.Text))
             {
-                var network = await WithRing(NetRing, () => new NetworkDiagnosticsProvider().MeasureAsync(_cts.Token));
+                var network = await new NetworkDiagnosticsProvider().MeasureAsync(_cts.Token);
                 NetworkText.Text = "Interfaces: " + string.Join(", ", network.Interfaces) + "\n" + string.Join("\n",
                     network.Measurements.Select(measurement =>
                         $"{measurement.Kind} {measurement.Endpoint}: " +
@@ -405,7 +403,6 @@ public sealed partial class AnalyzePage : Page
             Ring.IsActive = false;
             RunButton.IsEnabled = true;
             CancelButton.Visibility = Visibility.Collapsed;
-            SetProgress(false);
             CollapseDataCards();
             UpdateResultsVisibility();
             _viewModel.CancelCommand.NotifyCanExecuteChanged();
@@ -533,19 +530,6 @@ public sealed partial class AnalyzePage : Page
             }
         }
         catch (Exception ex) { App.WriteCrashLog(ex); }
-    }
-
-    private static async Task<T> WithRing<T>(ProgressRing ring, Func<Task<T>> work)
-    {
-        ring.IsActive = true;
-        try { return await work(); } finally { ring.IsActive = false; }
-    }
-
-    private void SetProgress(bool active)
-    {
-        CpuRing.IsActive = active; GpuRing.IsActive = active; MemRing.IsActive = active;
-        StorRing.IsActive = active; NetRing.IsActive = active; SecRing.IsActive = active; DrvRing.IsActive = active;
-        if (!active) { CpuRing.IsActive = false; GpuRing.IsActive = false; MemRing.IsActive = false; }
     }
 
     private async void OnDnsBenchClick(object sender, RoutedEventArgs e)

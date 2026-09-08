@@ -102,26 +102,6 @@
             <!-- Resultados (solo con análisis vigente o en curso) -->
             <StackPanel x:Name="ResultsContent" Spacing="20" Visibility="Collapsed">
 
-            <!-- Progress tracker (Fase 57) -->
-            <Border x:Name="ProgressCard" Style="{StaticResource CaoCardStyle}" Visibility="Collapsed">
-                <StackPanel Spacing="8">
-                    <TextBlock Text="Progreso del análisis" FontWeight="SemiBold" FontSize="13"/>
-                    <Grid ColumnSpacing="8" RowSpacing="6">
-                        <Grid.ColumnDefinitions><ColumnDefinition Width="120"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                        <Grid.RowDefinitions>
-                            <RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/>
-                        </Grid.RowDefinitions>
-                        <TextBlock Text="CPU" Grid.Row="0" Grid.Column="0" FontSize="12"/><ProgressRing x:Name="CpuRing" Grid.Row="0" Grid.Column="2" Width="14" Height="14" Style="{StaticResource CaoProgressRingStyle}"/>
-                        <TextBlock Text="GPU" Grid.Row="1" Grid.Column="0" FontSize="12"/><ProgressRing x:Name="GpuRing" Grid.Row="1" Grid.Column="2" Width="14" Height="14" Style="{StaticResource CaoProgressRingStyle}"/>
-                        <TextBlock Text="Memoria" Grid.Row="2" Grid.Column="0" FontSize="12"/><ProgressRing x:Name="MemRing" Grid.Row="2" Grid.Column="2" Width="14" Height="14" Style="{StaticResource CaoProgressRingStyle}"/>
-                        <TextBlock Text="Almacenamiento" Grid.Row="3" Grid.Column="0" FontSize="12"/><ProgressRing x:Name="StorRing" Grid.Row="3" Grid.Column="2" Width="14" Height="14" Style="{StaticResource CaoProgressRingStyle}"/>
-                        <TextBlock Text="Red" Grid.Row="4" Grid.Column="0" FontSize="12"/><ProgressRing x:Name="NetRing" Grid.Row="4" Grid.Column="2" Width="14" Height="14" Style="{StaticResource CaoProgressRingStyle}"/>
-                        <TextBlock Text="Seguridad" Grid.Row="5" Grid.Column="0" FontSize="12"/><ProgressRing x:Name="SecRing" Grid.Row="5" Grid.Column="2" Width="14" Height="14" Style="{StaticResource CaoProgressRingStyle}"/>
-                        <TextBlock Text="Drivers" Grid.Row="6" Grid.Column="0" FontSize="12"/><ProgressRing x:Name="DrvRing" Grid.Row="6" Grid.Column="2" Width="14" Height="14" Style="{StaticResource CaoProgressRingStyle}"/>
-                    </Grid>
-                </StackPanel>
-            </Border>
-
             <!-- Detalle medido por área -->
             <TextBlock Text="Detalle medido por área" Style="{StaticResource CaoSectionTitleStyle}"/>
 

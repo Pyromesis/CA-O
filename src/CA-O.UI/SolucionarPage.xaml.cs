@@ -45,8 +45,12 @@ public sealed partial class SolucionarPage : Page
         "restart-windows-audio-services" => AudioStatusText,
         "fix-microphone-access" => AudioStatusText,
         "disable-bluetooth-absolute-volume" => AudioStatusText,
+        "restart-bluetooth-service" => AudioStatusText,
         "restart-desktop-compositor" => VideoStatusText,
         "clear-icon-thumbnail-cache" => VideoStatusText,
+        "flush-dns-cache" => NetworkStatusText,
+        "restart-dns-client" => NetworkStatusText,
+        "restart-print-spooler" => PrintStatusText,
         _ => SystemStatusText,
     };
 

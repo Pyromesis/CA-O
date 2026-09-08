@@ -25,7 +25,7 @@ public sealed class OptimizationCatalogContractTests
     public void IdsAreUnique()
     {
         var ids = OptimizationCatalog.All.Select(o => o.Definition.Id).ToList();
-        Assert.Equal(75, ids.Count); // 68 previas + 7 troubleshoot // All optimizations now in production (phases 1-6): 19 core + 7 gaming + 7 power + 14 storage + 11 network + 6 startup + 4 system
+        Assert.Equal(80, ids.Count); // 75 previas + 5 solucionadores (spooler, bluetooth, dns, search, explorer) // All optimizations now in production (phases 1-6): 19 core + 7 gaming + 7 power + 14 storage + 11 network + 6 startup + 4 system
         Assert.Equal(ids.Count, ids.Distinct(StringComparer.Ordinal).Count());
     }
 
