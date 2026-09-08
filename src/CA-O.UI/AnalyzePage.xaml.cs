@@ -550,11 +550,10 @@ public sealed partial class AnalyzePage : Page
             DnsBestText.Text = "Benchmark DNS en curso...";
             var results = await new DnsBenchmarkProvider().BenchmarkAsync(null, ct);
             var best = DnsBenchmarkProvider.PickBest(results);
-            // Secundario: segundo mejor con respuesta (el primario solo no basta).
-            var second = results
-                .Where(result => result.MedianLatencyMs is not null && result.Successes >= Math.Max(1, result.Attempts / 2))
-                .OrderBy(result => result.MedianLatencyMs)
-                .FirstOrDefault(result => best is null || !result.Resolver.Equals(best.Resolver, StringComparison.OrdinalIgnoreCase));
+            // Secundario mismo-proveedor: nunca mezclar (p. ej. nunca ISP + 1.1.1.1).
+            // 1.1.1.1→1.0.0.1, 8.8.8.8→8.8.4.4, 9.9.9.9→149.112.112.112; ISP→hermano
+            // mismo /24 o un solo DNS antes que mezclar.
+            var second = best is null ? null : DnsBenchmarkProvider.PickConsistentSecondary(best, results);
             _bestDns = best;
             _secondDns = second?.Resolver == best?.Resolver ? null : second;
             NetworkText.Text = "DNS benchmark:\n" + string.Join("\n", results.Select(result =>
@@ -565,9 +564,12 @@ public sealed partial class AnalyzePage : Page
             RenderDnsBars(results);
             if (best != null)
             {
+                var secondLabel = _secondDns is null ? null :
+                    _secondDns.MedianLatencyMs is null ? _secondDns.Resolver :
+                    $"{_secondDns.Resolver} ({_secondDns.MedianLatencyMs:0.0} ms)";
                 DnsBestText.Text = _secondDns is null
-                    ? $"Mejor DNS: {best.Resolver} ({best.MedianLatencyMs:0.0} ms) — pulsa de nuevo para aplicar"
-                    : $"Primario: {best.Resolver} ({best.MedianLatencyMs:0.0} ms) · Secundario: {_secondDns.Resolver} ({_secondDns.MedianLatencyMs:0.0} ms) — pulsa de nuevo para aplicar ambos";
+                    ? $"Mejor DNS: {best.Resolver} ({best.MedianLatencyMs:0.0} ms) — mismo proveedor en ambos campos, pulsa de nuevo para aplicar"
+                    : $"Primario: {best.Resolver} ({best.MedianLatencyMs:0.0} ms) · Secundario: {secondLabel} (mismo proveedor, sin mezclar) — pulsa de nuevo para aplicar ambos";
                 DnsActionButton.Content = $"Aplicar DNS {best.Resolver}";
             }
             else
@@ -814,6 +816,15 @@ public sealed partial class AnalyzePage : Page
             _bestDns = new DnsBenchmarkResult(snap.DnsPrimary, snap.DnsPrimaryMs, null, 4, 4, 0);
         if (_secondDns is null && snap.DnsSecondary is not null)
             _secondDns = new DnsBenchmarkResult(snap.DnsSecondary, snap.DnsSecondaryMs, null, 4, 4, 0);
+        // Normalizar snapshot antiguo mezclado (p. ej. primario ISP + secundario
+        // Cloudflare): corregir al par mismo-proveedor para no re-aplicar mezcla.
+        if (_bestDns is not null && _secondDns is not null &&
+            !CAO.Shared.Networking.DnsResolverPairs.IsSameProvider(_bestDns.Resolver, _secondDns.Resolver))
+        {
+            var (_, fixedSecondary) = CAO.Shared.Networking.DnsResolverPairs.ResolvePair(_bestDns.Resolver);
+            _secondDns = fixedSecondary is null ? null :
+                new DnsBenchmarkResult(fixedSecondary, null, null, 0, 0, 0);
+        }
         if (snap.DpcMax is double dpc) MaybeAddDpcFinding(dpc);
         CollapseDataCards();
         UpdateResultsVisibility();

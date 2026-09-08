@@ -77,8 +77,9 @@ public static class IpcRequestValidator
                 error = "Payload de SetDns inválido.";
                 return false;
             }
-            if (string.IsNullOrWhiteSpace(dns.InterfaceName) || string.IsNullOrWhiteSpace(dns.DnsIp) ||
-                !System.Net.IPAddress.TryParse(dns.DnsIp.Split(',')[0].Trim(), out _))
+            var dnsParts = (dns.DnsIp ?? string.Empty).Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+            if (string.IsNullOrWhiteSpace(dns.InterfaceName) || dnsParts.Length == 0 || dnsParts.Length > 2 ||
+                !dnsParts.All(p => System.Net.IPAddress.TryParse(p, out _)))
             {
                 error = "SetDns InterfaceName/DnsIp no valido.";
                 return false;

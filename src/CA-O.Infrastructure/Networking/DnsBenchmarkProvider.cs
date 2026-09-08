@@ -1,5 +1,6 @@
 using System.Net.Sockets;
 using System.Text;
+using CAO.Shared.Networking;
 
 namespace CAO.Infrastructure.Networking;
 
@@ -53,6 +54,31 @@ public sealed class DnsBenchmarkProvider
             .Where(result => result.MedianLatencyMs is not null && result.Successes >= Math.Max(1, result.Attempts / 2))
             .OrderBy(result => result.MedianLatencyMs)
             .FirstOrDefault();
+
+    /// <summary>
+    /// Par consistente mismo-proveedor para <paramref name="best"/>: nunca mezcla
+    /// primario de un proveedor con secundario de otro (p. ej. ISP + Cloudflare).
+    /// Conocido → compañero canónico (1.1.1.1→1.0.0.1, 8.8.8.8→8.8.4.4, ...).
+    /// Desconocido (ISP) → hermano medido no-público del mismo /24 si existe;
+    /// si no, secundario null (un solo DNS antes que mezclar).
+    /// </summary>
+    public static DnsBenchmarkResult? PickConsistentSecondary(
+        DnsBenchmarkResult best,
+        IReadOnlyList<DnsBenchmarkResult> results)
+    {
+        var (_, secondaryIp) = DnsResolverPairs.ResolvePair(
+            best.Resolver,
+            results
+                .Where(r => r.MedianLatencyMs is not null && r.Successes >= Math.Max(1, r.Attempts / 2))
+                .Select(r => r.Resolver));
+        if (secondaryIp is null) return null;
+        var measured = results.FirstOrDefault(r =>
+            r.Resolver.Equals(secondaryIp, StringComparison.OrdinalIgnoreCase));
+        if (measured?.MedianLatencyMs is not null) return measured;
+        // Compañero canónico no medido (p. ej. 1.0.0.1 si solo se midió 1.1.1.1):
+        // devolver sintético sin latencia para que la UI aplique el par completo.
+        return new DnsBenchmarkResult(secondaryIp, null, null, 0, 0, 0);
+    }
 
     private async Task<DnsBenchmarkResult> MeasureResolverAsync(string resolverIp, CancellationToken ct)
     {

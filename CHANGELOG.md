@@ -2,6 +2,13 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
+## [2.1.11] - 2026-09-08
+
+### Corregido
+- DNS: el benchmark ya no mezcla proveedores entre primario y secundario (p. ej. nunca ISP `2000.21.200.10` + Cloudflare `1.1.1.1`). El secundario es siempre del mismo proveedor: `1.1.1.1→1.0.0.1`, `8.8.8.8→8.8.4.4`, `9.9.9.9→149.112.112.112`; ISP/red local → hermano mismo `/24` o un solo DNS si no hay hermano.
+- `OptimizationEngine.SetDnsAsync` normaliza pares mezclados heredados (snapshots antiguos) antes de aplicar, con rollback exacto si la verificación falla.
+- `IpcRequestValidator` valida 1–2 IPs en el payload `SetDns`.
+
 ## [2.0.0] - 2026-08-25
 
 Reconstrucción total como plataforma nativa Windows (WinUI 3 + .NET 10).

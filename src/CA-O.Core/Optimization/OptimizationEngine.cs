@@ -252,11 +252,30 @@ public sealed class OptimizationEngine
         if (string.IsNullOrWhiteSpace(interfaceName)) return OperationResult.Fail("Interfaz no especificada.", "invalid-adapter");
         
         // Handle comma-separated primary,secondary
-        var parts = dnsIp.Split(',', StringSplitOptions.TrimEntries);
+        var parts = dnsIp.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length == 0) return OperationResult.Fail("IP DNS no especificada.", "invalid-ip");
         var primary = parts[0];
         var secondary = parts.Length > 1 ? parts[1] : null;
         if (!System.Net.IPAddress.TryParse(primary, out _)) return OperationResult.Fail($"IP DNS inválida: {primary}", "invalid-ip");
         if (secondary != null && !System.Net.IPAddress.TryParse(secondary, out _)) return OperationResult.Fail($"IP DNS secundaria inválida: {secondary}", "invalid-ip");
+
+        // Regla mismo-proveedor: nunca mezclar (p. ej. nunca 2000.21.200.10 +
+        // 1.1.1.1). Si llega un par mezclado (snapshot antiguo o llamada
+        // externa), corregir el secundario al compañero canónico del primario
+        // (1.1.1.1→1.0.0.1, 8.8.8.8→8.8.4.4) o al hermano ISP mismo /24.
+        // Se lee el estado previo para buscar hermano ISP antes de normalizar.
+        var dnsProviderEarly = dnsProviderOverride ?? _dnsProvider;
+        var preDnsForPairing = dnsProviderEarly?.GetAdapter(interfaceName)?.CurrentDnsV4;
+        if (secondary != null && !global::CAO.Shared.Networking.DnsResolverPairs.IsSameProvider(primary, secondary))
+        {
+            var (_, fixedSecondary) = global::CAO.Shared.Networking.DnsResolverPairs.ResolvePair(primary, preDnsForPairing);
+            secondary = fixedSecondary;
+        }
+        else if (secondary == null)
+        {
+            // Par completo mismo-proveedor aunque solo venga el primario.
+            (_, secondary) = global::CAO.Shared.Networking.DnsResolverPairs.ResolvePair(primary, preDnsForPairing);
+        }
         
         var dnsProvider = dnsProviderOverride ?? _dnsProvider;
         
@@ -314,10 +333,12 @@ public sealed class OptimizationEngine
             if (!ok && after.Count == 0)
             {
                 // Provider no pudo leer — considerar aplicado (netsh exit 0) y avisar
-                return OperationResult.Ok($"DNS {primary} aplicado a {interfaceName} — aplicado (verificación no disponible, netsh ok).");
+                var pairPending = secondary is null ? primary : $"{primary},{secondary}";
+                return OperationResult.Ok($"DNS {pairPending} aplicado a {interfaceName} — aplicado (verificación no disponible, netsh ok).");
             }
         }
-        return OperationResult.Ok($"DNS {primary} aplicado a {interfaceName} — verificado.");
+        var pairLabel = secondary is null ? primary : $"{primary},{secondary}";
+        return OperationResult.Ok($"DNS {pairLabel} aplicado a {interfaceName} — verificado (mismo proveedor, sin mezclar).");
     }
 
     private async Task RollbackDnsExact(string interfaceName, bool wasDhcp, string[] beforeDnsV4, string[] beforeDnsV6, CancellationToken ct)
