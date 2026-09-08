@@ -130,7 +130,7 @@ public sealed partial class OptimizePage : Page
 
         var rows = filtered.Select(recommendation =>
             {
-                var (isLocked, lockReason) = EvaluateLock(recommendation, uiState.ExpertMode);
+                var (isLocked, lockReason) = EvaluateLock(recommendation, uiState.ExpertMode, uiState.Recommendations);
                 string benefit = GetBenefitDetail(recommendation.OptimizationId);
                 bool isApplied = recommendation.CurrentState == OptimizationState.AppliedByCao
                     || uiState.AppliedThisSession.Contains(recommendation.OptimizationId);
@@ -244,7 +244,7 @@ public sealed partial class OptimizePage : Page
             bool previewApplied = false;
             if (previewRec is not null)
             {
-                (previewLocked, previewLockReason) = EvaluateLock(previewRec, uiStatePreview.ExpertMode);
+                (previewLocked, previewLockReason) = EvaluateLock(previewRec, uiStatePreview.ExpertMode, uiStatePreview.Recommendations);
                 previewApplied = previewRec.CurrentState == OptimizationState.AppliedByCao
                     || uiStatePreview.AppliedThisSession.Contains(id);
             }
@@ -344,16 +344,29 @@ public sealed partial class OptimizePage : Page
 
     /// <summary>
     /// Única regla de bloqueo: bucket no-Recommended sin Modo Expert, hardware
-    /// incompatible, conflicto anti-cheat, cambio ya aplicado o auditoría de solo
-    /// diagnóstico. La comparten la tarjeta, el diálogo de Detalles y el guard.
+    /// incompatible, conflicto anti-cheat, plan de energía en conflicto con el
+    /// activo, cambio ya aplicado o auditoría de solo diagnóstico. La comparten
+    /// la tarjeta, el diálogo de Detalles y el guard.
     /// </summary>
-    private static (bool IsLocked, string LockReason) EvaluateLock(Recommendation recommendation, bool expertMode)
+    private static (bool IsLocked, string LockReason) EvaluateLock(
+        Recommendation recommendation, bool expertMode,
+        IReadOnlyList<Recommendation>? all = null)
     {
         bool isLocked = recommendation.Bucket != RecommendationBucket.Recommended && !expertMode;
         if (recommendation.Compatibility == CompatibilityStatus.Incompatible) isLocked = true;
         if (recommendation.AntiCheatConflictRisk) isLocked = true;
         if (recommendation.ExpectedImpact == PerformanceImpact.DiagnosticOnly) isLocked = true;
-        string lockReason = recommendation.ExpectedImpact == PerformanceImpact.DiagnosticOnly
+        string? conflictSibling = null;
+        if (all is not null)
+        {
+            conflictSibling = CAO.Core.Optimization.OptimizationConflicts.FindAppliedSibling(
+                recommendation.OptimizationId,
+                all.Select(r => (r.OptimizationId, r.CurrentState)));
+        }
+        if (conflictSibling is not null) isLocked = true;
+        string lockReason = conflictSibling is not null
+            ? $"En conflicto: '{conflictSibling}' ya está activo. Reviertelo antes de activar este plan: dos planes no pueden estar activos a la vez."
+            : recommendation.ExpectedImpact == PerformanceImpact.DiagnosticOnly
             ? Localizer.Get("optimize.lockedDiagnostic")
             : recommendation.Bucket switch
             {
@@ -373,7 +386,7 @@ public sealed partial class OptimizePage : Page
             r.OptimizationId.Equals(optimizationId, StringComparison.OrdinalIgnoreCase));
         if (recommendation is null) return false;
         if (uiState.AppliedThisSession.Contains(optimizationId)) return false;
-        var (isLocked, _) = EvaluateLock(recommendation, uiState.ExpertMode);
+        var (isLocked, _) = EvaluateLock(recommendation, uiState.ExpertMode, uiState.Recommendations);
         return !isLocked && recommendation.CurrentState != OptimizationState.AppliedByCao;
     }
 

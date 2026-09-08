@@ -123,6 +123,22 @@ public sealed class OptimizationEngine
             return OperationResult.Fail($"CAO-GAME-001: {gaming.ReasonEs}", "CAO-GAME-001");
         }
 
+        // Exclusión mutua de planes de energía: activar uno y después otro
+        // no acumula, se pisan. Se exige revertir el activo primero.
+        if (Optimization.OptimizationConflicts.IsPowerScheme(optimizationId))
+        {
+            var activeScheme = Optimization.PowerSchemes.ReadActiveScheme(_registry);
+            var conflict = Optimization.OptimizationConflicts.EvaluatePowerScheme(optimizationId, activeScheme);
+            if (conflict.Outcome == Optimization.OptimizationConflicts.ConflictOutcome.AlreadyApplied)
+            {
+                return OperationResult.Ok(conflict.MessageEs);
+            }
+            if (conflict.Outcome == Optimization.OptimizationConflicts.ConflictOutcome.Blocked)
+            {
+                return OperationResult.Fail(conflict.MessageEs, ErrorCodes.ConflictPowerScheme);
+            }
+        }
+
         // Idempotencia: ya aplicado => éxito sin mutar. Garantiza que una
         // optimización solo se puede activar una vez aunque la UI tenga
         // estado obsoleto (el Detect manda, no la tarjeta).

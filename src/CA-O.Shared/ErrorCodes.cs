@@ -27,6 +27,7 @@ public static class ErrorCodes
     public const string TxnRecoveryPending = "CAO-TXN-004";
     public const string TxnUnknownOptimization = "CAO-TXN-005";
     public const string TxnNotElevated = "CAO-TXN-006";
+    public const string ConflictPowerScheme = "CAO-TXN-007";
 
     // ---- Verification / rollback ----
     public const string VerifyFailed = "CAO-VERIFY-001";
