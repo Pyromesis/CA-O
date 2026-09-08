@@ -97,9 +97,21 @@ public sealed class ClearIconThumbnailCache : IOptimization
                 "Sin evidencia de ejecución en esta sesión."));
         }
 
-        return Task.FromResult(CacheFiles(context.Registry).Count == 0
-            ? VerificationResult.Passed(OptimizationState.AppliedByCao, "Cachés verificadas eliminadas.")
-            : VerificationResult.Failed(OptimizationState.NotApplied, "Aún quedan cachés (posiblemente en uso)."));
+        // Explorer regenera cachés al instante y hay ficheros en uso:
+        // éxito = progreso real o nada pendiente.
+        var remaining = CacheFiles(context.Registry).Count;
+        if (remaining == 0)
+        {
+            return Task.FromResult(VerificationResult.Passed(OptimizationState.AppliedByCao,
+                "Cachés verificadas eliminadas."));
+        }
+        if (_lastDeleted > 0)
+        {
+            return Task.FromResult(VerificationResult.Passed(OptimizationState.AppliedByCao,
+                $"Verificado: {_lastDeleted} fichero(s) eliminados; {remaining} restante(s) en uso o regenerados."));
+        }
+        return Task.FromResult(VerificationResult.Failed(OptimizationState.NotApplied,
+            "No se pudo eliminar ninguna caché (en uso)."));
     }
 
     private int? _lastDeleted;

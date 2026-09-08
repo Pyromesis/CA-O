@@ -70,7 +70,10 @@ public sealed class DiskCleanupSystemFiles : IOptimization
     {
         var pending = PendingFiles();
         if (pending.Count == 0)
+        {
+            _lastDeleted = 0;
             return await Task.FromResult(OperationResult.Ok("No quedaban restos de Windows Update para limpiar."));
+        }
 
         if (context.Services is not null)
         {
@@ -119,9 +122,21 @@ public sealed class DiskCleanupSystemFiles : IOptimization
                 "Sin evidencia de ejecución en esta sesión."));
         }
 
-        return Task.FromResult(PendingFiles().Count == 0
-            ? VerificationResult.Passed(OptimizationState.AppliedByCao, "Descargas de Windows Update verificadas limpias.")
-            : VerificationResult.Failed(OptimizationState.NotApplied, "Aún quedan restos (posiblemente en uso)."));
+        // Como en TempFileCleanupOptimization: Windows Update puede regenerar
+        // restos al reanudar wuauserv/bits; éxito = progreso real o nada pendiente.
+        var remaining = PendingFiles().Count;
+        if (remaining == 0)
+        {
+            return Task.FromResult(VerificationResult.Passed(OptimizationState.AppliedByCao,
+                "Descargas de Windows Update verificadas limpias."));
+        }
+        if (_lastDeleted > 0)
+        {
+            return Task.FromResult(VerificationResult.Passed(OptimizationState.AppliedByCao,
+                $"Verificado: {_lastDeleted} fichero(s) eliminados; {remaining} restante(s) en uso o regenerados."));
+        }
+        return Task.FromResult(VerificationResult.Failed(OptimizationState.NotApplied,
+            "No se pudo eliminar ningún resto (en uso o sin acceso)."));
     }
 
     private int? _lastDeleted;

@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using System.Threading;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using CAO.Shared.IPC;
@@ -194,11 +195,25 @@ public sealed partial class LimpiezaPage : Page
 
         try
         {
-            var result = await Task.Run(() => SHEmptyRecycleBin(IntPtr.Zero, null,
-                SherbNoConfirmation | SherbNoProgressUi | SherbNoSound));
+            // SHEmptyRecycleBin exige hilo STA: en MTA (Task.Run) devuelve
+            // E_UNEXPECTED (0x8000FFFF). Hilo STA dedicado sin UI.
+            var tcs = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var thread = new Thread(() =>
+            {
+                try
+                {
+                    tcs.SetResult(SHEmptyRecycleBin(IntPtr.Zero, null,
+                        SherbNoConfirmation | SherbNoProgressUi | SherbNoSound));
+                }
+                catch (Exception ex) { tcs.SetException(ex); }
+            });
+            thread.SetApartmentState(ApartmentState.STA);
+            thread.IsBackground = true;
+            thread.Start();
+            var result = await tcs.Task;
             RecycleStatusText.Text = result == 0
                 ? "✓ Papelera vaciada."
-                : $"No se pudo vaciar (código 0x{result:X}).";
+                : $"No se pudo vaciar (código 0x{result:X8}). Si persiste, abra la Papelera y vacíela a mano: puede estar dañada.";
         }
         catch (Exception ex)
         {
