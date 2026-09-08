@@ -150,12 +150,13 @@ public sealed class OptimizationTransactionTests
         var registry = new MemoryRegistry();
         var snapshots = new MemorySnapshotStore();
 
-        var good1 = new StubOptimization(Definition("batch-good-1"));
+        var good1 = new StubOptimization(Definition("batch-good-1")) { ValueName = "Good1" };
         var failing = new StubOptimization(Definition("batch-failing"))
         {
+            ValueName = "Failing",
             ApplyScript = _ => OperationResult.Fail("crítico falló"),
         };
-        var neverReached = new StubOptimization(Definition("batch-never"));
+        var neverReached = new StubOptimization(Definition("batch-never")) { ValueName = "Never" };
 
         var multi = new MultiOptimizationTransaction(
             [good1, failing, neverReached],

@@ -32,18 +32,29 @@ public sealed class MaximumPowerPlan : IOptimization
 
     private static string Id => "maximum-power-plan";
 
-    /// <summary>Active scheme GUID parsed by the engine from powercfg.</summary>
+    /// <summary>Active scheme GUID parsed by the engine from powercfg (legado).</summary>
     public string? ActiveSchemeGuid { get; set; }
 
-    public OptimizationState Detect(IRegistryAccessor registry) =>
-        string.Equals(ActiveSchemeGuid, HighPerformanceGuid, StringComparison.OrdinalIgnoreCase)
+    public OptimizationState Detect(IRegistryAccessor registry)
+    {
+        // El plan activo se lee del registro (sincronizado por powercfg):
+        // High o Ultimate cuentan como aplicados (igual que Verify).
+        var live = Optimization.PowerSchemes.DetectScheme(registry, HighPerformanceGuid, UltimatePerformanceGuid);
+        if (live != OptimizationState.Unknown)
+        {
+            return live;
+        }
+        // Fallback legado: inyección del motor.
+        return string.Equals(ActiveSchemeGuid, HighPerformanceGuid, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(ActiveSchemeGuid, UltimatePerformanceGuid, StringComparison.OrdinalIgnoreCase)
             ? OptimizationState.AppliedByCao
             : OptimizationState.NotApplied;
+    }
 
     public OptimizationSnapshot Capture(IRegistryAccessor registry)
     {
         var snapshot = new OptimizationSnapshot();
-        snapshot.RawNotes.Add($"scheme={ActiveSchemeGuid ?? "381b4222-f694-41f0-9685-ff5bb260df2e"}");
+        snapshot.RawNotes.Add($"scheme={Optimization.PowerSchemes.ReadActiveScheme(registry) ?? ActiveSchemeGuid ?? "381b4222-f694-41f0-9685-ff5bb260df2e"}");
         return snapshot;
     }
 

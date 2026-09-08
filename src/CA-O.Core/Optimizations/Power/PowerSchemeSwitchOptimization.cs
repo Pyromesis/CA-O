@@ -23,9 +23,16 @@ public abstract class PowerSchemeSwitchOptimization : IOptimization
         return match.Success ? match.Groups[1].Value : null;
     }
 
-    public OptimizationState Detect(IRegistryAccessor registry) => OptimizationState.NotApplied;
+    public OptimizationState Detect(IRegistryAccessor registry) =>
+        Optimization.PowerSchemes.DetectScheme(registry,
+            Optimization.PowerSchemes.ResolveSchemeGuid(TargetScheme));
 
-    public OptimizationSnapshot Capture(IRegistryAccessor registry) => new OptimizationSnapshot();
+    public OptimizationSnapshot Capture(IRegistryAccessor registry)
+    {
+        var snapshot = new OptimizationSnapshot();
+        snapshot.RawNotes.Add(Optimization.PowerSchemes.CaptureSchemeNote(registry));
+        return snapshot;
+    }
 
     public async Task<OperationResult> ApplyAsync(OptimizationContext context, CancellationToken ct = default)
     {

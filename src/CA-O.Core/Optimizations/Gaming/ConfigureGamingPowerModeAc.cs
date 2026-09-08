@@ -32,9 +32,15 @@ public sealed class ConfigureGamingPowerModeAc : IOptimization
         Impact = ImpactLevel.Medium,
     };
 
-    public OptimizationState Detect(IRegistryAccessor registry) => OptimizationState.NotApplied;
+    public OptimizationState Detect(IRegistryAccessor registry) =>
+        Optimization.PowerSchemes.DetectScheme(registry, UltimatePerformanceGuid);
 
-    public OptimizationSnapshot Capture(IRegistryAccessor registry) => new OptimizationSnapshot();
+    public OptimizationSnapshot Capture(IRegistryAccessor registry)
+    {
+        var snapshot = new OptimizationSnapshot();
+        snapshot.RawNotes.Add(Optimization.PowerSchemes.CaptureSchemeNote(registry));
+        return snapshot;
+    }
 
     public async Task<OperationResult> ApplyAsync(OptimizationContext context, CancellationToken ct = default)
     {

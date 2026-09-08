@@ -128,9 +128,12 @@ public sealed class StubOptimization(OptimizationDefinition definition) : IOptim
     public const string TestKey = @"SOFTWARE\CA-O\Test";
     public const string TestValue = "Enabled";
 
+    /// <summary>Per-instance value name so batch tests can keep stubs independent.</summary>
+    public string ValueName { get; set; } = TestValue;
+
     public OptimizationState Detect(IRegistryAccessor registry)
     {
-        var value = registry.GetValue(RegistryHive2.CurrentUser, TestKey, TestValue);
+        var value = registry.GetValue(RegistryHive2.CurrentUser, TestKey, ValueName);
         if (value is null)
         {
             return OptimizationState.NotApplied;
@@ -141,9 +144,9 @@ public sealed class StubOptimization(OptimizationDefinition definition) : IOptim
     public OptimizationSnapshot Capture(IRegistryAccessor registry)
     {
         var snapshot = new OptimizationSnapshot();
-        var existing = registry.GetValue(RegistryHive2.CurrentUser, TestKey, TestValue);
+        var existing = registry.GetValue(RegistryHive2.CurrentUser, TestKey, ValueName);
         snapshot.Registry.Add(new RegistrySnapshotEntry(
-            RegistryHive2.CurrentUser.ToString(), TestKey, TestValue, existing, Existed: existing is not null));
+            RegistryHive2.CurrentUser.ToString(), TestKey, ValueName, existing, Existed: existing is not null));
         return snapshot;
     }
 
@@ -154,7 +157,7 @@ public sealed class StubOptimization(OptimizationDefinition definition) : IOptim
         {
             return Task.FromResult(ApplyScript(memory));
         }
-        context.Registry.SetValue(RegistryHive2.CurrentUser, TestKey, TestValue, 1, RegistryValueKind2.DWord);
+        context.Registry.SetValue(RegistryHive2.CurrentUser, TestKey, ValueName, 1, RegistryValueKind2.DWord);
         return Task.FromResult(OperationResult.Ok("aplicado"));
     }
 

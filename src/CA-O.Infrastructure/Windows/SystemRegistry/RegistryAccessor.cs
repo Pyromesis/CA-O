@@ -1,5 +1,8 @@
+using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
 using CAO.Core.Abstractions;
 using Microsoft.Win32;
+using Microsoft.Win32.SafeHandles;
 
 namespace CAO.Infrastructure.Windows.SystemRegistry;
 
@@ -7,18 +10,55 @@ namespace CAO.Infrastructure.Windows.SystemRegistry;
 /// Real-registry implementation of IRegistryAccessor with EXACT kind
 /// fidelity (FASE 8): reads use DoNotExpandEnvironmentNames so REG_EXPAND_SZ
 /// is captured unexpanded; writes map the declared kind verbatim.
+///
+/// HKCU se abre con RegOpenCurrentUser (no con el handle cacheado del
+/// proceso): bajo suplantación (servicio SYSTEM ejecutando como el llamante)
+/// lee/escribe el hive DEL USUARIO; sin suplantar conserva el
+/// comportamiento anterior (hive del proceso).
 /// </summary>
+[SupportedOSPlatform("windows")]
 public sealed class RegistryAccessor : IRegistryAccessor
 {
-    private static RegistryKey OpenBase(RegistryHive2 hive) => hive switch
+    private static RegistryKey OpenBase(RegistryHive2 hive, bool writable) => hive switch
     {
-        RegistryHive2.CurrentUser => Registry.CurrentUser,
+        RegistryHive2.CurrentUser => OpenCurrentUser(writable),
         _ => Registry.LocalMachine,
     };
 
+    private static RegistryKey OpenCurrentUser(bool writable)
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            try
+            {
+                const int KeyQueryValue = 0x0001;
+                const int KeySetValue = 0x0002;
+                const int KeyCreateSubKey = 0x0004;
+                const int KeyEnumerateSubKeys = 0x0008;
+                const int KeyNotify = 0x0010;
+                const int ReadControl = 0x00020000;
+                var access = ReadControl | KeyQueryValue | KeyEnumerateSubKeys | KeyNotify
+                    | (writable ? (KeySetValue | KeyCreateSubKey) : 0);
+                if (RegOpenCurrentUser(access, out var hkey) == 0 && hkey != nint.Zero)
+                {
+                    return RegistryKey.FromHandle(new SafeRegistryHandle(hkey, ownsHandle: true));
+                }
+            }
+            catch (Exception ex) when (ex is DllNotFoundException or EntryPointNotFoundException or UnauthorizedAccessException or System.Security.SecurityException or IOException)
+            {
+                // Fallback al comportamiento anterior.
+            }
+        }
+        return Registry.CurrentUser;
+    }
+
+    [DllImport("advapi32.dll", SetLastError = true)]
+    private static extern int RegOpenCurrentUser(int desiredAccess, out nint phkResult);
+
     public RegistryValueKind2 GetKind(RegistryHive2 hive, string keyPath, string valueName)
     {
-        using var key = OpenBase(hive).OpenSubKey(keyPath);
+        using var baseKey = OpenBase(hive, writable: false);
+        using var key = baseKey.OpenSubKey(keyPath);
         var kind = key?.GetValueKind(valueName);
         return MapFromWin(kind);
     }
@@ -26,13 +66,15 @@ public sealed class RegistryAccessor : IRegistryAccessor
     public object? GetValue(RegistryHive2 hive, string keyPath, string valueName)
     {
         ValidatePath(hive, keyPath, valueName);
-        using var key = OpenBase(hive).OpenSubKey(keyPath);
+        using var baseKey = OpenBase(hive, writable: false);
+        using var key = baseKey.OpenSubKey(keyPath);
         return key?.GetValue(valueName);
     }
 
     public object? GetValueRaw(RegistryHive2 hive, string keyPath, string valueName, out RegistryValueKind2 kind)
     {
-        using var key = OpenBase(hive).OpenSubKey(keyPath);
+        using var baseKey = OpenBase(hive, writable: false);
+        using var key = baseKey.OpenSubKey(keyPath);
         if (key is null)
         {
             kind = RegistryValueKind2.None;
@@ -59,7 +101,8 @@ public sealed class RegistryAccessor : IRegistryAccessor
     public void SetValueRaw(RegistryHive2 hive, string keyPath, string valueName, object value, RegistryValueKind2 kind)
     {
         ValidatePath(hive, keyPath, valueName);
-        using var key = OpenBase(hive).CreateSubKey(keyPath, writable: true)!;
+        using var baseKey = OpenBase(hive, writable: true);
+        using var key = baseKey.CreateSubKey(keyPath, writable: true)!;
         key.SetValue(valueName, Coerce(value), MapToWin(kind));
     }
 
@@ -76,7 +119,8 @@ public sealed class RegistryAccessor : IRegistryAccessor
 
     public bool DeleteValue(RegistryHive2 hive, string keyPath, string valueName)
     {
-        using var key = OpenBase(hive).OpenSubKey(keyPath, writable: true);
+        using var baseKey = OpenBase(hive, writable: true);
+        using var key = baseKey.OpenSubKey(keyPath, writable: true);
         if (key is null || key.GetValue(valueName) is null) return false;
         key.DeleteValue(valueName, throwOnMissingValue: false);
         return true;
@@ -84,13 +128,15 @@ public sealed class RegistryAccessor : IRegistryAccessor
 
     public IReadOnlyList<string> GetValueNames(RegistryHive2 hive, string keyPath)
     {
-        using var key = OpenBase(hive).OpenSubKey(keyPath);
+        using var baseKey = OpenBase(hive, writable: false);
+        using var key = baseKey.OpenSubKey(keyPath);
         return key?.GetValueNames() ?? Array.Empty<string>();
     }
 
     public IReadOnlyList<string> GetSubKeyNames(RegistryHive2 hive, string keyPath)
     {
-        using var key = OpenBase(hive).OpenSubKey(keyPath);
+        using var baseKey = OpenBase(hive, writable: false);
+        using var key = baseKey.OpenSubKey(keyPath);
         return key?.GetSubKeyNames() ?? Array.Empty<string>();
     }
 

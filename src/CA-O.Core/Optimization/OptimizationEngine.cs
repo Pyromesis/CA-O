@@ -123,6 +123,23 @@ public sealed class OptimizationEngine
             return OperationResult.Fail($"CAO-GAME-001: {gaming.ReasonEs}", "CAO-GAME-001");
         }
 
+        // Idempotencia: ya aplicado => éxito sin mutar. Garantiza que una
+        // optimización solo se puede activar una vez aunque la UI tenga
+        // estado obsoleto (el Detect manda, no la tarjeta).
+        OptimizationState preState;
+        try
+        {
+            preState = Resolve(optimizationId).Detect(_registry);
+        }
+        catch
+        {
+            preState = OptimizationState.Unknown;
+        }
+        if (preState == OptimizationState.AppliedByCao)
+        {
+            return OperationResult.Ok("Ya aplicado y verificado — no se puede volver a aplicar. Use Revertir si desea restaurarlo.");
+        }
+
         var transaction = new OptimizationTransaction(
             Resolve(optimizationId), _registry, context, _services, _executor, _snapshots, _history, _journal, caller);
         var report = await transaction.RunAsync(ct);

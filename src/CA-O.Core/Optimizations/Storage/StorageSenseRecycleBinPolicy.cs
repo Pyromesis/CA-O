@@ -12,14 +12,14 @@ public sealed class StorageSenseRecycleBinPolicy : RegistryOptimizationBase
             // Enable Storage Sense cleanup of Recycle Bin
             new ValueTarget(
                 RegistryHive2.CurrentUser,
-                @"Software\\Microsoft\\Windows\\CurrentVersion\\StorageSense\\Parameters\\StoragePolicies",
+                @"Software\Microsoft\Windows\CurrentVersion\StorageSense\Parameters\StoragePolicies",
                 "04",
                 1,
                 RegistryValueKind2.DWord),
             // Set Recycle Bin retention to 30 days
             new ValueTarget(
                 RegistryHive2.CurrentUser,
-                @"Software\\Microsoft\\Windows\\CurrentVersion\\StorageSense\\Parameters\\StoragePolicies",
+                @"Software\Microsoft\Windows\CurrentVersion\StorageSense\Parameters\StoragePolicies",
                 "05",
                 30,
                 RegistryValueKind2.DWord)

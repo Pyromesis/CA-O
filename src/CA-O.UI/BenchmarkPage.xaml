@@ -27,28 +27,28 @@
                     <Border Style="{StaticResource CaoDividerStyle}"/>
                     <Grid ColumnSpacing="10">
                         <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                        <Border Background="{StaticResource CaoBlueSoftBrush}" CornerRadius="12" Padding="10">
+                        <Border Background="{StaticResource CaoBlueSoftBrush}" CornerRadius="8" Padding="10">
                             <StackPanel Spacing="4" HorizontalAlignment="Center">
                                 <FontIcon Glyph="&#xE950;" FontSize="18" Foreground="{StaticResource CaoBlueSolidBrush}" HorizontalAlignment="Center"/>
                                 <TextBlock Text="CPU" FontWeight="Bold" FontSize="12" TextAlignment="Center"/>
                                 <TextBlock Text="Primos fijos" FontSize="10" Opacity="0.7" TextAlignment="Center"/>
                             </StackPanel>
                         </Border>
-                        <Border Grid.Column="1" Background="{StaticResource CaoGreenSoftBrush}" CornerRadius="12" Padding="10">
+                        <Border Grid.Column="1" Background="{StaticResource CaoGreenSoftBrush}" CornerRadius="8" Padding="10">
                             <StackPanel Spacing="4" HorizontalAlignment="Center">
                                 <FontIcon Glyph="&#xEB4B;" FontSize="18" Foreground="{StaticResource CaoGreenSolidBrush}" HorizontalAlignment="Center"/>
                                 <TextBlock Text="Memoria" FontWeight="Bold" FontSize="12" TextAlignment="Center"/>
                                 <TextBlock Text="GB/s copia" FontSize="10" Opacity="0.7" TextAlignment="Center"/>
                             </StackPanel>
                         </Border>
-                        <Border Grid.Column="2" Background="{StaticResource CaoCyanSoftBrush}" CornerRadius="12" Padding="10">
+                        <Border Grid.Column="2" Background="{StaticResource CaoCyanSoftBrush}" CornerRadius="8" Padding="10">
                             <StackPanel Spacing="4" HorizontalAlignment="Center">
                                 <FontIcon Glyph="&#xEDA2;" FontSize="18" Foreground="{StaticResource CaoCyanSolidBrush}" HorizontalAlignment="Center"/>
                                 <TextBlock Text="Disco" FontWeight="Bold" FontSize="12" TextAlignment="Center"/>
                                 <TextBlock Text="R/W MB/s" FontSize="10" Opacity="0.7" TextAlignment="Center"/>
                             </StackPanel>
                         </Border>
-                        <Border Grid.Column="3" Background="{StaticResource CaoPurpleSoftBrush}" CornerRadius="12" Padding="10">
+                        <Border Grid.Column="3" Background="{StaticResource CaoPurpleSoftBrush}" CornerRadius="8" Padding="10">
                             <StackPanel Spacing="4" HorizontalAlignment="Center">
                                 <FontIcon Glyph="&#xE930;" FontSize="18" Foreground="{StaticResource CaoPurpleSolidBrush}" HorizontalAlignment="Center"/>
                                 <TextBlock Text="Regla 3%" FontWeight="Bold" FontSize="12" TextAlignment="Center"/>

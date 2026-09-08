@@ -116,6 +116,25 @@ public sealed class OptimizationTransaction
             return Fail(definition.Id, TransactionPhase.Failed, compatibility.ReasonEs);
         }
 
+        // ---- IDEMPOTENCIA: ya aplicado => éxito sin mutar ni snapshotear.
+        // Garantiza que una optimización solo se activa una vez aunque el
+        // llamante tenga estado obsoleto (el Detect manda, no la UI).
+        OptimizationState liveState;
+        try
+        {
+            liveState = _optimization.Detect(_registry);
+        }
+        catch
+        {
+            liveState = OptimizationState.Unknown;
+        }
+        if (liveState == OptimizationState.AppliedByCao)
+        {
+            const string alreadyApplied = "Ya aplicado y verificado — no se puede volver a aplicar. Use Revertir si desea restaurarlo.";
+            Log(definition.Id, "apply", true, null, applyResult: "skipped-already-applied", verification: "passed");
+            return Report(true, TransactionPhase.Commit, alreadyApplied);
+        }
+
         // ---- SNAPSHOT (transaction-scoped identity) ----
         var snapshot = _optimization.Capture(_registry);
         _snapshots?.Save(BuildRecord(definition.Id, snapshot));

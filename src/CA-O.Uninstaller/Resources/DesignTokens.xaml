@@ -73,15 +73,15 @@
         <Setter Property="HorizontalAlignment" Value="Center"/>
     </Style>
 
-    <!-- Semantic color tokens (§56) — no color solo por estética -->
-    <SolidColorBrush x:Key="CaoSuccessBrush" Color="#2E7D32"/>
-    <SolidColorBrush x:Key="CaoWarningBrush" Color="#ED6C02"/>
-    <SolidColorBrush x:Key="CaoDangerBrush" Color="#D32F2F"/>
-    <SolidColorBrush x:Key="CaoCriticalBrush" Color="#B71C1C"/>
-    <SolidColorBrush x:Key="CaoInfoBrush" Color="#1565C0"/>
-    <SolidColorBrush x:Key="CaoNeutralBrush" Color="#616161"/>
-    <SolidColorBrush x:Key="CaoExperimentalBrush" Color="#6A1B9A"/>
-    <SolidColorBrush x:Key="CaoSecurityBrush" Color="#C62828"/>
+    <!-- Semantic color tokens (§56): del sistema, se adaptan al tema -->
+    <SolidColorBrush x:Key="CaoSuccessBrush" Color="{ThemeResource SystemFillColorSuccess}"/>
+    <SolidColorBrush x:Key="CaoWarningBrush" Color="{ThemeResource SystemFillColorCaution}"/>
+    <SolidColorBrush x:Key="CaoDangerBrush" Color="{ThemeResource SystemFillColorCritical}"/>
+    <SolidColorBrush x:Key="CaoCriticalBrush" Color="{ThemeResource SystemFillColorCritical}"/>
+    <SolidColorBrush x:Key="CaoInfoBrush" Color="{ThemeResource SystemFillColorAttention}"/>
+    <SolidColorBrush x:Key="CaoNeutralBrush" Color="{ThemeResource SystemFillColorNeutral}"/>
+    <SolidColorBrush x:Key="CaoExperimentalBrush" Color="#8764B8"/>
+    <SolidColorBrush x:Key="CaoSecurityBrush" Color="{ThemeResource SystemFillColorCritical}"/>
     <SolidColorBrush x:Key="CaoTextPrimaryBrush" Color="#1A1A1A"/>
     <SolidColorBrush x:Key="CaoPrimaryBrush" Color="#0078D4"/>
     <SolidColorBrush x:Key="CaoTextSecondaryBrush" Color="#666666"/>

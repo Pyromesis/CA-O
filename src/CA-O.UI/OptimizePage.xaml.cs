@@ -132,7 +132,8 @@ public sealed partial class OptimizePage : Page
             {
                 var (isLocked, lockReason) = EvaluateLock(recommendation, uiState.ExpertMode);
                 string benefit = GetBenefitDetail(recommendation.OptimizationId);
-                bool isApplied = recommendation.CurrentState == OptimizationState.AppliedByCao;
+                bool isApplied = recommendation.CurrentState == OptimizationState.AppliedByCao
+                    || uiState.AppliedThisSession.Contains(recommendation.OptimizationId);
                 bool canApply = !isLocked && !isApplied;
                 return new RecommendationRow(
                 recommendation.OptimizationId,
@@ -244,7 +245,8 @@ public sealed partial class OptimizePage : Page
             if (previewRec is not null)
             {
                 (previewLocked, previewLockReason) = EvaluateLock(previewRec, uiStatePreview.ExpertMode);
-                previewApplied = previewRec.CurrentState == OptimizationState.AppliedByCao;
+                previewApplied = previewRec.CurrentState == OptimizationState.AppliedByCao
+                    || uiStatePreview.AppliedThisSession.Contains(id);
             }
             // Real diff view (Fase 12): Before/After per target, not generic text.
             var diffPanel = new StackPanel { Spacing = 10 };
@@ -370,6 +372,7 @@ public sealed partial class OptimizePage : Page
         var recommendation = uiState.Recommendations.FirstOrDefault(r =>
             r.OptimizationId.Equals(optimizationId, StringComparison.OrdinalIgnoreCase));
         if (recommendation is null) return false;
+        if (uiState.AppliedThisSession.Contains(optimizationId)) return false;
         var (isLocked, _) = EvaluateLock(recommendation, uiState.ExpertMode);
         return !isLocked && recommendation.CurrentState != OptimizationState.AppliedByCao;
     }
@@ -382,7 +385,8 @@ public sealed partial class OptimizePage : Page
         {
             var current = uiState.Recommendations.FirstOrDefault(r =>
                 r.OptimizationId.Equals(optimizationId, StringComparison.OrdinalIgnoreCase));
-            if (current?.CurrentState == OptimizationState.AppliedByCao)
+            if (current?.CurrentState == OptimizationState.AppliedByCao
+                || uiState.AppliedThisSession.Contains(optimizationId))
             {
                 StatusText.Text = "Ya está aplicado — no se puede volver a aplicar. Use Revertir si desea restaurarlo.";
                 return;
@@ -419,6 +423,8 @@ public sealed partial class OptimizePage : Page
                 var applied = operation == PrivilegedOperationKind.ApplyOptimization;
                 StatusText.Text = applied ? $"✓ {optimizationId} aplicado y verificado. Snapshot disponible para reversión." : $"✓ {optimizationId} revertido y verificado.";
                 TxText.Text = "Verificado ✓ — Commit OK";
+                if (applied) uiState.AppliedThisSession.Add(optimizationId);
+                else uiState.AppliedThisSession.Remove(optimizationId);
             }
             else
             {
@@ -496,7 +502,8 @@ public sealed partial class OptimizePage : Page
         var uiState = AppHost.Resolve<ViewModels.UiState>();
         var recommended = uiState.Recommendations
             .Where(recommendation => recommendation.Bucket == RecommendationBucket.Recommended &&
-                                     recommendation.CurrentState != OptimizationState.AppliedByCao)
+                                     recommendation.CurrentState != OptimizationState.AppliedByCao &&
+                                     !uiState.AppliedThisSession.Contains(recommendation.OptimizationId))
             .Select(recommendation => recommendation.OptimizationId)
             .ToList();
 
@@ -523,6 +530,7 @@ public sealed partial class OptimizePage : Page
                 }
                 appliedOk.Add(id);
             }
+            foreach (var ok in appliedOk) uiState.AppliedThisSession.Add(ok);
 
             using var refreshCts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
             await _vm.RefreshRecommendationsAsync(refreshCts.Token);

@@ -134,6 +134,14 @@ public sealed class UiState : ObservableObject
         set => SetProperty(ref _analysisAgeLabel, value);
     }
 
+    /// <summary>
+    /// Ids aplicados con éxito en esta sesión. Cubre one-shots sin estado
+    /// persistente (flush-dns, trim, DISM...): tras aplicarlos la tarjeta
+    /// muestra "Aplicado ✓" y no se pueden volver a aplicar hasta reiniciar.
+    /// Se limpia al revertir.
+    /// </summary>
+    public HashSet<string> AppliedThisSession { get; } = new(StringComparer.OrdinalIgnoreCase);
+
     public event EventHandler<string>? ThemeChanged;
     public event EventHandler<string>? LanguageChanged;
 }

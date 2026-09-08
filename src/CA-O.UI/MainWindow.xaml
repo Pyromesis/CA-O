@@ -40,7 +40,7 @@
                 </Grid.ColumnDefinitions>
                 <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
                     <Border Width="34" Height="34" CornerRadius="8" Background="{ThemeResource AccentFillColorDefaultBrush}">
-                        <TextBlock Text="CA" FontWeight="Bold" FontSize="14" Foreground="{ThemeResource TextOnAccentFillColorSelectedTextBrush}"
+                        <TextBlock Text="CA" FontWeight="SemiBold" FontSize="14" Foreground="{ThemeResource TextOnAccentFillColorSelectedTextBrush}"
                                    HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Border>
                     <StackPanel Spacing="1" VerticalAlignment="Center">

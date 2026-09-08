@@ -12,14 +12,14 @@ public sealed class StorageSenseTempCleanup : RegistryOptimizationBase
             // Enable Storage Sense cleanup of temporary files
             new ValueTarget(
                 RegistryHive2.CurrentUser,
-                @"Software\\Microsoft\\Windows\\CurrentVersion\\StorageSense\\Parameters\\StoragePolicies",
+                @"Software\Microsoft\Windows\CurrentVersion\StorageSense\Parameters\StoragePolicies",
                 "03",
                 1,
                 RegistryValueKind2.DWord),
             // Set temp file retention to 30 days
             new ValueTarget(
                 RegistryHive2.CurrentUser,
-                @"Software\\Microsoft\\Windows\\CurrentVersion\\StorageSense\\Parameters\\StoragePolicies",
+                @"Software\Microsoft\Windows\CurrentVersion\StorageSense\Parameters\StoragePolicies",
                 "06",
                 30,
                 RegistryValueKind2.DWord)

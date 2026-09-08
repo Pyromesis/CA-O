@@ -184,8 +184,8 @@
             <Border Style="{StaticResource CaoCardStyle}">
                 <StackPanel Spacing="10">
                     <StackPanel Orientation="Horizontal" Spacing="10">
-                        <Border Width="36" Height="36" CornerRadius="12" Background="{StaticResource CaoBrandGradientBrush}">
-                            <TextBlock Text="CA" FontWeight="Bold" FontSize="13" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        <Border Width="36" Height="36" CornerRadius="8" Background="{StaticResource CaoBrandGradientBrush}">
+                            <TextBlock Text="CA" FontWeight="SemiBold" FontSize="13" Foreground="{ThemeResource TextOnAccentFillColorSelectedTextBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
                         <StackPanel Spacing="2" VerticalAlignment="Center">
                             <TextBlock Text="Sobre CA-O" FontWeight="Bold" FontSize="14"/>
