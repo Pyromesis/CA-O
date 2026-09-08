@@ -32,7 +32,8 @@ public sealed class AnalysisStateStore
         TimeSpan Duration,
         string? ErrorCode,
         string? CorrelationId,
-        string? InstalledGamesFingerprint = null
+        string? InstalledGamesFingerprint = null,
+        AnalysisDisplaySnapshot? Display = null
     );
 
     public AnalysisStateStore(string? filePath = null)

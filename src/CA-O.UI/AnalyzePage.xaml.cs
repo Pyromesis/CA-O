@@ -24,6 +24,9 @@ public sealed partial class AnalyzePage : Page
     private CancellationTokenSource? _cts;
     private DnsBenchmarkResult? _bestDns;
     private DnsBenchmarkResult? _secondDns;
+    private double? _lastDpcMax;
+    private List<DnsRowSnapshot>? _lastDnsRows;
+    private List<StorageRowSnapshot>? _lastStorageRows;
 
     public AnalyzePage()
     {
@@ -71,13 +74,22 @@ public sealed partial class AnalyzePage : Page
     {
         base.OnNavigatedTo(e);
         LoadPersisted();
-        // Hydrate VM without ResetResults if persisted analysis exists
-        var session = AppHost.Resolve<CAO.Infrastructure.Persistence.AnalysisSessionService>();
-        var persisted = session.GetLastAnalysis();
-        if (persisted?.Context != null)
+        var uiStateNav = AppHost.Resolve<ViewModels.UiState>();
+        if (uiStateNav.DisplaySnapshot is not null)
         {
-            _viewModel.HydrateFromPersistedAnalysis(persisted);
-            RenderFromViewModel();
+            // Foto vigente: restauración instantánea sin re-medir nada.
+            RestoreDisplaySnapshot();
+        }
+        else
+        {
+            // Hydrate VM without ResetResults if persisted analysis exists
+            var session = AppHost.Resolve<CAO.Infrastructure.Persistence.AnalysisSessionService>();
+            var persisted = session.GetLastAnalysis();
+            if (persisted?.Context != null)
+            {
+                _viewModel.HydrateFromPersistedAnalysis(persisted);
+                RenderFromViewModel();
+            }
         }
         ApplyTexts();
         UpdateFreshnessBanner();
@@ -351,6 +363,8 @@ public sealed partial class AnalyzePage : Page
             try { await RunDpcAuto(_cts.Token); } catch { }
             // Escaneo gaming integrado (la pestaña Gaming vive aquí ahora)
             try { await _gamingVm.ScanCommand.ExecuteAsync(null); RenderGamingScan(); } catch { }
+            // Foto de todo lo renderizado (textos, DNS, DPC, gaming) a sesión + disco.
+            PersistDisplaySnapshot();
 
             var failed = results.Count(r => r.Status == ViewModels.AnalysisModuleStatus.Failed);
             var cancelled = results.Count(r => r.Status == ViewModels.AnalysisModuleStatus.Cancelled);
@@ -508,23 +522,14 @@ public sealed partial class AnalyzePage : Page
         try
         {
             StorageBarsPanel.Children.Clear();
-            foreach (var volume in volumes.Where(v => v.TotalBytes > 0).Take(4))
+            var rows = volumes.Where(v => v.TotalBytes > 0).Take(4).ToList();
+            _lastStorageRows = rows.Select(volume => new StorageRowSnapshot(
+                volume.Name,
+                (1 - (double)volume.FreeBytes / volume.TotalBytes) * 100,
+                volume.FreeBytes / 1024d / 1024 / 1024)).ToList();
+            foreach (var row in _lastStorageRows)
             {
-                var usedPct = (1 - (double)volume.FreeBytes / volume.TotalBytes) * 100;
-                var row = new Grid { ColumnSpacing = 8 };
-                row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(110) });
-                row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-                row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-                var name = new TextBlock { Text = volume.Name, FontSize = 11, FontFamily = new FontFamily("Consolas"), VerticalAlignment = VerticalAlignment.Center };
-                Grid.SetColumn(name, 0);
-                row.Children.Add(name);
-                var bar = new ProgressBar { Minimum = 0, Maximum = 100, Value = usedPct, VerticalAlignment = VerticalAlignment.Center };
-                Grid.SetColumn(bar, 1);
-                row.Children.Add(bar);
-                var pct = new TextBlock { Text = $"{volume.FreeBytes / 1024d / 1024 / 1024:0} GB libres", FontSize = 11, Opacity = 0.75, VerticalAlignment = VerticalAlignment.Center };
-                Grid.SetColumn(pct, 2);
-                row.Children.Add(pct);
-                StorageBarsPanel.Children.Add(row);
+                AddBarRow(StorageBarsPanel, row.Name, row.UsedPct, 100, $"{row.FreeGb:0} GB libres");
             }
         }
         catch (Exception ex) { App.WriteCrashLog(ex); }
@@ -605,28 +610,35 @@ public sealed partial class AnalyzePage : Page
                 .OrderBy(r => r.MedianLatencyMs)
                 .Take(4)
                 .ToList();
+            _lastDnsRows = ranked.Select(r => new DnsRowSnapshot(r.Resolver, r.MedianLatencyMs!.Value)).ToList();
             if (ranked.Count == 0) return;
             var max = ranked.Max(r => r.MedianLatencyMs!.Value);
             if (max <= 0) max = 1;
             foreach (var r in ranked)
             {
-                var row = new Grid { ColumnSpacing = 8 };
-                row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(110) });
-                row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-                row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-                var name = new TextBlock { Text = r.Resolver, FontSize = 11, FontFamily = new FontFamily("Consolas"), VerticalAlignment = VerticalAlignment.Center };
-                Grid.SetColumn(name, 0);
-                row.Children.Add(name);
-                var bar = new ProgressBar { Minimum = 0, Maximum = max, Value = r.MedianLatencyMs!.Value, VerticalAlignment = VerticalAlignment.Center };
-                Grid.SetColumn(bar, 1);
-                row.Children.Add(bar);
-                var ms = new TextBlock { Text = $"{r.MedianLatencyMs:0.0} ms", FontSize = 11, Opacity = 0.75, VerticalAlignment = VerticalAlignment.Center };
-                Grid.SetColumn(ms, 2);
-                row.Children.Add(ms);
-                DnsBarsPanel.Children.Add(row);
+                AddBarRow(DnsBarsPanel, r.Resolver, r.MedianLatencyMs!.Value, max, $"{r.MedianLatencyMs:0.0} ms");
             }
+            PersistDisplaySnapshot();
         }
         catch (Exception ex) { App.WriteCrashLog(ex); }
+    }
+
+    private void AddBarRow(StackPanel panel, string name, double value, double max, string suffix)
+    {
+        var row = new Grid { ColumnSpacing = 8 };
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(110) });
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        var nameBlock = new TextBlock { Text = name, FontSize = 11, FontFamily = new FontFamily("Consolas"), VerticalAlignment = VerticalAlignment.Center };
+        Grid.SetColumn(nameBlock, 0);
+        row.Children.Add(nameBlock);
+        var bar = new ProgressBar { Minimum = 0, Maximum = max, Value = value, VerticalAlignment = VerticalAlignment.Center };
+        Grid.SetColumn(bar, 1);
+        row.Children.Add(bar);
+        var suffixBlock = new TextBlock { Text = suffix, FontSize = 11, Opacity = 0.75, VerticalAlignment = VerticalAlignment.Center };
+        Grid.SetColumn(suffixBlock, 2);
+        row.Children.Add(suffixBlock);
+        panel.Children.Add(row);
     }
 
     private async Task ApplyBestDnsAsync()
@@ -728,21 +740,117 @@ public sealed partial class AnalyzePage : Page
             GamingScanText.Text = detail;
         }
         catch { GamingScanText.Text = "Escaneo gaming no disponible."; }
+        PersistDisplaySnapshot();
+    }
+
+    private AnalysisDisplaySnapshot BuildDisplaySnapshot() => new(
+        Network: NullIfEmpty(NetworkText.Text),
+        Security: NullIfEmpty(SecurityText.Text),
+        Storage: NullIfEmpty(StorageText.Text),
+        Drivers: NullIfEmpty(DriversText.Text),
+        Input: NullIfEmpty(DiagnInputText.Text),
+        Thermal: NullIfEmpty(DiagnThermalText.Text),
+        Perf: NullIfEmpty(DiagnPerfText.Text),
+        DnsBest: NullIfEmpty(DnsBestText.Text),
+        DnsPrimary: _bestDns?.Resolver,
+        DnsPrimaryMs: _bestDns?.MedianLatencyMs,
+        DnsSecondary: _secondDns?.Resolver,
+        DnsSecondaryMs: _secondDns?.MedianLatencyMs,
+        DnsRows: _lastDnsRows,
+        StorageRows: _lastStorageRows,
+        Interrupts: NullIfEmpty(InterruptsText.Text),
+        DpcStatus: NullIfEmpty(DpcStatusText.Text),
+        DpcMax: _lastDpcMax,
+        GamingScan: NullIfEmpty(GamingScanText.Text),
+        GamingBlocked: NullIfEmpty(GamingBlockedText.Text),
+        GamingGames: NullIfEmpty(GamingGamesText.Text));
+
+    private static string? NullIfEmpty(string value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value;
+
+    private void PersistDisplaySnapshot()
+    {
+        try
+        {
+            var uiState = AppHost.Resolve<ViewModels.UiState>();
+            uiState.DisplaySnapshot = BuildDisplaySnapshot();
+            var session = AppHost.Resolve<CAO.Infrastructure.Persistence.AnalysisSessionService>();
+            var persisted = session.GetLastAnalysis();
+            if (persisted is null) return;
+            session.Save(persisted with
+            {
+                Display = uiState.DisplaySnapshot,
+                Health = _viewModel.Health ?? persisted.Health,
+            });
+        }
+        catch (Exception ex) { App.WriteCrashLog(ex); }
+    }
+
+    private static void SetRestored(TextBlock target, string? value)
+    {
+        if (!string.IsNullOrWhiteSpace(value)) target.Text = value;
+    }
+
+    private void RestoreDisplaySnapshot()
+    {
+        var snap = AppHost.Resolve<ViewModels.UiState>().DisplaySnapshot;
+        if (snap is null) return;
+        SetRestored(NetworkText, snap.Network);
+        SetRestored(SecurityText, snap.Security);
+        SetRestored(StorageText, snap.Storage);
+        SetRestored(DriversText, snap.Drivers);
+        SetRestored(DiagnInputText, snap.Input);
+        SetRestored(DiagnThermalText, snap.Thermal);
+        SetRestored(DiagnPerfText, snap.Perf);
+        SetRestored(DnsBestText, snap.DnsBest);
+        SetRestored(InterruptsText, snap.Interrupts);
+        SetRestored(DpcStatusText, snap.DpcStatus);
+        SetRestored(GamingScanText, snap.GamingScan);
+        SetRestored(GamingBlockedText, snap.GamingBlocked);
+        SetRestored(GamingGamesText, snap.GamingGames);
+        try
+        {
+            DnsBarsPanel.Children.Clear();
+            if (snap.DnsRows?.Count > 0)
+            {
+                var max = snap.DnsRows.Max(r => r.Ms);
+                if (max <= 0) max = 1;
+                foreach (var r in snap.DnsRows)
+                    AddBarRow(DnsBarsPanel, r.Resolver, r.Ms, max, $"{r.Ms:0.0} ms");
+            }
+            StorageBarsPanel.Children.Clear();
+            if (snap.StorageRows?.Count > 0)
+            {
+                foreach (var r in snap.StorageRows)
+                    AddBarRow(StorageBarsPanel, r.Name, r.UsedPct, 100, $"{r.FreeGb:0} GB libres");
+            }
+        }
+        catch (Exception ex) { App.WriteCrashLog(ex); }
+        if (_bestDns is null && snap.DnsPrimary is not null)
+            _bestDns = new DnsBenchmarkResult(snap.DnsPrimary, snap.DnsPrimaryMs, null, 4, 4, 0);
+        if (_secondDns is null && snap.DnsSecondary is not null)
+            _secondDns = new DnsBenchmarkResult(snap.DnsSecondary, snap.DnsSecondaryMs, null, 4, 4, 0);
+        if (snap.DpcMax is double dpc) MaybeAddDpcFinding(dpc);
+        CollapseDataCards();
+        UpdateResultsVisibility();
     }
 
     private void MaybeAddDpcFinding(double maxPercent)
     {
-        // Uso real del muestreo: presión alta => hallazgo con severidad que
-        // alimenta veredicto, puntuación y conteos (umbral del propio motor).
         if (maxPercent < 10) return;
         try
         {
-            var health = _viewModel.Health;
+            var uiState = AppHost.Resolve<ViewModels.UiState>();
+            var health = _viewModel.Health
+                ?? (uiState.Context is null ? null : HealthEngine.Evaluate(uiState.Context));
             if (health is null) return;
-            if (health.Findings.Any(f => f.Code == "dpc-pressure")) return;
-            var finding = new DiagnosticFinding(HealthDimension.Input, DiagnosticSeverity.Warning, "dpc-pressure",
-                $"Presión DPC elevada ({maxPercent:0.00}%): investigue drivers USB/red/audio.");
-            _viewModel.Health = new SystemDiagnosticReport(health.Scores, health.Findings.Append(finding).ToList());
+            if (!health.Findings.Any(f => f.Code == "dpc-pressure"))
+            {
+                var finding = new DiagnosticFinding(HealthDimension.Input, DiagnosticSeverity.Warning, "dpc-pressure",
+                    $"Presión DPC elevada ({maxPercent:0.00}%): investigue drivers USB/red/audio.");
+                health = new SystemDiagnosticReport(health.Scores, health.Findings.Append(finding).ToList());
+            }
+            _viewModel.Health = health;
             RenderHealth();
         }
         catch (Exception ex) { App.WriteCrashLog(ex); }
@@ -762,7 +870,9 @@ public sealed partial class AnalyzePage : Page
                 $"Interpretación: {(report.TotalMaxDpcPercent > 5 ? "Alto — posible driver con latencia, revisa drivers de red/audio/GPU." : "Normal — sin impacto en juegos.")}\n" +
                 "La atribución exacta por driver requiere trazas ETW (no incluida); esta medida indica severidad y si hay problema.";
             DpcStatusText.Text = $"Severidad: {report.SeverityEs}";
+            _lastDpcMax = report.TotalMaxDpcPercent;
             MaybeAddDpcFinding(report.TotalMaxDpcPercent);
+            PersistDisplaySnapshot();
         }
         catch (OperationCanceledException) { DpcStatusText.Text = "Cancelado"; }
         catch (Exception ex)

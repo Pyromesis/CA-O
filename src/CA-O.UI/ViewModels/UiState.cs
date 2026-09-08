@@ -142,6 +142,13 @@ public sealed class UiState : ObservableObject
     /// </summary>
     public HashSet<string> AppliedThisSession { get; } = new(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>
+    /// Foto de lo renderizado en Analizar (textos DNS/DPC/gaming/diagnósticos
+    /// y filas de barras). Sobrevive a cambios de pestaña en sesión y se
+    /// persiste a disco al cerrar cada análisis completo.
+    /// </summary>
+    public AnalysisDisplaySnapshot? DisplaySnapshot { get; set; }
+
     public event EventHandler<string>? ThemeChanged;
     public event EventHandler<string>? LanguageChanged;
 }

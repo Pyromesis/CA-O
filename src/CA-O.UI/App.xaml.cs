@@ -43,6 +43,7 @@ public partial class App : Application
                 uiState.Context = persisted.Context;
                 uiState.Recommendations = persisted.Recommendations ?? Array.Empty<CAO.Shared.Recommendation>();
                 uiState.LastAnalysisUtc = persisted.TimestampUtc;
+                uiState.DisplaySnapshot = persisted.Display;
                 // freshness labels
                 var store = AppHost.Resolve<CAO.Infrastructure.Persistence.AnalysisStateStore>();
                 var fp = CAO.Infrastructure.Persistence.AnalysisStateStore.ComputeGamesFingerprint(persisted.Context.GamesDetected);
