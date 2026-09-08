@@ -59,10 +59,10 @@ public static class AppUpdater
         try
         {
             using var http = CreateClient(TimeSpan.FromSeconds(10));
-            using var response = await http.GetAsync(LatestApiUrl, ct);
+            using var response = await http.GetAsync(LatestApiUrl, ct).ConfigureAwait(false);
             response.EnsureSuccessStatusCode();
-            using var stream = await response.Content.ReadAsStreamAsync(ct);
-            using var document = await JsonDocument.ParseAsync(stream, cancellationToken: ct);
+            using var stream = await response.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
+            using var document = await JsonDocument.ParseAsync(stream, cancellationToken: ct).ConfigureAwait(false);
             var root = document.RootElement;
             var tag = root.TryGetProperty("tag_name", out var tagProp) ? tagProp.GetString() : null;
             if (!IsNewer(CurrentVersion, tag)) return null;
@@ -92,25 +92,44 @@ public static class AppUpdater
         }
     }
 
-    /// <summary>Descarga con progreso 0..1. Lanza si la red falla.</summary>
+    /// <summary>
+    /// Descarga con progreso 0..1. Nunca continúa en el hilo de UI
+    /// (<c>ConfigureAwait(false)</c>) y limita los reportes de progreso
+    /// (cada ≥0,5 % o ≥500 ms) para no inundar el dispatcher con los
+    /// ~5000 trozos de un paquete de ~400 MB — eso congelaba la app.
+    /// Lanza si la red falla.
+    /// </summary>
     public static async Task DownloadAsync(string url, string destinationPath, IProgress<double>? progress, CancellationToken ct)
     {
         using var http = CreateClient(TimeSpan.FromMinutes(30));
-        using var response = await http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct);
+        using var response = await http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
         var total = response.Content.Headers.ContentLength;
-        await using var network = await response.Content.ReadAsStreamAsync(ct);
-        await using var file = File.Create(destinationPath);
+        await using var network = await response.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
+        await using var file = new FileStream(destinationPath, FileMode.Create, FileAccess.Write, FileShare.None, 81920, FileOptions.Asynchronous | FileOptions.SequentialScan);
         var buffer = new byte[81920];
         long read = 0;
+        var lastReported = 0.0;
+        var lastReportAt = Environment.TickCount64;
         int n;
-        while ((n = await network.ReadAsync(buffer.AsMemory(0, buffer.Length), ct)) > 0)
+        while ((n = await network.ReadAsync(buffer.AsMemory(0, buffer.Length), ct).ConfigureAwait(false)) > 0)
         {
-            await file.WriteAsync(buffer.AsMemory(0, n), ct);
+            await file.WriteAsync(buffer.AsMemory(0, n), ct).ConfigureAwait(false);
             read += n;
-            if (total.HasValue && total.Value > 0)
-                progress?.Report((double)read / total.Value);
+            if (total.HasValue && total.Value > 0 && progress is not null)
+            {
+                var ratio = (double)read / total.Value;
+                var now = Environment.TickCount64;
+                if (ratio - lastReported >= 0.005 || now - lastReportAt >= 500 || ratio >= 1.0)
+                {
+                    lastReported = ratio;
+                    lastReportAt = now;
+                    progress.Report(Math.Min(ratio, 1.0));
+                }
+            }
         }
+        if (total.HasValue && total.Value > 0)
+            progress?.Report(1.0);
     }
 
     /// <summary>

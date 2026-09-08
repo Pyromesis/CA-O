@@ -400,7 +400,11 @@ public sealed partial class SettingsPage : Page
                 var zipPath = Path.Combine(updateDir, $"CA-O-{_uiState.LatestVersion}-win-x64.zip");
                 var progress = new Progress<double>(v => DispatcherQueue.TryEnqueue(() => UpdateProgressBar.Value = v * 100));
                 using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(30));
-                await Helpers.AppUpdater.DownloadAsync(_uiState.LatestAssetUrl, zipPath, progress, cts.Token);
+                // Descarga fuera del hilo UI: con ConfigureAwait(false) dentro y
+                // progreso limitado, la ventana sigue respondiendo durante los
+                // varios minutos que tarda un paquete de ~400 MB.
+                var downloadUrl = _uiState.LatestAssetUrl;
+                await Task.Run(() => Helpers.AppUpdater.DownloadAsync(downloadUrl, zipPath, progress, cts.Token), cts.Token);
 
                 // Verifica integridad: el tamaño debe coincidir con el anunciado por el release.
                 var expectedBytes = _uiState.LatestAssetBytes;
@@ -416,13 +420,14 @@ public sealed partial class SettingsPage : Page
                 var payloadDir = Path.Combine(updateDir, "payload");
                 // Borrado + extracción fuera del hilo UI (450 MB congelaban la app) y con
                 // reintentos: el antivirus suele bloquear el ZIP recién descargado unos segundos.
+                // Sin Task.Run anidado: la extracción ya corre en el pool.
                 await Task.Run(async () =>
                 {
                     if (Directory.Exists(payloadDir)) Directory.Delete(payloadDir, recursive: true);
                     await Helpers.AppUpdater.ExecuteWithRetryAsync(
                         () => Task.Run(() => System.IO.Compression.ZipFile.ExtractToDirectory(zipPath, payloadDir), cts.Token),
-                        ct: cts.Token);
-                }, cts.Token);
+                        ct: cts.Token).ConfigureAwait(false);
+                }, cts.Token).ConfigureAwait(false);
 
                 var installer = Path.Combine(payloadDir, "gui-installer", "CA-O.InstallerGui.exe");
                 if (!File.Exists(installer))

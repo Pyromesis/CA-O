@@ -2,6 +2,11 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
+## [2.1.12] - 2026-09-08
+
+### Corregido
+- Actualización en la app ya no congela la ventana ("sin responder"): la descarga del paquete (~400 MB) corre fuera del hilo UI (`ConfigureAwait(false)` + `Task.Run`), el progreso se limita (≥0,5 % o ≥500 ms) para no inundar el dispatcher, y la extracción ZIP evita `Task.Run` anidado. `CheckAsync` tampoco continúa en el hilo UI.
+
 ## [2.1.11] - 2026-09-08
 
 ### Corregido

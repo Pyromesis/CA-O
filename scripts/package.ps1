@@ -34,7 +34,8 @@ $releaseDir = Join-Path "artifacts" "release"
 if (-not (Test-Path $releaseDir)) { throw "Ejecute scripts\build-release.ps1 antes de empaquetar." }
 
 $stamp = Get-Date -Format "yyyyMMdd-HHmm"
-$zip = Join-Path "artifacts" ($FullPackageName -f $ProductVersion + "-$stamp")
+$zipName = ($FullPackageName -f $ProductVersion) -replace '\.zip$', "-$stamp.zip"
+$zip = Join-Path "artifacts" $zipName
 
 Write-Host "== Empaquetando $zip ==" -ForegroundColor Cyan
 Compress-Archive -Path (Join-Path $releaseDir "*") -DestinationPath $zip -Force
