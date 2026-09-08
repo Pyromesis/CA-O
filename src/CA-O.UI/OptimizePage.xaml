@@ -82,7 +82,7 @@
                 </ListView.ItemContainerStyle>
                 <ListView.ItemTemplate>
                     <DataTemplate>
-                        <Border Style="{StaticResource CaoCardStyle}">
+                        <Border Style="{StaticResource CaoCardStyle}" ToolTipService.ToolTip="{Binding TooltipDetail}">
                             <StackPanel Spacing="10">
                                 <!-- Header -->
                                 <Grid ColumnSpacing="10">

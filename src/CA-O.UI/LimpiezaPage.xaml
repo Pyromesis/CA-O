@@ -69,7 +69,7 @@
                                     <TextBlock Text="Temporales Windows" FontWeight="SemiBold" FontSize="13"/>
                                     <TextBlock Text="%TEMP% y Windows\Temp. Segundos." FontSize="11" Opacity="0.7" TextWrapping="Wrap"/>
                                 </StackPanel>
-                                <Button Grid.Column="1" Content="Limpiar" Tag="cleanup-windows-temp" Click="OnCleanClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="128" VerticalAlignment="Center" AutomationProperties.Name="Limpiar temporales Windows"/>
+                                <Button Grid.Column="1" Content="Limpiar" Tag="cleanup-windows-temp" Click="OnCleanClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="128" VerticalAlignment="Center" AutomationProperties.Name="Limpiar temporales Windows" ToolTipService.ToolTip="Vacía %TEMP% y Windows\Temp de ficheros antiguos. Omite lo que esté en uso. Tarda segundos y es reversible."/>
                             </Grid>
                             <Grid ColumnSpacing="12" Padding="0,8,0,8">
                                 <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
@@ -77,7 +77,7 @@
                                     <TextBlock Text="Caché Delivery Optimization" FontWeight="SemiBold" FontSize="13"/>
                                     <TextBlock Text="Caché P2P de Windows Update." FontSize="11" Opacity="0.7" TextWrapping="Wrap"/>
                                 </StackPanel>
-                                <Button Grid.Column="1" Content="Limpiar" Tag="cleanup-delivery-optimization-cache" Click="OnCleanClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="128" VerticalAlignment="Center" AutomationProperties.Name="Limpiar caché Delivery Optimization"/>
+                                <Button Grid.Column="1" Content="Limpiar" Tag="cleanup-delivery-optimization-cache" Click="OnCleanClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="128" VerticalAlignment="Center" AutomationProperties.Name="Limpiar caché Delivery Optimization" ToolTipService.ToolTip="Borra la caché P2P que Windows Update usa para compartir descargas. Libera espacio tras actualizar."/>
                             </Grid>
                             <Grid ColumnSpacing="12" Padding="0,8,0,8">
                                 <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
@@ -85,7 +85,7 @@
                                     <TextBlock Text="Archivos del sistema" FontWeight="SemiBold" FontSize="13"/>
                                     <TextBlock Text="SoftwareDistribution\Download. ~1 min, no reversible." FontSize="11" Opacity="0.7" TextWrapping="Wrap"/>
                                 </StackPanel>
-                                <Button Grid.Column="1" Content="Limpiar" Tag="disk-cleanup-system-files" Click="OnCleanClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="128" VerticalAlignment="Center" AutomationProperties.Name="Limpiar archivos del sistema"/>
+                                <Button Grid.Column="1" Content="Limpiar" Tag="disk-cleanup-system-files" Click="OnCleanClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="128" VerticalAlignment="Center" AutomationProperties.Name="Limpiar archivos del sistema" ToolTipService.ToolTip="Vacía SoftwareDistribution\Download (restos de Windows Update). Detiene wuauserv/bits ~1 min. Mantenimiento: no reversible."/>
                             </Grid>
                             <Grid ColumnSpacing="12" Padding="0,8,0,8">
                                 <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
@@ -93,9 +93,9 @@
                                     <TextBlock Text="Minidumps antiguos" FontWeight="SemiBold" FontSize="13"/>
                                     <TextBlock Text="*.dmp de +30 días. Recientes se conservan." FontSize="11" Opacity="0.7" TextWrapping="Wrap"/>
                                 </StackPanel>
-                                <Button Grid.Column="1" Content="Limpiar" Tag="stale-crash-dump-cleanup" Click="OnCleanClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="128" VerticalAlignment="Center" AutomationProperties.Name="Limpiar minidumps antiguos"/>
+                                <Button Grid.Column="1" Content="Limpiar" Tag="stale-crash-dump-cleanup" Click="OnCleanClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="128" VerticalAlignment="Center" AutomationProperties.Name="Limpiar minidumps antiguos" ToolTipService.ToolTip="Borra minivolcados (*.dmp) de más de 30 días. Los recientes se conservan."/>
                             </Grid>
-                            <Button x:Name="CleanAllButton" Content="Ejecutar todo" Click="OnCleanAllClick" Style="{StaticResource CaoGradientButtonStyle}" MinHeight="40" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Margin="0,8,0,0" AutomationProperties.Name="Ejecutar toda la limpieza"/>
+                            <Button x:Name="CleanAllButton" Content="Ejecutar todo" Click="OnCleanAllClick" Style="{StaticResource CaoGradientButtonStyle}" MinHeight="40" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Margin="0,8,0,0" AutomationProperties.Name="Ejecutar toda la limpieza" ToolTipService.ToolTip="Ejecuta seguidas las 4 limpiezas de temporales de esta tarjeta."/>
                         </StackPanel>
                         <TextBlock Grid.Row="2" x:Name="CleanupStatusText" FontSize="11" Opacity="0.75" TextWrapping="Wrap" VerticalAlignment="Bottom" AutomationProperties.LiveSetting="Polite"/>
                     </Grid>
@@ -121,7 +121,7 @@
                                     <TextBlock Text="Activar TRIM" FontWeight="SemiBold" FontSize="13"/>
                                     <TextBlock Text="Avisa al SSD de bloques libres. Instantáneo." FontSize="11" Opacity="0.7" TextWrapping="Wrap"/>
                                 </StackPanel>
-                                <Button Grid.Column="1" Content="Activar" Tag="ensure-trim-enabled" Click="OnCleanClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="128" VerticalAlignment="Center" AutomationProperties.Name="Activar TRIM SSD"/>
+                                <Button Grid.Column="1" Content="Activar" Tag="ensure-trim-enabled" Click="OnCleanClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="128" VerticalAlignment="Center" AutomationProperties.Name="Activar TRIM SSD" ToolTipService.ToolTip="Activa TRIM (fsutil): avisa al SSD de bloques libres para que rinda como nuevo. Instantáneo, imprescindible en SSD."/>
                             </Grid>
                             <Grid ColumnSpacing="12" Padding="0,8,0,8">
                                 <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
@@ -129,7 +129,7 @@
                                     <TextBlock Text="ReTrim SSD" FontWeight="SemiBold" FontSize="13"/>
                                     <TextBlock Text="Re-optimiza el SSD del sistema (1-3 min)." FontSize="11" Opacity="0.7" TextWrapping="Wrap"/>
                                 </StackPanel>
-                                <Button Grid.Column="1" Content="Ejecutar" Tag="retrim-system-ssd" Click="OnCleanClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="128" VerticalAlignment="Center" AutomationProperties.Name="ReTrim SSD del sistema"/>
+                                <Button Grid.Column="1" Content="Ejecutar" Tag="retrim-system-ssd" Click="OnCleanClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="128" VerticalAlignment="Center" AutomationProperties.Name="ReTrim SSD del sistema" ToolTipService.ToolTip="Re-optimiza el SSD del sistema (defrag C: /L). Tarda 1-3 minutos y es seguro."/>
                             </Grid>
                             <Grid ColumnSpacing="12" Padding="0,8,0,8">
                                 <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
@@ -137,7 +137,7 @@
                                     <TextBlock Text="Optimizar unidad C:" FontWeight="SemiBold" FontSize="13"/>
                                     <TextBlock Text="TRIM en SSD, desfragmentado en HDD. Minutos." FontSize="11" Opacity="0.7" TextWrapping="Wrap"/>
                                 </StackPanel>
-                                <Button Grid.Column="1" Content="Optimizar" Tag="optimize-system-drive" Click="OnCleanClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="128" VerticalAlignment="Center" AutomationProperties.Name="Optimizar unidad del sistema"/>
+                                <Button Grid.Column="1" Content="Optimizar" Tag="optimize-system-drive" Click="OnCleanClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="128" VerticalAlignment="Center" AutomationProperties.Name="Optimizar unidad del sistema" ToolTipService.ToolTip="Optimiza C: según su medio (TRIM en SSD, desfragmentado en HDD). Tarda minutos; evita usar el disco mientras tanto."/>
                             </Grid>
                             <Grid ColumnSpacing="12" Padding="0,8,0,8">
                                 <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
@@ -145,7 +145,7 @@
                                     <TextBlock Text="Optimizar HDD" FontWeight="SemiBold" FontSize="13"/>
                                     <TextBlock Text="Desfragmentado según el medio." FontSize="11" Opacity="0.7" TextWrapping="Wrap"/>
                                 </StackPanel>
-                                <Button Grid.Column="1" Content="Optimizar" Tag="optimize-hdd-media-aware" Click="OnCleanClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="128" VerticalAlignment="Center" AutomationProperties.Name="Optimizar HDD según medio"/>
+                                <Button Grid.Column="1" Content="Optimizar" Tag="optimize-hdd-media-aware" Click="OnCleanClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="128" VerticalAlignment="Center" AutomationProperties.Name="Optimizar HDD según medio" ToolTipService.ToolTip="Desfragmenta el disco duro según su medio para lecturas más rápidas. Tarda minutos."/>
                             </Grid>
                             <Grid ColumnSpacing="12" Padding="0,8,0,8">
                                 <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
@@ -153,7 +153,7 @@
                                     <TextBlock Text="Pagefile automático" FontWeight="SemiBold" FontSize="13"/>
                                     <TextBlock Text="Vuelve a memoria virtual gestionada por Windows." FontSize="11" Opacity="0.7" TextWrapping="Wrap"/>
                                 </StackPanel>
-                                <Button Grid.Column="1" Content="Restaurar" Tag="restore-system-managed-pagefile" Click="OnCleanClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="128" VerticalAlignment="Center" AutomationProperties.Name="Restaurar pagefile gestionado"/>
+                                <Button Grid.Column="1" Content="Restaurar" Tag="restore-system-managed-pagefile" Click="OnCleanClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="128" VerticalAlignment="Center" AutomationProperties.Name="Restaurar pagefile gestionado" ToolTipService.ToolTip="Vuelve a memoria virtual gestionada por Windows. Evita cuelgues por pagefile manual mal dimensionado. Reversible."/>
                             </Grid>
                             <Grid ColumnSpacing="12" Padding="0,8,0,8">
                                 <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
@@ -161,7 +161,7 @@
                                     <TextBlock Text="Desactivar hibernación" FontWeight="SemiBold" FontSize="13"/>
                                     <TextBlock Text="Libera hiberfil.sys (GB). Sin hibernar ni inicio rápido." FontSize="11" Opacity="0.7" TextWrapping="Wrap"/>
                                 </StackPanel>
-                                <Button Grid.Column="1" Content="Desactivar" Tag="disable-hibernate" Click="OnCleanClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="128" VerticalAlignment="Center" AutomationProperties.Name="Desactivar hibernación libera GB"/>
+                                <Button Grid.Column="1" Content="Desactivar" Tag="disable-hibernate" Click="OnCleanClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="128" VerticalAlignment="Center" AutomationProperties.Name="Desactivar hibernación libera GB" ToolTipService.ToolTip="Apaga hibernación (powercfg /h off) y libera hiberfil.sys (varios GB). Desactiva hibernar e inicio rápido; reversible."/>
                             </Grid>
                         </StackPanel>
                         <TextBlock Grid.Row="2" x:Name="DiskStatusText" FontSize="11" Opacity="0.75" TextWrapping="Wrap" VerticalAlignment="Bottom" AutomationProperties.LiveSetting="Polite"/>
@@ -188,7 +188,7 @@
                                     <TextBlock Text="Limpiar WinSxS" FontWeight="SemiBold" FontSize="13"/>
                                     <TextBlock Text="DISM /StartComponentCleanup. Seguro, tarda minutos." FontSize="11" Opacity="0.7" TextWrapping="Wrap"/>
                                 </StackPanel>
-                                <Button Grid.Column="1" Content="Limpiar" Tag="windows-component-store-cleanup" Click="OnCleanClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="128" VerticalAlignment="Center" AutomationProperties.Name="Limpiar almacén de componentes DISM"/>
+                                <Button Grid.Column="1" Content="Limpiar" Tag="windows-component-store-cleanup" Click="OnCleanClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="128" VerticalAlignment="Center" AutomationProperties.Name="Limpiar almacén de componentes DISM" ToolTipService.ToolTip="DISM /StartComponentCleanup: elimina componentes sustituidos de WinSxS. Seguro pero tarda minutos; no cancelable a la mitad."/>
                             </Grid>
                             <Grid ColumnSpacing="12" Padding="0,8,0,8">
                                 <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
@@ -196,7 +196,7 @@
                                     <TextBlock Text="ResetBase" FontWeight="SemiBold" FontSize="13"/>
                                     <TextBlock Text="IRREVERSIBLE: impide desinstalar updates. Solo Expert." FontSize="11" Opacity="0.7" TextWrapping="Wrap"/>
                                 </StackPanel>
-                                <Button Grid.Column="1" Content="Ejecutar" Tag="windows-component-store-resetbase" Click="OnCleanClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="128" VerticalAlignment="Center" AutomationProperties.Name="ResetBase irreversible solo expertos"/>
+                                <Button Grid.Column="1" Content="Ejecutar" Tag="windows-component-store-resetbase" Click="OnCleanClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="128" VerticalAlignment="Center" AutomationProperties.Name="ResetBase irreversible solo expertos" ToolTipService.ToolTip="DISM /ResetBase: máxima liberación pero IRREVERSIBLE, impide desinstalar actualizaciones. Solo Modo Expert con copia de seguridad."/>
                             </Grid>
                         </StackPanel>
                         <TextBlock Grid.Row="2" x:Name="MaintenanceStatusText" FontSize="11" Opacity="0.75" TextWrapping="Wrap" VerticalAlignment="Bottom" AutomationProperties.LiveSetting="Polite"/>
@@ -224,7 +224,7 @@
                                     <TextBlock Text="0,5 ms" FontWeight="SemiBold" FontSize="13"/>
                                     <TextBlock Text="Máxima respuesta. Más consumo." FontSize="11" Opacity="0.7" TextWrapping="Wrap"/>
                                 </StackPanel>
-                                <Button Grid.Column="1" Content="Aplicar" Tag="5000" Click="OnTimerClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="128" VerticalAlignment="Center" AutomationProperties.Name="Timer 0 coma 5 milisegundos"/>
+                                <Button Grid.Column="1" Content="Aplicar" Tag="5000" Click="OnTimerClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="128" VerticalAlignment="Center" AutomationProperties.Name="Timer 0 coma 5 milisegundos" ToolTipService.ToolTip="Fija el timer a 0,5 ms: máxima respuesta para gaming competitivo. Más consumo; solo con buena refrigeración."/>
                             </Grid>
                             <Grid ColumnSpacing="12" Padding="0,8,0,8">
                                 <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
@@ -232,7 +232,7 @@
                                     <TextBlock Text="1,0 ms" FontWeight="SemiBold" FontSize="13"/>
                                     <TextBlock Text="Equilibrio recomendado a diario." FontSize="11" Opacity="0.7" TextWrapping="Wrap"/>
                                 </StackPanel>
-                                <Button Grid.Column="1" Content="Aplicar" Tag="10000" Click="OnTimerClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="128" VerticalAlignment="Center" AutomationProperties.Name="Timer 1 milisegundo"/>
+                                <Button Grid.Column="1" Content="Aplicar" Tag="10000" Click="OnTimerClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="128" VerticalAlignment="Center" AutomationProperties.Name="Timer 1 milisegundo" ToolTipService.ToolTip="Fija el timer a 1,0 ms: equilibrio recomendado para jugar a diario."/>
                             </Grid>
                             <Grid ColumnSpacing="12" Padding="0,8,0,8">
                                 <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
@@ -240,7 +240,7 @@
                                     <TextBlock Text="Predeterminado" FontWeight="SemiBold" FontSize="13"/>
                                     <TextBlock Text="15,625 ms de Windows. Eficiencia máxima." FontSize="11" Opacity="0.7" TextWrapping="Wrap"/>
                                 </StackPanel>
-                                <Button Grid.Column="1" Content="Restaurar" Tag="156250" Click="OnTimerClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="128" VerticalAlignment="Center" AutomationProperties.Name="Restaurar timer predeterminado"/>
+                                <Button Grid.Column="1" Content="Restaurar" Tag="156250" Click="OnTimerClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="128" VerticalAlignment="Center" AutomationProperties.Name="Restaurar timer predeterminado" ToolTipService.ToolTip="Restaura los 15,625 ms de Windows: máxima eficiencia y batería."/>
                             </Grid>
                         </StackPanel>
                         <TextBlock Grid.Row="2" x:Name="TimerStatusText" FontSize="11" Opacity="0.75" TextWrapping="Wrap" VerticalAlignment="Bottom" AutomationProperties.LiveSetting="Polite"/>
@@ -267,7 +267,7 @@
                                     <TextBlock Text="Sensor de almacenamiento" FontWeight="SemiBold" FontSize="13"/>
                                     <TextBlock Text="Windows limpia solo." FontSize="11" Opacity="0.7" TextWrapping="Wrap"/>
                                 </StackPanel>
-                                <Button Grid.Column="1" Content="Activar" Tag="enable-storage-sense" Click="OnCleanClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="128" VerticalAlignment="Center" AutomationProperties.Name="Activar Storage Sense"/>
+                                <Button Grid.Column="1" Content="Activar" Tag="enable-storage-sense" Click="OnCleanClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="128" VerticalAlignment="Center" AutomationProperties.Name="Activar Storage Sense" ToolTipService.ToolTip="Enciende el sensor de almacenamiento: Windows limpia solo de forma periódica. Reversible desde aquí u Optimizar."/>
                             </Grid>
                             <Grid ColumnSpacing="12" Padding="0,8,0,8">
                                 <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
@@ -275,7 +275,7 @@
                                     <TextBlock Text="Temporales auto" FontWeight="SemiBold" FontSize="13"/>
                                     <TextBlock Text="Borrado periódico programado." FontSize="11" Opacity="0.7" TextWrapping="Wrap"/>
                                 </StackPanel>
-                                <Button Grid.Column="1" Content="Activar" Tag="storage-sense-temp-cleanup" Click="OnCleanClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="128" VerticalAlignment="Center" AutomationProperties.Name="Política temporales Storage Sense"/>
+                                <Button Grid.Column="1" Content="Activar" Tag="storage-sense-temp-cleanup" Click="OnCleanClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="128" VerticalAlignment="Center" AutomationProperties.Name="Política temporales Storage Sense" ToolTipService.ToolTip="Programa el borrado periódico de temporales por Storage Sense. Sin pensar."/>
                             </Grid>
                             <Grid ColumnSpacing="12" Padding="0,8,0,8">
                                 <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
@@ -283,7 +283,7 @@
                                     <TextBlock Text="Papelera auto" FontWeight="SemiBold" FontSize="13"/>
                                     <TextBlock Text="Vaciado por antigüedad (7-90 días)." FontSize="11" Opacity="0.7" TextWrapping="Wrap"/>
                                 </StackPanel>
-                                <Button Grid.Column="1" Content="Activar" Tag="storage-sense-recycle-bin-policy" Click="OnCleanClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="128" VerticalAlignment="Center" AutomationProperties.Name="Política papelera Storage Sense"/>
+                                <Button Grid.Column="1" Content="Activar" Tag="storage-sense-recycle-bin-policy" Click="OnCleanClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="128" VerticalAlignment="Center" AutomationProperties.Name="Política papelera Storage Sense" ToolTipService.ToolTip="Vacía la papelera automáticamente por antigüedad (7-90 días). Revisa antes si guardas cosas ahí."/>
                             </Grid>
                         </StackPanel>
                         <TextBlock Grid.Row="2" x:Name="SenseStatusText" FontSize="11" Opacity="0.75" TextWrapping="Wrap" VerticalAlignment="Bottom" AutomationProperties.LiveSetting="Polite"/>
@@ -309,7 +309,7 @@
                                     <TextBlock Text="Vaciar caché DNS" FontWeight="SemiBold" FontSize="13"/>
                                     <TextBlock Text="ipconfig /flushdns. Inmediato y repetible." FontSize="11" Opacity="0.7" TextWrapping="Wrap"/>
                                 </StackPanel>
-                                <Button Grid.Column="1" Content="Vaciar" Tag="flush-dns-cache" Click="OnCleanClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="128" VerticalAlignment="Center" AutomationProperties.Name="Vaciar caché DNS"/>
+                                <Button Grid.Column="1" Content="Vaciar" Tag="flush-dns-cache" Click="OnCleanClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="128" VerticalAlignment="Center" AutomationProperties.Name="Vaciar caché DNS" ToolTipService.ToolTip="Ejecuta ipconfig /flushdns. Arregla webs que no cargan tras cambiar de red. Efecto inmediato, seguro y repetible."/>
                             </Grid>
                             <TextBlock x:Name="NetworkStatusText" FontSize="11" Opacity="0.75" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite"/>
                         </StackPanel>
@@ -331,7 +331,7 @@
                                     <TextBlock Text="Vaciar papelera" FontWeight="SemiBold" FontSize="13"/>
                                     <TextBlock Text="Todas las papeleras de tu sesión." FontSize="11" Opacity="0.7" TextWrapping="Wrap"/>
                                 </StackPanel>
-                                <Button Grid.Column="1" Content="Vaciar" Click="OnEmptyRecycleBinClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="128" VerticalAlignment="Center" AutomationProperties.Name="Vaciar papelera de reciclaje"/>
+                                <Button Grid.Column="1" Content="Vaciar" Click="OnEmptyRecycleBinClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="128" VerticalAlignment="Center" AutomationProperties.Name="Vaciar papelera de reciclaje" ToolTipService.ToolTip="Vacía todas las papeleras de tu sesión. Pide confirmación y no se puede deshacer: revisa antes."/>
                             </Grid>
                             <TextBlock x:Name="RecycleStatusText" FontSize="11" Opacity="0.75" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite"/>
                         </StackPanel>
@@ -353,7 +353,7 @@
                                     <TextBlock Text="Auditar espacio" FontWeight="SemiBold" FontSize="13"/>
                                     <TextBlock Text="Avisa si C: baja de 10 GB libres." FontSize="11" Opacity="0.7" TextWrapping="Wrap"/>
                                 </StackPanel>
-                                <Button Grid.Column="1" Content="Auditar" Tag="free-low-storage-space" Click="OnCleanClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="128" VerticalAlignment="Center" AutomationProperties.Name="Auditar espacio bajo en disco"/>
+                                <Button Grid.Column="1" Content="Auditar" Tag="free-low-storage-space" Click="OnCleanClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="128" VerticalAlignment="Center" AutomationProperties.Name="Auditar espacio bajo en disco" ToolTipService.ToolTip="Comprueba si C: baja de 10 GB libres. Solo informa con lectura, no borra ni modifica nada."/>
                             </Grid>
                             <TextBlock x:Name="SpaceStatusText" FontSize="11" Opacity="0.75" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite"/>
                         </StackPanel>

@@ -27,7 +27,8 @@ public sealed record RecommendationRow(
     string BenefitDetail,
     bool IsApplyEnabled,
     bool IsApplied,
-    string ApplyLabel)
+    string ApplyLabel,
+    string TooltipDetail)
 {
     public Microsoft.UI.Xaml.Visibility LockVisibility => IsLocked ? Microsoft.UI.Xaml.Visibility.Visible : Microsoft.UI.Xaml.Visibility.Collapsed;
     public Microsoft.UI.Xaml.Visibility AppliedVisibility => IsApplied ? Microsoft.UI.Xaml.Visibility.Visible : Microsoft.UI.Xaml.Visibility.Collapsed;
@@ -135,6 +136,7 @@ public sealed partial class OptimizePage : Page
                 bool isApplied = recommendation.CurrentState == OptimizationState.AppliedByCao
                     || uiState.AppliedThisSession.Contains(recommendation.OptimizationId);
                 bool canApply = !isLocked && !isApplied;
+                string tooltip = BuildTooltip(recommendation);
                 return new RecommendationRow(
                 recommendation.OptimizationId,
                 recommendation.NameEs,
@@ -154,7 +156,8 @@ public sealed partial class OptimizePage : Page
                 benefit,
                 canApply,
                 isApplied,
-                isApplied ? "Aplicado ✓" : "Aplicar");
+                isApplied ? "Aplicado ✓" : "Aplicar",
+                tooltip);
             })
             .ToList();
 
@@ -198,6 +201,22 @@ public sealed partial class OptimizePage : Page
             EmptyStateCard.Visibility = Visibility.Collapsed;
             RecommendationsList.Visibility = Visibility.Visible;
         }
+    }
+
+    private static string BuildTooltip(Recommendation recommendation)
+    {
+        var def = CAO.Core.Catalog.OptimizationCatalog.All
+            .FirstOrDefault(o => o.Definition.Id.Equals(recommendation.OptimizationId, StringComparison.OrdinalIgnoreCase))?.Definition;
+        var sb = new System.Text.StringBuilder(recommendation.DescriptionEs);
+        if (def is not null && !string.IsNullOrWhiteSpace(def.TooltipEs) && !def.TooltipEs.Equals(recommendation.DescriptionEs, StringComparison.OrdinalIgnoreCase))
+        {
+            sb.Append('\n');
+            sb.Append(def.TooltipEs);
+        }
+        sb.Append($"\nRiesgo: {Localizer.GetRiskLabel(recommendation.Risk)}");
+        sb.Append($"\nReversible: {(def?.Reversible == true ? "sí — snapshot y Revertir" : "no — mantenimiento")}");
+        if (recommendation.RequiresReboot) sb.Append("\nRequiere reinicio para efecto completo.");
+        return sb.ToString();
     }
 
     private static string GetBenefitDetail(string id) => id switch
