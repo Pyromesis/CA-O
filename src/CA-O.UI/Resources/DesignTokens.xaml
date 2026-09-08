@@ -2,7 +2,8 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
-    <!-- CA-O Modern Design System — Enhanced UI/UX with animations and polish -->
+    <!-- CA-O Premium Design System — elegante, profesional, de confianza -->
+    <!-- Paleta sobria multicolor: azul confianza + acentos semánticos suaves -->
     <!-- Spacing System: 4/8/12/16/20/24/28/32/40/48/64 (perfect octal scale) -->
     <x:Double x:Key="CaoSpace2">2</x:Double>
     <x:Double x:Key="CaoSpace4">4</x:Double>
@@ -30,8 +31,8 @@
         <Setter Property="Background" Value="{ThemeResource CardBackgroundFillColorDefaultBrush}"/>
         <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}"/>
         <Setter Property="BorderThickness" Value="1"/>
-        <Setter Property="CornerRadius" Value="12"/>
-        <Setter Property="Padding" Value="{StaticResource CaoCardPadding}"/>
+        <Setter Property="CornerRadius" Value="16"/>
+        <Setter Property="Padding" Value="20,20,20,20"/>
     </Style>
 
     <Style x:Key="CaoCardElevatedStyle" TargetType="Border" BasedOn="{StaticResource CaoCardStyle}">
@@ -40,29 +41,89 @@
 
     <Style x:Key="CaoMetricCardStyle" TargetType="Border" BasedOn="{StaticResource CaoCardStyle}">
         <Setter Property="Padding" Value="16,16,16,16"/>
-        <Setter Property="MinHeight" Value="96"/>
+        <Setter Property="MinHeight" Value="104"/>
+    </Style>
+
+    <!-- Pinceles de marca: color de acento del SISTEMA (nativo Win11, sin degradados) -->
+    <SolidColorBrush x:Key="CaoBrandGradientBrush" Color="{ThemeResource SystemAccentColor}"/>
+    <SolidColorBrush x:Key="CaoHeroGlowBrush" Color="{ThemeResource SystemAccentColor}"/>
+    <SolidColorBrush x:Key="CaoSuccessGradientBrush" Color="#16A34A"/>
+
+    <!-- Fondos de icono neutros (gris sistema, estilo nativo Win11) -->
+    <SolidColorBrush x:Key="CaoBlueSoftBrush" Color="#808080" Opacity="0.12"/>
+    <SolidColorBrush x:Key="CaoGreenSoftBrush" Color="#808080" Opacity="0.12"/>
+    <SolidColorBrush x:Key="CaoAmberSoftBrush" Color="#808080" Opacity="0.12"/>
+    <SolidColorBrush x:Key="CaoPurpleSoftBrush" Color="#808080" Opacity="0.12"/>
+    <SolidColorBrush x:Key="CaoCyanSoftBrush" Color="#808080" Opacity="0.12"/>
+    <SolidColorBrush x:Key="CaoRoseSoftBrush" Color="#808080" Opacity="0.12"/>
+    <SolidColorBrush x:Key="CaoSlateSoftBrush" Color="#808080" Opacity="0.12"/>
+
+    <!-- Iconos en gris secundario del tema (monocromo nativo) -->
+    <SolidColorBrush x:Key="CaoBlueSolidBrush" Color="#605E5C"/>
+    <SolidColorBrush x:Key="CaoGreenSolidBrush" Color="#605E5C"/>
+    <SolidColorBrush x:Key="CaoAmberSolidBrush" Color="#605E5C"/>
+    <SolidColorBrush x:Key="CaoPurpleSolidBrush" Color="#605E5C"/>
+    <SolidColorBrush x:Key="CaoCyanSolidBrush" Color="#605E5C"/>
+    <SolidColorBrush x:Key="CaoRoseSolidBrush" Color="#605E5C"/>
+
+    <!-- Círculo de icono premium 40px -->
+    <Style x:Key="CaoIconCircleStyle" TargetType="Border">
+        <Setter Property="Width" Value="40"/>
+        <Setter Property="Height" Value="40"/>
+        <Setter Property="CornerRadius" Value="20"/>
+        <Setter Property="HorizontalAlignment" Value="Left"/>
+        <Setter Property="VerticalAlignment" Value="Top"/>
+    </Style>
+
+    <Style x:Key="CaoEyebrowStyle" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="11"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Foreground" Value="{ThemeResource AccentFillColorDefaultBrush}"/>
+        <Setter Property="Opacity" Value="0.95"/>
+    </Style>
+
+    <Style x:Key="CaoHeroTitleStyle" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="30"/>
+        <Setter Property="FontWeight" Value="Bold"/>
+        <Setter Property="Foreground" Value="{ThemeResource TextFillColorPrimaryBrush}"/>
+        <Setter Property="TextWrapping" Value="Wrap"/>
+    </Style>
+
+    <!-- Píldora de confianza -->
+    <Style x:Key="CaoTrustPillStyle" TargetType="Border">
+        <Setter Property="CornerRadius" Value="12"/>
+        <Setter Property="Padding" Value="10,6,10,6"/>
+        <Setter Property="Background" Value="{ThemeResource CardBackgroundFillColorSecondaryBrush}"/>
+        <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}"/>
+        <Setter Property="BorderThickness" Value="1"/>
     </Style>
 
     <!-- Modern Accent Button Style with hover effects -->
     <Style x:Key="CaoAccentButtonStyle" TargetType="Button">
         <Setter Property="Background" Value="{ThemeResource AccentFillColorDefaultBrush}"/>
-        <Setter Property="Foreground" Value="White"/>
-        <Setter Property="Padding" Value="16,10,16,10"/>
+        <Setter Property="Foreground" Value="{ThemeResource TextOnAccentFillColorSelectedTextBrush}"/>
+        <Setter Property="Padding" Value="18,11,18,11"/>
         <Setter Property="FontSize" Value="{StaticResource CaoFontSizeBody}"/>
         <Setter Property="FontWeight" Value="SemiBold"/>
-        <Setter Property="CornerRadius" Value="8"/>
+        <Setter Property="CornerRadius" Value="10"/>
         <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="MinHeight" Value="40"/>
     </Style>
+
+    <!-- Botón principal: color de acento del sistema (mismo que CaoAccentButtonStyle) -->
+    <Style x:Key="CaoGradientButtonStyle" TargetType="Button" BasedOn="{StaticResource CaoAccentButtonStyle}"/>
 
     <!-- Elevated Button for secondary actions -->
     <Style x:Key="CaoElevatedButtonStyle" TargetType="Button">
         <Setter Property="Background" Value="{ThemeResource CardBackgroundFillColorDefaultBrush}"/>
         <Setter Property="Foreground" Value="{ThemeResource TextFillColorPrimaryBrush}"/>
-        <Setter Property="Padding" Value="14,8,14,8"/>
-        <Setter Property="FontSize" Value="{StaticResource CaoFontSizeCaption}"/>
-        <Setter Property="CornerRadius" Value="8"/>
+        <Setter Property="Padding" Value="14,9,14,9"/>
+        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="CornerRadius" Value="10"/>
         <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}"/>
         <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="MinHeight" Value="38"/>
     </Style>
 
     <Style x:Key="CaoSectionHeaderStyle" TargetType="TextBlock">
@@ -94,12 +155,42 @@
         <Setter Property="TextWrapping" Value="Wrap"/>
     </Style>
 
-    <!-- Signature accent bar under every page header: follows the system accent color -->
+    <!-- Barra de acento sobria: sigue el color de acento del sistema -->
     <LinearGradientBrush x:Key="CaoAccentBarBrush" StartPoint="0,0" EndPoint="1,0">
         <GradientStop Offset="0" Color="{ThemeResource SystemAccentColorLight2}"/>
         <GradientStop Offset="0.5" Color="{ThemeResource SystemAccentColor}"/>
         <GradientStop Offset="1" Color="{ThemeResource SystemAccentColorDark1}"/>
     </LinearGradientBrush>
+
+    <!-- Círculo numerado para flujos (benchmark, análisis) -->
+    <Style x:Key="CaoStepCircleStyle" TargetType="Border">
+        <Setter Property="Width" Value="30"/>
+        <Setter Property="Height" Value="30"/>
+        <Setter Property="CornerRadius" Value="15"/>
+        <Setter Property="Background" Value="{StaticResource CaoBrandGradientBrush}"/>
+        <Setter Property="HorizontalAlignment" Value="Left"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+    </Style>
+
+    <!-- Tarjeta de acción principal: fondo con tinte de marca muy sutil -->
+    <Style x:Key="CaoActionCardStyle" TargetType="Border" BasedOn="{StaticResource CaoCardStyle}">
+        <Setter Property="Padding" Value="18,16,18,16"/>
+        <Setter Property="CornerRadius" Value="16"/>
+    </Style>
+
+    <!-- Título de sección con jerarquía premium (izquierda, no centrado) -->
+    <Style x:Key="CaoSectionTitleStyle" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="15"/>
+        <Setter Property="FontWeight" Value="Bold"/>
+        <Setter Property="Foreground" Value="{ThemeResource TextFillColorPrimaryBrush}"/>
+    </Style>
+
+    <Style x:Key="CaoSectionSubtitleStyle" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="11"/>
+        <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}"/>
+        <Setter Property="Opacity" Value="0.75"/>
+        <Setter Property="TextWrapping" Value="Wrap"/>
+    </Style>
 
     <Style x:Key="CaoHeaderAccentBarStyle" TargetType="Border">
         <Setter Property="Height" Value="4"/>
@@ -176,9 +267,10 @@
     <!-- Hero Section Card for Dashboard -->
     <Style x:Key="CaoHeroCardStyle" TargetType="Border" BasedOn="{StaticResource CaoCardStyle}">
         <Setter Property="Background" Value="{ThemeResource CardBackgroundFillColorSecondaryBrush}"/>
-        <Setter Property="Padding" Value="20,20,20,20"/>
-        <Setter Property="CornerRadius" Value="12"/>
-        <Setter Property="MinHeight" Value="140"/>
+        <Setter Property="Padding" Value="28,28,28,28"/>
+        <Setter Property="CornerRadius" Value="20"/>
+        <Setter Property="MinHeight" Value="190"/>
+        <Setter Property="BorderThickness" Value="1"/>
     </Style>
 
     <!-- Status Indicator Style -->
@@ -296,6 +388,47 @@
         <Setter Property="Background" Value="{ThemeResource CardBackgroundFillColorDefaultBrush}"/>
         <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}"/>
         <Setter Property="Padding" Value="16"/>
+    </Style>
+
+    <!-- Reusable page container: centered 1200px, 20px section rhythm -->
+    <Style x:Key="CaoPageContainerStyle" TargetType="StackPanel">
+        <Setter Property="Spacing" Value="20"/>
+        <Setter Property="MaxWidth" Value="1200"/>
+        <Setter Property="HorizontalAlignment" Value="Center"/>
+    </Style>
+
+    <!-- Thin divider line used between card sections -->
+    <Style x:Key="CaoDividerStyle" TargetType="Border">
+        <Setter Property="Height" Value="1"/>
+        <Setter Property="Background" Value="{ThemeResource DividerStrokeColorDefaultBrush}"/>
+        <Setter Property="Opacity" Value="0.5"/>
+        <Setter Property="CornerRadius" Value="0"/>
+        <Setter Property="HorizontalAlignment" Value="Stretch"/>
+    </Style>
+
+    <!-- Stable filter buttons: no layout jump when counts change -->
+    <Style x:Key="CaoFilterButtonStyle" TargetType="Button" BasedOn="{StaticResource CaoElevatedButtonStyle}">
+        <Setter Property="MinWidth" Value="132"/>
+        <Setter Property="MinHeight" Value="34"/>
+        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+    </Style>
+
+    <!-- Dashboard / shortcut tiles -->
+    <Style x:Key="CaoTileButtonStyle" TargetType="Button" BasedOn="{StaticResource CaoElevatedButtonStyle}">
+        <Setter Property="Padding" Value="16"/>
+        <Setter Property="MinHeight" Value="104"/>
+        <Setter Property="HorizontalAlignment" Value="Stretch"/>
+        <Setter Property="HorizontalContentAlignment" Value="Left"/>
+        <Setter Property="VerticalContentAlignment" Value="Top"/>
+        <Setter Property="CornerRadius" Value="16"/>
+    </Style>
+
+    <!-- Uniform action buttons inside Limpieza / Solucionar -->
+    <Style x:Key="CaoActionButtonStyle" TargetType="Button" BasedOn="{StaticResource CaoElevatedButtonStyle}">
+        <Setter Property="MinHeight" Value="38"/>
+        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="HorizontalAlignment" Value="Center"/>
     </Style>
 
 </ResourceDictionary>

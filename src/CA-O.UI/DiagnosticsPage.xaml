@@ -3,36 +3,75 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <ScrollViewer Padding="{StaticResource CaoPagePadding}" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-        <StackPanel Spacing="20" MaxWidth="1200" HorizontalAlignment="Center">
+        <StackPanel Style="{StaticResource CaoPageContainerStyle}">
             <StackPanel Style="{StaticResource CaoPageHeaderStyle}">
                 <TextBlock Text="Diagnóstico" TextAlignment="Center" Style="{StaticResource CaoPageTitleStyle}"/>
                 <TextBlock Text="Módulos con estado actual, métricas brutas, interpretación y confianza. Sin telemetría externa." TextAlignment="Center" Style="{StaticResource CaoSubtitleStyle}"/>
                 <Border Style="{StaticResource CaoHeaderAccentBarStyle}"/>
             </StackPanel>
-            <StackPanel Orientation="Horizontal" Spacing="12" HorizontalAlignment="Center">
-                <Button x:Name="RunButton" Content="Ejecutar diagnósticos completos" Click="OnRunClick" Style="{StaticResource CaoAccentButtonStyle}"
-                        AutomationProperties.Name="Ejecutar diagnósticos"/>
-                <ProgressRing x:Name="Ring" IsActive="False" Width="22" Height="22"/>
-                <TextBlock x:Name="StatusText" FontSize="12" Opacity="0.6" VerticalAlignment="Center"/>
-            </StackPanel>
+            <Border Style="{StaticResource CaoActionCardStyle}">
+                <Grid ColumnSpacing="14">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <Border Style="{StaticResource CaoIconCircleStyle}" Background="{StaticResource CaoCyanSoftBrush}" Width="44" Height="44">
+                        <FontIcon Glyph="&#xE9D5;" FontSize="19" Foreground="{StaticResource CaoCyanSolidBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                        <TextBlock Text="6 dimensiones en paralelo" FontWeight="Bold" FontSize="14"/>
+                        <TextBlock x:Name="StatusText" FontSize="12" Opacity="0.75" VerticalAlignment="Center" AutomationProperties.LiveSetting="Polite" Text="Entrada, térmica, rendimiento y más"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                        <Button x:Name="RunButton" Content="Ejecutar diagnósticos completos" Click="OnRunClick" Style="{StaticResource CaoGradientButtonStyle}"
+                                AutomationProperties.Name="Ejecutar diagnósticos"/>
+                        <ProgressRing x:Name="Ring" IsActive="False" Width="22" Height="22" Style="{StaticResource CaoProgressRingStyle}"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
             <Grid ColumnSpacing="12" RowSpacing="12">
                 <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                 <Border Style="{StaticResource CaoCardStyle}">
-                    <StackPanel Spacing="6">
-                        <StackPanel Orientation="Horizontal" Spacing="6"><FontIcon Glyph="&#xE8B0;" FontSize="13"/><TextBlock Text="Entrada" FontWeight="SemiBold" FontSize="13"/></StackPanel>
+                    <StackPanel Spacing="8">
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <Border Width="36" Height="36" CornerRadius="18" Background="{StaticResource CaoBlueSoftBrush}">
+                                <FontIcon Glyph="&#xE8B0;" FontSize="16" Foreground="{StaticResource CaoBlueSolidBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Text="Entrada" Style="{StaticResource CaoSectionTitleStyle}"/>
+                                <TextBlock Text="Ratón e HID" Style="{StaticResource CaoSectionSubtitleStyle}"/>
+                            </StackPanel>
+                        </StackPanel>
                         <TextBlock x:Name="InputText" TextWrapping="Wrap" IsTextSelectionEnabled="True" FontSize="12" Opacity="0.9"/>
                     </StackPanel>
                 </Border>
                 <Border Grid.Column="1" Style="{StaticResource CaoCardStyle}">
-                    <StackPanel Spacing="6">
-                        <StackPanel Orientation="Horizontal" Spacing="6"><FontIcon Glyph="&#xE9CA;" FontSize="13"/><TextBlock Text="Térmico" FontWeight="SemiBold" FontSize="13"/></StackPanel>
+                    <StackPanel Spacing="8">
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <Border Width="36" Height="36" CornerRadius="18" Background="{StaticResource CaoAmberSoftBrush}">
+                                <FontIcon Glyph="&#xE9CA;" FontSize="16" Foreground="{StaticResource CaoAmberSolidBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Text="Térmico" Style="{StaticResource CaoSectionTitleStyle}"/>
+                                <TextBlock Text="Zonas ACPI" Style="{StaticResource CaoSectionSubtitleStyle}"/>
+                            </StackPanel>
+                        </StackPanel>
                         <TextBlock x:Name="ThermalText" TextWrapping="Wrap" IsTextSelectionEnabled="True" FontSize="12" Opacity="0.9"/>
                     </StackPanel>
                 </Border>
             </Grid>
             <Border Style="{StaticResource CaoCardStyle}">
-                <StackPanel Spacing="6">
-                    <TextBlock Text="Rendimiento actual" Style="{StaticResource CaoSectionHeaderStyle}" Margin="0,0,0,0"/>
+                <StackPanel Spacing="8">
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <Border Width="36" Height="36" CornerRadius="18" Background="{StaticResource CaoGreenSoftBrush}">
+                            <FontIcon Glyph="&#xE950;" FontSize="16" Foreground="{StaticResource CaoGreenSolidBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <StackPanel Spacing="2" VerticalAlignment="Center">
+                            <TextBlock Text="Rendimiento actual" Style="{StaticResource CaoSectionTitleStyle}"/>
+                            <TextBlock Text="CPU y GPU en vivo" Style="{StaticResource CaoSectionSubtitleStyle}"/>
+                        </StackPanel>
+                    </StackPanel>
                     <TextBlock x:Name="PerfText" TextWrapping="Wrap" IsTextSelectionEnabled="True" FontSize="12" Opacity="0.9"/>
                 </StackPanel>
             </Border>

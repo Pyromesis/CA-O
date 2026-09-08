@@ -26,6 +26,18 @@ public sealed partial class LimpiezaPage : Page
         "stale-crash-dump-cleanup",
     ];
 
+    private static readonly HashSet<string> HeavyIds = new(StringComparer.Ordinal)
+    {
+        "windows-component-store-cleanup",
+        "windows-component-store-resetbase",
+        "optimize-system-drive",
+        "optimize-hdd-media-aware",
+        "retrim-system-ssd",
+    };
+
+    private static TimeSpan TimeoutFor(string id) =>
+        HeavyIds.Contains(id) ? TimeSpan.FromMinutes(20) : TimeSpan.FromSeconds(90);
+
     public LimpiezaPage()
     {
         try { InitializeComponent(); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"LimpiezaPage init failed: {ex}"); throw; }
@@ -56,7 +68,68 @@ public sealed partial class LimpiezaPage : Page
     private async void OnCleanClick(object sender, RoutedEventArgs e)
     {
         if (sender is not Button { Tag: string id }) return;
-        await RunCleanupAsync(id, CleanupStatusText, NetworkStatusText);
+        if (!await ConfirmIfNeededAsync(id)) return;
+        var target = TargetFor(id);
+        await RunCleanupAsync(id, target, null);
+    }
+
+    private TextBlock? TargetFor(string id) => id switch
+    {
+        "flush-dns-cache" => NetworkStatusText,
+        "windows-component-store-cleanup" or "windows-component-store-resetbase" => MaintenanceStatusText,
+        "ensure-trim-enabled" or "retrim-system-ssd" or "optimize-system-drive"
+            or "optimize-hdd-media-aware" or "restore-system-managed-pagefile"
+            or "disable-hibernate" => DiskStatusText,
+        "enable-storage-sense" or "storage-sense-temp-cleanup"
+            or "storage-sense-recycle-bin-policy" => SenseStatusText,
+        "free-low-storage-space" => SpaceStatusText,
+        _ => CleanupStatusText,
+    };
+
+    private async Task<bool> ConfirmIfNeededAsync(string id)
+    {
+        var (title, content) = id switch
+        {
+            "windows-component-store-cleanup" => ("Limpiar WinSxS",
+                "Ejecuta DISM /StartComponentCleanup. Tarda varios minutos y no se puede cancelar a la mitad. ¿Continuar?"),
+            "windows-component-store-resetbase" => ("ResetBase irreversible",
+                "IRREVERSIBLE: elimina la posibilidad de desinstalar actualizaciones de Windows. Solo para expertos con copia de seguridad. ¿Continuar?"),
+            "optimize-system-drive" or "optimize-hdd-media-aware" => ("Optimizar unidad",
+                "Ejecuta desfragmentado/TRIM en C:. Tarda varios minutos y es mejor no usar el disco mientras tanto. ¿Continuar?"),
+            "disable-hibernate" => ("Desactivar hibernación",
+                "Libera varios GB (hiberfil.sys) pero desactiva hibernación e inicio rápido. Reversible. ¿Continuar?"),
+            _ => (null, null),
+        };
+        if (title is null) return true;
+
+        if (id == "windows-component-store-resetbase")
+        {
+            var expert = AppHost.Resolve<ViewModels.UiState>().ExpertMode;
+            if (!expert)
+            {
+                var warn = new ContentDialog
+                {
+                    Title = "Requiere Modo Expert",
+                    Content = "ResetBase es irreversible y de alto riesgo. Activa Modo Expert en Ajustes para confirmar que entiendes el riesgo.",
+                    CloseButtonText = "Entendido",
+                    DefaultButton = ContentDialogButton.Close,
+                    XamlRoot = Content.XamlRoot,
+                };
+                await warn.ShowAsync();
+                return false;
+            }
+        }
+
+        var dialog = new ContentDialog
+        {
+            Title = title,
+            Content = content,
+            PrimaryButtonText = "Continuar",
+            CloseButtonText = "Cancelar",
+            DefaultButton = ContentDialogButton.Close,
+            XamlRoot = Content.XamlRoot,
+        };
+        return await dialog.ShowAsync() == ContentDialogResult.Primary;
     }
 
     private async void OnCleanAllClick(object sender, RoutedEventArgs e)
@@ -87,8 +160,9 @@ public sealed partial class LimpiezaPage : Page
         var target = optimizationId == "flush-dns-cache" ? secondary ?? primary : primary ?? secondary;
         try
         {
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(90));
+            using var cts = new CancellationTokenSource(TimeoutFor(optimizationId));
             var pipe = AppHost.Resolve<PrivilegedPipeClient>();
+            if (target != null && HeavyIds.Contains(optimizationId)) target.Text = $"{optimizationId}: en curso (puede tardar minutos)...";
             var response = await pipe.ApplyAsync(optimizationId, cts.Token);
             var message = response is { Accepted: true }
                 ? "✓ Completado."

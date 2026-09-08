@@ -33,7 +33,7 @@ public sealed partial class DiagnosticsViewModel : ObservableObject
             var securityTask = Task.Run(() => new Infrastructure.Security.SecurityDiagnosticsProvider().Measure(), ct);
             var driversTask = new Infrastructure.SystemInterop.DriverDiagnosticsProvider().MeasureAsync(ct);
 
-            await Task.WhenAll(inputTask, thermalTask, perfTask, driversTask);
+            await Task.WhenAll(inputTask, thermalTask, perfTask, storageTask, securityTask, driversTask);
 
             var input = await inputTask;
             InputSummary =

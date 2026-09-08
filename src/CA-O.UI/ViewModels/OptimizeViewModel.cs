@@ -56,6 +56,18 @@ public sealed partial class OptimizeViewModel : ObservableObject
             TransactionProgress = resp is { Accepted: true } ? "Precheck ✓ · Compatibility ✓ · Snapshot ✓ · Apply ✓ · Verify ✓ · Commit ✓" : "Precheck ✓ · Snapshot ✓ · Apply ✗";
             await RefreshRecommendationsAsync(ct);
         }
+        catch (OperationCanceledException)
+        {
+            CurrentPhase = "Cancelado";
+            LastMessage = "Operación cancelada por el usuario.";
+        }
+        catch (Exception ex)
+        {
+            CurrentPhase = "Error";
+            LastMessage = ex.Message;
+            LastErrorCode ??= CAO.Shared.ErrorCodes.UiOptimizeFailed;
+            App.WriteCrashLog(ex);
+        }
         finally { IsBusy = false; }
     }
 
@@ -72,6 +84,18 @@ public sealed partial class OptimizeViewModel : ObservableObject
             LastErrorCode = resp?.ErrorCode;
             CurrentPhase = resp is { Accepted: true } ? "Revertido y verificado" : $"Rechazado [{resp?.ErrorCode}]";
             await RefreshRecommendationsAsync(ct);
+        }
+        catch (OperationCanceledException)
+        {
+            CurrentPhase = "Cancelado";
+            LastMessage = "Reversión cancelada por el usuario.";
+        }
+        catch (Exception ex)
+        {
+            CurrentPhase = "Error";
+            LastMessage = ex.Message;
+            LastErrorCode ??= CAO.Shared.ErrorCodes.UiOptimizeFailed;
+            App.WriteCrashLog(ex);
         }
         finally { IsBusy = false; }
     }

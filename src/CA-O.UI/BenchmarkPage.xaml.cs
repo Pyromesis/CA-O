@@ -26,7 +26,7 @@ public sealed partial class BenchmarkPage : Page
         uiState.LanguageChanged += (_, __) => DispatcherQueue.TryEnqueue(ApplyTexts);
         _vm.PropertyChanged += (_, e) =>
         {
-            if (e.PropertyName is null or nameof(ViewModels.BenchmarkViewModel.BaselineSummary) or nameof(ViewModels.BenchmarkViewModel.ComparisonSummary) or nameof(ViewModels.BenchmarkViewModel.CurrentStep) or nameof(ViewModels.BenchmarkViewModel.Verdict))
+            if (e.PropertyName is null or nameof(ViewModels.BenchmarkViewModel.BaselineSummary) or nameof(ViewModels.BenchmarkViewModel.ComparisonSummary) or nameof(ViewModels.BenchmarkViewModel.CurrentStep) or nameof(ViewModels.BenchmarkViewModel.Verdict) or nameof(ViewModels.BenchmarkViewModel.ContextNote))
                 DispatcherQueue.TryEnqueue(RenderVm);
         };
     }
@@ -51,7 +51,20 @@ public sealed partial class BenchmarkPage : Page
         if (BenchStatusText is not null) BenchStatusText.Text = _vm.Status;
         if (CurrentStepText is not null) CurrentStepText.Text = _vm.CurrentStep;
         if (VerdictText is not null) VerdictText.Text = _vm.Verdict;
+        if (ContextText is not null && !string.IsNullOrWhiteSpace(_vm.ContextNote)) ContextText.Text = _vm.ContextNote;
         if (StepCard is not null) StepCard.Visibility = string.IsNullOrWhiteSpace(_vm.CurrentStep) ? Visibility.Collapsed : Visibility.Visible;
+    }
+
+    private void OnGoOptimizeClick(object sender, RoutedEventArgs e)
+    {
+        if (MainWindow.Current is not null) MainWindow.Current.SelectRoute("optimize");
+        else AppHost.Resolve<Navigation.INavigationService>().Select("optimize");
+    }
+
+    private void OnGoCleanupClick(object sender, RoutedEventArgs e)
+    {
+        if (MainWindow.Current is not null) MainWindow.Current.SelectRoute("cleanup");
+        else AppHost.Resolve<Navigation.INavigationService>().Select("cleanup");
     }
 
     private async void OnBaselineClick(object sender, RoutedEventArgs e) => await RunWithVm(true, BaselineButton);
@@ -62,10 +75,10 @@ public sealed partial class BenchmarkPage : Page
         var previous = button.Content;
         button.IsEnabled = false;
         Ring.IsActive = true;
-        if (BenchStatusText is not null) BenchStatusText.Text = "Midiendo…";
+        if (BenchStatusText is not null) BenchStatusText.Text = "Midiendo 3 trials con warmup…";
         try
         {
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(120));
             await _vm.RunAsync(isBaseline, cts.Token);
             RenderVm();
         }
@@ -79,7 +92,7 @@ public sealed partial class BenchmarkPage : Page
             Ring.IsActive = false;
             button.Content = previous;
             button.IsEnabled = true;
-            if (BenchStatusText is not null && BenchStatusText.Text == "Midiendo…") BenchStatusText.Text = _vm.Status;
+            if (BenchStatusText is not null && BenchStatusText.Text == "Midiendo 3 trials con warmup…") BenchStatusText.Text = _vm.Status;
         }
     }
 }

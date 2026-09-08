@@ -3,46 +3,42 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <Grid Background="{ThemeResource SolidBackgroundFillColorBaseBrush}">
-        <ScrollViewer Padding="32,24,32,32" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-        <StackPanel x:Name="PageContent" Spacing="20" MaxWidth="1200" HorizontalAlignment="Center">
+        <ScrollViewer Padding="{StaticResource CaoPagePadding}" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <StackPanel x:Name="PageContent" Style="{StaticResource CaoPageContainerStyle}">
             <!-- Hero: centro de la app -->
             <Border Style="{StaticResource CaoHeroCardStyle}">
-                <Grid>
-                    <Border Opacity="0.26" CornerRadius="12" Margin="-20" IsHitTestVisible="False">
-                        <Border.Background>
-                            <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
-                                <GradientStop Offset="0" Color="{ThemeResource SystemAccentColor}"/>
-                                <GradientStop Offset="1" Color="Transparent"/>
-                            </LinearGradientBrush>
-                        </Border.Background>
-                    </Border>
-                <Grid ColumnSpacing="20" RowSpacing="12">
+                <Grid ColumnSpacing="28" RowSpacing="16">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto" MinWidth="240"/>
+                        <ColumnDefinition Width="Auto" MinWidth="270"/>
                     </Grid.ColumnDefinitions>
                     <StackPanel Spacing="8">
-                        <TextBlock x:Name="TitleText" TextAlignment="Center" Style="{StaticResource CaoPageTitleStyle}"/>
-                        <TextBlock Text="Tu centro de control: analiza, optimiza, limpia y soluciona desde aquí." TextAlignment="Center" Style="{StaticResource CaoSubtitleStyle}"/>
-                        <Border Style="{StaticResource CaoHeaderAccentBarStyle}"/>
-                        <TextBlock x:Name="ProgramInfoText" FontSize="12" Opacity="0.7" TextWrapping="Wrap" IsTextSelectionEnabled="True" Margin="0,6,0,0" FontWeight="Medium" TextAlignment="Center"/>
-                        <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,8,0,0" HorizontalAlignment="Center">
+                        <TextBlock x:Name="TitleText" Style="{StaticResource CaoPageTitleStyle}"/>
+                        <TextBlock Text="Diagnostica primero, optimiza con evidencia y revierte con un clic. Todo cambio crea snapshot verificado." Style="{StaticResource CaoSubtitleStyle}" FontSize="13"/>
+                        <TextBlock x:Name="ProgramInfoText" FontSize="12" Opacity="0.7" TextWrapping="Wrap" IsTextSelectionEnabled="True" Margin="0,8,0,0" FontWeight="Medium"/>
+                        <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,4,0,0">
                             <Border x:Name="ServiceBadge" Style="{StaticResource CaoStatusIndicatorStyle}" Background="{ThemeResource SystemFillColorNeutralBrush}">
-                                <TextBlock x:Name="ServiceBadgeText" Text="Servicio: —" FontSize="12" FontWeight="SemiBold" Foreground="White"/>
+                                <TextBlock x:Name="ServiceBadgeText" Text="Servicio: —" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource TextOnAccentFillColorSelectedTextBrush}"/>
                             </Border>
                             <TextBlock x:Name="LastAnalysisText" VerticalAlignment="Center" FontSize="12" Opacity="0.7" FontWeight="Medium"/>
                         </StackPanel>
                     </StackPanel>
-                    <StackPanel Grid.Column="1" Spacing="12" VerticalAlignment="Center" MinWidth="240">
-                        <Button x:Name="AnalyzeButton" Click="OnAnalyzeClick" Style="{StaticResource CaoAccentButtonStyle}" HorizontalAlignment="Stretch"
-                                AutomationProperties.Name="Analizar sistema"/>
-                        <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
-                            <ProgressRing x:Name="AnalyzingRing" IsActive="False" Width="20" Height="20" Style="{StaticResource CaoProgressRingStyle}"/>
-                            <TextBlock x:Name="AnalyzeStatusText" FontSize="11" Opacity="0.65" VerticalAlignment="Center"/>
+                    <Border Grid.Column="1" Style="{StaticResource CaoCardStyle}" MinWidth="270" MaxWidth="300" VerticalAlignment="Center" Padding="20">
+                        <StackPanel Spacing="12">
+                            <StackPanel Spacing="2">
+                                <TextBlock Text="Empieza aquí" FontWeight="SemiBold" FontSize="14"/>
+                                <TextBlock Text="Análisis en ~30 s, sin cambios" FontSize="11" Opacity="0.7"/>
+                            </StackPanel>
+                            <Button x:Name="AnalyzeButton" Click="OnAnalyzeClick" Style="{StaticResource CaoAccentButtonStyle}" HorizontalAlignment="Stretch"
+                                    AutomationProperties.Name="Analizar sistema"/>
+                            <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
+                                <ProgressRing x:Name="AnalyzingRing" IsActive="False" Width="18" Height="18" Style="{StaticResource CaoProgressRingStyle}"/>
+                                <TextBlock x:Name="AnalyzeStatusText" FontSize="11" Opacity="0.7" VerticalAlignment="Center"/>
+                            </StackPanel>
+                            <Border Height="1" Background="{ThemeResource DividerStrokeColorDefaultBrush}" Opacity="0.4"/>
+                            <TextBlock x:Name="NoClaimsNote" FontSize="11" Opacity="0.7" TextWrapping="Wrap" HorizontalAlignment="Center" TextAlignment="Center"/>
                         </StackPanel>
-                        <TextBlock x:Name="NoClaimsNote" FontSize="11" Opacity="0.55" TextWrapping="Wrap" HorizontalAlignment="Center" TextAlignment="Center"/>
-                    </StackPanel>
-                </Grid>
+                    </Border>
                 </Grid>
             </Border>
 
@@ -76,60 +72,60 @@
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
-                <Button Grid.Row="0" Grid.Column="0" Tag="analyze" Click="OnTileClick" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Padding="14">
-                    <StackPanel Spacing="4">
-                        <FontIcon Glyph="&#xE71E;" FontSize="18" Opacity="0.8" Foreground="{ThemeResource AccentFillColorDefaultBrush}"/>
+                <Button Grid.Row="0" Grid.Column="0" Tag="analyze" Click="OnTileClick" Style="{StaticResource CaoTileButtonStyle}" AutomationProperties.Name="Ir a Analizar">
+                    <StackPanel Spacing="6">
+                        <FontIcon Glyph="&#xE71E;" FontSize="20" Foreground="{ThemeResource AccentFillColorDefaultBrush}"/>
                         <TextBlock Text="Analizar" FontWeight="SemiBold" FontSize="13"/>
-                        <TextBlock Text="Diagnóstico completo" FontSize="11" Opacity="0.6"/>
+                        <TextBlock Text="Diagnóstico completo" FontSize="11" Opacity="0.7"/>
                     </StackPanel>
                 </Button>
-                <Button Grid.Row="0" Grid.Column="1" Tag="optimize" Click="OnTileClick" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Padding="14">
-                    <StackPanel Spacing="4">
-                        <FontIcon Glyph="&#xE90F;" FontSize="18" Opacity="0.8" Foreground="{ThemeResource AccentFillColorDefaultBrush}"/>
+                <Button Grid.Row="0" Grid.Column="1" Tag="optimize" Click="OnTileClick" Style="{StaticResource CaoTileButtonStyle}" AutomationProperties.Name="Ir a Optimizar">
+                    <StackPanel Spacing="6">
+                        <FontIcon Glyph="&#xE90F;" FontSize="20" Foreground="{ThemeResource AccentFillColorDefaultBrush}"/>
                         <TextBlock Text="Optimizar" FontWeight="SemiBold" FontSize="13"/>
-                        <TextBlock x:Name="TileOptimizeSub" Text="Sin recomendaciones" FontSize="11" Opacity="0.6"/>
+                        <TextBlock x:Name="TileOptimizeSub" Text="Sin recomendaciones" FontSize="11" Opacity="0.7"/>
                     </StackPanel>
                 </Button>
-                <Button Grid.Row="0" Grid.Column="2" Tag="cleanup" Click="OnTileClick" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Padding="14">
-                    <StackPanel Spacing="4">
-                        <FontIcon Glyph="&#xE74D;" FontSize="18" Opacity="0.8" Foreground="{ThemeResource AccentFillColorDefaultBrush}"/>
+                <Button Grid.Row="0" Grid.Column="2" Tag="cleanup" Click="OnTileClick" Style="{StaticResource CaoTileButtonStyle}" AutomationProperties.Name="Ir a Limpieza">
+                    <StackPanel Spacing="6">
+                        <FontIcon Glyph="&#xE74D;" FontSize="20" Foreground="{ThemeResource AccentFillColorDefaultBrush}"/>
                         <TextBlock Text="Limpieza" FontWeight="SemiBold" FontSize="13"/>
-                        <TextBlock Text="Temporales y timer" FontSize="11" Opacity="0.6"/>
+                        <TextBlock Text="Temporales y timer" FontSize="11" Opacity="0.7"/>
                     </StackPanel>
                 </Button>
-                <Button Grid.Row="0" Grid.Column="3" Tag="solucionar" Click="OnTileClick" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Padding="14">
-                    <StackPanel Spacing="4">
-                        <FontIcon Glyph="&#xE897;" FontSize="18" Opacity="0.8" Foreground="{ThemeResource AccentFillColorDefaultBrush}"/>
+                <Button Grid.Row="0" Grid.Column="3" Tag="solucionar" Click="OnTileClick" Style="{StaticResource CaoTileButtonStyle}" AutomationProperties.Name="Ir a Solucionar">
+                    <StackPanel Spacing="6">
+                        <FontIcon Glyph="&#xE897;" FontSize="20" Foreground="{ThemeResource AccentFillColorDefaultBrush}"/>
                         <TextBlock Text="Solucionar" FontWeight="SemiBold" FontSize="13"/>
-                        <TextBlock Text="Audio, video, sistema" FontSize="11" Opacity="0.6"/>
+                        <TextBlock Text="Audio, video, sistema" FontSize="11" Opacity="0.7"/>
                     </StackPanel>
                 </Button>
-                <Button Grid.Row="1" Grid.Column="0" Tag="benchmark" Click="OnTileClick" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Padding="14">
-                    <StackPanel Spacing="4">
-                        <FontIcon Glyph="&#xE9D2;" FontSize="18" Opacity="0.8" Foreground="{ThemeResource AccentFillColorDefaultBrush}"/>
+                <Button Grid.Row="1" Grid.Column="0" Tag="benchmark" Click="OnTileClick" Style="{StaticResource CaoTileButtonStyle}" AutomationProperties.Name="Ir a Benchmark">
+                    <StackPanel Spacing="6">
+                        <FontIcon Glyph="&#xE9D2;" FontSize="20" Foreground="{ThemeResource AccentFillColorDefaultBrush}"/>
                         <TextBlock Text="Benchmark" FontWeight="SemiBold" FontSize="13"/>
-                        <TextBlock Text="Medir antes y después" FontSize="11" Opacity="0.6"/>
+                        <TextBlock Text="Medir antes y después" FontSize="11" Opacity="0.7"/>
                     </StackPanel>
                 </Button>
-                <Button Grid.Row="1" Grid.Column="1" Tag="restore" Click="OnTileClick" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Padding="14">
-                    <StackPanel Spacing="4">
-                        <FontIcon Glyph="&#xE7A7;" FontSize="18" Opacity="0.8" Foreground="{ThemeResource AccentFillColorDefaultBrush}"/>
+                <Button Grid.Row="1" Grid.Column="1" Tag="restore" Click="OnTileClick" Style="{StaticResource CaoTileButtonStyle}" AutomationProperties.Name="Ir a Restaurar">
+                    <StackPanel Spacing="6">
+                        <FontIcon Glyph="&#xE7A7;" FontSize="20" Foreground="{ThemeResource AccentFillColorDefaultBrush}"/>
                         <TextBlock Text="Restaurar" FontWeight="SemiBold" FontSize="13"/>
-                        <TextBlock Text="Snapshots y reversión" FontSize="11" Opacity="0.6"/>
+                        <TextBlock Text="Snapshots y reversión" FontSize="11" Opacity="0.7"/>
                     </StackPanel>
                 </Button>
-                <Button Grid.Row="1" Grid.Column="2" Tag="history" Click="OnTileClick" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Padding="14">
-                    <StackPanel Spacing="4">
-                        <FontIcon Glyph="&#xE81C;" FontSize="18" Opacity="0.8" Foreground="{ThemeResource AccentFillColorDefaultBrush}"/>
+                <Button Grid.Row="1" Grid.Column="2" Tag="history" Click="OnTileClick" Style="{StaticResource CaoTileButtonStyle}" AutomationProperties.Name="Ir a Historial">
+                    <StackPanel Spacing="6">
+                        <FontIcon Glyph="&#xE81C;" FontSize="20" Foreground="{ThemeResource AccentFillColorDefaultBrush}"/>
                         <TextBlock Text="Historial" FontWeight="SemiBold" FontSize="13"/>
-                        <TextBlock Text="Línea auditable" FontSize="11" Opacity="0.6"/>
+                        <TextBlock Text="Línea auditable" FontSize="11" Opacity="0.7"/>
                     </StackPanel>
                 </Button>
-                <Button Grid.Row="1" Grid.Column="3" Tag="settings" Click="OnTileClick" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Padding="14">
-                    <StackPanel Spacing="4">
-                        <FontIcon Glyph="&#xE713;" FontSize="18" Opacity="0.8" Foreground="{ThemeResource AccentFillColorDefaultBrush}"/>
+                <Button Grid.Row="1" Grid.Column="3" Tag="settings" Click="OnTileClick" Style="{StaticResource CaoTileButtonStyle}" AutomationProperties.Name="Ir a Ajustes">
+                    <StackPanel Spacing="6">
+                        <FontIcon Glyph="&#xE713;" FontSize="20" Foreground="{ThemeResource AccentFillColorDefaultBrush}"/>
                         <TextBlock Text="Ajustes" FontWeight="SemiBold" FontSize="13"/>
-                        <TextBlock Text="Tema, idioma, servicio" FontSize="11" Opacity="0.6"/>
+                        <TextBlock Text="Tema, idioma, servicio" FontSize="11" Opacity="0.7"/>
                     </StackPanel>
                 </Button>
             </Grid>
@@ -151,7 +147,7 @@
                     <StackPanel Spacing="6">
                         <TextBlock Text="Acerca de CA-O" FontWeight="SemiBold" FontSize="13"/>
                         <TextBlock x:Name="AboutText" FontSize="11" Opacity="0.75" TextWrapping="Wrap" IsTextSelectionEnabled="True"/>
-                        <TextBlock Text="Diagnóstico primero → recomendaciones por evidencia → transacción con snapshot → benchmark honesto → rollback exacto." FontSize="11" Opacity="0.55" TextWrapping="Wrap"/>
+                        <TextBlock Text="Diagnóstico primero → recomendaciones por evidencia → transacción con snapshot → benchmark honesto → rollback exacto." FontSize="11" Opacity="0.7" TextWrapping="Wrap"/>
                     </StackPanel>
                 </Border>
             </Grid>

@@ -30,16 +30,18 @@ public sealed class NetworkDiagnosticsProvider
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
 
-        var measurements = new List<NetworkEndpointMeasurement>();
-        foreach (var gateway in gateways)
+        var gatewayTasks = gateways.Select(g => MeasurePingAsync(g, "Gateway", ct)).ToArray();
+        var dnsTasks = dnsServers.Select(d =>
         {
-            measurements.Add(await MeasurePingAsync(gateway, "Gateway", ct));
-        }
+            if (!IPAddress.TryParse(d, out var ip)) return Task.FromResult(new NetworkEndpointMeasurement(d, "DNS", AttemptsPerEndpoint, 0, null, null));
+            return MeasurePingAsync(ip, "DNS", ct);
+        }).ToArray();
 
-        foreach (var dnsServer in dnsServers)
-        {
-            measurements.Add(await MeasurePingAsync(IPAddress.Parse(dnsServer), "DNS", ct));
-        }
+        await Task.WhenAll(gatewayTasks.Concat(dnsTasks));
+
+        var measurements = new List<NetworkEndpointMeasurement>();
+        measurements.AddRange(gatewayTasks.Select(t => t.Result));
+        measurements.AddRange(dnsTasks.Select(t => t.Result));
 
         return new NetworkDiagnosticsReport(
             interfaceNames,

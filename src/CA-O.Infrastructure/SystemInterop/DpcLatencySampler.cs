@@ -38,7 +38,7 @@ public sealed class DpcLatencySampler
         CancellationToken ct = default)
     {
         var duration = window ?? TimeSpan.FromSeconds(5);
-        return await Task.Run(() =>
+        return await Task.Run(async () =>
         {
             var dpcCounters = new List<PerformanceCounter>();
             var interruptCounters = new List<PerformanceCounter>();
@@ -59,7 +59,7 @@ public sealed class DpcLatencySampler
                     counter.NextValue(); // prime baseline
                 }
 
-                Thread.Sleep(duration);
+                await Task.Delay(duration, ct).ConfigureAwait(false);
 
                 var maxDpc = new Dictionary<string, double>(StringComparer.Ordinal);
                 var maxInterrupt = new Dictionary<string, double>(StringComparer.Ordinal);

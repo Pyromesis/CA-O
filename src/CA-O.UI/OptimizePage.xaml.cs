@@ -25,9 +25,12 @@ public sealed record RecommendationRow(
     bool IsLocked,
     string LockReason,
     string BenefitDetail,
-    bool IsApplyEnabled)
+    bool IsApplyEnabled,
+    bool IsApplied,
+    string ApplyLabel)
 {
     public Microsoft.UI.Xaml.Visibility LockVisibility => IsLocked ? Microsoft.UI.Xaml.Visibility.Visible : Microsoft.UI.Xaml.Visibility.Collapsed;
+    public Microsoft.UI.Xaml.Visibility AppliedVisibility => IsApplied ? Microsoft.UI.Xaml.Visibility.Visible : Microsoft.UI.Xaml.Visibility.Collapsed;
 }
 
 public sealed partial class OptimizePage : Page
@@ -78,12 +81,14 @@ public sealed partial class OptimizePage : Page
         FilterOptionalButton.Content = $"{Localizer.Get("optimize.filterOptional")} ({opt})";
         FilterExperimentalButton.Content = $"{Localizer.Get("optimize.filterExperimental")} ({exp})";
         FilterAppliedButton.Content = $"{Localizer.Get("optimize.filterApplied")} ({applied})";
-        // highlight active
-        FilterAllButton.Style = _activeFilter == null && !_appliedOnly ? (Microsoft.UI.Xaml.Style)Application.Current.Resources["AccentButtonStyle"] : (Microsoft.UI.Xaml.Style)Application.Current.Resources["DefaultButtonStyle"];
-        FilterRecommendedButton.Style = _activeFilter == RecommendationBucket.Recommended && !_appliedOnly ? (Microsoft.UI.Xaml.Style)Application.Current.Resources["AccentButtonStyle"] : (Microsoft.UI.Xaml.Style)Application.Current.Resources["DefaultButtonStyle"];
-        FilterOptionalButton.Style = _activeFilter == RecommendationBucket.Optional && !_appliedOnly ? (Microsoft.UI.Xaml.Style)Application.Current.Resources["AccentButtonStyle"] : (Microsoft.UI.Xaml.Style)Application.Current.Resources["DefaultButtonStyle"];
-        FilterExperimentalButton.Style = _activeFilter == RecommendationBucket.Experimental && !_appliedOnly ? (Microsoft.UI.Xaml.Style)Application.Current.Resources["AccentButtonStyle"] : (Microsoft.UI.Xaml.Style)Application.Current.Resources["DefaultButtonStyle"];
-        FilterAppliedButton.Style = _appliedOnly ? (Microsoft.UI.Xaml.Style)Application.Current.Resources["AccentButtonStyle"] : (Microsoft.UI.Xaml.Style)Application.Current.Resources["DefaultButtonStyle"];
+        // highlight active (estilos premium Cao; el activo en acento, el resto filtro estable)
+        var activeStyle = (Microsoft.UI.Xaml.Style)Application.Current.Resources["CaoAccentButtonStyle"];
+        var idleStyle = (Microsoft.UI.Xaml.Style)Application.Current.Resources["CaoFilterButtonStyle"];
+        FilterAllButton.Style = _activeFilter == null && !_appliedOnly ? activeStyle : idleStyle;
+        FilterRecommendedButton.Style = _activeFilter == RecommendationBucket.Recommended && !_appliedOnly ? activeStyle : idleStyle;
+        FilterOptionalButton.Style = _activeFilter == RecommendationBucket.Optional && !_appliedOnly ? activeStyle : idleStyle;
+        FilterExperimentalButton.Style = _activeFilter == RecommendationBucket.Experimental && !_appliedOnly ? activeStyle : idleStyle;
+        FilterAppliedButton.Style = _appliedOnly ? activeStyle : idleStyle;
     }
 
     private void OnFilterAllClick(object sender, RoutedEventArgs e) { _activeFilter = null; _appliedOnly = false; Render(); }
@@ -127,7 +132,8 @@ public sealed partial class OptimizePage : Page
             {
                 var (isLocked, lockReason) = EvaluateLock(recommendation, uiState.ExpertMode);
                 string benefit = GetBenefitDetail(recommendation.OptimizationId);
-                bool canApply = !isLocked && recommendation.CurrentState != OptimizationState.AppliedByCao;
+                bool isApplied = recommendation.CurrentState == OptimizationState.AppliedByCao;
+                bool canApply = !isLocked && !isApplied;
                 return new RecommendationRow(
                 recommendation.OptimizationId,
                 recommendation.NameEs,
@@ -145,7 +151,9 @@ public sealed partial class OptimizePage : Page
                 isLocked,
                 lockReason,
                 benefit,
-                canApply);
+                canApply,
+                isApplied,
+                isApplied ? "Aplicado ✓" : "Aplicar");
             })
             .ToList();
 
@@ -193,17 +201,17 @@ public sealed partial class OptimizePage : Page
 
     private static string GetBenefitDetail(string id) => id switch
     {
-        "maximum-power-plan" => "Beneficio: +5-10% rendimiento sostenido en carga, menor throttling. Ideal para juegos y render. Requiere reinicio no.",
-        "disable-visual-effects" => "Beneficio: -15% uso GPU en escritorio, +2-5% FPS en juegos con GPU limitada, menos input lag.",
-        "disable-search-indexing" => "Beneficio: -200 MB RAM y -5% I/O en SSD, +3% batería en portátil. Solo recomendado en SSD.",
-        "disable-background-apps" => "Beneficio: -8% uso CPU en reposo, mejor ping estable, menos notificaciones.",
-        "disable-transparency" => "Beneficio: -3% GPU, batería +4%, interfaz más nítida.",
-        "disable-vbs" => "Beneficio: +5-15% FPS en algunos juegos, pero reduce seguridad (HVCI). Bloqueado si Vanguard/EAC.",
-        "disable-hibernate" => "Beneficio: +4-12 GB libres en disco del sistema, arranque 0.5s más rápido.",
-        "optimize-system-drive" => "Beneficio: +2% velocidad secuencial SSD, menos fragmentación. Verificar TRIM.",
-        "normalize-tcp-autotuning" => "Beneficio: -10-20 ms ping en juegos con bufferbloat, más estabilidad.",
-        "enable-gpu-scheduling" => "Beneficio: -1-2 ms latencia GPU, +2% FPS en DX12. Requiere reinicio.",
-        "disable-gamedvr" => "Beneficio: -3% overhead, +1-3% FPS, menos stutter.",
+        "maximum-power-plan" => "Beneficio: rendimiento sostenido en carga al evitar planes de ahorro. Ideal para juegos y render.",
+        "disable-visual-effects" => "Beneficio: menos carga de GPU en escritorio y respuesta más ágil en equipos modestos.",
+        "disable-search-indexing" => "Beneficio: menos RAM e I/O en segundo plano. Solo recomendado en SSD.",
+        "disable-background-apps" => "Beneficio: menos CPU en reposo y menos interrupciones.",
+        "disable-transparency" => "Beneficio: menos carga de composición y algo más de batería.",
+        "disable-vbs" => "Beneficio: puede mejorar en algunos juegos, pero reduce seguridad (HVCI). Bloqueado si Vanguard/EAC.",
+        "disable-hibernate" => "Beneficio: libera el espacio de hiberfil.sys en el disco del sistema.",
+        "optimize-system-drive" => "Beneficio: unidad optimizada según su medio (TRIM en SSD). Requiere minutos.",
+        "normalize-tcp-autotuning" => "Beneficio: comportamiento de red estándar y estable.",
+        "enable-gpu-scheduling" => "Beneficio: planificación GPU por hardware. Requiere reinicio.",
+        "disable-gamedvr" => "Beneficio: menos sobrecarga al jugar si no grabas clips.",
         _ => "Beneficio: según perfil, revisa evidencia y confianza."
     };
 
@@ -402,15 +410,15 @@ public sealed partial class OptimizePage : Page
         TxText.Text = operation == PrivilegedOperationKind.ApplyOptimization ? "Aplicando cambio transaccional…" : "Revirtiendo…";
         try
         {
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+            using var cts = new CancellationTokenSource(TimeoutFor(optimizationId));
             var pipe = AppHost.Resolve<PrivilegedPipeClient>();
             var response = await pipe.SendAsync(operation, optimizationId, cts.Token);
             uiState.ServiceStatus = response is { Accepted: true } ? "connected" : "rejected";
             if (response is { Accepted: true })
             {
-                StatusText.Text = operation == PrivilegedOperationKind.ApplyOptimization ? "✓ Aplicado y verificado. Snapshot disponible para reversión." : "✓ Revertido y verificado.";
+                var applied = operation == PrivilegedOperationKind.ApplyOptimization;
+                StatusText.Text = applied ? $"✓ {optimizationId} aplicado y verificado. Snapshot disponible para reversión." : $"✓ {optimizationId} revertido y verificado.";
                 TxText.Text = "Verificado ✓ — Commit OK";
-                if (operation == PrivilegedOperationKind.ApplyOptimization) StatusText.Text += $" [{_vm.LastErrorCode ?? ""}]";
             }
             else
             {
@@ -418,7 +426,27 @@ public sealed partial class OptimizePage : Page
                 TxText.Text = "Rechazado — transacción no comprometida";
             }
 
-            // Feedback explícito para reversión
+            // Feedback explícito: diálogo de éxito al aplicar, de resultado al revertir
+            if (operation == PrivilegedOperationKind.ApplyOptimization && response is { Accepted: true })
+            {
+                var needsReboot = uiState.Recommendations.FirstOrDefault(r =>
+                    r.OptimizationId.Equals(optimizationId, StringComparison.OrdinalIgnoreCase))?.RequiresReboot == true;
+                var appliedDialog = new ContentDialog
+                {
+                    Title = "✓ Aplicado correctamente",
+                    Content = new TextBlock
+                    {
+                        Text = $"{optimizationId} se aplicó y verificó en el sistema.\nSnapshot previo guardado: reversible desde Restaurar o con Revertir." +
+                               (needsReboot ? "\nRequiere reinicio para efecto completo." : "") +
+                               "\nYa figura como Activo y no se puede volver a aplicar.",
+                        TextWrapping = TextWrapping.Wrap
+                    },
+                    CloseButtonText = "Aceptar",
+                    DefaultButton = ContentDialogButton.Close,
+                    XamlRoot = Content.XamlRoot
+                };
+                await appliedDialog.ShowAsync();
+            }
             if (operation == PrivilegedOperationKind.RevertOptimization)
             {
                 var dialog = new ContentDialog
@@ -455,6 +483,14 @@ public sealed partial class OptimizePage : Page
         }
     }
 
+    private static TimeSpan TimeoutFor(string optimizationId) => optimizationId switch
+    {
+        "windows-component-store-cleanup" or "windows-component-store-resetbase"
+            or "optimize-system-drive" or "optimize-hdd-media-aware" or "retrim-system-ssd"
+            or "disk-cleanup-system-files" or "reset-network-stack-repair" or "repair-windows-update" => TimeSpan.FromMinutes(20),
+        _ => TimeSpan.FromSeconds(60),
+    };
+
     private async void OnApplyRecommendedClick(object sender, RoutedEventArgs e)
     {
         var uiState = AppHost.Resolve<ViewModels.UiState>();
@@ -472,11 +508,12 @@ public sealed partial class OptimizePage : Page
 
         BusyRing.IsActive = true;
         var failures = new List<string>();
+        var appliedOk = new List<string>();
         try
         {
             foreach (var id in recommended)
             {
-                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+                using var cts = new CancellationTokenSource(TimeoutFor(id));
                 var pipe = AppHost.Resolve<PrivilegedPipeClient>();
                 var response = await pipe.SendAsync(PrivilegedOperationKind.ApplyOptimization, id, cts.Token);
                 if (response is not { Accepted: true })
@@ -484,14 +521,30 @@ public sealed partial class OptimizePage : Page
                     failures.Add($"{id}: [{response?.ErrorCode}] {response?.SafeMessage ?? "sin respuesta"}");
                     break; // stop the batch on first failure (spec 124)
                 }
+                appliedOk.Add(id);
             }
 
             using var refreshCts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
             await _vm.RefreshRecommendationsAsync(refreshCts.Token);
             Render();
             StatusText.Text = failures.Count == 0
-                ? $"Aplicados {recommended.Count} cambios recomendados."
+                ? $"✓ Aplicados {appliedOk.Count} cambios recomendados y verificados. Figuran como Activos."
                 : $"Lote detenido: {string.Join("; ", failures)}";
+            var batchDialog = new ContentDialog
+            {
+                Title = failures.Count == 0 ? $"✓ {appliedOk.Count} cambios aplicados" : "Lote detenido",
+                Content = new TextBlock
+                {
+                    Text = failures.Count == 0
+                        ? $"Se aplicaron y verificaron {appliedOk.Count} cambios.\nYa figuran como Activos y no se pueden volver a aplicar.\nSnapshots disponibles en Restaurar."
+                        : $"Se aplicaron {appliedOk.Count} antes del fallo y se revirtieron los reversibles.\nFallo: {string.Join("; ", failures)}",
+                    TextWrapping = TextWrapping.Wrap
+                },
+                CloseButtonText = "Aceptar",
+                DefaultButton = ContentDialogButton.Close,
+                XamlRoot = Content.XamlRoot
+            };
+            await batchDialog.ShowAsync();
         }
         catch (Exception ex)
         {

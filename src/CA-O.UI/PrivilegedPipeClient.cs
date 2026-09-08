@@ -64,13 +64,19 @@ public sealed class PrivilegedPipeClient
     {
         await using var pipe = new NamedPipeClientStream(
             ".", IpcConstants.PipeName, PipeDirection.InOut, PipeOptions.Asynchronous);
-        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        timeout.CancelAfter(CallTimeout);
+        // La conexión sí tiene techo corto (10 s); la RESPUESTA respeta el
+        // timeout del llamante (las operaciones pesadas necesitan minutos).
+        using var connectCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        connectCts.CancelAfter(CallTimeout);
         try
         {
-            await pipe.ConnectAsync(timeout.Token);
+            await pipe.ConnectAsync(connectCts.Token);
         }
-        catch (OperationCanceledException) when (timeout.IsCancellationRequested && !ct.IsCancellationRequested)
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (OperationCanceledException)
         {
             return IpcResponse.Rejected(ErrorCodes.IpcTimeout, "Servicio no disponible: tiempo de espera agotado (CAO-IPC-004). Verifique que CA-O Privileged Service esté instalado e iniciado.");
         }
@@ -100,26 +106,25 @@ public sealed class PrivilegedPipeClient
                 return IpcResponse.Rejected(ErrorCodes.IpcRequestTooLarge, "Solicitud excede 64KB.");
             using (var writer = new StreamWriter(pipe, System.Text.Encoding.UTF8, 1024, leaveOpen: true) { AutoFlush = true })
             {
-                await writer.WriteLineAsync(json.AsMemory(), timeout.Token);
+                await writer.WriteLineAsync(json.AsMemory(), ct);
                 writer.Flush();
             }
-            // Leer una línea de respuesta
+            // Leer una línea de respuesta con el timeout del llamante (no el de conexión)
             string? line;
             using (var reader = new StreamReader(pipe, System.Text.Encoding.UTF8, false, 1024, leaveOpen: true))
             {
-                // Leer con timeout ya aplicado via CancellationToken
-                var readTask = reader.ReadLineAsync(timeout.Token).AsTask();
-                var completed = await Task.WhenAny(readTask, Task.Delay(CallTimeout, timeout.Token));
-                if (completed != readTask)
-                    return IpcResponse.Rejected(ErrorCodes.IpcTimeout, "Servicio no respondió a tiempo (CAO-IPC-007).");
-                line = await readTask;
+                line = await reader.ReadLineAsync(ct);
             }
             if (string.IsNullOrWhiteSpace(line))
                 return IpcResponse.Rejected(ErrorCodes.IpcMalformedRequest, "Respuesta vacía del servicio.");
             var response = JsonSerializer.Deserialize<IpcResponse>(line, JsonOptions);
             return response ?? IpcResponse.Rejected(ErrorCodes.IpcMalformedRequest, "Respuesta vacía del servicio.");
         }
-        catch (OperationCanceledException) when (timeout.IsCancellationRequested)
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (OperationCanceledException)
         {
             return IpcResponse.Rejected(ErrorCodes.IpcTimeout, "Servicio no respondió a tiempo (CAO-IPC-007).");
         }

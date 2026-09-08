@@ -2,8 +2,8 @@
     x:Class="CAO.UI.Pages.BenchmarkPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-    <ScrollViewer Padding="32,24,32,32" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Background="{ThemeResource SolidBackgroundFillColorBaseBrush}">
-        <StackPanel Spacing="20" MaxWidth="1200" HorizontalAlignment="Center">
+    <ScrollViewer Padding="{StaticResource CaoPagePadding}" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Background="{ThemeResource SolidBackgroundFillColorBaseBrush}">
+        <StackPanel Style="{StaticResource CaoPageContainerStyle}">
             <StackPanel Style="{StaticResource CaoPageHeaderStyle}">
                 <TextBlock Text="Benchmark" TextAlignment="Center" Style="{StaticResource CaoPageTitleStyle}"/>
                 <TextBlock Text="Metodología honesta: cargas fijas y reproducibles (CPU/memoria/disco). Veredicto con suelo de ruido 3%." TextAlignment="Center" Style="{StaticResource CaoSubtitleStyle}"/>
@@ -11,24 +11,110 @@
             </StackPanel>
             <InfoBar IsOpen="True" Severity="Informational" IsClosable="False"
                      Title="Metodología honesta"
-                     Message="Cargas fijas y reproducibles (CPU/memoria/disco). Veredicto con suelo de ruido 3%: sin diferencia medible no hay mejora. El benchmark nunca muta el estado transaccional."/>
-            
-            <Border Style="{StaticResource CaoCardStyle}" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}">
-                <StackPanel Spacing="10">
-                    <TextBlock Text="Flujo de benchmark" FontWeight="SemiBold" FontSize="13"/>
-                    <TextBlock Text="1. Crear línea base de referencia" FontSize="12" Opacity="0.85" Margin="0,2,0,0"/>
-                    <TextBlock Text="2. Aplicar optimización (con snapshot)" FontSize="12" Opacity="0.85"/>
-                    <TextBlock Text="3. Medir después con cargas idénticas" FontSize="12" Opacity="0.85"/>
-                    <TextBlock Text="4. Comparar resultados con intervalo de confianza" FontSize="12" Opacity="0.85"/>
+                     Message="3 trials con warmup y mediana: un pico aislado no fabrica mejoras. Suelo de ruido 3%: sin diferencia medible no hay mejora. El benchmark nunca muta el estado transaccional."/>
+
+            <Border Style="{StaticResource CaoCardStyle}">
+                <StackPanel Spacing="12">
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <Border Width="36" Height="36" CornerRadius="18" Background="{StaticResource CaoBlueSoftBrush}">
+                            <FontIcon Glyph="&#xE9D9;" FontSize="16" Foreground="{StaticResource CaoBlueSolidBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <StackPanel Spacing="2" VerticalAlignment="Center">
+                            <TextBlock Text="Qué mide (y para qué sirve)" Style="{StaticResource CaoSectionTitleStyle}"/>
+                            <TextBlock Text="CPU, memoria y disco reales para validar cambios" Style="{StaticResource CaoSectionSubtitleStyle}"/>
+                        </StackPanel>
+                    </StackPanel>
+                    <Border Style="{StaticResource CaoDividerStyle}"/>
+                    <Grid ColumnSpacing="10">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                        <Border Background="{StaticResource CaoBlueSoftBrush}" CornerRadius="12" Padding="10">
+                            <StackPanel Spacing="4" HorizontalAlignment="Center">
+                                <FontIcon Glyph="&#xE950;" FontSize="18" Foreground="{StaticResource CaoBlueSolidBrush}" HorizontalAlignment="Center"/>
+                                <TextBlock Text="CPU" FontWeight="Bold" FontSize="12" TextAlignment="Center"/>
+                                <TextBlock Text="Primos fijos" FontSize="10" Opacity="0.7" TextAlignment="Center"/>
+                            </StackPanel>
+                        </Border>
+                        <Border Grid.Column="1" Background="{StaticResource CaoGreenSoftBrush}" CornerRadius="12" Padding="10">
+                            <StackPanel Spacing="4" HorizontalAlignment="Center">
+                                <FontIcon Glyph="&#xEB4B;" FontSize="18" Foreground="{StaticResource CaoGreenSolidBrush}" HorizontalAlignment="Center"/>
+                                <TextBlock Text="Memoria" FontWeight="Bold" FontSize="12" TextAlignment="Center"/>
+                                <TextBlock Text="GB/s copia" FontSize="10" Opacity="0.7" TextAlignment="Center"/>
+                            </StackPanel>
+                        </Border>
+                        <Border Grid.Column="2" Background="{StaticResource CaoCyanSoftBrush}" CornerRadius="12" Padding="10">
+                            <StackPanel Spacing="4" HorizontalAlignment="Center">
+                                <FontIcon Glyph="&#xEDA2;" FontSize="18" Foreground="{StaticResource CaoCyanSolidBrush}" HorizontalAlignment="Center"/>
+                                <TextBlock Text="Disco" FontWeight="Bold" FontSize="12" TextAlignment="Center"/>
+                                <TextBlock Text="R/W MB/s" FontSize="10" Opacity="0.7" TextAlignment="Center"/>
+                            </StackPanel>
+                        </Border>
+                        <Border Grid.Column="3" Background="{StaticResource CaoPurpleSoftBrush}" CornerRadius="12" Padding="10">
+                            <StackPanel Spacing="4" HorizontalAlignment="Center">
+                                <FontIcon Glyph="&#xE930;" FontSize="18" Foreground="{StaticResource CaoPurpleSolidBrush}" HorizontalAlignment="Center"/>
+                                <TextBlock Text="Regla 3%" FontWeight="Bold" FontSize="12" TextAlignment="Center"/>
+                                <TextBlock Text="Sin humo" FontSize="10" Opacity="0.7" TextAlignment="Center"/>
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+                    <TextBlock x:Name="ContextText" FontSize="11" Opacity="0.8" TextWrapping="Wrap" Text="Conecte el cargador y cierre apps pesadas antes de medir."/>
                 </StackPanel>
             </Border>
             
-            <StackPanel Orientation="Horizontal" Spacing="12" Margin="0,8,0,0">
-                <Button x:Name="BaselineButton" Content="Medir línea base" Click="OnBaselineClick" Style="{StaticResource CaoAccentButtonStyle}"/>
-                <Button x:Name="AfterButton" Content="Medir tras cambio" Click="OnAfterClick" Style="{StaticResource CaoElevatedButtonStyle}"/>
-                <ProgressRing x:Name="Ring" IsActive="False" Width="22" Height="22" Style="{StaticResource CaoProgressRingStyle}"/>
-                <TextBlock x:Name="BenchStatusText" FontSize="12" Opacity="0.75" VerticalAlignment="Center" FontWeight="Medium"/>
-            </StackPanel>
+            <Border Style="{StaticResource CaoCardStyle}">
+                <StackPanel Spacing="12">
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <Border Width="36" Height="36" CornerRadius="18" Background="{StaticResource CaoPurpleSoftBrush}">
+                            <FontIcon Glyph="&#xE9D2;" FontSize="16" Foreground="{StaticResource CaoPurpleSolidBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <StackPanel Spacing="2" VerticalAlignment="Center">
+                            <TextBlock Text="Flujo de benchmark" Style="{StaticResource CaoSectionTitleStyle}"/>
+                            <TextBlock Text="4 pasos guiados y reproducibles" Style="{StaticResource CaoSectionSubtitleStyle}"/>
+                        </StackPanel>
+                    </StackPanel>
+                    <Border Style="{StaticResource CaoDividerStyle}"/>
+                    <Grid ColumnSpacing="10">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                        <StackPanel Spacing="6" HorizontalAlignment="Center">
+                            <Border Style="{StaticResource CaoStepCircleStyle}" HorizontalAlignment="Center"><TextBlock Text="1" Foreground="White" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
+                            <TextBlock Text="Línea base" FontSize="11" FontWeight="SemiBold" TextAlignment="Center"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Spacing="6" HorizontalAlignment="Center">
+                            <Border Style="{StaticResource CaoStepCircleStyle}" HorizontalAlignment="Center"><TextBlock Text="2" Foreground="White" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
+                            <TextBlock Text="Aplicar cambio" FontSize="11" FontWeight="SemiBold" TextAlignment="Center"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="2" Spacing="6" HorizontalAlignment="Center">
+                            <Border Style="{StaticResource CaoStepCircleStyle}" HorizontalAlignment="Center"><TextBlock Text="3" Foreground="White" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
+                            <TextBlock Text="Medir después" FontSize="11" FontWeight="SemiBold" TextAlignment="Center"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="3" Spacing="6" HorizontalAlignment="Center">
+                            <Border Style="{StaticResource CaoStepCircleStyle}" HorizontalAlignment="Center"><TextBlock Text="4" Foreground="White" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
+                            <TextBlock Text="Comparar" FontSize="11" FontWeight="SemiBold" TextAlignment="Center"/>
+                        </StackPanel>
+                    </Grid>
+                </StackPanel>
+            </Border>
+            
+            <Border Style="{StaticResource CaoActionCardStyle}">
+                <Grid ColumnSpacing="14">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <Border Style="{StaticResource CaoIconCircleStyle}" Background="{StaticResource CaoBlueSoftBrush}" Width="44" Height="44">
+                        <FontIcon Glyph="&#xE7F8;" FontSize="19" Foreground="{StaticResource CaoBlueSolidBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                        <TextBlock Text="Medición A/B" FontWeight="Bold" FontSize="14"/>
+                        <TextBlock x:Name="BenchStatusText" FontSize="12" Opacity="0.75" VerticalAlignment="Center" FontWeight="Medium" AutomationProperties.LiveSetting="Polite" Text="Cargas idénticas antes y después"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                        <Button x:Name="BaselineButton" Content="Medir línea base" Click="OnBaselineClick" Style="{StaticResource CaoGradientButtonStyle}" AutomationProperties.Name="Medir línea base"/>
+                        <Button x:Name="AfterButton" Content="Medir tras cambio" Click="OnAfterClick" Style="{StaticResource CaoElevatedButtonStyle}" AutomationProperties.Name="Medir tras cambio"/>
+                        <ProgressRing x:Name="Ring" IsActive="False" Width="22" Height="22" Style="{StaticResource CaoProgressRingStyle}"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
             <Border Style="{StaticResource CaoCardStyle}" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" Visibility="Collapsed" x:Name="StepCard">
                 <StackPanel Spacing="8">
                     <TextBlock x:Name="CurrentStepText" FontSize="13" FontWeight="SemiBold" Foreground="{ThemeResource AccentFillColorDefaultBrush}"/>
@@ -41,29 +127,82 @@
                 <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                 <Border Style="{StaticResource CaoCardStyle}">
                     <StackPanel Spacing="8">
-                        <StackPanel Orientation="Horizontal" Spacing="6">
-                            <FontIcon Glyph="&#xE7F8;" FontSize="14" Opacity="0.7"/>
-                            <TextBlock Text="Línea base" FontWeight="SemiBold" FontSize="13"/>
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <Border Width="36" Height="36" CornerRadius="18" Background="{StaticResource CaoBlueSoftBrush}">
+                                <FontIcon Glyph="&#xE7F8;" FontSize="16" Foreground="{StaticResource CaoBlueSolidBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Text="Línea base" Style="{StaticResource CaoSectionTitleStyle}"/>
+                                <TextBlock Text="Referencia inicial" Style="{StaticResource CaoSectionSubtitleStyle}"/>
+                            </StackPanel>
                         </StackPanel>
-                        <Border Height="1" Background="{ThemeResource DividerStrokeColorDefaultBrush}" Opacity="0.3"/>
+                        <Border Style="{StaticResource CaoDividerStyle}"/>
                         <TextBlock x:Name="BaselineText" TextWrapping="Wrap" Opacity="0.85" IsTextSelectionEnabled="True" FontSize="12"/>
                     </StackPanel>
                 </Border>
                 <Border Grid.Column="1" Style="{StaticResource CaoCardStyle}">
                     <StackPanel Spacing="8">
-                        <StackPanel Orientation="Horizontal" Spacing="6">
-                            <FontIcon Glyph="&#xE9D1;" FontSize="14" Opacity="0.7"/>
-                            <TextBlock Text="Comparación A/B" FontWeight="SemiBold" FontSize="13"/>
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <Border Width="36" Height="36" CornerRadius="18" Background="{StaticResource CaoGreenSoftBrush}">
+                                <FontIcon Glyph="&#xE9D1;" FontSize="16" Foreground="{StaticResource CaoGreenSolidBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Text="Comparación A/B" Style="{StaticResource CaoSectionTitleStyle}"/>
+                                <TextBlock Text="Veredicto con 3% ruido" Style="{StaticResource CaoSectionSubtitleStyle}"/>
+                            </StackPanel>
                         </StackPanel>
-                        <Border Height="1" Background="{ThemeResource DividerStrokeColorDefaultBrush}" Opacity="0.3"/>
+                        <Border Style="{StaticResource CaoDividerStyle}"/>
                         <TextBlock x:Name="ComparisonText" TextWrapping="Wrap" Opacity="0.85" IsTextSelectionEnabled="True" FontSize="12"/>
                     </StackPanel>
                 </Border>
             </Grid>
+
+            <Border Style="{StaticResource CaoCardStyle}">
+                <StackPanel Spacing="12">
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <Border Width="36" Height="36" CornerRadius="18" Background="{StaticResource CaoGreenSoftBrush}">
+                            <FontIcon Glyph="&#xE90F;" FontSize="16" Foreground="{StaticResource CaoGreenSolidBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <StackPanel Spacing="2" VerticalAlignment="Center">
+                            <TextBlock Text="Rendimiento seguro (sin overclock directo)" Style="{StaticResource CaoSectionTitleStyle}"/>
+                            <TextBlock Text="Lo que sí sube rendimiento sin romper nada" Style="{StaticResource CaoSectionSubtitleStyle}"/>
+                        </StackPanel>
+                    </StackPanel>
+                    <Border Style="{StaticResource CaoDividerStyle}"/>
+                    <TextBlock Text="CA-O no hace overclock de CPU/GPU (frecuencias/voltajes): exige BIOS y herramientas del fabricante, sube temperatura, puede colgar el sistema, anula garantía y provoca baneos con anti-cheat. En su lugar valida estas ganancias seguras y reversibles:" FontSize="11" Opacity="0.8" TextWrapping="Wrap"/>
+                    <TextBlock Text="• Plan Alto rendimiento + AC en Best performance  • HAGS + Game Mode + optimización ventana  • GPU dedicada por juego  • Timer 1,0 ms para latencia" FontSize="11" Opacity="0.8" TextWrapping="Wrap"/>
+                    <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Center">
+                        <Button Content="Ver en Optimizar" Click="OnGoOptimizeClick" Style="{StaticResource CaoGradientButtonStyle}" AutomationProperties.Name="Ir a Optimizar desde Benchmark"/>
+                        <Button Content="Timer en Limpieza" Click="OnGoCleanupClick" Style="{StaticResource CaoElevatedButtonStyle}" AutomationProperties.Name="Ir a Limpieza timer"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource CaoCardStyle}">
+                <StackPanel Spacing="12">
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <Border Width="36" Height="36" CornerRadius="18" Background="{StaticResource CaoAmberSoftBrush}">
+                            <FontIcon Glyph="&#xE7BA;" FontSize="16" Foreground="{StaticResource CaoAmberSolidBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <StackPanel Spacing="2" VerticalAlignment="Center">
+                            <TextBlock Text="Overclock avanzado (solo herramientas vendor)" Style="{StaticResource CaoSectionTitleStyle}"/>
+                            <TextBlock Text="Bajo tu responsabilidad y con refrigeración" Style="{StaticResource CaoSectionSubtitleStyle}"/>
+                        </StackPanel>
+                    </StackPanel>
+                    <Border Style="{StaticResource CaoDividerStyle}"/>
+                    <TextBlock Text="Si buscas exprimir más: NVIDIA → MSI Afterburner / GeForce Experience (OC Scanner con curva automática); AMD → Adrenalin Performance Tuning / Ryzen Master; Intel → XTU. Reglas: sube de a poco (+25-50 MHz), prueba estabilidad 15-30 min, vigila &lt;85 °C, no toques voltaje sin saber, y desactiva el OC antes de jugar con Vanguard/EAC." FontSize="11" Opacity="0.8" TextWrapping="Wrap"/>
+                    <StackPanel Orientation="Horizontal" Spacing="16" HorizontalAlignment="Center">
+                        <HyperlinkButton Content="MSI Afterburner" NavigateUri="https://www.msi.com/Landing/afterburner" ToolTipService.ToolTip="Herramienta vendor para GPU NVIDIA/AMD"/>
+                        <HyperlinkButton Content="AMD Adrenalin" NavigateUri="https://www.amd.com/en/products/software/adrenalin.html" ToolTipService.ToolTip="Tuning oficial AMD"/>
+                        <HyperlinkButton Content="Intel XTU" NavigateUri="https://www.intel.com/content/www/us/en/download/17881/intel-extreme-tuning-utility-intel-xtu.html" ToolTipService.ToolTip="Overclock oficial Intel"/>
+                    </StackPanel>
+                    <TextBlock Text="Usa esta página para validar: mide base → aplica OC vendor → mide después. Si el veredicto es Regresión o el sistema se cuelga, revierte el OC." FontSize="11" Opacity="0.7" TextWrapping="Wrap" FontStyle="Italic"/>
+                </StackPanel>
+            </Border>
             
-            <Border Style="{StaticResource CaoCardStyle}" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" Opacity="0.8">
+            <Border Style="{StaticResource CaoCardStyle}" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" Opacity="0.9">
                 <StackPanel Spacing="4">
-                    <TextBlock Text="Nota: El benchmark no modifica snapshots ni historial; solo mide rendimiento sin efectos secundarios." FontSize="10" Opacity="0.6" TextWrapping="Wrap" FontStyle="Italic"/>
+                    <TextBlock Text="Nota: El benchmark no modifica snapshots ni historial; solo mide rendimiento sin efectos secundarios." FontSize="11" Opacity="0.75" TextWrapping="Wrap" FontStyle="Italic"/>
                 </StackPanel>
             </Border>
         </StackPanel>

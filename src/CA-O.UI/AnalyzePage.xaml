@@ -7,11 +7,14 @@
             <VisualStateGroup x:Name="Responsive">
                 <VisualState x:Name="Wide"><VisualState.StateTriggers><AdaptiveTrigger MinWindowWidth="1000"/></VisualState.StateTriggers></VisualState>
                 <VisualState x:Name="Narrow"><VisualState.StateTriggers><AdaptiveTrigger MinWindowWidth="0"/></VisualState.StateTriggers>
-                    <VisualState.Setters><Setter Target="CardsGrid.ColumnDefinitions[1].Width" Value="0"/></VisualState.Setters>
+                    <VisualState.Setters>
+                        <Setter Target="HardwareGrid.RowSpacing" Value="12"/>
+                        <Setter Target="StatusText.FontSize" Value="12"/>
+                    </VisualState.Setters>
                 </VisualState>
             </VisualStateGroup>
         </VisualStateManager.VisualStateGroups>
-        <ScrollViewer Padding="32,24,32,32" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalAlignment="Stretch">
+        <ScrollViewer Padding="{StaticResource CaoPagePadding}" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalAlignment="Stretch">
         <StackPanel x:Name="PageContent" Spacing="20" MaxWidth="1200" HorizontalAlignment="Center">
             <StackPanel Style="{StaticResource CaoPageHeaderStyle}">
                 <TextBlock Text="Analizar sistema" TextAlignment="Center" Style="{StaticResource CaoPageTitleStyle}"/>
@@ -19,24 +22,55 @@
                 <Border Style="{StaticResource CaoHeaderAccentBarStyle}"/>
             </StackPanel>
 
-            <StackPanel Orientation="Horizontal" Spacing="12" Margin="0,4,0,0" HorizontalAlignment="Center">
-                <Button x:Name="RunButton" Content="Ejecutar análisis completo" Click="OnRunClick" Style="{StaticResource CaoAccentButtonStyle}"
-                        AutomationProperties.Name="Ejecutar análisis completo"/>
-                <Button x:Name="CancelButton" Content="Cancelar" Click="OnCancelClick" Visibility="Collapsed"
-                        AutomationProperties.Name="Cancelar análisis" Style="{StaticResource CaoElevatedButtonStyle}"/>
-                <ProgressRing x:Name="Ring" IsActive="False" Width="22" Height="22" Style="{StaticResource CaoProgressRingStyle}"/>
-                <TextBlock x:Name="StatusText" FontSize="12" Opacity="0.7" VerticalAlignment="Center" FontWeight="Medium"/>
-            </StackPanel>
+            <Border Style="{StaticResource CaoActionCardStyle}">
+                <Grid ColumnSpacing="14">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <Border Style="{StaticResource CaoIconCircleStyle}" Background="{StaticResource CaoBlueSoftBrush}" Width="44" Height="44">
+                        <FontIcon Glyph="&#xE71E;" FontSize="19" Foreground="{StaticResource CaoBlueSolidBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                        <TextBlock Text="Diagnóstico con evidencia" FontWeight="Bold" FontSize="14"/>
+                        <TextBlock x:Name="StatusText" FontSize="12" Opacity="0.75" FontWeight="Medium" AutomationProperties.LiveSetting="Polite" Text="Listo para medir tu sistema"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                        <Button x:Name="RunButton" Content="Ejecutar análisis completo" Click="OnRunClick" Style="{StaticResource CaoGradientButtonStyle}"
+                                AutomationProperties.Name="Ejecutar análisis completo"/>
+                        <Button x:Name="CancelButton" Content="Cancelar" Click="OnCancelClick" Visibility="Collapsed"
+                                AutomationProperties.Name="Cancelar análisis" Style="{StaticResource CaoElevatedButtonStyle}"/>
+                        <ProgressRing x:Name="Ring" IsActive="False" Width="22" Height="22" Style="{StaticResource CaoProgressRingStyle}"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
 
+            <!-- SECCIÓN 1 · Veredicto: salud y hallazgos primero -->
+            <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,8,0,0">
+                <Border Style="{StaticResource CaoStepCircleStyle}"><TextBlock Text="1" Foreground="White" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
+                <StackPanel Spacing="2" VerticalAlignment="Center">
+                    <TextBlock Text="Salud y hallazgos" Style="{StaticResource CaoSectionTitleStyle}"/>
+                    <TextBlock Text="El veredicto primero: qué está mal antes de medir el resto" Style="{StaticResource CaoSectionSubtitleStyle}"/>
+                </StackPanel>
+            </StackPanel>
             <!-- Salud del sistema -->
             <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,4,0,0" HorizontalAlignment="Center">
                 <Border x:Name="SystemHealthBadge" Style="{StaticResource CaoStatusIndicatorStyle}" Background="{ThemeResource SystemFillColorNeutralBrush}">
-                    <TextBlock x:Name="SystemHealthText" Text="Sistema: —" FontSize="12" FontWeight="SemiBold" Foreground="White"/>
+                    <TextBlock x:Name="SystemHealthText" Text="Sistema: —" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource TextOnAccentFillColorSelectedTextBrush}"/>
                 </Border>
                 <HyperlinkButton x:Name="WhyScoresButton" Content="¿Por qué este estado?" FontSize="12" Click="OnWhyScoresClick" Visibility="Collapsed"/>
             </StackPanel>
             <TextBlock x:Name="HealthScoresText" FontSize="12" Opacity="0.8" TextWrapping="Wrap" IsTextSelectionEnabled="True" FontWeight="Medium"/>
 
+            <!-- SECCIÓN 2 · Hardware de un vistazo -->
+            <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,8,0,0">
+                <Border Style="{StaticResource CaoStepCircleStyle}"><TextBlock Text="2" Foreground="White" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
+                <StackPanel Spacing="2" VerticalAlignment="Center">
+                    <TextBlock Text="Hardware de un vistazo" Style="{StaticResource CaoSectionTitleStyle}"/>
+                    <TextBlock Text="CPU, GPU, memoria y postura de seguridad en 4 tarjetas" Style="{StaticResource CaoSectionSubtitleStyle}"/>
+                </StackPanel>
+            </StackPanel>
             <!-- Hardware -->
             <Grid x:Name="HardwareGrid" ColumnSpacing="12" RowSpacing="12">
                 <Grid.ColumnDefinitions>
@@ -46,10 +80,12 @@
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
                 <Border Style="{StaticResource CaoMetricCardStyle}" AutomationProperties.Name="CPU card">
-                    <StackPanel Spacing="4">
-                        <StackPanel Orientation="Horizontal" Spacing="6">
-                            <FontIcon Glyph="&#xE950;" FontSize="14" Opacity="0.7"/>
-                            <TextBlock Text="CPU" FontSize="12" Opacity="0.7" FontWeight="SemiBold"/>
+                    <StackPanel Spacing="6">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Border Width="32" Height="32" CornerRadius="16" Background="{StaticResource CaoBlueSoftBrush}">
+                                <FontIcon Glyph="&#xE950;" FontSize="15" Foreground="{StaticResource CaoBlueSolidBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <TextBlock Text="CPU" FontSize="12" Opacity="0.8" FontWeight="Bold" VerticalAlignment="Center"/>
                         </StackPanel>
                         <TextBlock x:Name="CpuNameText" FontWeight="SemiBold" FontSize="13" TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis"/>
                         <TextBlock x:Name="CpuDetailText" FontSize="11" Opacity="0.6" TextWrapping="Wrap"/>
@@ -59,42 +95,49 @@
                     </StackPanel>
                 </Border>
                 <Border Grid.Column="1" Style="{StaticResource CaoMetricCardStyle}" AutomationProperties.Name="GPU card">
-                    <StackPanel Spacing="4">
-                        <StackPanel Orientation="Horizontal" Spacing="6">
-                            <FontIcon Glyph="&#xE7F4;" FontSize="14" Opacity="0.7"/>
-                            <TextBlock Text="GPU" FontSize="12" Opacity="0.7" FontWeight="SemiBold"/>
+                    <StackPanel Spacing="6">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Border Width="32" Height="32" CornerRadius="16" Background="{StaticResource CaoPurpleSoftBrush}">
+                                <FontIcon Glyph="&#xE7F4;" FontSize="15" Foreground="{StaticResource CaoPurpleSolidBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <TextBlock Text="GPU" FontSize="12" Opacity="0.8" FontWeight="Bold" VerticalAlignment="Center"/>
                         </StackPanel>
                         <TextBlock x:Name="GpuNameText" FontWeight="SemiBold" FontSize="13" TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis"/>
                         <TextBlock x:Name="GpuDetailText" FontSize="11" Opacity="0.6" TextWrapping="Wrap"/>
-                        <TextBlock x:Name="GpuDriverText" FontSize="11" Opacity="0.55"/>
+                        <TextBlock x:Name="GpuDriverText" FontSize="11" Opacity="0.7"/>
                     </StackPanel>
                 </Border>
                 <Border Grid.Column="2" Style="{StaticResource CaoMetricCardStyle}">
-                    <StackPanel Spacing="4">
-                        <StackPanel Orientation="Horizontal" Spacing="6">
-                            <FontIcon Glyph="&#xEB4B;" FontSize="14" Opacity="0.7"/>
-                            <TextBlock Text="RAM" FontSize="12" Opacity="0.7" FontWeight="SemiBold"/>
+                    <StackPanel Spacing="6">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Border Width="32" Height="32" CornerRadius="16" Background="{StaticResource CaoGreenSoftBrush}">
+                                <FontIcon Glyph="&#xEB4B;" FontSize="15" Foreground="{StaticResource CaoGreenSolidBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <TextBlock Text="RAM" FontSize="12" Opacity="0.8" FontWeight="Bold" VerticalAlignment="Center"/>
                         </StackPanel>
                         <TextBlock x:Name="RamText" FontWeight="SemiBold" FontSize="18"/>
                         <TextBlock x:Name="RamDetailText" FontSize="11" Opacity="0.6"/>
-                        <TextBlock x:Name="StorageSummaryText" FontSize="11" Opacity="0.55"/>
+                        <TextBlock x:Name="StorageSummaryText" FontSize="11" Opacity="0.7"/>
                     </StackPanel>
                 </Border>
                 <Border Grid.Column="3" Style="{StaticResource CaoMetricCardStyle}">
-                    <StackPanel Spacing="4">
-                        <StackPanel Orientation="Horizontal" Spacing="6">
-                            <FontIcon Glyph="&#xE9A9;" FontSize="14" Opacity="0.7"/>
-                            <TextBlock Text="SEGURIDAD" FontSize="11" Opacity="0.7" FontWeight="SemiBold"/>
+                    <StackPanel Spacing="6">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Border Width="32" Height="32" CornerRadius="16" Background="{StaticResource CaoAmberSoftBrush}">
+                                <FontIcon Glyph="&#xE9A9;" FontSize="15" Foreground="{StaticResource CaoAmberSolidBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <TextBlock Text="SEGURIDAD" FontSize="11" Opacity="0.8" FontWeight="Bold" VerticalAlignment="Center"/>
                         </StackPanel>
                         <StackPanel x:Name="SecurityPosturePanel" Spacing="3"/>
                         <TextBlock x:Name="AntiCheatText" FontSize="11" Opacity="0.6" Margin="0,4,0,0"/>
                     </StackPanel>
                 </Border>
             </Grid>
-            <TextBlock x:Name="SystemSummary" FontSize="11" Opacity="0.45" TextWrapping="Wrap" IsTextSelectionEnabled="True"/>
+            <TextBlock x:Name="SystemSummary" FontSize="11" Opacity="0.75" TextWrapping="Wrap" IsTextSelectionEnabled="True"/>
 
             <!-- Hallazgos -->
-            <TextBlock x:Name="FindingsHeader" Text="Hallazgos" Style="{StaticResource CaoSectionHeaderStyle}"/>
+            <TextBlock x:Name="FindingsHeader" Text="Hallazgos del diagnóstico" Style="{StaticResource CaoSectionHeaderStyle}"/>
+            <TextBlock Text="Cada hallazgo sale de una medición real con su severidad. Sin hallazgos = sin problemas detectados." FontSize="11" Opacity="0.7" TextWrapping="Wrap" TextAlignment="Center"/>
             <Border x:Name="EmptyFindingsState" Style="{StaticResource CaoCardStyle}" Visibility="Collapsed">
                 <StackPanel Spacing="6" HorizontalAlignment="Center" Padding="12">
                     <FontIcon Glyph="&#xE930;" FontSize="24" Opacity="0.4" HorizontalAlignment="Center"/>
@@ -135,13 +178,13 @@
                         <Grid.RowDefinitions>
                             <RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/>
                         </Grid.RowDefinitions>
-                        <TextBlock Text="CPU" Grid.Row="0" Grid.Column="0" FontSize="12"/><ProgressRing x:Name="CpuRing" Grid.Row="0" Grid.Column="2" Width="14" Height="14"/>
-                        <TextBlock Text="GPU" Grid.Row="1" Grid.Column="0" FontSize="12"/><ProgressRing x:Name="GpuRing" Grid.Row="1" Grid.Column="2" Width="14" Height="14"/>
-                        <TextBlock Text="Memoria" Grid.Row="2" Grid.Column="0" FontSize="12"/><ProgressRing x:Name="MemRing" Grid.Row="2" Grid.Column="2" Width="14" Height="14"/>
-                        <TextBlock Text="Almacenamiento" Grid.Row="3" Grid.Column="0" FontSize="12"/><ProgressRing x:Name="StorRing" Grid.Row="3" Grid.Column="2" Width="14" Height="14"/>
-                        <TextBlock Text="Red" Grid.Row="4" Grid.Column="0" FontSize="12"/><ProgressRing x:Name="NetRing" Grid.Row="4" Grid.Column="2" Width="14" Height="14"/>
-                        <TextBlock Text="Seguridad" Grid.Row="5" Grid.Column="0" FontSize="12"/><ProgressRing x:Name="SecRing" Grid.Row="5" Grid.Column="2" Width="14" Height="14"/>
-                        <TextBlock Text="Drivers" Grid.Row="6" Grid.Column="0" FontSize="12"/><ProgressRing x:Name="DrvRing" Grid.Row="6" Grid.Column="2" Width="14" Height="14"/>
+                        <TextBlock Text="CPU" Grid.Row="0" Grid.Column="0" FontSize="12"/><ProgressRing x:Name="CpuRing" Grid.Row="0" Grid.Column="2" Width="14" Height="14" Style="{StaticResource CaoProgressRingStyle}"/>
+                        <TextBlock Text="GPU" Grid.Row="1" Grid.Column="0" FontSize="12"/><ProgressRing x:Name="GpuRing" Grid.Row="1" Grid.Column="2" Width="14" Height="14" Style="{StaticResource CaoProgressRingStyle}"/>
+                        <TextBlock Text="Memoria" Grid.Row="2" Grid.Column="0" FontSize="12"/><ProgressRing x:Name="MemRing" Grid.Row="2" Grid.Column="2" Width="14" Height="14" Style="{StaticResource CaoProgressRingStyle}"/>
+                        <TextBlock Text="Almacenamiento" Grid.Row="3" Grid.Column="0" FontSize="12"/><ProgressRing x:Name="StorRing" Grid.Row="3" Grid.Column="2" Width="14" Height="14" Style="{StaticResource CaoProgressRingStyle}"/>
+                        <TextBlock Text="Red" Grid.Row="4" Grid.Column="0" FontSize="12"/><ProgressRing x:Name="NetRing" Grid.Row="4" Grid.Column="2" Width="14" Height="14" Style="{StaticResource CaoProgressRingStyle}"/>
+                        <TextBlock Text="Seguridad" Grid.Row="5" Grid.Column="0" FontSize="12"/><ProgressRing x:Name="SecRing" Grid.Row="5" Grid.Column="2" Width="14" Height="14" Style="{StaticResource CaoProgressRingStyle}"/>
+                        <TextBlock Text="Drivers" Grid.Row="6" Grid.Column="0" FontSize="12"/><ProgressRing x:Name="DrvRing" Grid.Row="6" Grid.Column="2" Width="14" Height="14" Style="{StaticResource CaoProgressRingStyle}"/>
                     </Grid>
                 </StackPanel>
             </Border>
@@ -150,52 +193,86 @@
                 <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                 <Border Style="{StaticResource CaoCardStyle}">
                     <StackPanel Spacing="8">
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <FontIcon Glyph="&#xE950;" FontSize="14"/>
-                            <TextBlock Text="CPU" FontWeight="SemiBold"/>
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <Border Width="36" Height="36" CornerRadius="18" Background="{StaticResource CaoBlueSoftBrush}">
+                                <FontIcon Glyph="&#xE950;" FontSize="16" Foreground="{StaticResource CaoBlueSolidBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Text="CPU · detalle" Style="{StaticResource CaoSectionTitleStyle}"/>
+                                <TextBlock Text="Modelo, núcleos e hilos" Style="{StaticResource CaoSectionSubtitleStyle}"/>
+                            </StackPanel>
                         </StackPanel>
                         <TextBlock x:Name="CpuText" TextWrapping="Wrap" IsTextSelectionEnabled="True" FontSize="12" Opacity="0.9" Text="Ejecuta análisis para medir CPU"/>
                     </StackPanel>
                 </Border>
                 <Border Grid.Column="1" Style="{StaticResource CaoCardStyle}">
                     <StackPanel Spacing="8">
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <FontIcon Glyph="&#xE7F4;" FontSize="14"/>
-                            <TextBlock Text="GPU" FontWeight="SemiBold"/>
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <Border Width="36" Height="36" CornerRadius="18" Background="{StaticResource CaoPurpleSoftBrush}">
+                                <FontIcon Glyph="&#xE7F4;" FontSize="16" Foreground="{StaticResource CaoPurpleSolidBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Text="GPU · detalle" Style="{StaticResource CaoSectionTitleStyle}"/>
+                                <TextBlock Text="Modelo, driver y Hz" Style="{StaticResource CaoSectionSubtitleStyle}"/>
+                            </StackPanel>
                         </StackPanel>
                         <TextBlock x:Name="GpuText" TextWrapping="Wrap" IsTextSelectionEnabled="True" FontSize="12" Opacity="0.9" Text="Ejecuta análisis para medir GPU"/>
                     </StackPanel>
                 </Border>
                 <Border Grid.Column="2" Style="{StaticResource CaoCardStyle}">
                     <StackPanel Spacing="8">
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <FontIcon Glyph="&#xE8BE;" FontSize="14"/>
-                            <TextBlock Text="Memoria" FontWeight="SemiBold"/>
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <Border Width="36" Height="36" CornerRadius="18" Background="{StaticResource CaoGreenSoftBrush}">
+                                <FontIcon Glyph="&#xE8BE;" FontSize="16" Foreground="{StaticResource CaoGreenSolidBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Text="Memoria · detalle" Style="{StaticResource CaoSectionTitleStyle}"/>
+                                <TextBlock Text="RAM, disco y chasis" Style="{StaticResource CaoSectionSubtitleStyle}"/>
+                            </StackPanel>
                         </StackPanel>
                         <TextBlock x:Name="MemoryText" TextWrapping="Wrap" IsTextSelectionEnabled="True" FontSize="12" Opacity="0.9" Text="Ejecuta análisis para medir RAM"/>
                     </StackPanel>
                 </Border>
             </Grid>
 
+            <!-- SECCIÓN 3 · Detalle medido por área -->
+            <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,8,0,0">
+                <Border Style="{StaticResource CaoStepCircleStyle}"><TextBlock Text="3" Foreground="White" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
+                <StackPanel Spacing="2" VerticalAlignment="Center">
+                    <TextBlock Text="Detalle medido por área" Style="{StaticResource CaoSectionTitleStyle}"/>
+                    <TextBlock Text="Red, seguridad, disco y drivers con su estado y acciones" Style="{StaticResource CaoSectionSubtitleStyle}"/>
+                </StackPanel>
+            </StackPanel>
+
             <Grid x:Name="CardsGrid" ColumnSpacing="12" RowSpacing="12">
                 <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                 <Border Style="{StaticResource CaoCardStyle}">
                     <StackPanel Spacing="8">
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <FontIcon Glyph="&#xE774;" FontSize="14"/>
-                            <TextBlock Text="Red" FontWeight="SemiBold"/>
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <Border Width="36" Height="36" CornerRadius="18" Background="{StaticResource CaoCyanSoftBrush}">
+                                <FontIcon Glyph="&#xE774;" FontSize="16" Foreground="{StaticResource CaoCyanSolidBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Text="Red" Style="{StaticResource CaoSectionTitleStyle}"/>
+                                <TextBlock Text="Latencia, jitter y DNS" Style="{StaticResource CaoSectionSubtitleStyle}"/>
+                            </StackPanel>
                             <Border x:Name="NetStatusBadge" Style="{StaticResource CaoBadgeStyle}" Visibility="Collapsed"><TextBlock x:Name="NetStatusText" FontSize="11"/></Border>
                         </StackPanel>
                         <TextBlock x:Name="NetworkText" TextWrapping="Wrap" IsTextSelectionEnabled="True" FontSize="12" Opacity="0.9"/>
-                        <Button x:Name="DnsActionButton" Content="Aplicar mejor DNS detectado" Click="OnDnsBenchClick" FontSize="12" ToolTipService.ToolTip="Ejecuta benchmark y aplica el DNS más rápido via netsh (requiere servicio)"/>
+                        <Button x:Name="DnsActionButton" Content="Aplicar mejor DNS detectado" Click="OnDnsBenchClick" FontSize="12" Style="{StaticResource CaoElevatedButtonStyle}" AutomationProperties.Name="Aplicar mejor DNS detectado" ToolTipService.ToolTip="Ejecuta benchmark y aplica el DNS más rápido via netsh (requiere servicio)"/>
                         <TextBlock x:Name="DnsBestText" FontSize="11" Opacity="0.7" TextWrapping="Wrap"/>
                     </StackPanel>
                 </Border>
                 <Border Grid.Column="1" Style="{StaticResource CaoCardStyle}">
                     <StackPanel Spacing="8">
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <FontIcon Glyph="&#xE72E;" FontSize="14"/>
-                            <TextBlock Text="Seguridad" FontWeight="SemiBold"/>
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <Border Width="36" Height="36" CornerRadius="18" Background="{StaticResource CaoAmberSoftBrush}">
+                                <FontIcon Glyph="&#xE72E;" FontSize="16" Foreground="{StaticResource CaoAmberSolidBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Text="Seguridad" Style="{StaticResource CaoSectionTitleStyle}"/>
+                                <TextBlock Text="Secure Boot, VBS y anti-cheat" Style="{StaticResource CaoSectionSubtitleStyle}"/>
+                            </StackPanel>
                             <Border x:Name="SecStatusBadge" Style="{StaticResource CaoBadgeStyle}" Visibility="Collapsed"><TextBlock x:Name="SecStatusText" FontSize="11"/></Border>
                         </StackPanel>
                         <TextBlock x:Name="SecurityText" TextWrapping="Wrap" IsTextSelectionEnabled="True" FontSize="12" Opacity="0.9"/>
@@ -207,72 +284,134 @@
                 <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                 <Border Style="{StaticResource CaoCardStyle}">
                     <StackPanel Spacing="8">
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <FontIcon Glyph="&#xEDA2;" FontSize="14"/>
-                            <TextBlock Text="Almacenamiento" FontWeight="SemiBold"/>
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <Border Width="36" Height="36" CornerRadius="18" Background="{StaticResource CaoBlueSoftBrush}">
+                                <FontIcon Glyph="&#xEDA2;" FontSize="16" Foreground="{StaticResource CaoBlueSolidBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Text="Almacenamiento" Style="{StaticResource CaoSectionTitleStyle}"/>
+                                <TextBlock Text="Volúmenes y espacio libre" Style="{StaticResource CaoSectionSubtitleStyle}"/>
+                            </StackPanel>
                         </StackPanel>
                         <TextBlock x:Name="StorageText" TextWrapping="Wrap" IsTextSelectionEnabled="True" FontSize="12" Opacity="0.9"/>
                     </StackPanel>
                 </Border>
                 <Border Grid.Column="1" Style="{StaticResource CaoCardStyle}">
                     <StackPanel Spacing="8">
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <FontIcon Glyph="&#xE964;" FontSize="14"/>
-                            <TextBlock Text="Drivers" FontWeight="SemiBold"/>
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <Border Width="36" Height="36" CornerRadius="18" Background="{StaticResource CaoPurpleSoftBrush}">
+                                <FontIcon Glyph="&#xE964;" FontSize="16" Foreground="{StaticResource CaoPurpleSolidBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Text="Drivers" Style="{StaticResource CaoSectionTitleStyle}"/>
+                                <TextBlock Text="Problemas, firmas y estado" Style="{StaticResource CaoSectionSubtitleStyle}"/>
+                            </StackPanel>
                         </StackPanel>
-                        <TextBlock Text="Lista drivers con código de problema, sin firma o detenidos. Si no detecta nada, no hay problemas." FontSize="11" Opacity="0.55" TextWrapping="Wrap"/>
+                        <TextBlock Text="Lista drivers con código de problema, sin firma o detenidos. Si no detecta nada, no hay problemas." FontSize="11" Opacity="0.7" TextWrapping="Wrap"/>
                         <TextBlock x:Name="DriversText" TextWrapping="Wrap" IsTextSelectionEnabled="True" FontSize="12" Opacity="0.9"/>
                     </StackPanel>
                 </Border>
             </Grid>
 
+            <!-- SECCIÓN 4 · Latencia y respuesta -->
+            <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,8,0,0">
+                <Border Style="{StaticResource CaoStepCircleStyle}"><TextBlock Text="4" Foreground="White" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
+                <StackPanel Spacing="2" VerticalAlignment="Center">
+                    <TextBlock Text="Latencia y respuesta" Style="{StaticResource CaoSectionTitleStyle}"/>
+                    <TextBlock Text="Entrada, térmica, rendimiento y DPC que causan stutter" Style="{StaticResource CaoSectionSubtitleStyle}"/>
+                </StackPanel>
+            </StackPanel>
+
             <!-- Diagnóstico integrado (reutiliza mismos providers que DiagnosticsPage, sin duplicar lógica) -->
             <Grid ColumnSpacing="12" RowSpacing="12">
                 <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                 <Border Style="{StaticResource CaoCardStyle}">
-                    <StackPanel Spacing="6">
-                        <StackPanel Orientation="Horizontal" Spacing="6"><FontIcon Glyph="&#xE8B0;" FontSize="13"/><TextBlock Text="Entrada" FontWeight="SemiBold" FontSize="13"/></StackPanel>
+                    <StackPanel Spacing="8">
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <Border Width="36" Height="36" CornerRadius="18" Background="{StaticResource CaoCyanSoftBrush}">
+                                <FontIcon Glyph="&#xE8B0;" FontSize="16" Foreground="{StaticResource CaoCyanSolidBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Text="Entrada" Style="{StaticResource CaoSectionTitleStyle}"/>
+                                <TextBlock Text="Ratón e HID" Style="{StaticResource CaoSectionSubtitleStyle}"/>
+                            </StackPanel>
+                        </StackPanel>
                         <TextBlock x:Name="DiagnInputText" TextWrapping="Wrap" IsTextSelectionEnabled="True" FontSize="12" Opacity="0.9"/>
                     </StackPanel>
                 </Border>
                 <Border Grid.Column="1" Style="{StaticResource CaoCardStyle}">
-                    <StackPanel Spacing="6">
-                        <StackPanel Orientation="Horizontal" Spacing="6"><FontIcon Glyph="&#xE9CA;" FontSize="13"/><TextBlock Text="Térmico" FontWeight="SemiBold" FontSize="13"/></StackPanel>
+                    <StackPanel Spacing="8">
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <Border Width="36" Height="36" CornerRadius="18" Background="{StaticResource CaoAmberSoftBrush}">
+                                <FontIcon Glyph="&#xE9CA;" FontSize="16" Foreground="{StaticResource CaoAmberSolidBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Text="Térmico" Style="{StaticResource CaoSectionTitleStyle}"/>
+                                <TextBlock Text="Zonas ACPI y throttling" Style="{StaticResource CaoSectionSubtitleStyle}"/>
+                            </StackPanel>
+                        </StackPanel>
                         <TextBlock x:Name="DiagnThermalText" TextWrapping="Wrap" IsTextSelectionEnabled="True" FontSize="12" Opacity="0.9"/>
                     </StackPanel>
                 </Border>
             </Grid>
             <Border Style="{StaticResource CaoCardStyle}">
-                <StackPanel Spacing="6">
-                    <TextBlock Text="Rendimiento actual" Style="{StaticResource CaoSectionHeaderStyle}" Margin="0,0,0,0"/>
+                <StackPanel Spacing="8">
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <Border Width="36" Height="36" CornerRadius="18" Background="{StaticResource CaoGreenSoftBrush}">
+                            <FontIcon Glyph="&#xE950;" FontSize="16" Foreground="{StaticResource CaoGreenSolidBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <StackPanel Spacing="2" VerticalAlignment="Center">
+                            <TextBlock Text="Rendimiento actual" Style="{StaticResource CaoSectionTitleStyle}"/>
+                            <TextBlock Text="Carga de CPU en vivo" Style="{StaticResource CaoSectionSubtitleStyle}"/>
+                        </StackPanel>
+                    </StackPanel>
                     <TextBlock x:Name="DiagnPerfText" TextWrapping="Wrap" IsTextSelectionEnabled="True" FontSize="12" Opacity="0.9"/>
                 </StackPanel>
             </Border>
 
             <Border Style="{StaticResource CaoCardStyle}">
                 <StackPanel Spacing="8">
-                    <StackPanel Orientation="Horizontal" Spacing="8">
-                            <FontIcon Glyph="&#xE9D2;" FontSize="14"/>
-                            <TextBlock Text="Latencia DPC/ISR" FontWeight="SemiBold"/>
-                            <TextBlock Text="Mide % Tiempo DPC e Interrupción. Alto = audio entrecortado, micro-stutter, input lag. Se auto-ejecuta con el análisis." FontSize="11" Opacity="0.55" TextWrapping="Wrap"/>
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <Border Width="36" Height="36" CornerRadius="18" Background="{StaticResource CaoRoseSoftBrush}">
+                            <FontIcon Glyph="&#xE9D2;" FontSize="16" Foreground="{StaticResource CaoRoseSolidBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <StackPanel Spacing="2" VerticalAlignment="Center">
+                            <TextBlock Text="Latencia DPC/ISR" Style="{StaticResource CaoSectionTitleStyle}"/>
+                            <TextBlock Text="% DPC e interrupción · 5 s" Style="{StaticResource CaoSectionSubtitleStyle}"/>
                         </StackPanel>
+                    </StackPanel>
+                    <TextBlock Text="Alto = audio entrecortado, micro-stutter, input lag. Se auto-ejecuta con el análisis." FontSize="11" Opacity="0.7" TextWrapping="Wrap"/>
                         <StackPanel Orientation="Horizontal" Spacing="8">
-                            <Button Content="Muestrear 5 s" Click="OnDpcSampleClick" FontSize="12" ToolTipService.ToolTip="Mide 5s % DPC Time / % Interrupt Time via contadores. No atribuye driver sin ETW"/>
-                            <ProgressRing x:Name="DpcRing" Width="16" Height="16" IsActive="False"/>
-                            <TextBlock x:Name="DpcStatusText" FontSize="11" Opacity="0.6" VerticalAlignment="Center"/>
+                            <Button Content="Muestrear 5 s" Click="OnDpcSampleClick" FontSize="12" Style="{StaticResource CaoElevatedButtonStyle}" AutomationProperties.Name="Muestrear latencia DPC 5 segundos" ToolTipService.ToolTip="Mide 5s % DPC Time / % Interrupt Time via contadores. No atribuye driver sin ETW"/>
+                            <ProgressRing x:Name="DpcRing" Width="16" Height="16" IsActive="False" Style="{StaticResource CaoProgressRingStyle}"/>
+                            <TextBlock x:Name="DpcStatusText" FontSize="11" Opacity="0.7" VerticalAlignment="Center" AutomationProperties.LiveSetting="Polite"/>
                         </StackPanel>
                         <TextBlock x:Name="InterruptsText" TextWrapping="Wrap" IsTextSelectionEnabled="True" FontSize="12" Opacity="0.9"/>
                 </StackPanel>
             </Border>
 
+            <!-- SECCIÓN 5 · Gaming y bloqueos -->
+            <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,8,0,0">
+                <Border Style="{StaticResource CaoStepCircleStyle}"><TextBlock Text="5" Foreground="White" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
+                <StackPanel Spacing="2" VerticalAlignment="Center">
+                    <TextBlock Text="Gaming y bloqueos" Style="{StaticResource CaoSectionTitleStyle}"/>
+                    <TextBlock Text="Anti-cheat que bloquea cambios en Optimizar" Style="{StaticResource CaoSectionSubtitleStyle}"/>
+                </StackPanel>
+            </StackPanel>
+
             <Border Style="{StaticResource CaoCardStyle}" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}">
                 <StackPanel Spacing="8">
-                    <StackPanel Orientation="Horizontal" Spacing="8">
-                        <FontIcon Glyph="&#xE7FC;" FontSize="14"/>
-                        <TextBlock Text="Gaming — optimizaciones bloqueadas" FontWeight="SemiBold"/>
-                        <FontIcon Glyph="&#xE72E;" FontSize="12" Foreground="{ThemeResource SystemFillColorCriticalBrush}"/>
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <Border Width="36" Height="36" CornerRadius="18" Background="{StaticResource CaoPurpleSoftBrush}">
+                            <FontIcon Glyph="&#xE7FC;" FontSize="16" Foreground="{StaticResource CaoPurpleSolidBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <StackPanel Spacing="2" VerticalAlignment="Center">
+                            <TextBlock Text="Optimizaciones bloqueadas" Style="{StaticResource CaoSectionTitleStyle}"/>
+                            <TextBlock Text="Candado en Optimizar" Style="{StaticResource CaoSectionSubtitleStyle}"/>
+                        </StackPanel>
+                        <FontIcon Glyph="&#xE72E;" FontSize="12" Foreground="{ThemeResource SystemFillColorCriticalBrush}" VerticalAlignment="Center"/>
                     </StackPanel>
-                    <TextBlock Text="Anti-cheat detectado bloquea cambios que reducen seguridad. Con candado en Optimizar." FontSize="11" Opacity="0.6" TextWrapping="Wrap"/>
+                    <TextBlock Text="Anti-cheat detectado bloquea cambios que reducen seguridad. Con candado en Optimizar." FontSize="11" Opacity="0.7" TextWrapping="Wrap"/>
                     <TextBlock x:Name="GamingBlockedText" TextWrapping="Wrap" IsTextSelectionEnabled="True" FontSize="12" Opacity="0.9" Text="Ejecuta análisis para detectar anti-cheat y juegos"/>
                     <TextBlock x:Name="GamingGamesText" TextWrapping="Wrap" IsTextSelectionEnabled="True" FontSize="11" Opacity="0.7"/>
                 </StackPanel>

@@ -87,7 +87,7 @@ public sealed class WmiSystemInfoProvider : ISystemInfoProvider
             using var searcher = new ManagementObjectSearcher(
                 new ManagementScope(@"root\Microsoft\Windows\Storage"),
                 new ObjectQuery(@"SELECT MediaType FROM MSFT_PhysicalDisk"),
-                new System.Management.EnumerationOptions());
+                new System.Management.EnumerationOptions { Timeout = WmiTimeout, BlockSize = 1, Rewindable = false });
             foreach (var disk in searcher.Get())
             {
                 if (disk["MediaType"] != null && Convert.ToInt32(disk["MediaType"]) == 4)

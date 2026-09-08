@@ -18,6 +18,14 @@ public sealed record SystemBenchmarkResult(
 /// <summary>Verdict of an A/B comparison with a noise floor (spec 108).</summary>
 public sealed record SystemBenchmarkComparison(double CpuDeltaPercent, double MemoryDeltaPercent, string VerdictEs);
 
+/// <summary>Comparación completa incluyendo disco (informativo, no decide veredicto).</summary>
+public sealed record SystemBenchmarkFullComparison(
+    double CpuDeltaPercent,
+    double MemoryDeltaPercent,
+    double DiskReadDeltaPercent,
+    double DiskWriteDeltaPercent,
+    string VerdictEs);
+
 /// <summary>
 /// Reproducible system benchmark (spec 66, 69): fixed workload sizes, header
 /// records environment facts so runs are comparable. No invented numbers:
@@ -123,7 +131,16 @@ public sealed class SystemBenchmarkRunner
         return new(cpuDelta, memoryDelta, verdict);
     }
 
-    internal static double PercentChange(double before, double after) =>
+    /// <summary>Comparación extendida incluyendo disco (no cambia el veredicto: CPU/memoria mandan).</summary>
+    public static SystemBenchmarkFullComparison CompareFull(SystemBenchmarkResult baseline, SystemBenchmarkResult after)
+    {
+        var baseCmp = Compare(baseline, after);
+        var diskReadDelta = PercentChange(baseline.DiskReadMbs, after.DiskReadMbs);
+        var diskWriteDelta = PercentChange(baseline.DiskWriteMbs, after.DiskWriteMbs);
+        return new(baseCmp.CpuDeltaPercent, baseCmp.MemoryDeltaPercent, diskReadDelta, diskWriteDelta, baseCmp.VerdictEs);
+    }
+
+    public static double PercentChange(double before, double after) =>
         before == 0 ? 0 : Math.Round((after - before) / before * 100, 2);
 
     private static double MeasureCpu(CancellationToken ct)

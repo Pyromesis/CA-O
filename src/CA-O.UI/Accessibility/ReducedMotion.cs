@@ -15,10 +15,8 @@ public static class ReducedMotion
             try
             {
                 var settings = new UISettings();
-                // En WinUI 3 no hay API directa de reduced motion; se infiere via Transparency/Animations
-                // Fallback: si el sistema deshabilita animaciones, las nuestras también.
-                // Se evalúa de forma segura: si falla, se asume habilitado.
-                return true; // placeholder seguro — respetar si se expone via AccessibilitySettings en futuro
+                // Respeta el ajuste del sistema. Si la API no está disponible, habilitado por defecto.
+                return settings.AnimationsEnabled;
             }
             catch { return true; }
         }

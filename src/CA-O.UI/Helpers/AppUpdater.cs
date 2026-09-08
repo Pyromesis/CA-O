@@ -58,7 +58,7 @@ public static class AppUpdater
     {
         try
         {
-            using var http = CreateClient();
+            using var http = CreateClient(TimeSpan.FromSeconds(10));
             using var response = await http.GetAsync(LatestApiUrl, ct);
             response.EnsureSuccessStatusCode();
             using var stream = await response.Content.ReadAsStreamAsync(ct);
@@ -95,7 +95,7 @@ public static class AppUpdater
     /// <summary>Descarga con progreso 0..1. Lanza si la red falla.</summary>
     public static async Task DownloadAsync(string url, string destinationPath, IProgress<double>? progress, CancellationToken ct)
     {
-        using var http = CreateClient();
+        using var http = CreateClient(TimeSpan.FromMinutes(30));
         using var response = await http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct);
         response.EnsureSuccessStatusCode();
         var total = response.Content.Headers.ContentLength;
@@ -137,9 +137,9 @@ public static class AppUpdater
         }
     }
 
-    private static HttpClient CreateClient()
+    private static HttpClient CreateClient(TimeSpan? timeout = null)
     {
-        var http = new HttpClient { Timeout = TimeSpan.FromMinutes(30) };
+        var http = new HttpClient { Timeout = timeout ?? TimeSpan.FromSeconds(10) };
         http.DefaultRequestHeaders.UserAgent.ParseAdd($"CA-O-App/{CurrentVersion}");
         http.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github.v3+json");
         return http;

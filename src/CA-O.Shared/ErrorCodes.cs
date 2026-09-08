@@ -39,4 +39,5 @@ public static class ErrorCodes
     public const string UiBenchmarkFailed = "CAO-UI-003";
     public const string UiGamingScanFailed = "CAO-UI-004";
     public const string UiServiceUnavailable = "CAO-UI-005";
+    public const string UiOptimizeFailed = "CAO-UI-006";
 }

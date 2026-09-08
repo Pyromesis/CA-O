@@ -3,19 +3,34 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:local="using:CAO.UI.Pages">
-    <ScrollViewer Padding="32,24,32,32" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Background="{ThemeResource SolidBackgroundFillColorBaseBrush}">
-        <StackPanel x:Name="PageContent" Spacing="20" HorizontalAlignment="Center" MaxWidth="1200">
+    <ScrollViewer Padding="{StaticResource CaoPagePadding}" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Background="{ThemeResource SolidBackgroundFillColorBaseBrush}">
+        <StackPanel x:Name="PageContent" Style="{StaticResource CaoPageContainerStyle}">
             <StackPanel Style="{StaticResource CaoPageHeaderStyle}">
                 <TextBlock Text="Optimizar" TextAlignment="Center" Style="{StaticResource CaoPageTitleStyle}"/>
                 <TextBlock Text="Cada tarjeta muestra diff real, riesgo, seguridad, compatibilidad y reversibilidad. Solo Recomendadas se aplican sin Modo Expert." TextAlignment="Center" Style="{StaticResource CaoSubtitleStyle}"/>
                 <Border Style="{StaticResource CaoHeaderAccentBarStyle}"/>
             </StackPanel>
 
-            <StackPanel Orientation="Horizontal" Spacing="12" Margin="0,4,0,0" HorizontalAlignment="Center">
-                <Button x:Name="ApplyRecommendedButton" Click="OnApplyRecommendedClick" Style="{StaticResource CaoAccentButtonStyle}" AutomationProperties.Name="Aplicar recomendadas"/>
-                <ProgressRing x:Name="BusyRing" IsActive="False" Width="22" Height="22" AutomationProperties.AccessibilityView="Raw" Style="{StaticResource CaoProgressRingStyle}"/>
-                <TextBlock x:Name="StatusText" VerticalAlignment="Center" FontSize="12" Opacity="0.7" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite" FontWeight="Medium"/>
-            </StackPanel>
+            <Border Style="{StaticResource CaoActionCardStyle}">
+                <Grid ColumnSpacing="14">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <Border Style="{StaticResource CaoIconCircleStyle}" Background="{StaticResource CaoGreenSoftBrush}" Width="44" Height="44">
+                        <FontIcon Glyph="&#xE90F;" FontSize="19" Foreground="{StaticResource CaoGreenSolidBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                        <TextBlock Text="Aplicar con seguridad" FontWeight="Bold" FontSize="14"/>
+                        <TextBlock x:Name="StatusText" VerticalAlignment="Center" FontSize="12" Opacity="0.75" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite" FontWeight="Medium" Text="Snapshot previo y verificación en cada cambio"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                        <Button x:Name="ApplyRecommendedButton" Click="OnApplyRecommendedClick" Style="{StaticResource CaoGradientButtonStyle}" AutomationProperties.Name="Aplicar recomendadas"/>
+                        <ProgressRing x:Name="BusyRing" IsActive="False" Width="22" Height="22" AutomationProperties.AccessibilityView="Raw" Style="{StaticResource CaoProgressRingStyle}"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
 
             <InfoBar x:Name="ExpertBar" IsOpen="False" Severity="Warning"
                      Title="Modo Expert"
@@ -39,11 +54,11 @@
             <!-- Bucket filters (spec 12-15) -->
             <Border Style="{StaticResource CaoCardStyle}" Padding="8">
                 <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
-                    <Button x:Name="FilterAllButton" Content="Todas (0)" Click="OnFilterAllClick" Style="{StaticResource AccentButtonStyle}" FontSize="12"/>
-                    <Button x:Name="FilterRecommendedButton" Content="Recomendadas (0)" Click="OnFilterRecommendedClick" FontSize="12"/>
-                    <Button x:Name="FilterOptionalButton" Content="Opcionales (0)" Click="OnFilterOptionalClick" FontSize="12"/>
-                    <Button x:Name="FilterExperimentalButton" Content="Experimentales (0)" Click="OnFilterExperimentalClick" FontSize="12"/>
-                    <Button x:Name="FilterAppliedButton" Content="Activos (0)" Click="OnFilterAppliedClick" FontSize="12"/>
+                    <Button x:Name="FilterAllButton" Content="Todas (0)" Click="OnFilterAllClick" Style="{StaticResource CaoAccentButtonStyle}" FontSize="12" MinWidth="132" MinHeight="34" AutomationProperties.Name="Filtrar todas"/>
+                    <Button x:Name="FilterRecommendedButton" Content="Recomendadas (0)" Click="OnFilterRecommendedClick" Style="{StaticResource CaoFilterButtonStyle}" AutomationProperties.Name="Filtrar recomendadas"/>
+                    <Button x:Name="FilterOptionalButton" Content="Opcionales (0)" Click="OnFilterOptionalClick" Style="{StaticResource CaoFilterButtonStyle}" AutomationProperties.Name="Filtrar opcionales"/>
+                    <Button x:Name="FilterExperimentalButton" Content="Experimentales (0)" Click="OnFilterExperimentalClick" Style="{StaticResource CaoFilterButtonStyle}" AutomationProperties.Name="Filtrar experimentales"/>
+                    <Button x:Name="FilterAppliedButton" Content="Activos (0)" Click="OnFilterAppliedClick" Style="{StaticResource CaoFilterButtonStyle}" AutomationProperties.Name="Filtrar activos"/>
                 </StackPanel>
             </Border>
             <InfoBar x:Name="FilterInfoBar" IsOpen="False" Severity="Informational" IsClosable="False"/>
@@ -72,14 +87,17 @@
                                 <!-- Header -->
                                 <Grid ColumnSpacing="10">
                                     <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                                    <Border Width="36" Height="36" CornerRadius="8" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" VerticalAlignment="Top">
-                                        <FontIcon Glyph="&#xE8EE;" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center" Opacity="0.7"/>
+                                    <Border Width="42" Height="42" CornerRadius="21" Background="{StaticResource CaoGreenSoftBrush}" VerticalAlignment="Top">
+                                        <FontIcon Glyph="&#xE8EE;" FontSize="18" Foreground="{StaticResource CaoGreenSolidBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                     </Border>
                                     <StackPanel Grid.Column="1" Spacing="3">
                                         <StackPanel Orientation="Horizontal" Spacing="8">
                                             <TextBlock Text="{Binding NameEs}" FontSize="14" FontWeight="SemiBold" TextWrapping="Wrap"/>
                                             <Border Background="{ThemeResource AccentFillColorDefaultBrush}" CornerRadius="10" Padding="7,2" VerticalAlignment="Center">
-                                                <TextBlock Text="{Binding BucketLabel}" FontSize="10" Foreground="White" FontWeight="SemiBold"/>
+                                                <TextBlock Text="{Binding BucketLabel}" FontSize="10" Foreground="{ThemeResource TextOnAccentFillColorSelectedTextBrush}" FontWeight="SemiBold"/>
+                                            </Border>
+                                            <Border Background="{StaticResource CaoSuccessGradientBrush}" CornerRadius="10" Padding="7,2" VerticalAlignment="Center" Visibility="{Binding AppliedVisibility}">
+                                                <TextBlock Text="✓ ACTIVO" FontSize="10" Foreground="White" FontWeight="Bold"/>
                                             </Border>
                                             <FontIcon Glyph="&#xE72E;" FontSize="12" Foreground="{ThemeResource SystemFillColorCriticalBrush}" Visibility="{Binding LockVisibility}" ToolTipService.ToolTip="{Binding LockReason}"/>
                                             <TextBlock Text="{Binding RebootLabel}" FontSize="11" Opacity="0.6" VerticalAlignment="Center"/>
@@ -103,21 +121,21 @@
                                     </Grid.ColumnDefinitions>
                                     <Border Grid.Column="0" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="8">
                                         <StackPanel Spacing="2">
-                                            <TextBlock Text="POR QUÉ" FontSize="10" Opacity="0.55" FontWeight="SemiBold"/>
+                                            <TextBlock Text="POR QUÉ" FontSize="10" Opacity="0.7" FontWeight="SemiBold"/>
                                             <TextBlock FontSize="11" TextWrapping="Wrap"><Run Text="Evidencia: "/><Run Text="{Binding Evidence}" FontWeight="SemiBold"/><Run Text=" · Confianza: "/><Run Text="{Binding ScoreLabel}"/></TextBlock>
                                             <TextBlock FontSize="11" Opacity="0.7"><Run Text="Estado actual: "/><Run Text="{Binding CurrentState}"/></TextBlock>
                                         </StackPanel>
                                     </Border>
                                     <Border Grid.Column="1" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="8">
                                         <StackPanel Spacing="2">
-                                            <TextBlock Text="IMPACTO" FontSize="10" Opacity="0.55" FontWeight="SemiBold"/>
+                                            <TextBlock Text="IMPACTO" FontSize="10" Opacity="0.7" FontWeight="SemiBold"/>
                                             <TextBlock FontSize="11"><Run Text="Riesgo: "/><Run Text="{Binding Risk}"/></TextBlock>
                                             <TextBlock FontSize="11"><Run Text="Seguridad: "/><Run Text="{Binding SecurityImpact}"/></TextBlock>
                                         </StackPanel>
                                     </Border>
                                     <Border Grid.Column="2" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="8">
                                         <StackPanel Spacing="2">
-                                            <TextBlock Text="REVERSIBILIDAD" FontSize="10" Opacity="0.55" FontWeight="SemiBold"/>
+                                            <TextBlock Text="REVERSIBILIDAD" FontSize="10" Opacity="0.7" FontWeight="SemiBold"/>
                                             <TextBlock FontSize="11"><Run Text="Compatibilidad: "/><Run Text="{Binding Compatibility}"/></TextBlock>
                                             <TextBlock FontSize="11" Opacity="0.7">Rollback: disponible (snapshot por TX)</TextBlock>
                                         </StackPanel>
@@ -125,9 +143,9 @@
                                 </Grid>
 
                                 <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,2,0,0">
-                                    <Button Content="Detalles" Tag="{Binding OptimizationId}" Click="OnPreviewClick" FontSize="12" AutomationProperties.Name="Ver diff antes/después" AutomationProperties.HelpText="Muestra registry/valor antes y después"/>
-                                    <Button Content="Aplicar" Tag="{Binding OptimizationId}" Click="OnApplyClick" Style="{StaticResource AccentButtonStyle}" FontSize="12" IsEnabled="{Binding IsApplyEnabled}" AutomationProperties.Name="Aplicar optimización" AutomationProperties.HelpText="Crea snapshot por TransactionId, aplica y verifica"/>
-                                    <Button Content="Revertir" Tag="{Binding OptimizationId}" Click="OnRevertClick" FontSize="12" Opacity="0.9" AutomationProperties.Name="Revertir cambio" AutomationProperties.HelpText="Restaura snapshot exacto verificado"/>
+                                    <Button Content="Detalles" Tag="{Binding OptimizationId}" Click="OnPreviewClick" FontSize="12" Style="{StaticResource CaoElevatedButtonStyle}" AutomationProperties.Name="Ver diff antes/después" AutomationProperties.HelpText="Muestra registry/valor antes y después"/>
+                                    <Button Content="{Binding ApplyLabel}" Tag="{Binding OptimizationId}" Click="OnApplyClick" Style="{StaticResource CaoGradientButtonStyle}" FontSize="12" MinWidth="110" IsEnabled="{Binding IsApplyEnabled}" AutomationProperties.Name="Aplicar optimización" AutomationProperties.HelpText="Crea snapshot por TransactionId, aplica y verifica"/>
+                                    <Button Content="Revertir" Tag="{Binding OptimizationId}" Click="OnRevertClick" FontSize="12" Opacity="0.9" Style="{StaticResource CaoElevatedButtonStyle}" AutomationProperties.Name="Revertir cambio" AutomationProperties.HelpText="Restaura snapshot exacto verificado"/>
                                     <FontIcon Glyph="&#xE72E;" FontSize="14" Foreground="{ThemeResource SystemFillColorCriticalBrush}" Visibility="{Binding LockVisibility}" ToolTipService.ToolTip="Bloqueado — requiere Modo Expert o anti-cheat"/>
                                 </StackPanel>
                             </StackPanel>
@@ -136,7 +154,7 @@
                 </ListView.ItemTemplate>
             </ListView>
 
-            <TextBlock Text="Cada aplicación crea un snapshot previo por TransactionId, verifica exactamente y permite reversión precisa." FontSize="11" Opacity="0.45" TextWrapping="Wrap"/>
+            <TextBlock Text="Cada aplicación crea un snapshot previo por TransactionId, verifica exactamente y permite reversión precisa." FontSize="11" Opacity="0.7" TextWrapping="Wrap"/>
         </StackPanel>
     </ScrollViewer>
 </Page>

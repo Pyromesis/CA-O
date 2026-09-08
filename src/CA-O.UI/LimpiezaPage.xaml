@@ -2,8 +2,8 @@
     x:Class="CAO.UI.Pages.LimpiezaPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-    <ScrollViewer Padding="32,24,32,32" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Background="{ThemeResource SolidBackgroundFillColorBaseBrush}">
-        <StackPanel x:Name="PageContent" Spacing="20" MaxWidth="1200" HorizontalAlignment="Center">
+    <ScrollViewer Padding="{StaticResource CaoPagePadding}" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Background="{ThemeResource SolidBackgroundFillColorBaseBrush}">
+        <StackPanel x:Name="PageContent" Style="{StaticResource CaoPageContainerStyle}">
             <StackPanel Style="{StaticResource CaoPageHeaderStyle}">
                 <TextBlock Text="Limpieza" TextAlignment="Center" Style="{StaticResource CaoPageTitleStyle}"/>
                 <TextBlock Text="Acciones rápidas y seguras: temporales, papelera, DNS y timer. Cada limpieza usa snapshots donde aplica." TextAlignment="Center" Style="{StaticResource CaoSubtitleStyle}"/>
@@ -13,58 +13,214 @@
             <!-- Archivos temporales -->
             <Border Style="{StaticResource CaoCardStyle}">
                 <StackPanel Spacing="12">
-                    <TextBlock Text="Archivos temporales" FontWeight="SemiBold" FontSize="14" Foreground="{ThemeResource TextFillColorPrimaryBrush}"/>
-                    <Border Height="1" Background="{ThemeResource DividerStrokeColorDefaultBrush}" Opacity="0.5"/>
-                    <TextBlock Text="Borra solo ficheros antiguos o cachés regenerables. Omite lo que esté en uso." FontSize="11" Opacity="0.65" TextWrapping="Wrap"/>
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <Border Width="36" Height="36" CornerRadius="18" Background="{StaticResource CaoCyanSoftBrush}">
+                            <FontIcon Glyph="&#xE74D;" FontSize="16" Foreground="{StaticResource CaoCyanSolidBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <StackPanel Spacing="2" VerticalAlignment="Center">
+                            <TextBlock Text="Archivos temporales" FontWeight="Bold" FontSize="14"/>
+                            <TextBlock Text="Seguro y reversible" FontSize="11" Opacity="0.65"/>
+                        </StackPanel>
+                    </StackPanel>
+                    <Border Style="{StaticResource CaoDividerStyle}"/>
+                    <TextBlock Text="Borra solo ficheros antiguos o cachés regenerables. Omite lo que esté en uso. Cada acción informa de archivos y KB liberados." FontSize="11" Opacity="0.7" TextWrapping="Wrap"/>
+                    <StackPanel Spacing="6">
+                        <TextBlock FontSize="11" TextWrapping="Wrap" Opacity="0.85"><Run Text="• Temporales Windows: " FontWeight="SemiBold"/><Run Text="vacía %TEMP% y Windows\Temp. Para qué: recuperar MB/GB de instalaciones y apps. Cómo: borrado directo por el servicio con reintento; lo bloqueado se omite. Rápido (segundos), riesgo bajo."/></TextBlock>
+                        <TextBlock FontSize="11" TextWrapping="Wrap" Opacity="0.85"><Run Text="• Caché Delivery Optimization: " FontWeight="SemiBold"/><Run Text="borra la caché P2P de Windows Update. Para qué: liberar GB tras actualizar. Cómo: vacía la carpeta de caché del sistema. Rápido, riesgo bajo."/></TextBlock>
+                        <TextBlock FontSize="11" TextWrapping="Wrap" Opacity="0.85"><Run Text="• Archivos del sistema: " FontWeight="SemiBold"/><Run Text="vacía SoftwareDistribution\Download (restos de Windows Update). Cómo: detiene wuauserv/bits, borra, y los reanuda. Tarda ~1 min, riesgo moderado, no reversible (mantenimiento)."/></TextBlock>
+                        <TextBlock FontSize="11" TextWrapping="Wrap" Opacity="0.85"><Run Text="• Minidumps antiguos: " FontWeight="SemiBold"/><Run Text="borra *.dmp de +30 días en Minidump. Para qué: limpiar restos de pantallazos. Cómo: borrado directo; los recientes se conservan. Rápido, riesgo bajo."/></TextBlock>
+                    </StackPanel>
                     <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,2,0,0" HorizontalAlignment="Center">
-                        <Button Content="Temporales Windows" Tag="cleanup-windows-temp" Click="OnCleanClick" FontSize="12"/>
-                        <Button Content="Caché Delivery Optimization" Tag="cleanup-delivery-optimization-cache" Click="OnCleanClick" FontSize="12"/>
+                        <Button Content="Temporales Windows" Tag="cleanup-windows-temp" Click="OnCleanClick" Style="{StaticResource CaoActionButtonStyle}" AutomationProperties.Name="Limpiar temporales Windows"/>
+                        <Button Content="Caché Delivery Optimization" Tag="cleanup-delivery-optimization-cache" Click="OnCleanClick" Style="{StaticResource CaoActionButtonStyle}" AutomationProperties.Name="Limpiar caché Delivery Optimization"/>
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
-                        <Button Content="Archivos del sistema" Tag="disk-cleanup-system-files" Click="OnCleanClick" FontSize="12"/>
-                        <Button Content="Minidumps antiguos" Tag="stale-crash-dump-cleanup" Click="OnCleanClick" FontSize="12"/>
+                        <Button Content="Archivos del sistema" Tag="disk-cleanup-system-files" Click="OnCleanClick" Style="{StaticResource CaoActionButtonStyle}" AutomationProperties.Name="Limpiar archivos del sistema"/>
+                        <Button Content="Minidumps antiguos" Tag="stale-crash-dump-cleanup" Click="OnCleanClick" Style="{StaticResource CaoActionButtonStyle}" AutomationProperties.Name="Limpiar minidumps antiguos"/>
                     </StackPanel>
-                    <Button x:Name="CleanAllButton" Content="Ejecutar todo" Click="OnCleanAllClick" Style="{StaticResource CaoAccentButtonStyle}" MinHeight="38" HorizontalAlignment="Center"/>
-                    <TextBlock x:Name="CleanupStatusText" FontSize="11" Opacity="0.7" TextWrapping="Wrap"/>
+                    <Button x:Name="CleanAllButton" Content="Ejecutar todo" Click="OnCleanAllClick" Style="{StaticResource CaoGradientButtonStyle}" MinHeight="40" MinWidth="220" HorizontalAlignment="Center" AutomationProperties.Name="Ejecutar toda la limpieza"/>
+                    <TextBlock x:Name="CleanupStatusText" FontSize="11" Opacity="0.75" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite"/>
                 </StackPanel>
             </Border>
 
             <!-- Red -->
             <Border Style="{StaticResource CaoCardStyle}">
                 <StackPanel Spacing="12">
-                    <TextBlock Text="Red" FontWeight="SemiBold" FontSize="14" Foreground="{ThemeResource TextFillColorPrimaryBrush}"/>
-                    <Border Height="1" Background="{ThemeResource DividerStrokeColorDefaultBrush}" Opacity="0.5"/>
-                    <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
-                        <Button Content="Vaciar caché DNS" Tag="flush-dns-cache" Click="OnCleanClick" FontSize="12"/>
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <Border Width="36" Height="36" CornerRadius="18" Background="{StaticResource CaoBlueSoftBrush}">
+                            <FontIcon Glyph="&#xE774;" FontSize="16" Foreground="{StaticResource CaoBlueSolidBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <StackPanel Spacing="2" VerticalAlignment="Center">
+                            <TextBlock Text="Red" FontWeight="Bold" FontSize="14"/>
+                            <TextBlock Text="DNS y conectividad" FontSize="11" Opacity="0.65"/>
+                        </StackPanel>
                     </StackPanel>
-                    <TextBlock x:Name="NetworkStatusText" FontSize="11" Opacity="0.7" TextWrapping="Wrap"/>
+                    <Border Style="{StaticResource CaoDividerStyle}"/>
+                    <TextBlock FontSize="11" TextWrapping="Wrap" Opacity="0.85"><Run Text="Vaciar caché DNS: " FontWeight="SemiBold"/><Run Text="ejecuta ipconfig /flushdns. Para qué: arreglar webs que no cargan tras cambiar de red o DNS. Cómo: comando exacto vía gateway (sin shell). Efecto inmediato, seguro e idempotente: se puede repetir sin riesgo."/></TextBlock>
+                    <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
+                        <Button Content="Vaciar caché DNS" Tag="flush-dns-cache" Click="OnCleanClick" Style="{StaticResource CaoActionButtonStyle}" AutomationProperties.Name="Vaciar caché DNS"/>
+                    </StackPanel>
+                    <TextBlock x:Name="NetworkStatusText" FontSize="11" Opacity="0.75" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite"/>
                 </StackPanel>
             </Border>
 
             <!-- Papelera -->
             <Border Style="{StaticResource CaoCardStyle}">
                 <StackPanel Spacing="12">
-                    <TextBlock Text="Papelera de reciclaje" FontWeight="SemiBold" FontSize="14" Foreground="{ThemeResource TextFillColorPrimaryBrush}"/>
-                    <Border Height="1" Background="{ThemeResource DividerStrokeColorDefaultBrush}" Opacity="0.5"/>
-                    <TextBlock Text="Vacía todas las papeleras. Pide confirmación y no se puede deshacer." FontSize="11" Opacity="0.65" TextWrapping="Wrap"/>
-                    <Button Content="Vaciar papelera" Click="OnEmptyRecycleBinClick" FontSize="12" MinHeight="38" HorizontalAlignment="Center"/>
-                    <TextBlock x:Name="RecycleStatusText" FontSize="11" Opacity="0.7" TextWrapping="Wrap"/>
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <Border Width="36" Height="36" CornerRadius="18" Background="{StaticResource CaoSlateSoftBrush}">
+                            <FontIcon Glyph="&#xE74D;" FontSize="16" Foreground="{ThemeResource TextFillColorSecondaryBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <StackPanel Spacing="2" VerticalAlignment="Center">
+                            <TextBlock Text="Papelera de reciclaje" FontWeight="Bold" FontSize="14"/>
+                            <TextBlock Text="Con confirmación" FontSize="11" Opacity="0.65"/>
+                        </StackPanel>
+                    </StackPanel>
+                    <Border Style="{StaticResource CaoDividerStyle}"/>
+                    <TextBlock FontSize="11" TextWrapping="Wrap" Opacity="0.85"><Run Text="Vacía todas las papeleras del equipo " FontWeight="SemiBold"/><Run Text="con SHEmptyRecycleBin. Para qué: recuperar el espacio de lo ya borrado. Cómo: se ejecuta en tu sesión (no necesita el servicio). Pide confirmación y no se puede deshacer: revisa antes."/></TextBlock>
+                    <Button Content="Vaciar papelera" Click="OnEmptyRecycleBinClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="200" AutomationProperties.Name="Vaciar papelera de reciclaje"/>
+                    <TextBlock x:Name="RecycleStatusText" FontSize="11" Opacity="0.75" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite"/>
                 </StackPanel>
             </Border>
 
             <!-- Timer resolution -->
             <Border Style="{StaticResource CaoCardStyle}">
                 <StackPanel Spacing="12">
-                    <TextBlock Text="Timer resolution" FontWeight="SemiBold" FontSize="14" Foreground="{ThemeResource TextFillColorPrimaryBrush}"/>
-                    <Border Height="1" Background="{ThemeResource DividerStrokeColorDefaultBrush}" Opacity="0.5"/>
-                    <TextBlock Text="Resolución del temporizador del sistema. Valores bajos reducen latencia en juegos y audio a costa de más consumo. Se mantiene mientras el servicio privilegiado corre." FontSize="11" Opacity="0.65" TextWrapping="Wrap"/>
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <Border Width="36" Height="36" CornerRadius="18" Background="{StaticResource CaoPurpleSoftBrush}">
+                            <FontIcon Glyph="&#xE9D2;" FontSize="16" Foreground="{StaticResource CaoPurpleSolidBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <StackPanel Spacing="2" VerticalAlignment="Center">
+                            <TextBlock Text="Timer resolution" FontWeight="Bold" FontSize="14"/>
+                            <TextBlock Text="Latencia fina para gaming/audio" FontSize="11" Opacity="0.65"/>
+                        </StackPanel>
+                    </StackPanel>
+                    <Border Style="{StaticResource CaoDividerStyle}"/>
+                    <TextBlock Text="Resolución del temporizador del sistema (NtSetTimerResolution, en unidades de 100 ns). Se mantiene mientras el servicio privilegiado corre; al detenerlo vuelve al valor de Windows." FontSize="11" Opacity="0.7" TextWrapping="Wrap"/>
+                    <StackPanel Spacing="6">
+                        <TextBlock FontSize="11" TextWrapping="Wrap" Opacity="0.85"><Run Text="• 0,5 ms (mínimo): " FontWeight="SemiBold"/><Run Text="máxima respuesta para gaming competitivo y audio en directo. A cambio, más consumo y menos batería. Solo con buena refrigeración."/></TextBlock>
+                        <TextBlock FontSize="11" TextWrapping="Wrap" Opacity="0.85"><Run Text="• 1,0 ms: " FontWeight="SemiBold"/><Run Text="equilibrio recomendado: baja la latencia de forma notable con consumo moderado. Ideal para jugar a diario."/></TextBlock>
+                        <TextBlock FontSize="11" TextWrapping="Wrap" Opacity="0.85"><Run Text="• Predeterminado (15,625 ms): " FontWeight="SemiBold"/><Run Text="valor de Windows. Máxima eficiencia y batería, algo más de latencia. Úsalo para ofimática o portátil sin cargador."/></TextBlock>
+                    </StackPanel>
                     <TextBlock x:Name="TimerCurrentText" FontSize="13" FontWeight="Medium" Text="Actual: —"/>
                     <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
-                        <Button Content="0,5 ms (mínimo)" Tag="5000" Click="OnTimerClick" FontSize="12"/>
-                        <Button Content="1,0 ms" Tag="10000" Click="OnTimerClick" FontSize="12"/>
-                        <Button Content="Predeterminado" Tag="156250" Click="OnTimerClick" FontSize="12"/>
+                        <Button Content="0,5 ms (mínimo)" Tag="5000" Click="OnTimerClick" Style="{StaticResource CaoActionButtonStyle}" AutomationProperties.Name="Timer 0 coma 5 milisegundos"/>
+                        <Button Content="1,0 ms" Tag="10000" Click="OnTimerClick" Style="{StaticResource CaoActionButtonStyle}" AutomationProperties.Name="Timer 1 milisegundo"/>
+                        <Button Content="Predeterminado" Tag="156250" Click="OnTimerClick" Style="{StaticResource CaoActionButtonStyle}" AutomationProperties.Name="Restaurar timer predeterminado"/>
                     </StackPanel>
-                    <TextBlock x:Name="TimerStatusText" FontSize="11" Opacity="0.7" TextWrapping="Wrap"/>
+                    <TextBlock x:Name="TimerStatusText" FontSize="11" Opacity="0.75" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite"/>
+                </StackPanel>
+            </Border>
+
+            <!-- Mantenimiento del sistema (WinSxS) -->
+            <Border Style="{StaticResource CaoCardStyle}">
+                <StackPanel Spacing="12">
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <Border Width="36" Height="36" CornerRadius="18" Background="{StaticResource CaoAmberSoftBrush}">
+                            <FontIcon Glyph="&#xE9D9;" FontSize="16" Foreground="{StaticResource CaoAmberSolidBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <StackPanel Spacing="2" VerticalAlignment="Center">
+                            <TextBlock Text="Mantenimiento del sistema" FontWeight="Bold" FontSize="14"/>
+                            <TextBlock Text="WinSxS con DISM real (tarda minutos)" FontSize="11" Opacity="0.65"/>
+                        </StackPanel>
+                    </StackPanel>
+                    <Border Style="{StaticResource CaoDividerStyle}"/>
+                    <TextBlock Text="Limpia el almacén de componentes de Windows (WinSxS), que crece con cada actualización. Ambos usan DISM real y tardan varios minutos." FontSize="11" Opacity="0.7" TextWrapping="Wrap"/>
+                    <StackPanel Spacing="6">
+                        <TextBlock FontSize="11" TextWrapping="Wrap" Opacity="0.85"><Run Text="• Limpiar WinSxS: " FontWeight="SemiBold"/><Run Text="DISM /StartComponentCleanup. Para qué: liberar GB tras actualizar. Cómo: elimina componentes sustituidos. Seguro, pero lento (minutos) y no cancelable a la mitad."/></TextBlock>
+                        <TextBlock FontSize="11" TextWrapping="Wrap" Opacity="0.85"><Run Text="• ResetBase: " FontWeight="SemiBold"/><Run Text="DISM /ResetBase. Para qué: máxima liberación. Cómo: además elimina la base para desinstalar actualizaciones. IRREVERSIBLE y de alto riesgo: exige Modo Expert y copia de seguridad."/></TextBlock>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
+                        <Button Content="Limpiar WinSxS (DISM)" Tag="windows-component-store-cleanup" Click="OnCleanClick" Style="{StaticResource CaoActionButtonStyle}" AutomationProperties.Name="Limpiar almacén de componentes DISM"/>
+                        <Button Content="ResetBase (irreversible)" Tag="windows-component-store-resetbase" Click="OnCleanClick" Style="{StaticResource CaoActionButtonStyle}" AutomationProperties.Name="ResetBase irreversible solo expertos"/>
+                    </StackPanel>
+                    <TextBlock x:Name="MaintenanceStatusText" FontSize="11" Opacity="0.75" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite"/>
+                </StackPanel>
+            </Border>
+
+            <!-- Salud del disco -->
+            <Border Style="{StaticResource CaoCardStyle}">
+                <StackPanel Spacing="12">
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <Border Width="36" Height="36" CornerRadius="18" Background="{StaticResource CaoBlueSoftBrush}">
+                            <FontIcon Glyph="&#xEDA2;" FontSize="16" Foreground="{StaticResource CaoBlueSolidBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <StackPanel Spacing="2" VerticalAlignment="Center">
+                            <TextBlock Text="Salud del disco" FontWeight="Bold" FontSize="14"/>
+                            <TextBlock Text="TRIM, desfragmentado y pagefile reales" FontSize="11" Opacity="0.65"/>
+                        </StackPanel>
+                    </StackPanel>
+                    <Border Style="{StaticResource CaoDividerStyle}"/>
+                    <TextBlock Text="Mantenimiento físico y lógico del disco con herramientas oficiales de Windows. Lo lento pide confirmación y conviene no usar el disco mientras tanto." FontSize="11" Opacity="0.7" TextWrapping="Wrap"/>
+                    <StackPanel Spacing="6">
+                        <TextBlock FontSize="11" TextWrapping="Wrap" Opacity="0.85"><Run Text="• Activar TRIM: " FontWeight="SemiBold"/><Run Text="fsutil DisableDeleteNotify 0. Para qué: que el SSD rinda como nuevo. Cómo: avisa al SSD qué bloques están libres. Instantáneo, reversible, imprescindible en SSD."/></TextBlock>
+                        <TextBlock FontSize="11" TextWrapping="Wrap" Opacity="0.85"><Run Text="• ReTrim SSD: " FontWeight="SemiBold"/><Run Text="defrag C: /L. Para qué: re-optimizar el SSD del sistema. Cómo: reenvía los bloques libres. Tarda 1-3 min, seguro."/></TextBlock>
+                        <TextBlock FontSize="11" TextWrapping="Wrap" Opacity="0.85"><Run Text="• Optimizar unidad C: / HDD: " FontWeight="SemiBold"/><Run Text="defrag /O según el medio (TRIM en SSD, desfragmentado en HDD). Para qué: lectura más rápida. Cómo: reorganiza con la herramienta del sistema. Tarda minutos, mantenimiento no reversible."/></TextBlock>
+                        <TextBlock FontSize="11" TextWrapping="Wrap" Opacity="0.85"><Run Text="• Pagefile automático: " FontWeight="SemiBold"/><Run Text="vuelve a memoria virtual gestionada por Windows (registry). Para qué: evitar cuelgues por pagefile manual mal dimensionado. Reversible."/></TextBlock>
+                        <TextBlock FontSize="11" TextWrapping="Wrap" Opacity="0.85"><Run Text="• Desactivar hibernación: " FontWeight="SemiBold"/><Run Text="powercfg /h off. Para qué: libera 4-12 GB de hiberfil.sys. Cómo: borra el archivo de hibernación. Desactiva hibernar e inicio rápido; reversible con /h on."/></TextBlock>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
+                        <Button Content="Activar TRIM" Tag="ensure-trim-enabled" Click="OnCleanClick" Style="{StaticResource CaoActionButtonStyle}" AutomationProperties.Name="Activar TRIM SSD"/>
+                        <Button Content="ReTrim SSD" Tag="retrim-system-ssd" Click="OnCleanClick" Style="{StaticResource CaoActionButtonStyle}" AutomationProperties.Name="ReTrim SSD del sistema"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
+                        <Button Content="Optimizar unidad C:" Tag="optimize-system-drive" Click="OnCleanClick" Style="{StaticResource CaoActionButtonStyle}" AutomationProperties.Name="Optimizar unidad del sistema"/>
+                        <Button Content="Optimizar HDD" Tag="optimize-hdd-media-aware" Click="OnCleanClick" Style="{StaticResource CaoActionButtonStyle}" AutomationProperties.Name="Optimizar HDD según medio"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
+                        <Button Content="Pagefile automático" Tag="restore-system-managed-pagefile" Click="OnCleanClick" Style="{StaticResource CaoActionButtonStyle}" AutomationProperties.Name="Restaurar pagefile gestionado"/>
+                        <Button Content="Desactivar hibernación" Tag="disable-hibernate" Click="OnCleanClick" Style="{StaticResource CaoActionButtonStyle}" AutomationProperties.Name="Desactivar hibernación libera GB"/>
+                    </StackPanel>
+                    <TextBlock x:Name="DiskStatusText" FontSize="11" Opacity="0.75" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite"/>
+                </StackPanel>
+            </Border>
+
+            <!-- Storage Sense -->
+            <Border Style="{StaticResource CaoCardStyle}">
+                <StackPanel Spacing="12">
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <Border Width="36" Height="36" CornerRadius="18" Background="{StaticResource CaoGreenSoftBrush}">
+                            <FontIcon Glyph="&#xE90F;" FontSize="16" Foreground="{StaticResource CaoGreenSolidBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <StackPanel Spacing="2" VerticalAlignment="Center">
+                            <TextBlock Text="Storage Sense (automático)" FontWeight="Bold" FontSize="14"/>
+                            <TextBlock Text="Limpieza automática de Windows" FontSize="11" Opacity="0.65"/>
+                        </StackPanel>
+                    </StackPanel>
+                    <Border Style="{StaticResource CaoDividerStyle}"/>
+                    <TextBlock Text="Activa el limpiador automático de Windows (registry real) para no tener que limpiar a mano. Todo reversible desde esta misma pantalla u Optimizar." FontSize="11" Opacity="0.7" TextWrapping="Wrap"/>
+                    <StackPanel Spacing="6">
+                        <TextBlock FontSize="11" TextWrapping="Wrap" Opacity="0.85"><Run Text="• Activar Storage Sense: " FontWeight="SemiBold"/><Run Text="enciende el sensor de almacenamiento. Para qué: que Windows limpie solo. Cómo: clave StorageSense en HKCU. Reversible."/></TextBlock>
+                        <TextBlock FontSize="11" TextWrapping="Wrap" Opacity="0.85"><Run Text="• Temporales auto: " FontWeight="SemiBold"/><Run Text="política de borrado de temporales. Para qué: temporales fuera sin pensar. Cómo: programa la limpieza periódica del sistema."/></TextBlock>
+                        <TextBlock FontSize="11" TextWrapping="Wrap" Opacity="0.85"><Run Text="• Papelera auto: " FontWeight="SemiBold"/><Run Text="política de papelera 7-90 días. Para qué: que la papelera no crezca sin fin. Cómo: vaciado automático por antigüedad. Revisa antes si guardas cosas en la papelera."/></TextBlock>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
+                        <Button Content="Activar Storage Sense" Tag="enable-storage-sense" Click="OnCleanClick" Style="{StaticResource CaoActionButtonStyle}" AutomationProperties.Name="Activar Storage Sense"/>
+                        <Button Content="Temporales auto" Tag="storage-sense-temp-cleanup" Click="OnCleanClick" Style="{StaticResource CaoActionButtonStyle}" AutomationProperties.Name="Política temporales Storage Sense"/>
+                        <Button Content="Papelera auto" Tag="storage-sense-recycle-bin-policy" Click="OnCleanClick" Style="{StaticResource CaoActionButtonStyle}" AutomationProperties.Name="Política papelera Storage Sense"/>
+                    </StackPanel>
+                    <TextBlock x:Name="SenseStatusText" FontSize="11" Opacity="0.75" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite"/>
+                </StackPanel>
+            </Border>
+
+            <!-- Espacio en disco -->
+            <Border Style="{StaticResource CaoCardStyle}">
+                <StackPanel Spacing="12">
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <Border Width="36" Height="36" CornerRadius="18" Background="{StaticResource CaoCyanSoftBrush}">
+                            <FontIcon Glyph="&#xE7B8;" FontSize="16" Foreground="{StaticResource CaoCyanSolidBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <StackPanel Spacing="2" VerticalAlignment="Center">
+                            <TextBlock Text="Espacio en disco" FontWeight="Bold" FontSize="14"/>
+                            <TextBlock Text="Auditoría honesta: solo informa" FontSize="11" Opacity="0.65"/>
+                        </StackPanel>
+                    </StackPanel>
+                    <Border Style="{StaticResource CaoDividerStyle}"/>
+                    <TextBlock FontSize="11" TextWrapping="Wrap" Opacity="0.85"><Run Text="Auditar espacio: " FontWeight="SemiBold"/><Run Text="comprueba si el disco del sistema baja de 10 GB libres. Para qué: saber si el problema es espacio antes de tocar nada. Cómo: lectura de DriveInfo, sin borrar ni modificar. Si avisa de poco espacio, usa Temporales, WinSxS o Papelera de arriba."/></TextBlock>
+                    <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
+                        <Button Content="Auditar espacio" Tag="free-low-storage-space" Click="OnCleanClick" Style="{StaticResource CaoActionButtonStyle}" AutomationProperties.Name="Auditar espacio bajo en disco"/>
+                    </StackPanel>
+                    <TextBlock x:Name="SpaceStatusText" FontSize="11" Opacity="0.75" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite"/>
                 </StackPanel>
             </Border>
         </StackPanel>

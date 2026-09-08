@@ -25,6 +25,19 @@ internal sealed class PrivilegedPipeService(
     IPrivilegedCallerAuthorizer authorizer) : BackgroundService
 {
     private static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(15);
+    private static readonly TimeSpan DispatchTimeoutDefault = TimeSpan.FromSeconds(60);
+    private static readonly TimeSpan DispatchTimeoutHeavy = TimeSpan.FromMinutes(20);
+    private static readonly HashSet<string> HeavyOptimizationIds = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "windows-component-store-cleanup",
+        "windows-component-store-resetbase",
+        "optimize-system-drive",
+        "optimize-hdd-media-aware",
+        "retrim-system-ssd",
+        "disk-cleanup-system-files",
+        "reset-network-stack-repair",
+        "repair-windows-update",
+    };
     private readonly Core.Security.IIpcReplayGuard _replayGuard = new Core.Security.ReplayCache();
 
 
@@ -140,7 +153,15 @@ try { request = JsonSerializer.Deserialize<IpcRequest>(line, JsonOptions); }
                 return;
             }
             logger.LogDebug("Request OK op={Operation} id={RequestId}", request?.Operation, request?.RequestId);
-            var response = await ValidateAndDispatchAsync(request, caller, timeout.Token);
+            // Timeout de despacho según la operación: las pesadas (DISM/defrag)
+            // necesitan minutos; el techo de 15 s solo aplica a la lectura.
+            var dispatchTimeout = IsHeavy(request) ? DispatchTimeoutHeavy : DispatchTimeoutDefault;
+            using var dispatchCts = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
+            dispatchCts.CancelAfter(dispatchTimeout);
+            // Suplantar al llamante: HKCU y carpetas de perfil (%TEMP%, etc.)
+            // deben resolverse en SU hive, no en el de SYSTEM. Sin suplantación,
+            // lo aplicado a HKCU sería invisible para la UI (siempre "no aplicado").
+            var response = await DispatchAsCallerAsync(pipe, () => ValidateAndDispatchAsync(request, caller, dispatchCts.Token));
 
             logger.LogInformation(
                 "AuditorÃ­a IPC: requestedBy={Sid}/{Name} executedBy=SYSTEM op={Op} accepted={Accepted} code={Code}",
@@ -163,6 +184,47 @@ catch (Exception ex)
                 logger.LogError(ex, "Fallo inesperado atendiendo la conexión IPC.");
                 await WriteResponse(pipe, IpcResponse.Rejected(ErrorCodes.IpcMalformedRequest, $"Error interno: {ex.GetType().Name} — {ex.Message}"), stoppingToken);
             }
+    }
+
+    private static bool IsHeavy(IpcRequest? request) =>
+        request?.Payload is IOptimizationIdPayload p && HeavyOptimizationIds.Contains(p.OptimizationId);
+
+    /// <summary>
+    /// Ejecuta el despacho suplantando al llamante autorizado para que HKCU y
+    /// las rutas de perfil se resuelvan en su hive (no en el de SYSTEM).
+    /// No eleva privilegios: el llamante ya está autorizado como administrador
+    /// elevado; solo reduce el contexto de SYSTEM al del usuario. Si la
+    /// suplantación falla, se ejecuta como SYSTEM (comportamiento anterior).
+    /// </summary>
+    private async Task<IpcResponse> DispatchAsCallerAsync(
+        NamedPipeServerStream pipe,
+        Func<Task<IpcResponse>> dispatch)
+    {
+        WindowsIdentity? callerIdentity = null;
+        try
+        {
+            pipe.RunAsClient(() => { callerIdentity = WindowsIdentity.GetCurrent(); });
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "No se pudo capturar el token del llamante; se ejecuta como SYSTEM.");
+        }
+        if (callerIdentity is null)
+        {
+            return await dispatch();
+        }
+        using (callerIdentity)
+        {
+            try
+            {
+                return await WindowsIdentity.RunImpersonated(callerIdentity.AccessToken, dispatch);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Suplantación falló; reintento como SYSTEM.");
+                return await dispatch();
+            }
+        }
     }
 
     private async Task<IpcResponse> ValidateAndDispatchAsync(IpcRequest? request, CallerIdentity caller, CancellationToken ct)
