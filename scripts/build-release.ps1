@@ -135,6 +135,8 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 $setupExePath = Join-Path $setupOutput (Get-BuildConstant 'SetupExecutable')
 if (-not (Test-Path $setupExePath)) { throw "Setup executable not found at $setupExePath" }
 Copy-Item $setupExePath (Join-Path $artifactRoot "CA-O.Setup.exe") -Force
+# Alias estable para Releases: un solo .exe descargable que instala todo.
+Copy-Item $setupExePath (Join-Path $artifactRoot (Get-BuildConstant 'SetupSingleExeName')) -Force
 
 Write-Host '== Signing ==' -ForegroundColor Cyan
 $signScript = Join-Path $scriptRoot 'sign.ps1'

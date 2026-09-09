@@ -69,37 +69,39 @@ Log($"Destino (donde se instala la app): {installDir}");
 if (!File.Exists(payloadUi) || !File.Exists(payloadService))
 {
     Console.WriteLine($"Payload no local — descargando desde GitHub Release v{productVersion}...");
-    var zipUrl = $"https://github.com/Pyromesis/CA-O/releases/download/v{productVersion}/CA-O-{productVersion}-win-x64.zip";
-    var fallbackUrl = $"https://github.com/Pyromesis/CA-O/releases/latest/download/CA-O-{productVersion}-win-x64.zip";
     var tmpZip = Path.Combine(Path.GetTempPath(), "CA-O-payload.zip");
     var tmpDir = Path.Combine(Path.GetTempPath(), "CA-O-payload");
-    try
+    var candidates = new List<string>
     {
-        using var http = new HttpClient();
-        http.Timeout = TimeSpan.FromMinutes(10);
-        Console.WriteLine($"  Descargando {zipUrl} ...");
-        var data = http.GetByteArrayAsync(zipUrl).GetAwaiter().GetResult();
-        File.WriteAllBytes(tmpZip, data);
-        Console.WriteLine($"  Descargado {tmpZip} ({data.Length/1024/1024} MB)");
-    }
-    catch (Exception ex)
+        $"https://github.com/Pyromesis/CA-O/releases/download/v{productVersion}/CA-O-{productVersion}-win-x64.zip",
+    };
+    var latestAsset = GetLatestFullAssetUrl();
+    if (latestAsset != null) candidates.Add(latestAsset);
+    Exception? lastError = null;
+    var downloaded = false;
+    foreach (var url in candidates)
     {
-        Console.WriteLine($"  Falló descarga primaria: {ex.Message}, probando fallback {fallbackUrl}");
         try
         {
-            using var http2 = new HttpClient();
-            var data2 = http2.GetByteArrayAsync(fallbackUrl).GetAwaiter().GetResult();
-            File.WriteAllBytes(tmpZip, data2);
-            Console.WriteLine($"  Descargado fallback {data2.Length/1024/1024} MB");
+            Console.WriteLine($"  Descargando {url} ...");
+            DownloadStreaming(url, tmpZip);
+            Console.WriteLine($"  Descargado {tmpZip} ({new FileInfo(tmpZip).Length/1024/1024} MB)");
+            downloaded = true;
+            break;
         }
-        catch (Exception ex2)
+        catch (Exception ex)
         {
-            Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine($"No se pudo descargar payload: {ex2.Message}");
-            Console.WriteLine($"Descarga manual: https://github.com/Pyromesis/CA-O/releases/tag/v{productVersion}");
-            Console.ResetColor();
-            return 1;
+            Console.WriteLine($"  Falló: {ex.Message}");
+            lastError = ex;
         }
+    }
+    if (!downloaded)
+    {
+        Console.ForegroundColor = ConsoleColor.Red;
+        Console.WriteLine($"No se pudo descargar payload: {lastError?.Message}");
+        Console.WriteLine($"Descarga manual: https://github.com/Pyromesis/CA-O/releases/latest");
+        Console.ResetColor();
+        return 1;
     }
     try
     {
@@ -225,6 +227,61 @@ static bool IsAdmin()
 {
     using var id = System.Security.Principal.WindowsIdentity.GetCurrent();
     return new System.Security.Principal.WindowsPrincipal(id).IsInRole(System.Security.Principal.WindowsBuiltInRole.Administrator);
+}
+// Descarga por streaming con progreso (nunca carga el ZIP entero en memoria:
+// 452 MB en RAM reventaban con OutOfMemory/EndOfCentralDirectory).
+static void DownloadStreaming(string url, string dest)
+{
+    using var http = new HttpClient() { Timeout = TimeSpan.FromMinutes(30) };
+    http.DefaultRequestHeaders.UserAgent.ParseAdd("CA-O-Setup");
+    using var resp = http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead).GetAwaiter().GetResult();
+    resp.EnsureSuccessStatusCode();
+    var total = resp.Content.Headers.ContentLength;
+    using var net = resp.Content.ReadAsStreamAsync().GetAwaiter().GetResult();
+    using var file = File.Create(dest);
+    var buffer = new byte[81920];
+    long read = 0, lastShown = -1;
+    int n;
+    while ((n = net.Read(buffer, 0, buffer.Length)) > 0)
+    {
+        file.Write(buffer, 0, n);
+        read += n;
+        var mb = read / 1024 / 1024;
+        if (mb - lastShown >= 10)
+        {
+            lastShown = mb;
+            Console.WriteLine(total.HasValue
+                ? $"  ... {mb} / {total.Value / 1024 / 1024} MB"
+                : $"  ... {mb} MB");
+        }
+    }
+}
+// Último recurso: el asset completo del release latest vía API de GitHub.
+static string? GetLatestFullAssetUrl()
+{
+    try
+    {
+        using var http = new HttpClient() { Timeout = TimeSpan.FromSeconds(30) };
+        http.DefaultRequestHeaders.UserAgent.ParseAdd("CA-O-Setup");
+        http.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github.v3+json");
+        var json = http.GetStringAsync("https://api.github.com/repos/Pyromesis/CA-O/releases/latest").GetAwaiter().GetResult();
+        using var doc = System.Text.Json.JsonDocument.Parse(json);
+        foreach (var asset in doc.RootElement.GetProperty("assets").EnumerateArray())
+        {
+            var name = asset.TryGetProperty("name", out var n) ? n.GetString() ?? "" : "";
+            var dl = asset.TryGetProperty("browser_download_url", out var u) ? u.GetString() ?? "" : "";
+            if (name.EndsWith("-win-x64.zip", StringComparison.OrdinalIgnoreCase) &&
+                !name.StartsWith("CA-O-Setup-GUI", StringComparison.OrdinalIgnoreCase) &&
+                Uri.TryCreate(dl, UriKind.Absolute, out _))
+                return dl;
+        }
+        return null;
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"  No se pudo consultar latest: {ex.Message}");
+        return null;
+    }
 }
 static void CopyDirectory(string src, string dst)
 {

@@ -54,6 +54,9 @@ public static class BuildConstants
     public const string GuiInstallerPackageName = "CA-O-Setup-GUI-x64.zip";
     public const string GuiInstallerExeName = "CA-O-Setup-GUI-x64.exe";
     public const string SetupPackageName = "CA-O.Setup.exe";
+    // Descargador/instalador consola de un solo .exe autocontenido (para la
+    // página de Releases: bajar solo este archivo e instalar).
+    public const string SetupSingleExeName = "CA-O-Setup-x64.exe";
 
     // Manifest Files
     public const string Sha256ManifestName = "SHA256SUMS.txt";
