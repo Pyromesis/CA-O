@@ -37,12 +37,21 @@ public sealed class RecoverWindowsExplorer : IOptimization
 
     public async Task<OperationResult> ApplyAsync(OptimizationContext context, CancellationToken ct = default)
     {
-        if (ExplorerShell.AnyInteractiveExplorer())
-            return OperationResult.Ok("El Explorador ya está en ejecución; nada que recuperar.");
-        var (ok, error) = await ExplorerShell.EnsureInteractiveExplorerAsync(ct);
-        return ok
-            ? OperationResult.Ok("Explorador recuperado: barra y escritorio de vuelta.")
-            : OperationResult.Fail(error, "relaunch-failed");
+        try
+        {
+            if (ExplorerShell.AnyInteractiveExplorer())
+                return OperationResult.Ok("El Explorador ya está en ejecución; nada que recuperar.");
+            var (ok, error) = await ExplorerShell.EnsureInteractiveExplorerAsync(ct);
+            return ok
+                ? OperationResult.Ok("Explorador recuperado: barra y escritorio de vuelta.")
+                : OperationResult.Fail(error, "relaunch-failed");
+        }
+        catch (Exception ex)
+        {
+            return OperationResult.Fail(
+                $"Fallo interno recuperando el Explorador ({ex.GetType().Name}: {ex.Message}). {ExplorerShell.RecoveryHintEs}",
+                "unexpected");
+        }
     }
 
     public Task<OperationResult> RevertAsync(OptimizationContext context, OptimizationSnapshot snapshot, CancellationToken ct = default) =>

@@ -2,6 +2,12 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
+## [2.1.16] - 2026-09-09
+
+### Corregido
+- `restart/recover-windows-explorer`: el Apply ya no lanza excepciones — cada paso (detener, esperar salida, relanzar) reporta su causa real (`kill-failed`, `exit-timeout`, `relaunch-failed`) en vez del genérico "Error inesperado"; si el shell no termina de cerrarse se falla honesto antes de relanzar.
+- Menú colapsado: el pie de estado (sistema/servicio/build) se oculta a 52 px — antes se envolvía en una columna ilegible. El estado sigue en la barra superior.
+
 ## [2.1.15] - 2026-09-09
 
 ### Corregido

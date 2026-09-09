@@ -135,7 +135,7 @@
                 <NavigationViewItem Content="Ajustes" Tag="settings" Icon="Setting" ToolTipService.ToolTip="Ajustes — tema, idioma, modo Expert"/>
             </NavigationView.FooterMenuItems>
             <NavigationView.PaneFooter>
-                <StackPanel Margin="14,10,14,14" Spacing="8">
+                <StackPanel x:Name="SidebarFooterPanel" Margin="14,10,14,14" Spacing="8">
                     <Border Height="1" Background="{ThemeResource DividerStrokeColorDefaultBrush}" Opacity="0.3"/>
                     <StackPanel Spacing="4">
                         <TextBlock x:Name="SidebarSystemStatus" Text="Estado: —" FontSize="11" Opacity="0.85" FontWeight="Medium"/>

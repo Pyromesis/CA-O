@@ -34,23 +34,53 @@ public sealed class RestartWindowsExplorer : IOptimization
 
     public async Task<OperationResult> ApplyAsync(OptimizationContext context, CancellationToken ct = default)
     {
-        if (context.Executor is null)
-            return OperationResult.Fail("Ejecutor no disponible.", "CAO-SEC-010");
+        // Nunca lanza: cada paso captura su error con contexto para que la UI
+        // muestre la causa real en vez del genérico "Error inesperado".
+        try
+        {
+            if (context.Executor is null)
+                return OperationResult.Fail("Ejecutor no disponible.", "CAO-SEC-010");
 
-        var result = await context.Executor.ExecuteAsync(
-            SystemCommandKey.TaskKillExplorer, ["/F", "/IM", "explorer.exe"], ct);
-        if (!result.Success)
-            return OperationResult.Fail("No se pudo detener el Explorador.", result.StdErr);
+            bool killed;
+            string killDetail;
+            try
+            {
+                var result = await context.Executor.ExecuteAsync(
+                    SystemCommandKey.TaskKillExplorer, ["/F", "/IM", "explorer.exe"], ct);
+                killed = result.Success;
+                killDetail = result.StdErr;
+            }
+            catch (Exception ex)
+            {
+                return OperationResult.Fail(
+                    $"No se pudo detener el Explorador ({ex.GetType().Name}: {ex.Message}). {ExplorerShell.RecoveryHintEs}",
+                    "kill-failed");
+            }
+            if (!killed)
+                return OperationResult.Fail(
+                    $"No se pudo detener el Explorador ({killDetail}). {ExplorerShell.RecoveryHintEs}",
+                    "kill-failed");
 
-        // Esperar a que salga del todo antes de relanzar.
-        await ExplorerShell.WaitForExitAsync(ct);
+            // Esperar a que salga del todo antes de relanzar: si sigue vivo,
+            // relanzar crearía un segundo shell en vez del escritorio.
+            if (!await ExplorerShell.WaitForExitAsync(ct))
+                return OperationResult.Fail(
+                    "El Explorador no terminó de cerrarse; espera unos segundos y reintenta. " + ExplorerShell.RecoveryHintEs,
+                    "exit-timeout");
 
-        // Relanzar explícitamente en la sesión interactiva (ver ExplorerShell:
-        // el servicio vive en sesión 0 y esperar no basta).
-        var (ok, error) = await ExplorerShell.EnsureInteractiveExplorerAsync(ct);
-        if (!ok)
-            return OperationResult.Fail($"Se detuvo explorer.exe pero el escritorio no volvió. {error}", "relaunch-failed");
-        return OperationResult.Ok("Explorador reiniciado.");
+            // Relanzar explícitamente en la sesión interactiva (ver ExplorerShell:
+            // el servicio vive en sesión 0 y esperar no basta).
+            var (ok, error) = await ExplorerShell.EnsureInteractiveExplorerAsync(ct);
+            if (!ok)
+                return OperationResult.Fail($"Se detuvo explorer.exe pero el escritorio no volvió. {error}", "relaunch-failed");
+            return OperationResult.Ok("Explorador reiniciado.");
+        }
+        catch (Exception ex)
+        {
+            return OperationResult.Fail(
+                $"Fallo interno reiniciando el Explorador ({ex.GetType().Name}: {ex.Message}). {ExplorerShell.RecoveryHintEs}",
+                "unexpected");
+        }
     }
 
     public Task<OperationResult> RevertAsync(OptimizationContext context, OptimizationSnapshot snapshot, CancellationToken ct = default) =>

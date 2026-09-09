@@ -60,6 +60,12 @@ public sealed partial class MainWindow : Window
         };
 
         Nav.SelectedItem = Nav.MenuItems[0];
+        // El pie con textos de estado solo cabe con el panel abierto: en modo
+        // compacto (52 px) se envolvía en una columna ilegible. Se oculta al
+        // colapsar; el estado sigue visible en la barra superior.
+        Nav.PaneOpening += (_, _) => RefreshPaneFooter();
+        Nav.PaneClosing += (_, _) => RefreshPaneFooter();
+        RefreshPaneFooter();
         // Kick off background service probe without blocking first frame (Fase 25).
         _ = ProbeServiceAsync();
         // Chequeo de actualización en segundo plano: solo avisa, nunca descarga solo.
@@ -143,6 +149,20 @@ public sealed partial class MainWindow : Window
         TopBarSubtitle.Text = Localizer.Get("app.subtitle");
         Title = $"{Localizer.Get("app.title")} — {Localizer.Get("app.subtitle")}";
         RefreshChrome();
+    }
+
+    /// <summary>
+    /// Oculta el pie textual (estado/servicio/build) cuando el panel está
+    /// colapsado: a 52 px los TextBlock se envolvían en una columna ilegible.
+    /// </summary>
+    private void RefreshPaneFooter()
+    {
+        try
+        {
+            if (SidebarFooterPanel is not null && Nav is not null)
+                SidebarFooterPanel.Visibility = Nav.IsPaneOpen ? Visibility.Visible : Visibility.Collapsed;
+        }
+        catch { }
     }
 
     private void RefreshChrome()
