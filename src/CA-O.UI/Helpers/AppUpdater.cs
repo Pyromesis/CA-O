@@ -1,3 +1,4 @@
+using System.IO.Compression;
 using System.Net.Http;
 using System.Text.Json;
 
@@ -130,6 +131,52 @@ public static class AppUpdater
         }
         if (total.HasValue && total.Value > 0)
             progress?.Report(1.0);
+    }
+
+    /// <summary>
+    /// Extrae el ZIP entrada por entrada con progreso 0..1 (limitado a ≥0,5 % o
+    /// ≥500 ms) para que la UI muestre porcentaje real en vez de una espera
+    /// indeterminada de varios minutos. Corre fuera del hilo UI, protege
+    /// contra Zip-Slip y propaga cancelación. Lanza si falla.
+    /// </summary>
+    public static async Task ExtractWithProgressAsync(
+        string zipPath, string destinationDir,
+        IProgress<(double Ratio, int Done, int Total)>? progress, CancellationToken ct)
+    {
+        await Task.Run(() =>
+        {
+            using var archive = ZipFile.OpenRead(zipPath);
+            var entries = archive.Entries
+                .Where(e => !string.IsNullOrEmpty(e.Name))
+                .ToList();
+            var total = Math.Max(entries.Count, 1);
+            var root = Path.GetFullPath(destinationDir) + Path.DirectorySeparatorChar;
+            var done = 0;
+            var lastReported = 0.0;
+            var lastReportAt = Environment.TickCount64;
+            foreach (var entry in entries)
+            {
+                ct.ThrowIfCancellationRequested();
+                var dest = Path.GetFullPath(Path.Combine(destinationDir, entry.FullName));
+                if (!dest.StartsWith(root, StringComparison.Ordinal))
+                    throw new IOException($"Entrada ZIP fuera del destino: {entry.FullName}");
+                Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
+                entry.ExtractToFile(dest, overwrite: true);
+                done++;
+                if (progress is not null)
+                {
+                    var ratio = (double)done / total;
+                    var now = Environment.TickCount64;
+                    if (ratio - lastReported >= 0.005 || now - lastReportAt >= 500 || done >= total)
+                    {
+                        lastReported = ratio;
+                        lastReportAt = now;
+                        progress.Report((Math.Min(ratio, 1.0), done, total));
+                    }
+                }
+            }
+            progress?.Report((1.0, done, total));
+        }, ct).ConfigureAwait(false);
     }
 
     /// <summary>

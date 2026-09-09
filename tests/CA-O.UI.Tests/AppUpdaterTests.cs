@@ -78,6 +78,56 @@ public sealed class AppUpdaterTests
     }
 
     [Fact]
+    public async Task ExtractWithProgress_ExtractsFilesAndReportsCompletion()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "cao-extract-test-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        try
+        {
+            var zipPath = Path.Combine(dir, "pack.zip");
+            using (var archive = System.IO.Compression.ZipFile.Open(zipPath, System.IO.Compression.ZipArchiveMode.Create))
+            {
+                foreach (var name in new[] { "a.txt", "sub/b.txt", "sub/c.txt" })
+                {
+                    var entry = archive.CreateEntry(name);
+                    using var writer = new StreamWriter(entry.Open());
+                    writer.Write("data-" + name);
+                }
+            }
+            var dest = Path.Combine(dir, "out");
+            var reports = new List<(double Ratio, int Done, int Total)>();
+            var progress = new Progress<(double Ratio, int Done, int Total)>(p => reports.Add(p));
+            await AppUpdater.ExtractWithProgressAsync(zipPath, dest, progress, CancellationToken.None);
+            Assert.Equal("data-a.txt", File.ReadAllText(Path.Combine(dest, "a.txt")));
+            Assert.Equal("data-sub/b.txt", File.ReadAllText(Path.Combine(dest, "sub", "b.txt")));
+            Assert.NotEmpty(reports);
+            Assert.Equal(1.0, reports[^1].Ratio);
+            Assert.Equal(3, reports[^1].Total);
+        }
+        finally { try { Directory.Delete(dir, recursive: true); } catch { } }
+    }
+
+    [Fact]
+    public async Task ExtractWithProgress_RejectsZipSlip()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "cao-slip-test-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        try
+        {
+            var zipPath = Path.Combine(dir, "evil.zip");
+            using (var archive = System.IO.Compression.ZipFile.Open(zipPath, System.IO.Compression.ZipArchiveMode.Create))
+            {
+                var entry = archive.CreateEntry("../escape.txt");
+                using var writer = new StreamWriter(entry.Open());
+                writer.Write("evil");
+            }
+            await Assert.ThrowsAsync<IOException>(() =>
+                AppUpdater.ExtractWithProgressAsync(zipPath, Path.Combine(dir, "out"), null, CancellationToken.None));
+        }
+        finally { try { Directory.Delete(dir, recursive: true); } catch { } }
+    }
+
+    [Fact]
     public async Task ExecuteWithRetry_GivesUpAfterMaxAttempts()
     {
         var attempts = 0;

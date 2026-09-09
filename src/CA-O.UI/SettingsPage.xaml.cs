@@ -382,7 +382,7 @@ public sealed partial class SettingsPage : Page
             var dialog = new ContentDialog
             {
                 Title = $"Instalar {_uiState.LatestVersion}",
-                Content = "Se descargará el paquete completo, se abrirá el instalador (pide UAC) y esta app se cerrará. ¿Continuar?",
+                Content = "Se descargará el paquete completo (~450 MB) con su progreso, se extraerá (~1700 archivos, varios minutos con progreso) y se abrirá el instalador (pide UAC). La app solo se cerrará cuando confirmes que el instalador ya está abierto. ¿Continuar?",
                 PrimaryButtonText = "Descargar e instalar",
                 CloseButtonText = "Cancelar",
                 DefaultButton = ContentDialogButton.Close,
@@ -427,35 +427,63 @@ public sealed partial class SettingsPage : Page
                     throw new InvalidOperationException($"Descarga incompleta ({actualBytes} de {expectedBytes} bytes). Reintenta.");
                 }
 
-                UpdateDetailText.Text = "Extrayendo paquete (puede tardar varios minutos)...";
-                DispatcherQueue.TryEnqueue(() => UpdateProgressBar.IsIndeterminate = true);
                 var payloadDir = Path.Combine(updateDir, "payload");
-                // Borrado + extracción fuera del hilo UI (450 MB congelaban la app) y con
-                // reintentos: el antivirus suele bloquear el ZIP recién descargado unos segundos.
-                // Sin Task.Run anidado: la extracción ya corre en el pool.
-                await Task.Run(async () =>
+                // Borrado + extracción fuera del hilo UI con progreso REAL
+                // (archivo x de y) y reintentos: el antivirus suele bloquear
+                // el ZIP recién descargado unos segundos.
+                UpdateDetailText.Text = "Limpiando descarga anterior...";
+                await Task.Run(() =>
                 {
                     if (Directory.Exists(payloadDir)) Directory.Delete(payloadDir, recursive: true);
-                    await Helpers.AppUpdater.ExecuteWithRetryAsync(
-                        () => Task.Run(() => System.IO.Compression.ZipFile.ExtractToDirectory(zipPath, payloadDir), cts.Token),
-                        ct: cts.Token).ConfigureAwait(false);
                 }, cts.Token).ConfigureAwait(false);
+                var extractProgress = new Progress<(double Ratio, int Done, int Total)>(p => DispatcherQueue.TryEnqueue(() =>
+                {
+                    UpdateProgressBar.IsIndeterminate = false;
+                    UpdateProgressBar.Value = p.Ratio * 100;
+                    UpdateDetailText.Text = $"Extrayendo paquete: {p.Done} de {p.Total} archivos ({p.Ratio * 100:0}%)...";
+                }));
+                await Helpers.AppUpdater.ExecuteWithRetryAsync(
+                    () => Helpers.AppUpdater.ExtractWithProgressAsync(zipPath, payloadDir, extractProgress, cts.Token),
+                    ct: cts.Token).ConfigureAwait(false);
 
                 var installer = Path.Combine(payloadDir, "gui-installer", "CA-O.InstallerGui.exe");
                 if (!File.Exists(installer))
                 {
-                    UpdateDetailText.Text = "El paquete no trae instalador.";
+                    UpdateDetailText.Text = $"El paquete no trae instalador. Puedes ejecutarlo a mano desde: {payloadDir}";
                     return;
                 }
 
+                // Handoff con confirmación: antes la app se cerraba sola y si
+                // el instalador no aparecía (UAC cancelado, crash) el usuario
+                // se quedaba sin nada. Ahora solo se cierra al confirmar.
                 UpdateDetailText.Text = "Abriendo instalador...";
-                Process.Start(new ProcessStartInfo(installer)
+                try
                 {
-                    UseShellExecute = true,
-                    Arguments = $"--auto-update --payload-dir=\"{payloadDir}\"",
-                    WorkingDirectory = Path.GetDirectoryName(installer)!,
-                });
-                Application.Current.Exit();
+                    Process.Start(new ProcessStartInfo(installer)
+                    {
+                        UseShellExecute = true,
+                        Arguments = $"--auto-update --payload-dir=\"{payloadDir}\"",
+                        WorkingDirectory = Path.GetDirectoryName(installer)!,
+                    });
+                }
+                catch (Exception startEx)
+                {
+                    UpdateDetailText.Text = $"No se pudo abrir el instalador ({startEx.Message}). Ejecútalo a mano desde: {installer}";
+                    return;
+                }
+                var handoff = new ContentDialog
+                {
+                    Title = "Instalador en marcha",
+                    Content = $"El instalador debería estar abierto (acepta el UAC si te lo pide).\nSi no lo ves, ejecútalo a mano desde:\n{payloadDir}\n\n¿Cerrar esta app para continuar en el instalador?",
+                    PrimaryButtonText = "Cerrar app y continuar",
+                    CloseButtonText = "Ahora no",
+                    DefaultButton = ContentDialogButton.Primary,
+                    XamlRoot = Content.XamlRoot,
+                };
+                if (await handoff.ShowAsync() == ContentDialogResult.Primary)
+                    Application.Current.Exit();
+                else
+                    UpdateDetailText.Text = $"Instalador disponible en: {payloadDir} (la app sigue abierta).";
             }
             catch (Exception ex)
             {

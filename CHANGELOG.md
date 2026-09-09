@@ -2,6 +2,12 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
+## [2.1.15] - 2026-09-09
+
+### Corregido
+- Auto-update: la extracción muestra progreso real (archivo x de y, %) en vez de espera indeterminada de minutos; si el instalador no abre, la app ya no se cierra sola — pide confirmación y muestra la ruta manual del paquete.
+- Extracción endurecida contra Zip-Slip (las entradas fuera del destino se rechazan).
+
 ## [2.1.14] - 2026-09-09
 
 ### Añadido
