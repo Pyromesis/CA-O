@@ -577,6 +577,30 @@ Cada perfil es **dinámico** — no es lista fija. Ej. `maximum-power-plan` solo
 | **Solucionar** | `SolucionarPage.xaml` | Audio (reinicio pila, micro, BT), video (compositor, iconos) y sistema (Windows Update, reloj) con efecto real |
 | **Ajustes** | `SettingsPage.xaml` | Tema (Sistema/Claro/Oscuro), idioma (es-ES/en-US), `ExpertMode` + `InfoBar` warning, **Servicio privilegiado** con `InfoBar` explicativo + `ProgressRing` + `ServiceCheck` + `Instalar ahora` (auto-eleva, wrapper PS1, start service, verify, restart app) + `VersionsText` + `PrivilegeText`, **Actualizaciones** (chequeo en arranque + aviso en Panel, descarga con progreso y auto-instalación con `--auto-update`) |
 
+### Capturas (v2.1.15, tema oscuro)
+
+![Panel — Centro de Control y Rendimiento](capturas/01-panel.png)
+
+| Analizar | Optimizar |
+|---|---|
+| ![Analizar — diagnóstico con evidencia y benchmark DNS](capturas/02-analizar.png) | ![Optimizar — tarjetas con bucket, evidencia y filtros](capturas/03-optimizar.png) |
+| **Analizar**: salud 0-100 por dimensión, DNS benchmark medido, DPC/ISR | **Optimizar**: diff Before/After, `Precheck…Commit`, batch recomendadas |
+
+| Limpieza | Solucionar |
+|---|---|
+| ![Limpieza — temporales, disco, timer resolution](capturas/04-limpieza.png) | ![Solucionar — audio, video, red y sistema](capturas/05-solucionar.png) |
+| **Limpieza**: `Ejecutar todo`, papelera, DNS, timer 0,5/1,0 ms | **Solucionar**: fixes directos con efecto real + Recuperar Explorador |
+
+| Benchmark | Restaurar |
+|---|---|
+| ![Benchmark — flujo A/B honesto con suelo 3%](capturas/06-benchmark.png) | ![Restaurar — snapshots por TransactionId](capturas/07-restaurar.png) |
+| **Benchmark**: línea base → aplicar → medir → veredicto | **Restaurar**: reversión verificada por `TxId` |
+
+| Historial | Ajustes |
+|---|---|
+| ![Historial — timeline auditable con hash-chain](capturas/08-historial.png) | ![Ajustes — tema, idioma, servicio y actualizaciones](capturas/09-ajustes.png) |
+| **Historial**: `history.jsonl` + verificación de integridad | **Ajustes**: `ExpertMode`, servicio privilegiado, auto-update |
+
 **Controles custom:** `MetricCard`, `RiskBadge`, `ScoreRing`, `Diagnostic*Card`, `DesignTokens.xaml` (Mica, `CaoCardStyle`, `CaoAccentButtonStyle`).
 
 **Vida visual:** `Helpers/UiAnimations` — entrada escalonada por página, contadores animados, pulso en el punto de servicio, héroe con degradado de acento. Todo respeta `ReducedMotion` (si el sistema desactiva animaciones, se aplican valores finales al instante).
