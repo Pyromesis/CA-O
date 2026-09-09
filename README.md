@@ -6,7 +6,7 @@
 [![.NET 10](https://img.shields.io/badge/.NET%2010-512BD4?style=flat-square&logo=dotnet&logoColor=white)](global.json)
 [![WinUI 3](https://img.shields.io/badge/WinUI%203-00B7C3?style=flat-square&logo=windows&logoColor=white)](https://microsoft.github.io/microsoft-ui-xaml/)
 [![Build](https://img.shields.io/badge/build-passing-brightgreen?style=flat-square)](https://github.com/Pyromesis/CA-O/actions)
-[![Tests](https://img.shields.io/badge/tests-695%20passed-brightgreen?style=flat-square)](#-pruebas)
+[![Tests](https://img.shields.io/badge/tests-697%20passed-brightgreen?style=flat-square)](#-pruebas)
 [![Release](https://img.shields.io/badge/release-v2.1.19-blue?style=flat-square)](https://github.com/Pyromesis/CA-O/releases/tag/v2.1.19)
 [![License](https://img.shields.io/badge/license-privado-lightgrey?style=flat-square)](#licencia)
 
@@ -49,7 +49,7 @@ La UI **siempre eleva** (`app.manifest` `requireAdministrator` → UAC en cada i
 **En números:**
 - **75 optimizaciones** con efecto real verificado (transaccionales) + `AllLegacy` para trazabilidad
 - **11 páginas** WinUI 3 con Mica, `NavigationView`, animaciones de entrada, i18n `es-ES`/`en-US` instantáneo
-- **695 tests** en 6 suites (Core 457 · Integration 48 · Security 118 · Infra 17 · Benchmark 7 · UI 48)
+- **697 tests** en 6 suites (Core 457 · Integration 48 · Security 118 · Infra 17 · Benchmark 7 · UI 50)
 - **0 telemetría externa**, 0 dependencias web, 0 comandos arbitrarios
 
 ---
@@ -79,7 +79,7 @@ La UI **siempre eleva** (`app.manifest` `requireAdministrator` → UAC en cada i
 | **Perf** | System.Diagnostics.PerformanceCounter | **10.0.0** | `% DPC Time` / `% Interrupt Time` |
 | **Servicios** | System.ServiceProcess.ServiceController | **8.0.1** | `CAO.Privileged` como `BackgroundService` |
 | **Build** | `Directory.Packages.props` + `Directory.Build.props` + `Version.props` (single source `2.1.19`) | Centralizado | Un lugar para bump de versión/paquetes |
-| **Tests** | xUnit 2.9.2 + Microsoft.NET.Test.Sdk 17.11.1 | — | 695 tests en Release |
+| **Tests** | xUnit 2.9.2 + Microsoft.NET.Test.Sdk 17.11.1 | — | 697 tests en Release |
 | **Seguridad** | CodeQL + `dotnet audit` + Dependabot + CycloneDX SBOM | CI | Cadena de suministro auditada |
 
 > **Self-contained:** los artefactos de release no requieren runtime instalado. El instalador es `self-contained` sin `single-file` (requisito WinUI 3).
@@ -706,7 +706,7 @@ powershell -ExecutionPolicy Bypass -File scripts/harden-data-acls.ps1
 
 ## Pruebas
 
-**695 pruebas en 6 suites, todas en Release:**
+**697 pruebas en 6 suites, todas en Release:**
 
 | Suite | Cubre | Cant. |
 |---|---|---|
@@ -715,8 +715,8 @@ powershell -ExecutionPolicy Bypass -File scripts/harden-data-acls.ps1
 | `CA-O.Integration.Tests` | `E2EFlowsTests` 10 flujos (Abrir→Analizar→Persistir→Vanguard→Restore→Benchmark→History→Cancel→Recovery), `TransactionJournalRecovery` (Incomplete→RollbackRequired), `ArchitectureDependencyTests` | **48** |
 | `CA-O.Infrastructure.Tests` | `HistoryRobustness` (líneas malformadas), `SnapshotRepository` (TX identity), `SystemContextCache` dual-TTL, `DnsBenchmark` | **17** |
 | `CA-O.Benchmark.Tests` | `SystemBenchmarkRunner` (suelo 3 %, mediana, trials) | **7** |
-| `CA-O.UI.Tests` | `ViewModelTests` (Analyze/Dashboard con `SystemAnalysisService` + `CorrelationId`), `LocalizerTests`, `AppUpdater` (extracción con progreso + Zip-Slip), `DriverConflicts`, `VendorDriverSupport` | **48** |
-| **Total** | **Gates 1-5 `verify.ps1` + `build-release` con `gui-installer`** | **695** |
+| `CA-O.UI.Tests` | `ViewModelTests` (Analyze/Dashboard con `SystemAnalysisService` + `CorrelationId`), `LocalizerTests`, `AppUpdater` (extracción con progreso + Zip-Slip), `DriverConflicts`, `VendorDriverSupport`, `UnblockTree` | **50** |
+| **Total** | **Gates 1-5 `verify.ps1` + `build-release` con `gui-installer`** | **697** |
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts/test.ps1
