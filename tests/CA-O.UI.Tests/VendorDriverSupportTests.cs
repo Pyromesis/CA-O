@@ -53,4 +53,40 @@ public sealed class VendorDriverSupportTests
     {
         Assert.Equal("•••1234", VendorDriverSupport.MaskSerial("ABC1234"));
     }
+
+    [Fact]
+    public void BoardFallbackWhenSystemLies()
+    {
+        // El caso del usuario: sistema "Default string", placa ASUS real.
+        var support = VendorDriverSupport.Resolve(new CAO.Shared.ComputerInfo(
+            "Default string", "Default string", "0", "ASUSTeK COMPUTER INC.", "PRIME B560M-A", "American Megatrends Inc."));
+        Assert.StartsWith("https://www.asus.com/", support.DriversUrl);
+        Assert.Equal("placa base", support.DetectedBy);
+    }
+
+    [Fact]
+    public void BiosFallbackWhenNothingElse()
+    {
+        var support = VendorDriverSupport.Resolve(new CAO.Shared.ComputerInfo(
+            "To be filled by O.E.M.", "", "", "", "", "Dell Inc."));
+        Assert.StartsWith("https://www.dell.com/", support.DriversUrl);
+        Assert.Equal("BIOS", support.DetectedBy);
+    }
+
+    [Fact]
+    public void VirtualMachineIsReportedHonestly()
+    {
+        var support = VendorDriverSupport.Resolve(new CAO.Shared.ComputerInfo(
+            "Microsoft Corporation", "Virtual Machine", "", "", "", ""));
+        Assert.Equal("Máquina virtual", support.Vendor);
+        Assert.Equal("virtualización", support.DetectedBy);
+    }
+
+    [Fact]
+    public void TotalUnknownNeverDeadEnds()
+    {
+        var support = VendorDriverSupport.Resolve(new CAO.Shared.ComputerInfo("", "", "", "", "", ""));
+        Assert.Equal(VendorDriverSupport.MicrosoftCatalogUrl, support.DriversUrl);
+        Assert.Contains("catálogo", support.Note.ToLowerInvariant());
+    }
 }

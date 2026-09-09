@@ -20,8 +20,15 @@ public sealed record DriverDiagnosticsReport(
     IReadOnlyList<DriverDiagnostic> Drivers,
     DateTime TimestampUtc);
 
-/// <summary>Identidad del equipo (fase drivers 3: originales del fabricante).</summary>
+/// <summary>
+/// Identidad del equipo (fase drivers 3: originales del fabricante).
+/// Los equipos clónicos/VM devuelven "Default string" en sistema: por eso
+/// también se lee placa base y BIOS como respaldo.
+/// </summary>
 public sealed record ComputerInfo(
     string Manufacturer,
     string Model,
-    string SerialNumber);
+    string SerialNumber,
+    string BoardManufacturer = "",
+    string BoardProduct = "",
+    string BiosManufacturer = "");

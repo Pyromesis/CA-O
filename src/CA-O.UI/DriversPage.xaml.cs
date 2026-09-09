@@ -102,7 +102,8 @@ public sealed partial class DriversPage : Page
             return new ConflictRow(
                 d.PnpDeviceId,
                 string.IsNullOrWhiteSpace(d.DeviceClass) ? d.Name : $"{d.Name} [{d.DeviceClass}]",
-                $"{DriverConflicts.DescribeProblem(d.ProblemCode)} · {provider} v{d.Version} · {d.InfName}".Trim(' ', '·'),
+                ($"{DriverConflicts.DescribeProblem(d.ProblemCode)} · {provider} v{d.Version} · {d.InfName}".Trim(' ', '·') +
+                 DriverIdsLine(d)).Trim(),
                 label, action,
                 CanFix: !string.IsNullOrWhiteSpace(d.PnpDeviceId));
         }).ToList();
@@ -153,11 +154,13 @@ public sealed partial class DriversPage : Page
         try
         {
             var info = await new DriverDiagnosticsProvider().GetComputerInfoAsync(ct);
-            var maker = string.IsNullOrWhiteSpace(info.Manufacturer) ? "desconocido" : info.Manufacturer;
-            var model = string.IsNullOrWhiteSpace(info.Model) ? "" : $" {info.Model}";
-            var support = Helpers.VendorDriverSupport.Resolve(info.Manufacturer, info.Model, info.SerialNumber);
+            var support = Helpers.VendorDriverSupport.Resolve(info);
             _vendorUrl = support.DriversUrl;
-            OemText.Text = $"Equipo: {maker}{model} · Serie: {Helpers.VendorDriverSupport.MaskSerial(info.SerialNumber)} · {support.Vendor}";
+            var board = string.IsNullOrWhiteSpace(info.BoardProduct) ? info.BoardManufacturer
+                : $"{info.BoardManufacturer} {info.BoardProduct}".Trim();
+            var sysModel = string.IsNullOrWhiteSpace(info.Model) ? "" : $" {info.Model}";
+            OemText.Text = $"Equipo: {info.Manufacturer}{sysModel} · Placa: {(string.IsNullOrWhiteSpace(board) ? "—" : board)} · " +
+                $"Serie: {Helpers.VendorDriverSupport.MaskSerial(info.SerialNumber)} · {support.Vendor} (por {support.DetectedBy})";
             VendorLinkText.Text = $"{support.Note}\n{support.DriversUrl}";
             CopyVendorLinkButton.IsEnabled = true;
         }
@@ -255,6 +258,18 @@ public sealed partial class DriversPage : Page
         OnScanClick(ScanButton, new RoutedEventArgs());
     }
 
+    /// <summary>Segunda línea con los IDs uno a uno (instancia, hardware, INF, proveedor).</summary>
+    private static string DriverIdsLine(DriverDiagnostic d)
+    {
+        var parts = new List<string>();
+        if (!string.IsNullOrWhiteSpace(d.PnpDeviceId)) parts.Add($"ID: {d.PnpDeviceId}");
+        if (!string.IsNullOrWhiteSpace(d.HardwareId)) parts.Add($"HW: {d.HardwareId}");
+        if (!string.IsNullOrWhiteSpace(d.InfName)) parts.Add($"INF: {d.InfName}");
+        var provider = string.IsNullOrWhiteSpace(d.Provider) ? d.Manufacturer : d.Provider;
+        if (!string.IsNullOrWhiteSpace(provider)) parts.Add($"Prov: {provider}");
+        return parts.Count == 0 ? string.Empty : "\n" + string.Join(" · ", parts);
+    }
+
     private void OnSearchChanged(object sender, TextChangedEventArgs e) => RenderInventory();
 
     private void RenderInventory()
@@ -269,7 +284,8 @@ public sealed partial class DriversPage : Page
         DriversList.ItemsSource = filtered.Select(d => new DriverRow(
             string.IsNullOrWhiteSpace(d.DeviceClass) ? d.Name : $"{d.Name} [{d.DeviceClass}]",
             $"{d.Manufacturer} · v{d.Version} · {DriverConflicts.FormatDriverDate(d.Date)} · {DriverConflicts.SignedLabel(d.IsSigned)}" +
-            (d.ProblemCode != 0 ? $" · {DriverConflicts.DescribeProblem(d.ProblemCode)}" : string.Empty))).ToList();
+            (d.ProblemCode != 0 ? $" · {DriverConflicts.DescribeProblem(d.ProblemCode)}" : string.Empty) +
+            DriverIdsLine(d))).ToList();
         InventoryCountText.Text = _drivers.Count == 0
             ? string.Empty
             : $"{filtered.Count} de {_drivers.Count} en lista.";

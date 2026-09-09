@@ -10,7 +10,7 @@
 [![Release](https://img.shields.io/badge/release-v2.1.19-blue?style=flat-square)](https://github.com/Pyromesis/CA-O/releases/tag/v2.1.19)
 [![License](https://img.shields.io/badge/license-privado-lightgrey?style=flat-square)](#licencia)
 
-**Descargas v2.1.19:** [CA-O-Instalador.exe (94 MB, un solo exe: descarga e instala todo)](https://github.com/Pyromesis/CA-O/releases/download/v2.1.19/CA-O-Instalador.exe) | [CA-O-Setup-GUI-x64.zip (92 MB, instalador GUI)](https://github.com/Pyromesis/CA-O/releases/download/v2.1.19/CA-O-Setup-GUI-x64.zip) | [CA-O-2.1.19-win-x64.zip (394 MB, paquete completo offline)](https://github.com/Pyromesis/CA-O/releases/download/v2.1.19/CA-O-2.1.19-win-x64.zip) | [Notas de la versión](https://github.com/Pyromesis/CA-O/releases/tag/v2.1.19) | [Documentación](docs/ARCHITECTURE.md)
+**Descargas v2.1.19:** [CA-O-Instalador.exe (135 MB, un solo exe con ventana: descarga y abre el instalador)](https://github.com/Pyromesis/CA-O/releases/download/v2.1.19/CA-O-Instalador.exe) | [CA-O-Setup-GUI-x64.zip (92 MB, instalador GUI)](https://github.com/Pyromesis/CA-O/releases/download/v2.1.19/CA-O-Setup-GUI-x64.zip) | [CA-O-2.1.19-win-x64.zip (394 MB, paquete completo offline)](https://github.com/Pyromesis/CA-O/releases/download/v2.1.19/CA-O-2.1.19-win-x64.zip) | [Notas de la versión](https://github.com/Pyromesis/CA-O/releases/tag/v2.1.19) | [Documentación](docs/ARCHITECTURE.md)
 
 ---
 
@@ -626,7 +626,7 @@ Cada perfil es **dinámico** — no es lista fija. Ej. `maximum-power-plan` solo
 
 ### Opción A — Un solo exe (lo más fácil)
 
-1. Descarga [CA-O-Instalador.exe (94 MB)](https://github.com/Pyromesis/CA-O/releases/download/v2.1.19/CA-O-Instalador.exe) — es el único archivo que necesitas
+1. Descarga [CA-O-Instalador.exe (135 MB)](https://github.com/Pyromesis/CA-O/releases/download/v2.1.19/CA-O-Instalador.exe) — es el único archivo que necesitas
 2. Ejecútalo (pide UAC) → descarga el paquete (~450 MB con progreso) y abre el **instalador gráfico**, que instala app + servicio + atajos y abre CA-O
 3. Necesita internet la primera vez (luego el ZIP queda en `%TEMP%\CA-O-payload.zip`)
 

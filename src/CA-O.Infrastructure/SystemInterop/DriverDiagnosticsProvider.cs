@@ -47,17 +47,23 @@ public sealed class DriverDiagnosticsProvider
         }, ct);
     }
 
-    /// <summary>Identidad del equipo para buscar drivers originales del fabricante.</summary>
+    /// <summary>
+    /// Identidad del equipo para buscar drivers originales del fabricante.
+    /// Lee sistema + placa base + BIOS: los clónicos/VM mienten en sistema
+    /// ("Default string") y la placa suele decir la verdad.
+    /// </summary>
     public async Task<ComputerInfo> GetComputerInfoAsync(CancellationToken ct = default)
     {
         return await Task.Run(() =>
         {
             string manufacturer = string.Empty, model = string.Empty, serial = string.Empty;
+            string boardMaker = string.Empty, boardProduct = string.Empty, biosMaker = string.Empty;
             try
             {
                 var opts = new System.Management.EnumerationOptions { Timeout = WmiTimeout, BlockSize = 20, Rewindable = false };
+                var scope = new System.Management.ManagementScope(@"root\cimv2");
                 using var system = new ManagementObjectSearcher(
-                    new System.Management.ManagementScope(@"root\cimv2"),
+                    scope,
                     new System.Management.ObjectQuery("SELECT Manufacturer, Model FROM Win32_ComputerSystem"),
                     opts);
                 foreach (var item in system.Get().Cast<ManagementObject>())
@@ -66,12 +72,23 @@ public sealed class DriverDiagnosticsProvider
                     model = item["Model"]?.ToString() ?? string.Empty;
                     break;
                 }
+                using var board = new ManagementObjectSearcher(
+                    scope,
+                    new System.Management.ObjectQuery("SELECT Manufacturer, Product FROM Win32_BaseBoard"),
+                    opts);
+                foreach (var item in board.Get().Cast<ManagementObject>())
+                {
+                    boardMaker = item["Manufacturer"]?.ToString() ?? string.Empty;
+                    boardProduct = item["Product"]?.ToString() ?? string.Empty;
+                    break;
+                }
                 using var bios = new ManagementObjectSearcher(
-                    new System.Management.ManagementScope(@"root\cimv2"),
-                    new System.Management.ObjectQuery("SELECT SerialNumber FROM Win32_BIOS"),
+                    scope,
+                    new System.Management.ObjectQuery("SELECT Manufacturer, SerialNumber FROM Win32_BIOS"),
                     opts);
                 foreach (var item in bios.Get().Cast<ManagementObject>())
                 {
+                    biosMaker = item["Manufacturer"]?.ToString() ?? string.Empty;
                     serial = item["SerialNumber"]?.ToString() ?? string.Empty;
                     break;
                 }
@@ -79,7 +96,8 @@ public sealed class DriverDiagnosticsProvider
             catch (OperationCanceledException) { throw; }
             catch (ManagementException) { }
             ct.ThrowIfCancellationRequested();
-            return new ComputerInfo(manufacturer.Trim(), model.Trim(), serial.Trim());
+            return new ComputerInfo(manufacturer.Trim(), model.Trim(), serial.Trim(),
+                boardMaker.Trim(), boardProduct.Trim(), biosMaker.Trim());
         }, ct);
     }
 }
