@@ -41,23 +41,79 @@ internal sealed class PrivilegedPipeService(
     private readonly Core.Security.IIpcReplayGuard _replayGuard = new Core.Security.ReplayCache();
 
 
+    /// <summary>Máximo de despachos simultáneos; las conexiones siempre se aceptan.</summary>
+    private const int MaxConcurrentDispatch = 4;
+    private readonly SemaphoreSlim _gate = new(MaxConcurrentDispatch, MaxConcurrentDispatch);
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        // Multi-instancia: por cada conexión aceptada se crea la siguiente
+        // ANTES de atenderla, y cada cliente se atiende en su propia tarea.
+        // Antes había una sola instancia secuencial: mientras se procesaba
+        // una operación (p. ej. reiniciar explorer, crear restore point),
+        // nadie más podía ni CONECTAR y la UI fallaba con CAO-IPC-007/004.
+        var pending = CreateServer();
         while (!stoppingToken.IsCancellationRequested)
         {
-            await using var server = CreateServer();
             try
             {
-                await server.WaitForConnectionAsync(stoppingToken);
-                await HandleClientAsync(server, stoppingToken);
+                await pending.WaitForConnectionAsync(stoppingToken);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
+                pending.Dispose();
                 break;
             }
             catch (IOException ex)
             {
-                logger.LogWarning(ex, "La conexiÃ³n IPC terminÃ³ de forma inesperada.");
+                logger.LogWarning(ex, "La conexión IPC terminó de forma inesperada.");
+                try { pending.Dispose(); } catch { }
+                pending = CreateServer();
+                continue;
+            }
+            var accepted = pending;
+            try
+            {
+                pending = CreateServer();
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "No se pudo crear la siguiente instancia del pipe.");
+                _ = HandleOneAsync(accepted, stoppingToken);
+                try { await Task.Delay(500, stoppingToken); }
+                catch (OperationCanceledException) { accepted.Dispose(); break; }
+                pending = CreateServer();
+                continue;
+            }
+            _ = HandleOneAsync(accepted, stoppingToken);
+        }
+    }
+
+    private async Task HandleOneAsync(NamedPipeServerStream pipe, CancellationToken stoppingToken)
+    {
+        await using (pipe)
+        {
+            var acquired = false;
+            try
+            {
+                await _gate.WaitAsync(stoppingToken);
+                acquired = true;
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+            try
+            {
+                await HandleClientAsync(pipe, stoppingToken);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Fallo inesperado atendiendo un cliente IPC concurrente.");
+            }
+            finally
+            {
+                if (acquired) _gate.Release();
             }
         }
     }
@@ -81,7 +137,7 @@ internal sealed class PrivilegedPipeService(
         return NamedPipeServerStreamAcl.Create(
             IpcConstants.PipeName,
             PipeDirection.InOut,
-            1,
+            NamedPipeServerStream.MaxAllowedServerInstances,
             PipeTransmissionMode.Byte,
             PipeOptions.Asynchronous,
             IpcProtocol.MaxRequestBytes,

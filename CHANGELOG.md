@@ -2,6 +2,13 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
+## [2.1.13] - 2026-09-09
+
+### Corregido
+- `disable-hibernate` ya no falla la verificación con CAO-TXN-003: Detect/Verify leen el estado vivo (`HKLM\...\Power\HibernateEnabled`) en vez del valor inyectado `powercfg /a`, que en el servicio siempre era `true` y provocaba rollback (la hibernación se reactivaba sola).
+- `restart-windows-explorer` ya no deja sin escritorio: tras `taskkill` relanza `explorer.exe` en la sesión interactiva (token WTS + `CreateProcessAsUser` en `winsta0\default`) y falla con mensaje honesto + instrucciones (Ctrl+Mayús+Esc → explorer.exe) si no vuelve. Verify exige shell en sesión > 0.
+- Servicio `CAO.Privileged` multi-instancia concurrente (4 despachos): antes una sola conexión secuencial hacía que cualquier operación lenta (restore point, reinicio explorer) dejara al resto sin poder ni conectar → `flush-dns-cache` y demás fallaban con CAO-IPC-007/004.
+
 ## [2.1.12] - 2026-09-08
 
 ### Corregido

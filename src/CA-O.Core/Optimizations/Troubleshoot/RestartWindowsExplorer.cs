@@ -41,9 +41,38 @@ public sealed class RestartWindowsExplorer : IOptimization
         var result = await context.Executor.ExecuteAsync(
             SystemCommandKey.TaskKillExplorer, ["/F", "/IM", "explorer.exe"], ct);
         if (!result.Success)
-            return OperationResult.Fail("No se pudo reiniciar el Explorador.", result.StdErr);
+            return OperationResult.Fail("No se pudo detener el Explorador.", result.StdErr);
 
-        await Task.Delay(TimeSpan.FromSeconds(5), ct);
+        // Esperar a que salga del todo (máx ~10 s) antes de relanzar.
+        for (var i = 0; i < 40 && AnyInteractiveExplorer(); i++)
+        {
+            try { await Task.Delay(250, ct); } catch { break; }
+        }
+
+        // El servicio corre como SYSTEM en sesión 0: NO basta con esperar a
+        // que Windows lo relance (a veces no vuelve y deja sin barra ni
+        // escritorio). Relanzar explícitamente en la sesión interactiva.
+        var explorerPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "explorer.exe");
+        if (!Interop.InteractiveSessionLauncher.TryLaunch(explorerPath, null, hidden: false, out var launchError))
+        {
+            return OperationResult.Fail(
+                $"Se detuvo explorer.exe pero no se pudo relanzar en tu sesión: {launchError} " +
+                "Pulsa Ctrl+Mayús+Esc → Archivo → Ejecutar nueva tarea → escribe explorer.exe para recuperar el escritorio.",
+                "relaunch-failed");
+        }
+
+        // Dar margen al shell (máx ~20 s) y comprobar que hay shell interactivo.
+        for (var i = 0; i < 80 && !AnyInteractiveExplorer(); i++)
+        {
+            try { await Task.Delay(250, ct); } catch { break; }
+        }
+        if (!AnyInteractiveExplorer())
+        {
+            return OperationResult.Fail(
+                "Se detuvo explorer.exe pero el escritorio no volvió. " +
+                "Pulsa Ctrl+Mayús+Esc → Archivo → Ejecutar nueva tarea → escribe explorer.exe para recuperarlo.",
+                "relaunch-failed");
+        }
         return OperationResult.Ok("Explorador reiniciado.");
     }
 
@@ -54,8 +83,9 @@ public sealed class RestartWindowsExplorer : IOptimization
     {
         try
         {
-            var running = Process.GetProcessesByName("explorer").Length > 0;
-            return Task.FromResult(running
+            // Exigir shell INTERACTIVO (sesión > 0): una copia en sesión 0
+            // (servicios) no es un escritorio válido y antes daba falso éxito.
+            return Task.FromResult(AnyInteractiveExplorer()
                 ? VerificationResult.Passed(OptimizationState.AppliedByCao, "Explorador en ejecución tras el reinicio.")
                 : VerificationResult.Failed(OptimizationState.NotApplied, "El Explorador no volvió a arrancar."));
         }
@@ -63,5 +93,23 @@ public sealed class RestartWindowsExplorer : IOptimization
         {
             return Task.FromResult(VerificationResult.Unknown(OptimizationState.Unknown, ex.Message));
         }
+    }
+
+    private static bool AnyInteractiveExplorer()
+    {
+        try
+        {
+            foreach (var process in Process.GetProcessesByName("explorer"))
+            {
+                try
+                {
+                    if (process.SessionId > 0) return true;
+                }
+                catch { }
+                finally { process.Dispose(); }
+            }
+        }
+        catch { }
+        return false;
     }
 }
