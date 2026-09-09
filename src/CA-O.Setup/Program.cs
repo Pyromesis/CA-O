@@ -126,13 +126,38 @@ if (!File.Exists(payloadUi) || !File.Exists(payloadService))
 
 try
 {
+    // ANTES de copiar: si hay instalación previa, detener servicio y cerrar UI
+    // (sus DLLs en Program Files quedan bloqueadas y la copia fallaba con
+    // "being used by another process" dejando la instalación a medias).
+    var isUpdateSetup = Directory.Exists(installDir);
+    if (isUpdateSetup)
+    {
+        Log("Actualización: cerrando app y deteniendo servicio para liberar archivos...");
+        foreach (var p in Process.GetProcessesByName("CA-O.UI"))
+        {
+            try { p.Kill(); } catch { }
+        }
+        Run("sc.exe", $"stop {serviceName}", ignoreError: true);
+        for (int i = 0; i < 16; i++)
+        {
+            Thread.Sleep(500);
+            var q = RunCapture("sc.exe", $"query {serviceName}");
+            if (q.Contains("STOPPED") || q.Contains("does not exist")) break;
+        }
+        foreach (var p in Process.GetProcessesByName("CA-O.Privileged"))
+        {
+            try { p.Kill(); } catch { }
+        }
+        Thread.Sleep(800);
+    }
+
     Log("\n[1/5] Creando directorio de instalación...");
     Log($"  Carpeta de instalación: {installDir}");
     Directory.CreateDirectory(installDir);
     var destUi = Path.Combine(installDir, "ui");
     var destSvc = Path.Combine(installDir, "service");
-    CopyDirectory(Path.GetDirectoryName(payloadUi)!, destUi);
-    CopyDirectory(Path.GetDirectoryName(payloadService)!, destSvc);
+    CopyDirectoryRetry(Path.GetDirectoryName(payloadUi)!, destUi);
+    CopyDirectoryRetry(Path.GetDirectoryName(payloadService)!, destSvc);
     var installedExe = Path.Combine(destUi, "CA-O.UI.exe");
     Log($"  Instalado en {installedExe} ({new FileInfo(installedExe).Length / 1024 / 1024} MB)");
     Log($"  La app se ha descargado/instalado en: {installDir}");
@@ -285,13 +310,31 @@ static string? GetLatestFullAssetUrl()
 }
 static void CopyDirectory(string src, string dst)
 {
-    Directory.CreateDirectory(dst);
-    foreach (var file in Directory.GetFiles(src, "*", SearchOption.AllDirectories))
+    CopyDirectoryRetry(src, dst);
+}
+// Copia con reintentos ante bloqueos transitorios (servicio deteniéndose,
+// antivirus escaneando). Solo el último intento propaga el error.
+static void CopyDirectoryRetry(string src, string dst)
+{
+    for (int attempt = 0; ; attempt++)
     {
-        var rel = Path.GetRelativePath(src, file);
-        var dest = Path.Combine(dst, rel);
-        Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
-        File.Copy(file, dest, true);
+        try
+        {
+            Directory.CreateDirectory(dst);
+            foreach (var file in Directory.GetFiles(src, "*", SearchOption.AllDirectories))
+            {
+                var rel = Path.GetRelativePath(src, file);
+                var dest = Path.Combine(dst, rel);
+                Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
+                File.Copy(file, dest, true);
+            }
+            return;
+        }
+        catch (IOException ex) when (attempt < 3)
+        {
+            Console.WriteLine($"  Reintento copia {attempt + 1}/3: {ex.Message}");
+            Thread.Sleep(1500);
+        }
     }
 }
 static void Run(string file, string args, bool ignoreError = false)
