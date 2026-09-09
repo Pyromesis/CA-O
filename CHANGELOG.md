@@ -2,6 +2,11 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
+## [2.1.17] - 2026-09-09
+
+### Corregido
+- Auto-update que "descargaba pero no aplicaba": la app verifica que el instalador siga vivo tras lanzarlo (si muere al abrir, informa con código de salida + ruta del log en vez de cerrar la app); el instalador arranca aunque falle el evento `Activated` (fallback a los 8 s, una sola vez) y su timeout sube de 10 a 30 min para discos lentos con antivirus.
+
 ## [2.1.16] - 2026-09-09
 
 ### Corregido

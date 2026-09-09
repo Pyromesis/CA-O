@@ -20,6 +20,7 @@ public sealed partial class MainWindow : Window
 
     private readonly bool _autoUpdate;
     private readonly string? _payloadOverrideDir;
+    private int _installStarted;
 
     public MainWindow()
     {
@@ -34,6 +35,15 @@ public sealed partial class MainWindow : Window
         if (_autoUpdate)
         {
             Activated += OnAutoUpdateActivated;
+            // Fallback: si Activated no llegara a dispararse, arrancar igual a
+            // los pocos segundos (una sola vez). Sin esto, un fallo silencioso
+            // dejaba la "actualización descargada pero nunca aplicada".
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(TimeSpan.FromSeconds(8));
+                if (Interlocked.CompareExchange(ref _installStarted, 1, 0) == 0)
+                    DispatcherQueue.TryEnqueue(() => _ = InstallAsync());
+            });
         }
         var productVersion = CAO.Shared.Constants.BuildConstants.ProductVersion;
         Title = $"CA-O {productVersion} Setup";
@@ -58,7 +68,8 @@ public sealed partial class MainWindow : Window
     private void OnAutoUpdateActivated(object sender, WindowActivatedEventArgs args)
     {
         Activated -= OnAutoUpdateActivated;
-        _ = InstallAsync();
+        if (Interlocked.CompareExchange(ref _installStarted, 1, 0) == 0)
+            _ = InstallAsync();
     }
 
 private async Task LoadPreviousAnalysisAsync()
@@ -95,7 +106,9 @@ private async Task InstallAsync()
         try { File.AppendAllText(logFile, $"[{DateTime.Now:O}] GUI Setup iniciado\n"); } catch { }
 
         var installCts = CancellationTokenSource.CreateLinkedTokenSource(_installCts.Token);
-        installCts.CancelAfter(TimeSpan.FromMinutes(10));
+        // 30 min: copiar ~1,7 GB con antivirus escrutando puede superar los 10 min
+        // en discos lentos y antes se reportaba como "cancelada por el usuario".
+        installCts.CancelAfter(TimeSpan.FromMinutes(30));
 
         try
         {

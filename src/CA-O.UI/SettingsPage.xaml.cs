@@ -455,11 +455,14 @@ public sealed partial class SettingsPage : Page
 
                 // Handoff con confirmación: antes la app se cerraba sola y si
                 // el instalador no aparecía (UAC cancelado, crash) el usuario
-                // se quedaba sin nada. Ahora solo se cierra al confirmar.
+                // se quedaba sin nada. Ahora se verifica que siga vivo y
+                // solo se cierra al confirmar.
+                var installerLog = Path.Combine(Path.GetTempPath(), "CA-O-Setup-Gui.log");
                 UpdateDetailText.Text = "Abriendo instalador...";
+                Process? installerProcess;
                 try
                 {
-                    Process.Start(new ProcessStartInfo(installer)
+                    installerProcess = Process.Start(new ProcessStartInfo(installer)
                     {
                         UseShellExecute = true,
                         Arguments = $"--auto-update --payload-dir=\"{payloadDir}\"",
@@ -471,10 +474,27 @@ public sealed partial class SettingsPage : Page
                     UpdateDetailText.Text = $"No se pudo abrir el instalador ({startEx.Message}). Ejecútalo a mano desde: {installer}";
                     return;
                 }
+                if (installerProcess is null)
+                {
+                    UpdateDetailText.Text = $"El instalador no arrancó. Ejecútalo a mano desde: {installer}";
+                    return;
+                }
+                // Liveness: si muere en los primeros segundos (crash al abrir),
+                // no tiene sentido cerrar la app: informar con log y ruta manual.
+                try { await Task.Delay(TimeSpan.FromSeconds(6), cts.Token); } catch { }
+                bool exitedEarly = false;
+                try { exitedEarly = installerProcess.HasExited; } catch { }
+                if (exitedEarly)
+                {
+                    int code;
+                    try { code = installerProcess.ExitCode; } catch { code = -1; }
+                    UpdateDetailText.Text = $"El instalador se cerró solo (código {code}) y no aplicó nada. Revisa el log: {installerLog} — o ejecútalo a mano desde: {installer}";
+                    return;
+                }
                 var handoff = new ContentDialog
                 {
                     Title = "Instalador en marcha",
-                    Content = $"El instalador debería estar abierto (acepta el UAC si te lo pide).\nSi no lo ves, ejecútalo a mano desde:\n{payloadDir}\n\n¿Cerrar esta app para continuar en el instalador?",
+                    Content = $"El instalador está abierto y trabajando (acepta el UAC si te lo pide).\nSi lo pierdes de vista, su log está en:\n{installerLog}\nManual en:\n{payloadDir}\n\n¿Cerrar esta app para continuar en el instalador?",
                     PrimaryButtonText = "Cerrar app y continuar",
                     CloseButtonText = "Ahora no",
                     DefaultButton = ContentDialogButton.Primary,
