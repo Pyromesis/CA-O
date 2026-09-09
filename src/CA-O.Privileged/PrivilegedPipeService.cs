@@ -328,6 +328,32 @@ catch (Exception ex)
                 }
             }
 
+            if (request.Operation == PrivilegedOperationKind.FixDriver && request.Payload is DriverFixPayload fix)
+            {
+                try
+                {
+                    var result = await engine.FixDriverAsync(fix.InstanceId, fix.Action, ct);
+                    return result.Success ? IpcResponse.Ok() : IpcResponse.Rejected(ErrorCodes.TxnApplyFailed, result.MessageEs);
+                }
+                catch (Exception ex)
+                {
+                    return IpcResponse.Rejected(ErrorCodes.TxnApplyFailed, $"Error corrigiendo driver: {ex.Message}");
+                }
+            }
+
+            if (request.Operation == PrivilegedOperationKind.InstallDriver && request.Payload is InstallDriverPayload install)
+            {
+                try
+                {
+                    var result = await engine.InstallDriverInfAsync(install.InfPath, install.InstanceId, ct);
+                    return result.Success ? IpcResponse.Ok() : IpcResponse.Rejected(ErrorCodes.TxnApplyFailed, result.MessageEs);
+                }
+                catch (Exception ex)
+                {
+                    return IpcResponse.Rejected(ErrorCodes.TxnApplyFailed, $"Error instalando driver: {ex.Message}");
+                }
+            }
+
             if (request.Operation == PrivilegedOperationKind.SetTimerResolution && request.Payload is SetTimerResolutionPayload timer)
             {
                 if (!TimerResolution.TrySet(timer.Resolution100Ns, out var actual, out var timerError))

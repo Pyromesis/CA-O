@@ -119,6 +119,11 @@
                     </NavigationViewItem.Icon>
                 </NavigationViewItem>
                 <NavigationViewItem Content="Solucionar" Tag="solucionar" Icon="Help" ToolTipService.ToolTip="Solucionar — audio, video y sistema"/>
+                <NavigationViewItem Content="Drivers" Tag="drivers" ToolTipService.ToolTip="Drivers — inventario, conflictos y firmas">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE950;" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
                 <NavigationViewItem Content="Benchmark" Tag="benchmark" ToolTipService.ToolTip="Benchmark — A/B honesto con suelo de ruido">
                     <NavigationViewItem.Icon>
                         <FontIcon Glyph="&#xE9D2;" />

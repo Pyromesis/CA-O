@@ -2,6 +2,14 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
+## [2.1.18] - 2026-09-09
+
+### Añadido
+- Nueva pestaña **Drivers**: inventario WMI (nombre, clase, fabricante, versión, fecha, firma), contadores (detectados/con problema/sin firmar/sin controlador), conflictos con significado en español y filtro por texto. Solo lectura.
+- **Corrección por dispositivo**: Habilitar (código 22), Re-detectar (código 28) y Reinstalar (`pnputil`, con confirmación), siempre verificado contra la lista de problemas.
+- **Originales del fabricante**: detección del equipo (fabricante/modelo/serie enmascarada), enlace oficial copiable (Dell por serie, Lenovo, HP, ASUS, Acer, MSI, Gigabyte, Samsung, Surface, Huawei, Xiaomi; catálogo Microsoft de fallback) e instalación de INF descargados con verificación.
+- Nueva operación IPC `FixDriver` + `InstallDriver` (validadas) y comandos `pnputil` en allowlist con Instance ID/Ruta INF estrictos (695 tests).
+
 ## [2.1.17] - 2026-09-09
 
 ### Corregido

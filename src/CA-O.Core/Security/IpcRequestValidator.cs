@@ -56,7 +56,7 @@ public static class IpcRequestValidator
             return false;
         }
 
-        // Ping, GetServiceStatus y SetDns no llevan OptimizationId (§10, FASE 8)
+        // Ping, GetServiceStatus, SetDns, SetTimerResolution, FixDriver e InstallDriver no llevan OptimizationId (§10, FASE 8)
         if (request.Operation is PrivilegedOperationKind.Ping or PrivilegedOperationKind.GetServiceStatus)
         {
             var pingExpected = request.Operation == PrivilegedOperationKind.Ping ? typeof(global::CAO.Shared.IPC.PingPayload) : typeof(global::CAO.Shared.IPC.GetServiceStatusPayload);
@@ -104,6 +104,41 @@ public static class IpcRequestValidator
             return true;
         }
 
+        if (request.Operation is PrivilegedOperationKind.FixDriver)
+        {
+            if (request.Payload is not global::CAO.Shared.IPC.DriverFixPayload fix)
+            {
+                errorCode = ErrorCodes.IpcPayloadSchemaInvalid;
+                error = "Payload de FixDriver inválido.";
+                return false;
+            }
+            if (!global::CAO.Shared.IPC.FixDriverActions.IsValid(fix.Action) ||
+                !global::CAO.Shared.Security.CommandPolicy.IsValidPnpInstanceId(fix.InstanceId))
+            {
+                error = "FixDriver InstanceId/Action no valido.";
+                return false;
+            }
+            error = string.Empty;
+            return true;
+        }
+        if (request.Operation is PrivilegedOperationKind.InstallDriver)
+        {
+            if (request.Payload is not global::CAO.Shared.IPC.InstallDriverPayload install)
+            {
+                errorCode = ErrorCodes.IpcPayloadSchemaInvalid;
+                error = "Payload de InstallDriver inválido.";
+                return false;
+            }
+            if (!global::CAO.Shared.Security.CommandPolicy.IsValidInfPath(install.InfPath) ||
+                (!string.IsNullOrEmpty(install.InstanceId) &&
+                 !global::CAO.Shared.Security.CommandPolicy.IsValidPnpInstanceId(install.InstanceId)))
+            {
+                error = "InstallDriver InfPath/InstanceId no valido.";
+                return false;
+            }
+            error = string.Empty;
+            return true;
+        }
         if (request.Payload is not global::CAO.Shared.IPC.IOptimizationIdPayload target)
         {
             errorCode = ErrorCodes.IpcPayloadSchemaInvalid;

@@ -19,7 +19,7 @@ public sealed class LocalizerTests
         string[] keys =
         [
             "app.title", "app.subtitle",
-            "nav.dashboard", "nav.analyze", "nav.optimize", "nav.gaming",
+            "nav.dashboard", "nav.analyze", "nav.optimize", "nav.drivers", "nav.gaming",
             "nav.diagnostics", "nav.benchmark", "nav.restore", "nav.history", "nav.settings",
             "dashboard.analyze", "dashboard.analyzing", "dashboard.lastAnalysis", "dashboard.never",
             "dashboard.recommended", "dashboard.optional", "dashboard.experimental",

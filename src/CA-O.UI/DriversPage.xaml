@@ -1,0 +1,148 @@
+<Page
+    x:Class="CAO.UI.Pages.DriversPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <ScrollViewer Padding="{StaticResource CaoPagePadding}" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Background="{ThemeResource SolidBackgroundFillColorBaseBrush}">
+        <StackPanel x:Name="PageContent" Style="{StaticResource CaoPageContainerStyle}">
+            <StackPanel Style="{StaticResource CaoPageHeaderStyle}">
+                <TextBlock Text="Controladores" TextAlignment="Center" Style="{StaticResource CaoPageTitleStyle}"/>
+                <TextBlock Text="Inventario completo, conflictos y firmas. Solo lectura: nada aquí modifica el sistema." TextAlignment="Center" Style="{StaticResource CaoSubtitleStyle}"/>
+                <Border Style="{StaticResource CaoHeaderAccentBarStyle}"/>
+            </StackPanel>
+            <InfoBar IsOpen="True" Severity="Informational" IsClosable="False"
+                     Title="Solo diagnóstico"
+                     Message="Lee tus drivers instalados (nombre, clase, versión, fecha, firma y estado). No instala ni cambia nada."/>
+
+            <Border Style="{StaticResource CaoCardStyle}">
+                <StackPanel Spacing="12">
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <Border Width="36" Height="36" CornerRadius="18" Background="{StaticResource CaoBlueSoftBrush}">
+                            <FontIcon Glyph="&#xE950;" FontSize="16" Foreground="{StaticResource CaoBlueSolidBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <StackPanel Spacing="2" VerticalAlignment="Center">
+                            <TextBlock Text="Escanear drivers" Style="{StaticResource CaoSectionTitleStyle}"/>
+                            <TextBlock Text="Lee el inventario vía WMI (tarda segundos)" Style="{StaticResource CaoSectionSubtitleStyle}"/>
+                        </StackPanel>
+                    </StackPanel>
+                    <Border Style="{StaticResource CaoDividerStyle}"/>
+                    <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+                        <Button x:Name="ScanButton" Content="Escanear" Click="OnScanClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="160" AutomationProperties.Name="Escanear drivers"/>
+                        <ProgressRing x:Name="ScanRing" Width="20" Height="20" IsActive="False" Visibility="Collapsed"/>
+                        <TextBlock x:Name="ScanStatusText" FontSize="11" Opacity="0.75" TextWrapping="Wrap" VerticalAlignment="Center" Text="Pulsa Escanear para leer tus drivers instalados."/>
+                    </StackPanel>
+                    <Grid ColumnSpacing="10">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                        <Border Background="{StaticResource CaoBlueSoftBrush}" CornerRadius="8" Padding="10">
+                            <StackPanel Spacing="4" HorizontalAlignment="Center">
+                                <TextBlock x:Name="TotalText" Text="—" FontWeight="Bold" FontSize="20" TextAlignment="Center"/>
+                                <TextBlock Text="Detectados" FontSize="10" Opacity="0.7" TextAlignment="Center"/>
+                            </StackPanel>
+                        </Border>
+                        <Border Grid.Column="1" Background="{StaticResource CaoGreenSoftBrush}" CornerRadius="8" Padding="10">
+                            <StackPanel Spacing="4" HorizontalAlignment="Center">
+                                <TextBlock x:Name="ProblemsText" Text="—" FontWeight="Bold" FontSize="20" TextAlignment="Center"/>
+                                <TextBlock Text="Con problema" FontSize="10" Opacity="0.7" TextAlignment="Center"/>
+                            </StackPanel>
+                        </Border>
+                        <Border Grid.Column="2" Background="{StaticResource CaoPurpleSoftBrush}" CornerRadius="8" Padding="10">
+                            <StackPanel Spacing="4" HorizontalAlignment="Center">
+                                <TextBlock x:Name="UnsignedText" Text="—" FontWeight="Bold" FontSize="20" TextAlignment="Center"/>
+                                <TextBlock Text="Sin firmar" FontSize="10" Opacity="0.7" TextAlignment="Center"/>
+                            </StackPanel>
+                        </Border>
+                        <Border Grid.Column="3" Background="{StaticResource CaoCyanSoftBrush}" CornerRadius="8" Padding="10">
+                            <StackPanel Spacing="4" HorizontalAlignment="Center">
+                                <TextBlock x:Name="MissingText" Text="—" FontWeight="Bold" FontSize="20" TextAlignment="Center"/>
+                                <TextBlock Text="Sin controlador" FontSize="10" Opacity="0.7" TextAlignment="Center"/>
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource CaoCardStyle}">
+                <StackPanel Spacing="12">
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <Border Width="36" Height="36" CornerRadius="18" Background="{StaticResource CaoGreenSoftBrush}">
+                            <FontIcon Glyph="&#xE930;" FontSize="16" Foreground="{StaticResource CaoGreenSolidBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <StackPanel Spacing="2" VerticalAlignment="Center">
+                            <TextBlock Text="Conflictos" Style="{StaticResource CaoSectionTitleStyle}"/>
+                            <TextBlock Text="Dispositivos que Windows marca con error" Style="{StaticResource CaoSectionSubtitleStyle}"/>
+                        </StackPanel>
+                    </StackPanel>
+                    <Border Style="{StaticResource CaoDividerStyle}"/>
+                    <TextBlock x:Name="ConflictsText" FontSize="12" TextWrapping="Wrap" Opacity="0.85" Text="Sin escanear: pulsa Escanear para detectar conflictos."/>
+                    <ListView x:Name="ConflictsList" SelectionMode="None" Visibility="Collapsed" AutomationProperties.Name="Conflictos con botón de corrección">
+                        <ListView.ItemTemplate>
+                            <DataTemplate>
+                                <Grid ColumnSpacing="10" Padding="0,6">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                    <StackPanel Spacing="2">
+                                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="12" TextWrapping="Wrap"/>
+                                        <TextBlock Text="{Binding Detail}" FontSize="11" Opacity="0.7" TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                        <Button Content="{Binding FixLabel}" Tag="{Binding}" Click="OnFixDriverClick" IsEnabled="{Binding CanFix}" Style="{StaticResource CaoActionButtonStyle}" MinWidth="120" AutomationProperties.Name="Corregir driver"/>
+                                        <Button Content="INF…" Tag="{Binding}" Click="OnRowInfClick" IsEnabled="{Binding CanFix}" Style="{StaticResource CaoActionButtonStyle}" MinWidth="70" AutomationProperties.Name="Instalar INF original para este dispositivo" ToolTipService.ToolTip="Elige el .inf oficial descargado para ESTE dispositivo."/>
+                                    </StackPanel>
+                                </Grid>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
+                    <TextBlock x:Name="FixStatusText" FontSize="12" TextWrapping="Wrap" Opacity="0.85" Visibility="Collapsed"/>
+                </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource CaoCardStyle}">
+                <StackPanel Spacing="12">
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <Border Width="36" Height="36" CornerRadius="18" Background="{StaticResource CaoCyanSoftBrush}">
+                            <FontIcon Glyph="&#xE8B7;" FontSize="16" Foreground="{StaticResource CaoCyanSolidBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <StackPanel Spacing="2" VerticalAlignment="Center">
+                            <TextBlock Text="Inventario" Style="{StaticResource CaoSectionTitleStyle}"/>
+                            <TextBlock Text="Todos los drivers detectados (filtra por texto)" Style="{StaticResource CaoSectionSubtitleStyle}"/>
+                        </StackPanel>
+                    </StackPanel>
+                    <Border Style="{StaticResource CaoDividerStyle}"/>
+                    <TextBox x:Name="SearchBox" PlaceholderText="Filtrar por nombre, clase o fabricante…" TextChanged="OnSearchChanged" AutomationProperties.Name="Filtrar drivers"/>
+                    <TextBlock x:Name="InventoryCountText" FontSize="11" Opacity="0.7"/>
+                    <ListView x:Name="DriversList" MaxHeight="420" SelectionMode="None" AutomationProperties.Name="Lista de drivers">
+                        <ListView.ItemTemplate>
+                            <DataTemplate>
+                                <StackPanel Spacing="2" Padding="0,6">
+                                    <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="12" TextWrapping="Wrap"/>
+                                    <TextBlock Text="{Binding Detail}" FontSize="11" Opacity="0.7" TextWrapping="Wrap" FontFamily="Consolas"/>
+                                </StackPanel>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
+                </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource CaoCardStyle}">
+                <StackPanel Spacing="12">
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <Border Width="36" Height="36" CornerRadius="18" Background="{StaticResource CaoPurpleSoftBrush}">
+                            <FontIcon Glyph="&#xE964;" FontSize="16" Foreground="{StaticResource CaoPurpleSolidBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <StackPanel Spacing="2" VerticalAlignment="Center">
+                            <TextBlock Text="Instalar originales" Style="{StaticResource CaoSectionTitleStyle}"/>
+                            <TextBlock Text="Fase 2: fabricante, descarga oficial e instalación" Style="{StaticResource CaoSectionSubtitleStyle}"/>
+                        </StackPanel>
+                    </StackPanel>
+                    <Border Style="{StaticResource CaoDividerStyle}"/>
+                    <TextBlock x:Name="OemText" FontSize="12" Opacity="0.85" TextWrapping="Wrap" Text="El fabricante se detecta al escanear."/>
+                    <TextBlock x:Name="VendorLinkText" FontSize="11" Opacity="0.75" TextWrapping="Wrap" IsTextSelectionEnabled="True"/>
+                    <StackPanel Orientation="Horizontal" Spacing="12">
+                        <Button x:Name="CopyVendorLinkButton" Content="Copiar enlace oficial" Click="OnCopyVendorLinkClick" IsEnabled="False" Style="{StaticResource CaoActionButtonStyle}" MinWidth="220" AutomationProperties.Name="Copiar enlace oficial del fabricante"/>
+                        <Button x:Name="PickInfButton" Content="Seleccionar INF…" Click="OnPickInfClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="220" AutomationProperties.Name="Seleccionar INF descargado del fabricante"/>
+                    </StackPanel>
+                    <TextBlock FontSize="11" Opacity="0.7" TextWrapping="Wrap" Text="Flujo: copia el enlace, descarga el driver de tu modelo en la web oficial, vuelve aquí, elige el .inf descargado y CA-O lo instala (pnputil) con verificación. Crea un punto de restauración antes si es un equipo crítico."/>
+                    <TextBlock x:Name="InfStatusText" FontSize="12" TextWrapping="Wrap" Opacity="0.85" Visibility="Collapsed"/>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</Page>

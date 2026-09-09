@@ -341,6 +341,135 @@ public sealed class OptimizationEngine
         return OperationResult.Ok($"DNS {pairLabel} aplicado a {interfaceName} — verificado (mismo proveedor, sin mezclar).");
     }
 
+    /// <summary>
+    /// Corrige un dispositivo con problema vía pnputil (fase drivers 2).
+    /// rescan = re-detectar; enable = habilitar; reinstall = desinstalar +
+    /// re-detectar (reinstala el controlador de la tienda de drivers).
+    /// Verifica con `pnputil /enum-devices /problem`: éxito solo si el
+    /// dispositivo ya no aparece listado. Nunca lanza.
+    /// </summary>
+    public async Task<OperationResult> FixDriverAsync(string instanceId, string action, CancellationToken ct = default)
+    {
+        // La entrada se valida antes que los privilegios: rechazar basura no
+        // requiere permisos (y así es testeable sin elevación).
+        if (!global::CAO.Shared.IPC.FixDriverActions.IsValid(action))
+            return OperationResult.Fail($"Acción no válida: {action}", "invalid-action");
+        if (!global::CAO.Shared.Security.CommandPolicy.IsValidPnpInstanceId(instanceId))
+            return OperationResult.Fail("ID de instancia no válido.", "invalid-id");
+        if (!IsRunningAsAdmin()) return OperationResult.Fail("Se requieren privilegios.", "not-admin");
+        if (_executor is null) return OperationResult.Fail("Ejecutor no disponible.", "no-executor");
+
+        try
+        {
+            if (action == global::CAO.Shared.IPC.FixDriverActions.Enable)
+            {
+                var enable = await _executor.ExecuteAsync(
+                    global::CAO.Shared.Security.SystemCommandKey.PnPUtilEnableDevice,
+                    ["/enable-device", instanceId], ct);
+                if (!enable.Success)
+                    return OperationResult.Fail($"No se pudo habilitar el dispositivo: {enable.StdErr}", enable.StdErr);
+            }
+            else if (action == global::CAO.Shared.IPC.FixDriverActions.Reinstall)
+            {
+                var remove = await _executor.ExecuteAsync(
+                    global::CAO.Shared.Security.SystemCommandKey.PnPUtilRemoveDevice,
+                    ["/remove-device", instanceId], ct);
+                if (!remove.Success)
+                    return OperationResult.Fail($"No se pudo desinstalar el dispositivo: {remove.StdErr}", remove.StdErr);
+            }
+            // rescan tras habilitar/reinstalar (y como acción propia): re-enumera
+            // el hardware para que Windows recargue el controlador.
+            var scan = await _executor.ExecuteAsync(
+                global::CAO.Shared.Security.SystemCommandKey.PnPUtilScanDevices,
+                ["/scan-devices"], ct);
+            if (!scan.Success)
+                return OperationResult.Fail($"Re-detección fallida: {scan.StdErr}", scan.StdErr);
+
+            try { await Task.Delay(TimeSpan.FromSeconds(3), ct); } catch { }
+
+            var problems = await _executor.ExecuteAsync(
+                global::CAO.Shared.Security.SystemCommandKey.PnPUtilEnumProblemDevices,
+                ["/enum-devices", "/problem"], ct);
+            if (!problems.Success)
+                return OperationResult.Ok("Acción ejecutada, pero no se pudo verificar (lista de problemas ilegible). Revisa Administrador de dispositivos.");
+
+            if (IsProblemListed(problems.StdOut, instanceId))
+                return OperationResult.Fail(
+                    "El dispositivo sigue reportando problema tras la corrección. Prueba con el controlador original del fabricante (fase 2) o reinicia el equipo.",
+                    "still-broken");
+            var rebootHint = problems.StdOut.Contains("reboot", StringComparison.OrdinalIgnoreCase) ? " (si pide reinicio, reinicia para completar)" : string.Empty;
+            return OperationResult.Ok($"Dispositivo corregido: ya no reporta problema{rebootHint}.");
+        }
+        catch (Exception ex)
+        {
+            return OperationResult.Fail($"Error corrigiendo el dispositivo ({ex.GetType().Name}: {ex.Message}).", "unexpected");
+        }
+    }
+
+    internal static bool IsProblemListed(string enumOutput, string instanceId)
+    {
+        foreach (var line in enumOutput.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries))
+        {
+            var trimmed = line.Trim();
+            if (trimmed.StartsWith("Instance ID:", StringComparison.OrdinalIgnoreCase) &&
+                trimmed["Instance ID:".Length..].Trim().Equals(instanceId, StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Instala un INF del fabricante (pnputil /add-driver + /install) y
+    /// re-detecta. Si se indica InstanceId de un dispositivo con problema,
+    /// éxito solo si desaparece de la lista; si no, vale el exit code con
+    /// aviso de comprobar en Administrador de dispositivos. Nunca lanza.
+    /// </summary>
+    public async Task<OperationResult> InstallDriverInfAsync(string infPath, string instanceId, CancellationToken ct = default)
+    {
+        if (!global::CAO.Shared.Security.CommandPolicy.IsValidInfPath(infPath))
+            return OperationResult.Fail("Ruta INF no válida.", "invalid-inf");
+        if (!string.IsNullOrEmpty(instanceId) &&
+            !global::CAO.Shared.Security.CommandPolicy.IsValidPnpInstanceId(instanceId))
+            return OperationResult.Fail("ID de instancia no válido.", "invalid-id");
+        if (!IsRunningAsAdmin()) return OperationResult.Fail("Se requieren privilegios.", "not-admin");
+        if (_executor is null) return OperationResult.Fail("Ejecutor no disponible.", "no-executor");
+
+        try
+        {
+            var add = await _executor.ExecuteAsync(
+                global::CAO.Shared.Security.SystemCommandKey.PnPUtilAddDriver,
+                ["/add-driver", infPath, "/install"], ct);
+            if (!add.Success)
+                return OperationResult.Fail($"No se pudo instalar el controlador: {add.StdErr}", add.StdErr);
+
+            var scan = await _executor.ExecuteAsync(
+                global::CAO.Shared.Security.SystemCommandKey.PnPUtilScanDevices,
+                ["/scan-devices"], ct);
+            if (!scan.Success)
+                return OperationResult.Fail($"Instalado, pero la re-detección falló: {scan.StdErr}", scan.StdErr);
+
+            if (string.IsNullOrEmpty(instanceId))
+                return OperationResult.Ok("Controlador instalado (pnputil exit 0). Comprueba el dispositivo en Administrador de dispositivos.");
+
+            try { await Task.Delay(TimeSpan.FromSeconds(3), ct); } catch { }
+
+            var problems = await _executor.ExecuteAsync(
+                global::CAO.Shared.Security.SystemCommandKey.PnPUtilEnumProblemDevices,
+                ["/enum-devices", "/problem"], ct);
+            if (!problems.Success)
+                return OperationResult.Ok("Controlador instalado, pero no se pudo verificar (lista ilegible). Revisa Administrador de dispositivos.");
+            if (IsProblemListed(problems.StdOut, instanceId))
+                return OperationResult.Fail(
+                    "Instalado, pero el dispositivo sigue con problema. Prueba otro INF del fabricante o reinicia.",
+                    "still-broken");
+            return OperationResult.Ok("Controlador original instalado y dispositivo sin problema.");
+        }
+        catch (Exception ex)
+        {
+            return OperationResult.Fail($"Error instalando el controlador ({ex.GetType().Name}: {ex.Message}).", "unexpected");
+        }
+    }
+
     private async Task RollbackDnsExact(string interfaceName, bool wasDhcp, string[] beforeDnsV4, string[] beforeDnsV6, CancellationToken ct)
     {
         if (_executor == null) return;

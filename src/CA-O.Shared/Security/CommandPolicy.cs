@@ -53,6 +53,11 @@ public enum SystemCommandKey
     WprStartCpuFileMode,
     WprStopToDefaultFile,
     LogmanDeleteSession,
+    PnPUtilScanDevices,
+    PnPUtilEnumProblemDevices,
+    PnPUtilEnableDevice,
+    PnPUtilRemoveDevice,
+    PnPUtilAddDriver,
 }
 
 /// <summary>Normalized result captured by the gateway.</summary>
@@ -83,7 +88,14 @@ public static partial class CommandPolicy
     /// </summary>
     public static string? Resolve(SystemCommandKey key, IReadOnlyList<string> arguments)
     {
-        if (arguments.Any(arg => string.IsNullOrWhiteSpace(arg) || !SafeArg().IsMatch(arg)))
+        // Los Instance ID PNP contienen '&' legítimo (p. ej. HDAUDIO\FUNC_01&VEN_...),
+        // vetado por SafeArg, y las rutas INF reales llevan espacios/paréntesis:
+        // esas claves usan su propio validador estricto (sin shell de por medio:
+        // ArgumentList nunca interpreta metacaracteres).
+        var customValidatedKey = key is SystemCommandKey.PnPUtilEnableDevice
+            or SystemCommandKey.PnPUtilRemoveDevice
+            or SystemCommandKey.PnPUtilAddDriver;
+        if (!customValidatedKey && arguments.Any(arg => string.IsNullOrWhiteSpace(arg) || !SafeArg().IsMatch(arg)))
         {
             return null;
         }
@@ -287,6 +299,27 @@ public static partial class CommandPolicy
                 "delete", "CAO-DPC", "-ets") =>
                 Path.Combine(system32, "logman.exe"),
 
+            // Fase drivers: pnputil solo con formas fijas; el ID de instancia
+            // va validado por IsValidPnpInstanceId (sin espacios, comillas ni
+            // metacaracteres de shell) y viaja por ArgumentList, nunca por shell.
+            SystemCommandKey.PnPUtilScanDevices when Eq(arguments, "/scan-devices") =>
+                Path.Combine(system32, "pnputil.exe"),
+
+            SystemCommandKey.PnPUtilEnumProblemDevices when Eq(arguments, "/enum-devices", "/problem") =>
+                Path.Combine(system32, "pnputil.exe"),
+
+            SystemCommandKey.PnPUtilEnableDevice when arguments.Count == 2 &&
+                arguments[0] == "/enable-device" && IsValidPnpInstanceId(arguments[1]) =>
+                Path.Combine(system32, "pnputil.exe"),
+
+            SystemCommandKey.PnPUtilRemoveDevice when arguments.Count == 2 &&
+                arguments[0] == "/remove-device" && IsValidPnpInstanceId(arguments[1]) =>
+                Path.Combine(system32, "pnputil.exe"),
+
+            SystemCommandKey.PnPUtilAddDriver when arguments.Count == 3 &&
+                arguments[0] == "/add-driver" && IsValidInfPath(arguments[1]) && arguments[2] == "/install" =>
+                Path.Combine(system32, "pnputil.exe"),
+
             _ => null,
         };
     }
@@ -322,6 +355,33 @@ public static partial class CommandPolicy
     private static bool IsValidTaskName(string name) =>
         !string.IsNullOrWhiteSpace(name) && name.Length <= 256 &&
         name.StartsWith('\\') && !name.Contains("..") && SafeArg().IsMatch(name);
+
+    [GeneratedRegex(@"^[A-Za-z0-9\\&_\-+#.()]+$", RegexOptions.CultureInvariant)]
+    private static partial Regex PnpInstanceId();
+
+    /// <summary>
+    /// Instance ID PNP estricto (p. ej. HDAUDIO\FUNC_01&amp;VEN_10EC&amp;DEV_0283...).
+    /// Permite '&amp;' y '\' legítimos; veta espacios, comillas, ';', '|', '%', '^',
+    /// '$', '`', saltos y '..'. El token viaja por ArgumentList (sin shell).
+    /// </summary>
+    public static bool IsValidPnpInstanceId(string id) =>
+        !string.IsNullOrWhiteSpace(id) && id.Length <= 256 && !id.Contains("..") && PnpInstanceId().IsMatch(id);
+
+    /// <summary>
+    /// Ruta INF estricta para pnputil /add-driver: absoluta, extensión .inf,
+    /// sin '..', sin ADS (':' solo tras la unidad), sin comillas ni control.
+    /// Se permiten espacios y paréntesis de carpetas reales de Descargas.
+    /// </summary>
+    public static bool IsValidInfPath(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path) || path.Length > 260) return false;
+        if (!Path.IsPathFullyQualified(path)) return false;
+        if (!".inf".Equals(Path.GetExtension(path), StringComparison.OrdinalIgnoreCase)) return false;
+        if (path.Contains("..")) return false;
+        if (path.IndexOf(':', 2) >= 0) return false;
+        if (path.Any(c => c is '"' or '\'' or '\n' or '\r' or '\t' or '\0' || char.IsControl(c))) return false;
+        return true;
+    }
 
     private static bool IsValidInterfaceName(string name) =>
         !string.IsNullOrWhiteSpace(name) && name.Length <= 64 && SafeArg().IsMatch(name);

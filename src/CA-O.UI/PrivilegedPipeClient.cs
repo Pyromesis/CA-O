@@ -36,6 +36,14 @@ public sealed class PrivilegedPipeClient
             var dns = parts.Length > 1 ? parts[1] : "";
             payload = new SetDnsPayload(iface, dns);
         }
+        else if (operation == PrivilegedOperationKind.FixDriver)
+        {
+            // optimizationId lleva "instanceId|action" para FixDriver
+            var parts = optimizationId.Split('|', 2);
+            var instanceId = parts.Length > 0 ? parts[0] : "";
+            var action = parts.Length > 1 ? parts[1] : "";
+            payload = new DriverFixPayload(instanceId, action);
+        }
         else
         {
             payload = operation switch
@@ -53,6 +61,12 @@ public sealed class PrivilegedPipeClient
 
         return SendPayloadAsync(operation, payload, ct);
     }
+
+    public Task<IpcResponse?> FixDriverAsync(string instanceId, string action, CancellationToken ct = default) =>
+        SendAsync(PrivilegedOperationKind.FixDriver, $"{instanceId}|{action}", ct);
+
+    public Task<IpcResponse?> InstallDriverAsync(string infPath, string instanceId, CancellationToken ct = default) =>
+        SendPayloadAsync(PrivilegedOperationKind.InstallDriver, new InstallDriverPayload(infPath, instanceId), ct);
 
     public Task<IpcResponse?> SetTimerResolutionAsync(uint resolution100Ns, CancellationToken ct = default) =>
         SendPayloadAsync(PrivilegedOperationKind.SetTimerResolution, new SetTimerResolutionPayload(resolution100Ns), ct);

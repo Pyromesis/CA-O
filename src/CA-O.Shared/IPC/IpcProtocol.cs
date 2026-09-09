@@ -29,6 +29,8 @@ public enum PrivilegedOperationKind
     GetServiceStatus,
     SetDns,
     SetTimerResolution,
+    FixDriver,
+    InstallDriver,
 }
 
 /// <summary>
@@ -51,6 +53,8 @@ public interface IOptimizationIdPayload : ITypedPayload
 [JsonDerivedType(typeof(GetServiceStatusPayload), "status")]
 [JsonDerivedType(typeof(SetDnsPayload), "setdns")]
 [JsonDerivedType(typeof(SetTimerResolutionPayload), "settimer")]
+[JsonDerivedType(typeof(DriverFixPayload), "driverfix")]
+[JsonDerivedType(typeof(InstallDriverPayload), "installdriver")]
 public interface ITypedPayload
 {
 }
@@ -73,6 +77,27 @@ public sealed record SetDnsPayload(string InterfaceName, string DnsIp) : ITypedP
 
 /// <summary>Desired system timer resolution in 100-ns units (5000 = 0.5 ms, 156250 = default).</summary>
 public sealed record SetTimerResolutionPayload(uint Resolution100Ns) : ITypedPayload;
+
+/// <summary>Corrección de un dispositivo: rescan | enable | reinstall (ver FixDriverActions).</summary>
+public sealed record DriverFixPayload(string InstanceId, string Action) : ITypedPayload;
+
+/// <summary>Acciones permitidas de FixDriver (lista cerrada en validador y motor).</summary>
+public static class FixDriverActions
+{
+    public const string Rescan = "rescan";
+    public const string Enable = "enable";
+    public const string Reinstall = "reinstall";
+
+    public static bool IsValid(string? action) =>
+        action is Rescan or Enable or Reinstall;
+}
+
+/// <summary>
+/// Instala un INF descargado del fabricante (pnputil /add-driver + /install).
+/// InstanceId opcional: si se indica y estaba en la lista de problemas, se
+/// verifica su desaparición; si no, solo vale el exit code de pnputil.
+/// </summary>
+public sealed record InstallDriverPayload(string InfPath, string InstanceId = "") : ITypedPayload;
 
 public sealed record PingResponse(string ServiceVersion, int ProtocolVersion, int ProcessId, bool IsSystem, string Status);
 public sealed record ServiceStatusResponse(string ServiceVersion, int ProtocolVersion, int ProcessId, bool IsSystem, string Status, IReadOnlyList<string> Capabilities);
