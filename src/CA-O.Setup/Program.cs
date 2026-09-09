@@ -124,6 +124,40 @@ if (!File.Exists(payloadUi) || !File.Exists(payloadService))
     }
 }
 
+// Handoff al setup gráfico (bonito: Mica, progreso, diálogos). Este exe solo
+// descarga+extrae y deriva; si no hay GUI en el payload, sigue por consola.
+{
+    var uiDir = Path.GetDirectoryName(payloadUi);
+    var payloadRoot = uiDir != null ? Path.GetDirectoryName(uiDir) : null;
+    var guiExe = payloadRoot != null ? Path.Combine(payloadRoot, "gui-installer", "CA-O.InstallerGui.exe") : null;
+    if (guiExe != null && File.Exists(guiExe))
+    {
+        Console.WriteLine("Abriendo instalador gráfico...");
+        UnblockTree(payloadRoot!);
+        try
+        {
+            Process.Start(new ProcessStartInfo(guiExe)
+            {
+                UseShellExecute = true,
+                Arguments = $"--auto-update --payload-dir=\"{payloadRoot}\"",
+                WorkingDirectory = Path.GetDirectoryName(guiExe)!,
+            });
+            Console.WriteLine("Instalador gráfico en marcha. Cerrando descargador...");
+            Log("Handoff a InstallerGui; descargador termina.");
+            return 0;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"No se pudo abrir el gráfico ({ex.Message}); sigo por consola...");
+            Log($"Handoff GUI falló, fallback consola: {ex.Message}");
+        }
+    }
+    else
+    {
+        Log("Sin instalador gráfico en payload; instalación por consola.");
+    }
+}
+
 try
 {
     // ANTES de copiar: si hay instalación previa, detener servicio y cerrar UI
@@ -311,6 +345,21 @@ static string? GetLatestFullAssetUrl()
 static void CopyDirectory(string src, string dst)
 {
     CopyDirectoryRetry(src, dst);
+}
+// Quita Mark-of-the-Web heredado del ZIP para que SmartScreen no frene los
+// ejecutables auto-lanzados. Best-effort, nunca lanza.
+static void UnblockTree(string dir)
+{
+    try
+    {
+        if (!Directory.Exists(dir)) return;
+        foreach (var file in Directory.GetFiles(dir, "*", SearchOption.AllDirectories))
+        {
+            try { File.Delete(file + ":Zone.Identifier"); }
+            catch { }
+        }
+    }
+    catch { }
 }
 // Copia con reintentos ante bloqueos transitorios (servicio deteniéndose,
 // antivirus escaneando). Solo el último intento propaga el error.
