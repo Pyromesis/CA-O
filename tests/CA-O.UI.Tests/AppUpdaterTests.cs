@@ -128,6 +128,43 @@ public sealed class AppUpdaterTests
     }
 
     [Fact]
+    public void UnblockTree_RemovesZoneIdentifierKeepsContent()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "cao-unblock-test-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        try
+        {
+            var file = Path.Combine(dir, "app.exe");
+            File.WriteAllText(file, "binary-stub");
+            File.WriteAllText(file + ":Zone.Identifier", "[ZoneTransfer]\nZoneId=3");
+            Assert.True(AdsExists(file));
+            AppUpdater.UnblockTree(dir);
+            Assert.False(AdsExists(file));
+            Assert.Equal("binary-stub", File.ReadAllText(file));
+        }
+        finally { try { Directory.Delete(dir, recursive: true); } catch { } }
+    }
+
+    [Fact]
+    public void UnblockTree_MissingDirDoesNotThrow()
+    {
+        Assert.Equal(0, AppUpdater.UnblockTree(Path.Combine(Path.GetTempPath(), "cao-nope-" + Guid.NewGuid().ToString("N"))));
+    }
+
+    private static bool AdsExists(string file)
+    {
+        try
+        {
+            using var _ = File.OpenRead(file + ":Zone.Identifier");
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    [Fact]
     public async Task ExecuteWithRetry_GivesUpAfterMaxAttempts()
     {
         var attempts = 0;

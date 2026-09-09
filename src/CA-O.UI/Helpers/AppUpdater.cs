@@ -180,6 +180,44 @@ public static class AppUpdater
     }
 
     /// <summary>
+    /// Quita Mark-of-the-Web (Zone.Identifier) de un árbol descargado. Los
+    /// archivos extraídos de un ZIP de internet heredan la marca y SmartScreen
+    /// puede frenar el instalador auto-lanzado en silencio (el proceso vive
+    /// pero su ventana nunca aparece). Best-effort: nunca lanza.
+    /// Devuelve cuántos ADS eliminó.
+    /// </summary>
+    public static int UnblockTree(string directory)
+    {
+        var removed = 0;
+        try
+        {
+            if (File.Exists(directory))
+                return TryDeleteAds(directory) ? 1 : 0;
+            if (!Directory.Exists(directory)) return 0;
+            foreach (var file in Directory.EnumerateFiles(directory, "*", SearchOption.AllDirectories))
+            {
+                if (TryDeleteAds(file)) removed++;
+            }
+        }
+        catch { }
+        return removed;
+    }
+
+    private static bool TryDeleteAds(string file)
+    {
+        try
+        {
+            File.Delete(file + ":Zone.Identifier");
+            return true;
+        }
+        catch (FileNotFoundException) { return false; }
+        catch (DirectoryNotFoundException) { return false; }
+        catch (UnauthorizedAccessException) { return false; }
+        catch (IOException) { return false; }
+        catch (NotSupportedException) { return false; }
+    }
+
+    /// <summary>
     /// Reintenta una operación ante bloqueos transitorios del archivo (p. ej. el antivirus
     /// escaneando el ZIP recién descargado). Solo reintenta IOException; cualquier otro
     /// error se propaga de inmediato.

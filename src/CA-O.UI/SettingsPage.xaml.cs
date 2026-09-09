@@ -416,6 +416,9 @@ public sealed partial class SettingsPage : Page
                 // progreso limitado, la ventana sigue respondiendo durante los
                 // varios minutos que tarda un paquete de ~400 MB.
                 var downloadUrl = _uiState.LatestAssetUrl;
+                // Sin ConfigureAwait(false): lo que sigue toca UI (TextBlock,
+                // diálogos) y debe continuar en el hilo UI. El trabajo pesado
+                // vive dentro (Task.Run + ConfigureAwait(false) internos).
                 await Task.Run(() => Helpers.AppUpdater.DownloadAsync(downloadUrl, zipPath, progress, cts.Token), cts.Token);
 
                 // Verifica integridad: el tamaño debe coincidir con el anunciado por el release.
@@ -426,6 +429,9 @@ public sealed partial class SettingsPage : Page
                     try { File.Delete(zipPath); } catch { }
                     throw new InvalidOperationException($"Descarga incompleta ({actualBytes} de {expectedBytes} bytes). Reintenta.");
                 }
+                // Quita Mark-of-the-Web del ZIP para que lo extraído no lo herede
+                // (SmartScreen frenaba el instalador auto-lanzado en silencio).
+                Helpers.AppUpdater.UnblockTree(zipPath);
 
                 var payloadDir = Path.Combine(updateDir, "payload");
                 // Borrado + extracción fuera del hilo UI con progreso REAL
@@ -435,7 +441,7 @@ public sealed partial class SettingsPage : Page
                 await Task.Run(() =>
                 {
                     if (Directory.Exists(payloadDir)) Directory.Delete(payloadDir, recursive: true);
-                }, cts.Token).ConfigureAwait(false);
+                }, cts.Token);
                 var extractProgress = new Progress<(double Ratio, int Done, int Total)>(p => DispatcherQueue.TryEnqueue(() =>
                 {
                     UpdateProgressBar.IsIndeterminate = false;
@@ -444,7 +450,11 @@ public sealed partial class SettingsPage : Page
                 }));
                 await Helpers.AppUpdater.ExecuteWithRetryAsync(
                     () => Helpers.AppUpdater.ExtractWithProgressAsync(zipPath, payloadDir, extractProgress, cts.Token),
-                    ct: cts.Token).ConfigureAwait(false);
+                    ct: cts.Token);
+                // Los archivos pueden traer Zone.Identifier aunque el ZIP se
+                // desbloqueara (cachés/proxies lo re-marcan): limpiar el árbol.
+                UpdateDetailText.Text = "Quitando bloqueos de Windows (SmartScreen)...";
+                await Task.Run(() => Helpers.AppUpdater.UnblockTree(payloadDir), cts.Token);
 
                 var installer = Path.Combine(payloadDir, "gui-installer", "CA-O.InstallerGui.exe");
                 if (!File.Exists(installer))
@@ -479,11 +489,23 @@ public sealed partial class SettingsPage : Page
                     UpdateDetailText.Text = $"El instalador no arrancó. Ejecútalo a mano desde: {installer}";
                     return;
                 }
-                // Liveness: si muere en los primeros segundos (crash al abrir),
-                // no tiene sentido cerrar la app: informar con log y ruta manual.
-                try { await Task.Delay(TimeSpan.FromSeconds(6), cts.Token); } catch { }
-                bool exitedEarly = false;
-                try { exitedEarly = installerProcess.HasExited; } catch { }
+                // Liveness REAL: no basta con que el proceso viva (atascado tras
+                // SmartScreen también "vive") — se exige ventana principal hasta
+                // 25 s. Sin ventana: avisar en vez de cerrar la app a ciegas.
+                UpdateDetailText.Text = "Esperando la ventana del instalador...";
+                var hasWindow = false;
+                var exitedEarly = false;
+                for (var i = 0; i < 25; i++)
+                {
+                    try
+                    {
+                        installerProcess.Refresh();
+                        if (installerProcess.HasExited) { exitedEarly = true; break; }
+                        if (installerProcess.MainWindowHandle != IntPtr.Zero) { hasWindow = true; break; }
+                    }
+                    catch { break; }
+                    try { await Task.Delay(TimeSpan.FromSeconds(1), cts.Token); } catch { break; }
+                }
                 if (exitedEarly)
                 {
                     int code;
@@ -491,10 +513,15 @@ public sealed partial class SettingsPage : Page
                     UpdateDetailText.Text = $"El instalador se cerró solo (código {code}) y no aplicó nada. Revisa el log: {installerLog} — o ejecútalo a mano desde: {installer}";
                     return;
                 }
+                if (!hasWindow)
+                {
+                    UpdateDetailText.Text = $"El instalador arrancó pero no muestra ventana (¿lo frenó SmartScreen? Busca su aviso y acepta). Si no aparece, ejecútalo a mano desde: {installer} — log: {installerLog}";
+                    return;
+                }
                 var handoff = new ContentDialog
                 {
                     Title = "Instalador en marcha",
-                    Content = $"El instalador está abierto y trabajando (acepta el UAC si te lo pide).\nSi lo pierdes de vista, su log está en:\n{installerLog}\nManual en:\n{payloadDir}\n\n¿Cerrar esta app para continuar en el instalador?",
+                    Content = $"El instalador está abierto y trabajando (acepta el UAC y SmartScreen si te lo piden).\nSi lo pierdes de vista, su log está en:\n{installerLog}\nManual en:\n{payloadDir}\n\n¿Cerrar esta app para continuar en el instalador?",
                     PrimaryButtonText = "Cerrar app y continuar",
                     CloseButtonText = "Ahora no",
                     DefaultButton = ContentDialogButton.Primary,

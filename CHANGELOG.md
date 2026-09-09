@@ -2,6 +2,12 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
+## [2.1.19] - 2026-09-09
+
+### Corregido
+- Update que "descargaba pero cerraba la app sin aplicar": el handler tocaba UI tras `ConfigureAwait(false)` (hilo fondo) y el `catch` volvía a tocar UI → excepción no manejada → cierre. Ahora las continuaciones del flujo vuelven al hilo UI.
+- Mark-of-the-Web: se desbloquea el ZIP y el árbol extraído (Zone.Identifier) para que SmartScreen no frene el instalador en silencio; el handoff exige ventana real del instalador (hasta 25 s) antes de ofrecer cerrar la app.
+
 ## [2.1.18] - 2026-09-09
 
 ### Añadido
