@@ -141,12 +141,24 @@ public sealed partial class SettingsPage : Page
 
         if (IsConnected(status))
         {
-            ServiceStatusText.Text = "✓ Servicio activo y conectado";
-            ServiceDetailText.Text = string.IsNullOrEmpty(lastCheck)
-                ? "El servicio privilegiado está funcionando correctamente."
-                : $"El servicio privilegiado está funcionando correctamente. {lastCheck}";
-            if (ServiceInstallButton != null) ServiceInstallButton.Visibility = Visibility.Collapsed;
-            if (ServiceCheckButton != null) ServiceCheckButton.Content = Localizer.Get("settings.serviceStateOk");
+            var serviceVersion = _uiState?.ServiceVersion ?? string.Empty;
+            if (Helpers.ServiceVersionProbe.IsStale(serviceVersion))
+            {
+                var appVersion = Helpers.AppUpdater.CurrentVersion;
+                ServiceStatusText.Text = $"⚠ Servicio desactualizado ({serviceVersion})";
+                ServiceDetailText.Text = $"La app es {appVersion} pero el servicio instalado es {serviceVersion}: los últimos fixes no están activos. Pulsa 'Instalar ahora' para actualizarlo.";
+                if (ServiceInstallButton != null) ServiceInstallButton.Visibility = Visibility.Visible;
+                if (ServiceCheckButton != null) ServiceCheckButton.Content = Localizer.Get("settings.serviceCheck");
+            }
+            else
+            {
+                ServiceStatusText.Text = "✓ Servicio activo y conectado";
+                ServiceDetailText.Text = string.IsNullOrEmpty(lastCheck)
+                    ? "El servicio privilegiado está funcionando correctamente."
+                    : $"El servicio privilegiado está funcionando correctamente. {lastCheck}";
+                if (ServiceInstallButton != null) ServiceInstallButton.Visibility = Visibility.Collapsed;
+                if (ServiceCheckButton != null) ServiceCheckButton.Content = Localizer.Get("settings.serviceStateOk");
+            }
         }
         else
         {

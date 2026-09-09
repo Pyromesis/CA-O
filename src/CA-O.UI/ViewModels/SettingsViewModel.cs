@@ -56,6 +56,8 @@ public sealed partial class SettingsViewModel : ObservableObject
             ServiceCheckedUtc = DateTime.UtcNow;
             _state.ServiceStatus = ServiceStatus;
             _state.ServiceCheckedUtc = ServiceCheckedUtc;
+            if (ServiceStatus == "connected")
+                _state.ServiceVersion = await Helpers.ServiceVersionProbe.FetchAsync(_pipe, ct) ?? string.Empty;
         }
         catch (Exception)
         {

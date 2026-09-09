@@ -2,6 +2,15 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
+## [2.1.14] - 2026-09-09
+
+### Añadido
+- Nuevo `recover-windows-explorer`: trae de vuelta barra y escritorio sin matar nada (idempotente, solo actúa si falta el shell). Botón "Recuperar Explorador" en Solucionar.
+
+### Corregido
+- Reinicio del Explorador: si la vía servicio falla o está desactualizada, la UI aplica fallback local en tu sesión (relanza `explorer.exe`); nunca más silencio + sin escritorio. Lógica del shell centralizada en `ExplorerShell` (espera de salida/arranque hasta 30 s).
+- Ajustes muestra "Servicio desactualizado (x.y.z)" cuando el servicio instalado no coincide con la app, con botón para reinstalarlo: los fixes viven en el servicio y antes se ejecutaba el binario viejo sin avisar.
+
 ## [2.1.13] - 2026-09-09
 
 ### Corregido

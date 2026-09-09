@@ -54,6 +54,10 @@ public sealed partial class SolucionarPage : Page
         _ => SystemStatusText,
     };
 
+    private static bool IsExplorerFix(string id) =>
+        id.Equals("restart-windows-explorer", StringComparison.Ordinal) ||
+        id.Equals("recover-windows-explorer", StringComparison.Ordinal);
+
     private async Task RunFixAsync(string optimizationId, TextBlock? target, bool confirm)
     {
         if (confirm)
@@ -75,14 +79,35 @@ public sealed partial class SolucionarPage : Page
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(120));
             var pipe = AppHost.Resolve<PrivilegedPipeClient>();
             var response = await pipe.ApplyAsync(optimizationId, cts.Token);
-            var message = response is { Accepted: true }
-                ? "✓ Solucionado."
-                : $"Rechazado [{response?.ErrorCode}]: {response?.SafeMessage ?? "sin respuesta"}";
+            if (response is { Accepted: true })
+            {
+                if (target != null) target.Text = $"{optimizationId}: ✓ Solucionado.";
+                return;
+            }
+            var message = $"Rechazado [{response?.ErrorCode}]: {response?.SafeMessage ?? "sin respuesta"}";
+            // Plan B local para el shell: la UI vive en la sesión del usuario
+            // y puede relanzar explorer.exe sin el servicio (p. ej. servicio
+            // desactualizado sin este id, o pipe saturado).
+            if (IsExplorerFix(optimizationId))
+            {
+                var local = await Helpers.ExplorerRecovery.RecoverLocallyAsync(
+                    killLeftovers: optimizationId.Equals("restart-windows-explorer", StringComparison.Ordinal),
+                    CancellationToken.None);
+                message += $"\nFallback local: {local}";
+            }
             if (target != null) target.Text = $"{optimizationId}: {message}";
         }
         catch (Exception ex)
         {
-            if (target != null) target.Text = $"{optimizationId}: servicio no disponible ({ex.Message})";
+            var message = $"servicio no disponible ({ex.Message})";
+            if (IsExplorerFix(optimizationId))
+            {
+                var local = await Helpers.ExplorerRecovery.RecoverLocallyAsync(
+                    killLeftovers: optimizationId.Equals("restart-windows-explorer", StringComparison.Ordinal),
+                    CancellationToken.None);
+                message += $"\nFallback local: {local}";
+            }
+            if (target != null) target.Text = $"{optimizationId}: {message}";
             App.WriteCrashLog(ex);
         }
     }

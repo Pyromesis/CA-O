@@ -17,6 +17,7 @@ public sealed class UiState : ObservableObject
     private string _language = "es-ES";
     private DateTime? _lastAnalysisUtc;
     private string _serviceStatus = "unknown";
+    private string _serviceVersion = string.Empty;
     private DateTime? _serviceCheckedUtc;
     private IReadOnlyList<string> _recoveryCandidates = Array.Empty<string>();
     private string _freshnessLabel = string.Empty;
@@ -63,6 +64,13 @@ public sealed class UiState : ObservableObject
     {
         get => _serviceStatus;
         set => SetProperty(ref _serviceStatus, value);
+    }
+
+    /// <summary>Versión del servicio instalado (vacía si se desconoce).</summary>
+    public string ServiceVersion
+    {
+        get => _serviceVersion;
+        set => SetProperty(ref _serviceVersion, value);
     }
 
     private bool _updateAvailable;

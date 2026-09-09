@@ -296,6 +296,8 @@ public sealed partial class MainWindow : Window
             var resp = await pipe.DetectAsync("disable-transparency", cts.Token);
             uiState.ServiceStatus = resp is { Accepted: true } ? "connected" : "rejected";
             uiState.ServiceCheckedUtc = DateTime.UtcNow;
+            if (uiState.ServiceStatus == "connected")
+                uiState.ServiceVersion = await Helpers.ServiceVersionProbe.FetchAsync(pipe, cts.Token) ?? string.Empty;
         }
         catch
         {

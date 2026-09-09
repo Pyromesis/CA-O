@@ -24,6 +24,11 @@ public sealed class ArchitectureDependencyTests
         {
             // SettingsPage instala el servicio privilegiado vía PowerShell elevado (UAC) — flujo legítimo de instalación, no bypass del gateway
             if (file.EndsWith("SettingsPage.xaml.cs", StringComparison.Ordinal)) continue;
+            // ExplorerRecovery relanza explorer.exe en la PROPIA sesión del usuario como plan B
+            // cuando el servicio falla/está desactualizado. No es escalada (mismo usuario,
+            // misma integridad que pulsar Win+R → explorer.exe) y no puede vivir en el
+            // gateway: ese corre en sesión 0 y no alcanza el escritorio interactivo.
+            if (file.EndsWith("ExplorerRecovery.cs", StringComparison.Ordinal)) continue;
             var text = File.ReadAllText(file);
             Assert.DoesNotContain("Process.Start", text);
             Assert.DoesNotContain("new Process", text);
@@ -68,7 +73,8 @@ public sealed class ArchitectureDependencyTests
                 var text = File.ReadAllText(file);
                 if ((text.Contains("Process.Start") || text.Contains("new Process {")) &&
                     !file.EndsWith("SystemCommandGateway.cs", StringComparison.Ordinal) &&
-                    !file.EndsWith("SettingsPage.xaml.cs", StringComparison.Ordinal))
+                    !file.EndsWith("SettingsPage.xaml.cs", StringComparison.Ordinal) &&
+                    !file.EndsWith("ExplorerRecovery.cs", StringComparison.Ordinal))
                 {
                     offenders.Add(file);
                 }

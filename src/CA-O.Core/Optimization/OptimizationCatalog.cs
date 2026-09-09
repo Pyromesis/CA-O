@@ -122,6 +122,7 @@ public static class OptimizationCatalog
     public static readonly RestartDnsClient RestartDnsClient = new();
     public static readonly RestartWindowsSearch RestartWindowsSearch = new();
     public static readonly RestartWindowsExplorer RestartWindowsExplorer = new();
+    public static readonly RecoverWindowsExplorer RecoverWindowsExplorer = new();
 
     /// <summary>Production catalog: 66 verified optimizations (19 core + 7 gaming + 7 power + 14 storage + 11 network + 5 startup + 2 system) - all phases promoted from legacy. All optimizations are now in production.</summary>
     public static IReadOnlyList<IOptimization> All { get; } = new IOptimization[]
@@ -213,6 +214,7 @@ public static class OptimizationCatalog
         RestartDnsClient,
         RestartWindowsSearch,
         RestartWindowsExplorer,
+        RecoverWindowsExplorer,
     };
 
     /// <summary>Catálogo completo histórico (66) - solo para tests de trazabilidad docs ↔ código. No usar en producción.</summary>
