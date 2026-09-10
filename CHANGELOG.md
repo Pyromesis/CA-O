@@ -2,6 +2,16 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
+## [2.1.20] - 2026-09-10
+
+### Añadido
+- Instalador de un solo `.exe` (`CA-O-Instalador.exe`, Inno Setup): asistente con licencia, destino e iconos; deriva al setup gráfico con ventana de progreso (sin consola) y firma de editor CA; si no hay payload local, descarga el paquete con streaming desde `latest`.
+- Setup con ventana de progreso WinForms y reintentos al copiar.
+
+### Corregido
+- Instalación/actualización con la app o el servicio en marcha: se cierra la UI y se detiene/elimina el servicio antes de copiar (con remate forzoso de remanentes) — fin del fallo por DLL bloqueada; limpieza de la clave ARP pre-Inno duplicada.
+- Apertura de la app tras instalar (error 740): lanzamiento con ShellExecute para que el UAC aparezca como debe.
+
 ## [2.1.19] - 2026-09-09
 
 ### Corregido
