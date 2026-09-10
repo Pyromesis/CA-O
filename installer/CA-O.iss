@@ -62,7 +62,9 @@ Name: "{group}\{#AppName}"; Filename: "{app}\ui\CA-O.UI.exe"; Comment: "CA-O —
 Name: "{autodesktop}\{#AppName}"; Filename: "{app}\ui\CA-O.UI.exe"; Comment: "CA-O — Plataforma de rendimiento para Windows"; Tasks: desktopicon
 
 [Run]
-Filename: "{app}\ui\CA-O.UI.exe"; Description: "Abrir CA-O ahora"; Flags: nowait postinstall skipifsilent
+; shellexec: CA-O.UI.exe exige elevación (requireAdministrator); con
+; CreateProcess fallaba con 740. Por Shell sale el UAC como debe.
+Filename: "{app}\ui\CA-O.UI.exe"; Description: "Abrir CA-O ahora"; Flags: nowait postinstall skipifsilent shellexec
 
 [UninstallRun]
 Filename: "{sys}\taskkill.exe"; Parameters: "/F /IM CA-O.UI.exe"; Flags: runhidden; RunOnceId: "KillUi"
