@@ -58,6 +58,7 @@ public enum SystemCommandKey
     PnPUtilEnableDevice,
     PnPUtilRemoveDevice,
     PnPUtilAddDriver,
+    PnPUtilEnumDevice,
 }
 
 /// <summary>Normalized result captured by the gateway.</summary>
@@ -94,6 +95,7 @@ public static partial class CommandPolicy
         // ArgumentList nunca interpreta metacaracteres).
         var customValidatedKey = key is SystemCommandKey.PnPUtilEnableDevice
             or SystemCommandKey.PnPUtilRemoveDevice
+            or SystemCommandKey.PnPUtilEnumDevice
             or SystemCommandKey.PnPUtilAddDriver;
         if (!customValidatedKey && arguments.Any(arg => string.IsNullOrWhiteSpace(arg) || !SafeArg().IsMatch(arg)))
         {
@@ -316,6 +318,10 @@ public static partial class CommandPolicy
                 arguments[0] == "/remove-device" && IsValidPnpInstanceId(arguments[1]) =>
                 Path.Combine(system32, "pnputil.exe"),
 
+            SystemCommandKey.PnPUtilEnumDevice when arguments.Count == 3 &&
+                arguments[0] == "/enum-devices" && arguments[1] == "/instanceid" && IsValidPnpInstanceId(arguments[2]) =>
+                Path.Combine(system32, "pnputil.exe"),
+
             SystemCommandKey.PnPUtilAddDriver when arguments.Count == 3 &&
                 arguments[0] == "/add-driver" && IsValidInfPath(arguments[1]) && arguments[2] == "/install" =>
                 Path.Combine(system32, "pnputil.exe"),
@@ -366,6 +372,14 @@ public static partial class CommandPolicy
     /// </summary>
     public static bool IsValidPnpInstanceId(string id) =>
         !string.IsNullOrWhiteSpace(id) && id.Length <= 256 && !id.Contains("..") && PnpInstanceId().IsMatch(id);
+
+    /// <summary>
+    /// UpdateId de Windows Update: GUID estricto. Nunca se ejecuta nada con
+    /// él: solo se compara contra los IDs de una búsqueda fresca del propio
+    /// servicio; lo que no venga de WU no se instala.
+    /// </summary>
+    public static bool IsValidWindowsUpdateId(string id) =>
+        !string.IsNullOrWhiteSpace(id) && id.Length <= 64 && Guid.TryParse(id, out _);
 
     /// <summary>
     /// Ruta INF estricta para pnputil /add-driver: absoluta, extensión .inf,

@@ -22,6 +22,14 @@ public sealed record DriverDiagnosticsReport(
     IReadOnlyList<DriverDiagnostic> Drivers,
     DateTime TimestampUtc);
 
+/// <summary>Un driver ofertado por Windows Update (DTO de ida y vuelta).</summary>
+public sealed record DriverUpdateInfo(
+    string UpdateId,
+    string Title,
+    string Kb,
+    long SizeBytes,
+    bool RebootRequired);
+
 /// <summary>
 /// Identidad del equipo (fase drivers 3: originales del fabricante).
 /// Los equipos clónicos/VM devuelven "Default string" en sistema: por eso

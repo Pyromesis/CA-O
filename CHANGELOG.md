@@ -2,6 +2,17 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
+## [2.1.22] - 2026-09-10
+
+### Añadido
+- Pestaña Drivers con memoria: al cambiar de pestaña se conservan escaneo, fantasmas y resultados (página cacheada).
+- Limpieza de fantasmas: lista los no presentes y los desinstala en bloque con confirmación; el servicio solo toca lo no arrancado y omite lo visible (doble fail-safe). Nueva op IPC `RemovePhantomDevices`.
+- Actualización de drivers vía Windows Update: buscar ofertas `Type='Driver'`, elegir con casillas, descargar e instalar con punto de restauración previo y aviso de reinicio. Nuevas ops IPC `SearchDriverUpdates` + `InstallDriverUpdates` (IDs GUID re-validados contra búsqueda fresca).
+- 30+ tests nuevos (validador, allowlist pnputil, engine, mapeo WU, fantasmas).
+
+### Corregido
+- Textos obsoletos de Drivers ("vía WMI", "solo diagnóstico"): ahora SetupAPI + WMI con acciones reales.
+
 ## [2.1.21] - 2026-09-10
 
 ### Añadido

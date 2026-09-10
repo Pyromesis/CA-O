@@ -56,7 +56,9 @@ public static class IpcRequestValidator
             return false;
         }
 
-        // Ping, GetServiceStatus, SetDns, SetTimerResolution, FixDriver e InstallDriver no llevan OptimizationId (§10, FASE 8)
+        // Ping, GetServiceStatus, SetDns, SetTimerResolution, FixDriver,
+        // InstallDriver, RemovePhantomDevices, SearchDriverUpdates e
+        // InstallDriverUpdates no llevan OptimizationId (§10, FASE 8)
         if (request.Operation is PrivilegedOperationKind.Ping or PrivilegedOperationKind.GetServiceStatus)
         {
             var pingExpected = request.Operation == PrivilegedOperationKind.Ping ? typeof(global::CAO.Shared.IPC.PingPayload) : typeof(global::CAO.Shared.IPC.GetServiceStatusPayload);
@@ -134,6 +136,51 @@ public static class IpcRequestValidator
                  !global::CAO.Shared.Security.CommandPolicy.IsValidPnpInstanceId(install.InstanceId)))
             {
                 error = "InstallDriver InfPath/InstanceId no valido.";
+                return false;
+            }
+            error = string.Empty;
+            return true;
+        }
+        if (request.Operation is PrivilegedOperationKind.RemovePhantomDevices)
+        {
+            if (request.Payload is not global::CAO.Shared.IPC.RemovePhantomDevicesPayload phantoms)
+            {
+                errorCode = ErrorCodes.IpcPayloadSchemaInvalid;
+                error = "Payload de RemovePhantomDevices inválido.";
+                return false;
+            }
+            if (phantoms.InstanceIds is null || phantoms.InstanceIds.Count == 0 || phantoms.InstanceIds.Count > 200 ||
+                !phantoms.InstanceIds.All(global::CAO.Shared.Security.CommandPolicy.IsValidPnpInstanceId))
+            {
+                error = "RemovePhantomDevices: lista vacía, excesiva o con IDs no válidos.";
+                return false;
+            }
+            error = string.Empty;
+            return true;
+        }
+        if (request.Operation is PrivilegedOperationKind.SearchDriverUpdates)
+        {
+            if (request.Payload is not global::CAO.Shared.IPC.SearchDriverUpdatesPayload)
+            {
+                errorCode = ErrorCodes.IpcPayloadSchemaInvalid;
+                error = "Payload de SearchDriverUpdates inválido.";
+                return false;
+            }
+            error = string.Empty;
+            return true;
+        }
+        if (request.Operation is PrivilegedOperationKind.InstallDriverUpdates)
+        {
+            if (request.Payload is not global::CAO.Shared.IPC.InstallDriverUpdatesPayload updates)
+            {
+                errorCode = ErrorCodes.IpcPayloadSchemaInvalid;
+                error = "Payload de InstallDriverUpdates inválido.";
+                return false;
+            }
+            if (updates.UpdateIds is null || updates.UpdateIds.Count == 0 || updates.UpdateIds.Count > 50 ||
+                !updates.UpdateIds.All(global::CAO.Shared.Security.CommandPolicy.IsValidWindowsUpdateId))
+            {
+                error = "InstallDriverUpdates: lista vacía, excesiva o con IDs no válidos.";
                 return false;
             }
             error = string.Empty;

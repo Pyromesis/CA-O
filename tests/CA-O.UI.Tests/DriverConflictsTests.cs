@@ -39,6 +39,15 @@ public sealed class DriverConflictsTests
         Assert.False(DriverConflicts.IsUnsigned(Driver(0, null)));
     }
 
+    [Fact]
+    public void IsPhantom_FlagsNonPresentDevices()
+    {
+        var present = Driver(0);
+        var phantom = present with { IsPresent = false };
+        Assert.False(DriverConflicts.IsPhantom(present));
+        Assert.True(DriverConflicts.IsPhantom(phantom));
+    }
+
     [Theory]
     [InlineData("20240115120000.000000-060", "15/01/2024")]
     [InlineData("", "Fecha desconocida")]

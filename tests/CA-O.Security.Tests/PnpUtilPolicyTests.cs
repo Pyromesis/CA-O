@@ -163,4 +163,115 @@ public sealed class PnpUtilPolicyTests
     {
         Assert.False(IpcRequestValidator.TryValidate(InstallRequest(inf, instanceId), out _, out _));
     }
+
+    [Theory]
+    [InlineData(SystemCommandKey.PnPUtilEnumDevice, new[] { "/enum-devices", "/instanceid", RealId })]
+    public void PnpUtilEnumDeviceResolvesToCanonicalExecutable(SystemCommandKey key, string[] arguments)
+    {
+        Assert.Equal(System32("pnputil.exe"), CommandPolicy.Resolve(key, arguments));
+    }
+
+    [Theory]
+    [InlineData(SystemCommandKey.PnPUtilEnumDevice, new[] { "/enum-devices", "/instanceid", "x|whoami" })]
+    [InlineData(SystemCommandKey.PnPUtilEnumDevice, new[] { "/enum-devices", RealId })]
+    [InlineData(SystemCommandKey.PnPUtilEnumDevice, new[] { "/enum-devices", "/instanceid", RealId, "extra" })]
+    [InlineData(SystemCommandKey.PnPUtilEnumDevice, new[] { "/enum-devices", "/problem", RealId })]
+    public void PnpUtilEnumDeviceDeviationResolvesToNull(SystemCommandKey key, string[] arguments)
+    {
+        Assert.Null(CommandPolicy.Resolve(key, arguments));
+    }
+
+    private static IpcRequest PhantomRequest(IReadOnlyList<string>? ids, object? payloadOverride = null)
+    {
+        object payload = payloadOverride ?? new RemovePhantomDevicesPayload(ids!);
+        return new IpcRequest(
+            ProtocolVersion: IpcProtocol.Version,
+            RequestId: Guid.NewGuid(),
+            Nonce: Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(16)),
+            CreatedAtUtc: DateTime.UtcNow,
+            Operation: PrivilegedOperationKind.RemovePhantomDevices,
+            Payload: (ITypedPayload)payload);
+    }
+
+    [Fact]
+    public void RemovePhantomsAcceptsValidRequest()
+    {
+        Assert.True(IpcRequestValidator.TryValidate(PhantomRequest(new[] { RealId }), out _, out _));
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(201)]
+    public void RemovePhantomsRejectsBadCount(int count)
+    {
+        var ids = Enumerable.Repeat(RealId, count).ToList();
+        Assert.False(IpcRequestValidator.TryValidate(PhantomRequest(ids), out _, out _));
+    }
+
+    [Fact]
+    public void RemovePhantomsRejectsBadIdAndWrongPayload()
+    {
+        Assert.False(IpcRequestValidator.TryValidate(PhantomRequest(new[] { "x;rm" }), out _, out _));
+        Assert.False(IpcRequestValidator.TryValidate(PhantomRequest(new[] { RealId }, new PingPayload()), out _, out _));
+    }
+
+    private static IpcRequest SearchDriversRequest(object? payloadOverride = null) => new(
+        ProtocolVersion: IpcProtocol.Version,
+        RequestId: Guid.NewGuid(),
+        Nonce: Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(16)),
+        CreatedAtUtc: DateTime.UtcNow,
+        Operation: PrivilegedOperationKind.SearchDriverUpdates,
+        Payload: (ITypedPayload)(payloadOverride ?? new SearchDriverUpdatesPayload()));
+
+    [Fact]
+    public void SearchDriversAcceptsValidRequest()
+    {
+        Assert.True(IpcRequestValidator.TryValidate(SearchDriversRequest(), out _, out _));
+        Assert.False(IpcRequestValidator.TryValidate(SearchDriversRequest(new PingPayload()), out _, out _));
+    }
+
+    private static IpcRequest InstallUpdatesRequest(IReadOnlyList<string>? ids, object? payloadOverride = null) => new(
+        ProtocolVersion: IpcProtocol.Version,
+        RequestId: Guid.NewGuid(),
+        Nonce: Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(16)),
+        CreatedAtUtc: DateTime.UtcNow,
+        Operation: PrivilegedOperationKind.InstallDriverUpdates,
+        Payload: (ITypedPayload)(payloadOverride ?? new InstallDriverUpdatesPayload(ids!)));
+
+    [Fact]
+    public void InstallUpdatesAcceptsGuidIds()
+    {
+        var ids = new[] { "11111111-2222-3333-4444-555555555555", "AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE" };
+        Assert.True(IpcRequestValidator.TryValidate(InstallUpdatesRequest(ids), out _, out _));
+    }
+
+    [Theory]
+    [InlineData("not-a-guid")]
+    [InlineData("")]
+    [InlineData("x;calc")]
+    public void InstallUpdatesRejectsBadIds(string id)
+    {
+        Assert.False(IpcRequestValidator.TryValidate(InstallUpdatesRequest(new[] { id }), out _, out _));
+    }
+
+    [Fact]
+    public void InstallUpdatesRejectsBadCountAndWrongPayload()
+    {
+        Assert.False(IpcRequestValidator.TryValidate(InstallUpdatesRequest(Array.Empty<string>()), out _, out _));
+        Assert.False(IpcRequestValidator.TryValidate(
+            InstallUpdatesRequest(Enumerable.Repeat("11111111-2222-3333-4444-555555555555", 51).ToList()), out _, out _));
+        Assert.False(IpcRequestValidator.TryValidate(
+            InstallUpdatesRequest(new[] { "11111111-2222-3333-4444-555555555555" }, new PingPayload()), out _, out _));
+    }
+
+    [Theory]
+    [InlineData("11111111-2222-3333-4444-555555555555", true)]
+    [InlineData("{11111111-2222-3333-4444-555555555555}", true)]
+    [InlineData("not-a-guid", false)]
+    [InlineData("", false)]
+    [InlineData("x;rm -rf", false)]
+    public void UpdateIdValidatorIsStrict(string id, bool expected)
+    {
+        Assert.Equal(expected, CommandPolicy.IsValidWindowsUpdateId(id));
+    }
 }

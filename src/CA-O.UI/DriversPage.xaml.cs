@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using CAO.Infrastructure.SystemInterop;
@@ -11,7 +12,14 @@ public sealed partial class DriversPage : Page
 {
     private sealed record DriverRow(string Title, string Detail);
 
+    private sealed record DriverUpdateRow(string UpdateId, string Title, string Detail);
+
+    private static readonly JsonSerializerOptions CaseInsensitiveJson = new() { PropertyNameCaseInsensitive = true };
+
     private IReadOnlyList<DriverDiagnostic> _drivers = Array.Empty<DriverDiagnostic>();
+    private IReadOnlyList<DriverDiagnostic> _phantoms = Array.Empty<DriverDiagnostic>();
+    private List<DriverUpdateInfo> _wuUpdates = new();
+    private readonly HashSet<string> _wuSelected = new(StringComparer.OrdinalIgnoreCase);
     private CancellationTokenSource? _cts;
     private string _vendorUrl = string.Empty;
 
@@ -43,6 +51,7 @@ public sealed partial class DriversPage : Page
                 .ToList();
             RenderSummary();
             RenderConflicts();
+            RenderPhantoms();
             RenderInventory();
             await RenderOemAsync(_cts.Token);
             ScanStatusText.Text = $"Escaneo completo: {_drivers.Count} dispositivos ({report.TimestampUtc.ToLocalTime():g}). Incluye ocultos y sin controlador. Solo lectura.";
@@ -108,6 +117,207 @@ public sealed partial class DriversPage : Page
                 CanFix: !string.IsNullOrWhiteSpace(d.PnpDeviceId));
         }).ToList();
     }
+
+    /// <summary>
+    /// Fantasmas: no presentes (restos de hardware desconectado). Se listan
+    /// aparte y se limpian en bloque con confirmación; el servicio solo toca
+    /// lo que no esté arrancado. Los datos sobreviven al cambio de pestaña
+    /// (página cacheada) hasta el próximo escaneo.
+    /// </summary>
+    private void RenderPhantoms()
+    {
+        _phantoms = _drivers.Where(d => !d.IsPresent && !string.IsNullOrWhiteSpace(d.PnpDeviceId)).ToList();
+        if (_phantoms.Count == 0)
+        {
+            PhantomsText.Text = _drivers.Count == 0
+                ? "Aparecen al escanear."
+                : "✓ Sin fantasmas: no hay restos de hardware desconectado.";
+            PhantomsList.Visibility = Visibility.Collapsed;
+            PhantomsList.ItemsSource = null;
+            CleanPhantomsButton.IsEnabled = false;
+            CleanPhantomsButton.Content = "Limpiar fantasmas";
+            return;
+        }
+        PhantomsText.Text = $"{_phantoms.Count} restos de hardware desconectado (audio, USB, monitores…). Suelen causar conflictos: se pueden desinstalar sin riesgo, el driver queda en la tienda.";
+        PhantomsList.ItemsSource = _phantoms
+            .OrderBy(d => d.Name)
+            .Select(d => new DriverRow(
+                string.IsNullOrWhiteSpace(d.DeviceClass) ? d.Name : $"{d.Name} [{d.DeviceClass}]",
+                $"ID: {d.PnpDeviceId}" +
+                (string.IsNullOrWhiteSpace(d.HardwareId) ? string.Empty : $" · HW: {d.HardwareId}")))
+            .ToList();
+        PhantomsList.Visibility = Visibility.Visible;
+        CleanPhantomsButton.IsEnabled = true;
+        CleanPhantomsButton.Content = $"Limpiar {_phantoms.Count} fantasmas";
+    }
+
+    private async void OnCleanPhantomsClick(object sender, RoutedEventArgs e)
+    {
+        if (_phantoms.Count == 0) return;
+        var sample = string.Join("\n", _phantoms.Take(6).Select(d => $"• {d.Name}"));
+        var confirm = new ContentDialog
+        {
+            Title = $"Limpiar {_phantoms.Count} fantasmas",
+            Content = new TextBlock
+            {
+                Text = $"Se desinstalarán estos restos (el driver NO se borra):\n{sample}" +
+                    (_phantoms.Count > 6 ? $"\n…y {_phantoms.Count - 6} más." : string.Empty) +
+                    "\n\nSolo se toca lo no presente y no arrancado; lo en uso se omite. ¿Continuar?",
+                TextWrapping = TextWrapping.Wrap,
+            },
+            PrimaryButtonText = "Limpiar",
+            CloseButtonText = "Cancelar",
+            DefaultButton = ContentDialogButton.Close,
+            XamlRoot = Content.XamlRoot,
+        };
+        if (await confirm.ShowAsync() != ContentDialogResult.Primary) return;
+
+        PhantomStatusText.Visibility = Visibility.Visible;
+        PhantomStatusText.Text = $"Limpiando {_phantoms.Count} fantasmas…";
+        CleanPhantomsButton.IsEnabled = false;
+        try
+        {
+            using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(10));
+            var pipe = AppHost.Resolve<PrivilegedPipeClient>();
+            var ids = _phantoms.Select(d => d.PnpDeviceId).ToList();
+            var response = await pipe.RemovePhantomDevicesAsync(ids, cts.Token);
+            PhantomStatusText.Text = response is { Accepted: true }
+                ? $"✓ {response.DetailJson ?? "Limpieza completada."}"
+                : $"Rechazado [{response?.ErrorCode}]: {response?.SafeMessage ?? "sin respuesta"}";
+        }
+        catch (Exception ex)
+        {
+            PhantomStatusText.Text = $"Servicio no disponible ({ex.Message})";
+            App.WriteCrashLog(ex);
+        }
+        OnScanClick(ScanButton, new RoutedEventArgs());
+    }
+
+    private async void OnSearchDriverUpdatesClick(object sender, RoutedEventArgs e)
+    {
+        SearchUpdatesButton.IsEnabled = false;
+        UpdatesRing.IsActive = true;
+        UpdatesRing.Visibility = Visibility.Visible;
+        UpdatesStatusText.Text = "Buscando en Windows Update (en línea, puede tardar minutos)…";
+        DriverUpdatesList.Visibility = Visibility.Collapsed;
+        try
+        {
+            using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(10));
+            var pipe = AppHost.Resolve<PrivilegedPipeClient>();
+            var response = await pipe.SearchDriverUpdatesAsync(cts.Token);
+            if (response is not { Accepted: true } || string.IsNullOrWhiteSpace(response.DetailJson))
+            {
+                UpdatesStatusText.Text = $"Sin resultados [{response?.ErrorCode}]: {response?.SafeMessage ?? "sin respuesta"}";
+                return;
+            }
+            try
+            {
+                _wuUpdates = JsonSerializer.Deserialize<List<DriverUpdateInfo>>(response.DetailJson, CaseInsensitiveJson) ?? new();
+            }
+            catch
+            {
+                _wuUpdates = new();
+            }
+            _wuSelected.Clear();
+            if (_wuUpdates.Count == 0)
+            {
+                UpdatesStatusText.Text = "Windows Update no ofrece drivers para este equipo. Todo al día.";
+                return;
+            }
+            DriverUpdatesList.ItemsSource = _wuUpdates.Select(u => new DriverUpdateRow(
+                u.UpdateId,
+                string.IsNullOrWhiteSpace(u.Title) ? u.UpdateId : u.Title,
+                $"{u.Kb} · {FormatBytes(u.SizeBytes)}".Trim(' ', '·') +
+                (u.RebootRequired ? " · Requiere reinicio" : string.Empty))).ToList();
+            DriverUpdatesList.Visibility = Visibility.Visible;
+            UpdatesStatusText.Text = $"{_wuUpdates.Count} actualizaciones disponibles. Marca las que quieras instalar.";
+            UpdateInstallButton();
+        }
+        catch (Exception ex)
+        {
+            UpdatesStatusText.Text = $"Servicio no disponible ({ex.Message})";
+            App.WriteCrashLog(ex);
+        }
+        finally
+        {
+            UpdatesRing.IsActive = false;
+            UpdatesRing.Visibility = Visibility.Collapsed;
+            SearchUpdatesButton.IsEnabled = true;
+        }
+    }
+
+    private void OnDriverUpdateToggled(object sender, RoutedEventArgs e)
+    {
+        if (sender is not CheckBox { Tag: string id }) return;
+        if (!_wuUpdates.Any(u => u.UpdateId.Equals(id, StringComparison.OrdinalIgnoreCase))) return;
+        if (!_wuSelected.Add(id)) _wuSelected.Remove(id);
+        UpdateInstallButton();
+    }
+
+    private void UpdateInstallButton()
+    {
+        InstallUpdatesButton.IsEnabled = _wuSelected.Count > 0;
+        InstallUpdatesButton.Content = _wuSelected.Count == 0
+            ? "Descargar e instalar"
+            : $"Descargar e instalar ({_wuSelected.Count})";
+    }
+
+    private async void OnInstallDriverUpdatesClick(object sender, RoutedEventArgs e)
+    {
+        if (_wuSelected.Count == 0) return;
+        var picked = _wuUpdates.Where(u => _wuSelected.Contains(u.UpdateId)).ToList();
+        var totalMb = picked.Sum(u => (double)u.SizeBytes) / 1024 / 1024;
+        var reboot = picked.Any(u => u.RebootRequired);
+        var confirm = new ContentDialog
+        {
+            Title = $"Instalar {picked.Count} drivers",
+            Content = new TextBlock
+            {
+                Text = $"Descarga oficial de Windows Update ({totalMb:0.#} MB)." +
+                    (reboot ? " Alguno REQUIERE REINICIO." : string.Empty) +
+                    " Se crea un punto de restauración antes (si el sistema lo permite). ¿Continuar?",
+                TextWrapping = TextWrapping.Wrap,
+            },
+            PrimaryButtonText = "Instalar",
+            CloseButtonText = "Cancelar",
+            DefaultButton = ContentDialogButton.Close,
+            XamlRoot = Content.XamlRoot,
+        };
+        if (await confirm.ShowAsync() != ContentDialogResult.Primary) return;
+
+        DriverUpdateResultText.Visibility = Visibility.Visible;
+        DriverUpdateResultText.Text = $"Descargando e instalando {picked.Count} drivers (puede tardar muchos minutos)…";
+        InstallUpdatesButton.IsEnabled = false;
+        SearchUpdatesButton.IsEnabled = false;
+        try
+        {
+            using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(30));
+            var pipe = AppHost.Resolve<PrivilegedPipeClient>();
+            var response = await pipe.InstallDriverUpdatesAsync(picked.Select(u => u.UpdateId).ToList(), cts.Token);
+            DriverUpdateResultText.Text = response is { Accepted: true }
+                ? $"✓ {response.DetailJson ?? response.SafeMessage ?? "Instalación completada."}"
+                : $"Rechazado [{response?.ErrorCode}]: {response?.SafeMessage ?? "sin respuesta"}";
+            _wuSelected.Clear();
+            UpdateInstallButton();
+        }
+        catch (Exception ex)
+        {
+            DriverUpdateResultText.Text = $"Servicio no disponible ({ex.Message})";
+            App.WriteCrashLog(ex);
+        }
+        finally
+        {
+            SearchUpdatesButton.IsEnabled = true;
+        }
+        OnScanClick(ScanButton, new RoutedEventArgs());
+    }
+
+    private static string FormatBytes(long bytes) => bytes switch
+    {
+        < 1024 => $"{bytes} B",
+        < 1024 * 1024 => $"{bytes / 1024.0:0.#} KB",
+        _ => $"{bytes / 1024.0 / 1024:0.#} MB",
+    };
 
     private async void OnFixDriverClick(object sender, RoutedEventArgs e)
     {

@@ -12,6 +12,8 @@ public static class DriverConflicts
 
     public static bool IsMissing(DriverDiagnostic driver) => driver.ProblemCode == 28;
 
+    public static bool IsPhantom(DriverDiagnostic driver) => !driver.IsPresent;
+
     public static bool IsUnsigned(DriverDiagnostic driver) => driver.IsSigned == false;
 
     public static string SignedLabel(bool? signed) => signed switch

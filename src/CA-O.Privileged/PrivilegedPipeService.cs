@@ -243,7 +243,10 @@ catch (Exception ex)
     }
 
     private static bool IsHeavy(IpcRequest? request) =>
-        request?.Payload is IOptimizationIdPayload p && HeavyOptimizationIds.Contains(p.OptimizationId);
+        (request?.Payload is IOptimizationIdPayload p && HeavyOptimizationIds.Contains(p.OptimizationId)) ||
+        request?.Operation is PrivilegedOperationKind.SearchDriverUpdates
+            or PrivilegedOperationKind.InstallDriverUpdates
+            or PrivilegedOperationKind.RemovePhantomDevices;
 
     /// <summary>
     /// Ejecuta el despacho suplantando al llamante autorizado para que HKCU y
@@ -351,6 +354,48 @@ catch (Exception ex)
                 catch (Exception ex)
                 {
                     return IpcResponse.Rejected(ErrorCodes.TxnApplyFailed, $"Error instalando driver: {ex.Message}");
+                }
+            }
+
+            if (request.Operation == PrivilegedOperationKind.RemovePhantomDevices && request.Payload is RemovePhantomDevicesPayload phantoms)
+            {
+                try
+                {
+                    var result = await engine.RemovePhantomDevicesAsync(phantoms.InstanceIds, ct);
+                    return result.Success ? IpcResponse.Ok(result.MessageEs) : IpcResponse.Rejected(ErrorCodes.TxnApplyFailed, result.MessageEs);
+                }
+                catch (Exception ex)
+                {
+                    return IpcResponse.Rejected(ErrorCodes.TxnApplyFailed, $"Error limpiando fantasmas: {ex.Message}");
+                }
+            }
+
+            if (request.Operation == PrivilegedOperationKind.SearchDriverUpdates && request.Payload is SearchDriverUpdatesPayload)
+            {
+                try
+                {
+                    var search = await new WindowsUpdateDriverService().SearchAsync(ct);
+                    if (!search.Success) return IpcResponse.Rejected(ErrorCodes.TxnApplyFailed, search.MessageEs);
+                    return IpcResponse.Ok(JsonSerializer.Serialize(search.Updates, JsonOptions));
+                }
+                catch (Exception ex)
+                {
+                    return IpcResponse.Rejected(ErrorCodes.TxnApplyFailed, $"Error buscando drivers: {ex.Message}");
+                }
+            }
+
+            if (request.Operation == PrivilegedOperationKind.InstallDriverUpdates && request.Payload is InstallDriverUpdatesPayload updates)
+            {
+                try
+                {
+                    var installed = await new WindowsUpdateDriverService().InstallAsync(updates.UpdateIds, ct);
+                    return installed.Success
+                        ? IpcResponse.Ok(installed.MessageEs)
+                        : IpcResponse.Rejected(ErrorCodes.TxnApplyFailed, installed.MessageEs);
+                }
+                catch (Exception ex)
+                {
+                    return IpcResponse.Rejected(ErrorCodes.TxnApplyFailed, $"Error instalando drivers: {ex.Message}");
                 }
             }
 

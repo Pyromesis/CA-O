@@ -470,6 +470,119 @@ public sealed class OptimizationEngine
         }
     }
 
+    /// <summary>
+    /// Limpieza de fantasmas: desinstala dispositivos NO presentes (restos de
+    /// hardware desconectado que causan conflictos, p. ej. audio/USB antiguos).
+    /// Fail-safe por diseño: se omite todo ID visible en Win32_PnPEntity
+    /// (presente) o con estado Started en pnputil. /remove-device no borra el
+    /// driver, solo desinstala el nodo; un /scan-devices final re-enumera.
+    /// Nunca lanza (salvo cancelación).
+    /// </summary>
+    public async Task<OperationResult> RemovePhantomDevicesAsync(IReadOnlyList<string> instanceIds, CancellationToken ct = default)
+    {
+        if (instanceIds is null || instanceIds.Count == 0 || instanceIds.Count > 200)
+            return OperationResult.Fail("Lista vacía o excesiva (máx. 200).", "invalid-list");
+        foreach (var id in instanceIds)
+        {
+            if (!global::CAO.Shared.Security.CommandPolicy.IsValidPnpInstanceId(id))
+                return OperationResult.Fail("ID de instancia no válido.", "invalid-id");
+        }
+        if (!IsRunningAsAdmin()) return OperationResult.Fail("Se requieren privilegios.", "not-admin");
+        if (_executor is null) return OperationResult.Fail("Ejecutor no disponible.", "no-executor");
+
+        try
+        {
+            var present = await ReadPresentDeviceIdsAsync(ct);
+            int removed = 0, skipped = 0, failed = 0;
+            foreach (var id in instanceIds.Distinct(StringComparer.OrdinalIgnoreCase))
+            {
+                ct.ThrowIfCancellationRequested();
+                if (present.Contains(id))
+                {
+                    skipped++;
+                    continue;
+                }
+                var probe = await _executor.ExecuteAsync(
+                    global::CAO.Shared.Security.SystemCommandKey.PnPUtilEnumDevice,
+                    ["/enum-devices", "/instanceid", id], ct);
+                if (IsStartedStatus(probe.StdOut))
+                {
+                    skipped++;
+                    continue;
+                }
+                var remove = await _executor.ExecuteAsync(
+                    global::CAO.Shared.Security.SystemCommandKey.PnPUtilRemoveDevice,
+                    ["/remove-device", id], ct);
+                if (!remove.Success)
+                {
+                    failed++;
+                    continue;
+                }
+                var verify = await _executor.ExecuteAsync(
+                    global::CAO.Shared.Security.SystemCommandKey.PnPUtilEnumDevice,
+                    ["/enum-devices", "/instanceid", id], ct);
+                if (IsStartedStatus(verify.StdOut)) failed++;
+                else removed++;
+            }
+            try
+            {
+                await _executor.ExecuteAsync(
+                    global::CAO.Shared.Security.SystemCommandKey.PnPUtilScanDevices,
+                    ["/scan-devices"], ct);
+            }
+            catch { }
+            if (failed > 0)
+                return OperationResult.Fail(
+                    $"Limpieza parcial: {removed} eliminados, {skipped} omitidos (en uso), {failed} fallaron. Re-escanea y revisa Administrador de dispositivos.",
+                    "partial");
+            return OperationResult.Ok(
+                $"Fantasmas eliminados: {removed} (omitidos en uso: {skipped}). Re-escanea para confirmar.");
+        }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception ex)
+        {
+            return OperationResult.Fail($"Error limpiando fantasmas ({ex.GetType().Name}: {ex.Message}).", "unexpected");
+        }
+    }
+
+    /// <summary>ID de instancia presentes según WMI (los fantasmas no salen aquí).</summary>
+    internal static async Task<HashSet<string>> ReadPresentDeviceIdsAsync(CancellationToken ct = default)
+    {
+        var present = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        try
+        {
+            await Task.Run(() =>
+            {
+                var opts = new System.Management.EnumerationOptions { Timeout = TimeSpan.FromSeconds(10), BlockSize = 50, Rewindable = false };
+                using var searcher = new System.Management.ManagementObjectSearcher(
+                    new System.Management.ManagementScope(@"root\cimv2"),
+                    new System.Management.ObjectQuery("SELECT DeviceID FROM Win32_PnPEntity"),
+                    opts);
+                foreach (var device in searcher.Get())
+                {
+                    ct.ThrowIfCancellationRequested();
+                    var id = (device as System.Management.ManagementObject)?["DeviceID"]?.ToString();
+                    if (!string.IsNullOrWhiteSpace(id)) present.Add(id);
+                }
+            }, ct);
+        }
+        catch { }
+        return present;
+    }
+
+    /// <summary>Solo "Status: Started" explícito cuenta como arrancado (fail-safe).</summary>
+    internal static bool IsStartedStatus(string enumOutput)
+    {
+        foreach (var line in enumOutput.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries))
+        {
+            var trimmed = line.Trim();
+            if (trimmed.StartsWith("Status:", StringComparison.OrdinalIgnoreCase) &&
+                trimmed["Status:".Length..].Trim().Equals("Started", StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+        return false;
+    }
+
     private async Task RollbackDnsExact(string interfaceName, bool wasDhcp, string[] beforeDnsV4, string[] beforeDnsV6, CancellationToken ct)
     {
         if (_executor == null) return;

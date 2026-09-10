@@ -68,6 +68,15 @@ public sealed class PrivilegedPipeClient
     public Task<IpcResponse?> InstallDriverAsync(string infPath, string instanceId, CancellationToken ct = default) =>
         SendPayloadAsync(PrivilegedOperationKind.InstallDriver, new InstallDriverPayload(infPath, instanceId), ct);
 
+    public Task<IpcResponse?> RemovePhantomDevicesAsync(IReadOnlyList<string> instanceIds, CancellationToken ct = default) =>
+        SendPayloadAsync(PrivilegedOperationKind.RemovePhantomDevices, new RemovePhantomDevicesPayload(instanceIds), ct);
+
+    public Task<IpcResponse?> SearchDriverUpdatesAsync(CancellationToken ct = default) =>
+        SendPayloadAsync(PrivilegedOperationKind.SearchDriverUpdates, new SearchDriverUpdatesPayload(), ct);
+
+    public Task<IpcResponse?> InstallDriverUpdatesAsync(IReadOnlyList<string> updateIds, CancellationToken ct = default) =>
+        SendPayloadAsync(PrivilegedOperationKind.InstallDriverUpdates, new InstallDriverUpdatesPayload(updateIds), ct);
+
     public Task<IpcResponse?> SetTimerResolutionAsync(uint resolution100Ns, CancellationToken ct = default) =>
         SendPayloadAsync(PrivilegedOperationKind.SetTimerResolution, new SetTimerResolutionPayload(resolution100Ns), ct);
 

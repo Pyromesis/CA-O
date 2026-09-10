@@ -31,6 +31,9 @@ public enum PrivilegedOperationKind
     SetTimerResolution,
     FixDriver,
     InstallDriver,
+    RemovePhantomDevices,
+    SearchDriverUpdates,
+    InstallDriverUpdates,
 }
 
 /// <summary>
@@ -55,6 +58,9 @@ public interface IOptimizationIdPayload : ITypedPayload
 [JsonDerivedType(typeof(SetTimerResolutionPayload), "settimer")]
 [JsonDerivedType(typeof(DriverFixPayload), "driverfix")]
 [JsonDerivedType(typeof(InstallDriverPayload), "installdriver")]
+[JsonDerivedType(typeof(RemovePhantomDevicesPayload), "removephantoms")]
+[JsonDerivedType(typeof(SearchDriverUpdatesPayload), "searchdrivers")]
+[JsonDerivedType(typeof(InstallDriverUpdatesPayload), "installdrivers")]
 public interface ITypedPayload
 {
 }
@@ -98,6 +104,23 @@ public static class FixDriverActions
 /// verifica su desaparición; si no, solo vale el exit code de pnputil.
 /// </summary>
 public sealed record InstallDriverPayload(string InfPath, string InstanceId = "") : ITypedPayload;
+
+/// <summary>
+/// Limpieza de fantasmas: desinstala dispositivos no presentes (restos de
+/// hardware desconectado que generan conflictos). El servicio solo toca
+/// dispositivos que NO estén arrancados (fail-safe).
+/// </summary>
+public sealed record RemovePhantomDevicesPayload(IReadOnlyList<string> InstanceIds) : ITypedPayload;
+
+/// <summary>Búsqueda de drivers en Windows Update (solo lectura).</summary>
+public sealed record SearchDriverUpdatesPayload() : ITypedPayload;
+
+/// <summary>
+/// Descarga+instala actualizaciones de driver de Windows Update ya ofertadas.
+/// Solo UpdateIds con forma GUID devueltos por una búsqueda (el servicio
+/// re-busca y solo instala los que sigan ofertados).
+/// </summary>
+public sealed record InstallDriverUpdatesPayload(IReadOnlyList<string> UpdateIds) : ITypedPayload;
 
 public sealed record PingResponse(string ServiceVersion, int ProtocolVersion, int ProcessId, bool IsSystem, string Status);
 public sealed record ServiceStatusResponse(string ServiceVersion, int ProtocolVersion, int ProcessId, bool IsSystem, string Status, IReadOnlyList<string> Capabilities);
