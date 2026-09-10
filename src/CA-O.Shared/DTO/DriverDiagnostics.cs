@@ -14,7 +14,9 @@ public sealed record DriverDiagnostic(
     string PnpDeviceId = "",
     string HardwareId = "",
     string InfName = "",
-    string Provider = "");
+    string Provider = "",
+    // Visible en Administrador de dispositivos (presente) u oculto/fantasma.
+    bool IsPresent = true);
 
 public sealed record DriverDiagnosticsReport(
     IReadOnlyList<DriverDiagnostic> Drivers,

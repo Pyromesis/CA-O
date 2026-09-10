@@ -5,6 +5,8 @@
     <Platform>x64</Platform>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <Description>Windows integration: WMI, PowerShell interop, settings persistence, logging.</Description>
+    <!-- Requerido por LibraryImport (SetupAPI): el generador emite código unsafe. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
   <ItemGroup>

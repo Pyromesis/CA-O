@@ -121,6 +121,42 @@ public static class Localizer
         ["risk.low"] = "Bajo",
         ["risk.moderate"] = "Moderado",
         ["risk.high"] = "Alto",
+        ["risk.safe"] = "Seguro",
+        ["risk.critical"] = "Crítico",
+        ["security.none"] = "Sin impacto",
+        ["security.privacyOnly"] = "Solo privacidad",
+        ["security.reducedProtection"] = "Reduce protección",
+        ["security.increasedProtection"] = "Más protección",
+        ["security.unknown"] = "Desconocido",
+        ["state.unknown"] = "Desconocido",
+        ["state.appliedByCao"] = "Aplicado por CA-O",
+        ["state.notApplied"] = "No aplicado",
+        ["state.appliedManually"] = "Aplicado manualmente",
+        ["state.pendingReboot"] = "Reinicio pendiente",
+        ["compat.compatible"] = "Compatible",
+        ["compat.noKnownConflict"] = "Sin conflictos conocidos",
+        ["compat.conditional"] = "Condicional",
+        ["compat.potentialConflict"] = "Posible conflicto",
+        ["compat.incompatible"] = "Incompatible",
+        ["compat.unknown"] = "Desconocido",
+        ["severity.information"] = "Información",
+        ["severity.warning"] = "Aviso",
+        ["severity.critical"] = "Crítica",
+        ["dim.system"] = "Sistema",
+        ["dim.thermals"] = "Térmica",
+        ["dim.network"] = "Red",
+        ["dim.storage"] = "Disco",
+        ["dim.security"] = "Seguridad",
+        ["dim.input"] = "Entrada",
+        ["dim.gaming"] = "Gaming",
+        ["dim.startup"] = "Inicio",
+        ["dim.stability"] = "Estabilidad",
+        ["dim.drivers"] = "Drivers",
+        ["kind.registry"] = "Registro",
+        ["kind.service"] = "Servicio",
+        ["kind.power"] = "Energía",
+        ["kind.boot"] = "Arranque",
+        ["kind.network"] = "Red",
         ["evidence.official"] = "Oficial",
         ["evidence.vendor"] = "Vendor",
         ["evidence.benchmark"] = "Benchmark",
@@ -306,6 +342,42 @@ public static class Localizer
         ["risk.low"] = "Low",
         ["risk.moderate"] = "Moderate",
         ["risk.high"] = "High",
+        ["risk.safe"] = "Safe",
+        ["risk.critical"] = "Critical",
+        ["security.none"] = "No impact",
+        ["security.privacyOnly"] = "Privacy only",
+        ["security.reducedProtection"] = "Reduces protection",
+        ["security.increasedProtection"] = "More protection",
+        ["security.unknown"] = "Unknown",
+        ["state.unknown"] = "Unknown",
+        ["state.appliedByCao"] = "Applied by CA-O",
+        ["state.notApplied"] = "Not applied",
+        ["state.appliedManually"] = "Applied manually",
+        ["state.pendingReboot"] = "Pending reboot",
+        ["compat.compatible"] = "Compatible",
+        ["compat.noKnownConflict"] = "No known conflicts",
+        ["compat.conditional"] = "Conditional",
+        ["compat.potentialConflict"] = "Possible conflict",
+        ["compat.incompatible"] = "Incompatible",
+        ["compat.unknown"] = "Unknown",
+        ["severity.information"] = "Information",
+        ["severity.warning"] = "Warning",
+        ["severity.critical"] = "Critical",
+        ["dim.system"] = "System",
+        ["dim.thermals"] = "Thermals",
+        ["dim.network"] = "Network",
+        ["dim.storage"] = "Storage",
+        ["dim.security"] = "Security",
+        ["dim.input"] = "Input",
+        ["dim.gaming"] = "Gaming",
+        ["dim.startup"] = "Startup",
+        ["dim.stability"] = "Stability",
+        ["dim.drivers"] = "Drivers",
+        ["kind.registry"] = "Registry",
+        ["kind.service"] = "Service",
+        ["kind.power"] = "Power",
+        ["kind.boot"] = "Boot",
+        ["kind.network"] = "Network",
         ["evidence.official"] = "Official",
         ["evidence.vendor"] = "Vendor",
         ["evidence.benchmark"] = "Benchmark",
@@ -399,11 +471,13 @@ public static class Localizer
         _ => bucket.ToString()
     };
 
-    public static string GetRiskLabel(CAO.Shared.RiskLevel risk) => risk.ToString().ToLowerInvariant() switch
+    public static string GetRiskLabel(CAO.Shared.RiskLevel risk) => risk switch
     {
-        "low" => Get("risk.low"),
-        "moderate" => Get("risk.moderate"),
-        "high" => Get("risk.high"),
+        CAO.Shared.RiskLevel.Safe => Get("risk.safe"),
+        CAO.Shared.RiskLevel.Low => Get("risk.low"),
+        CAO.Shared.RiskLevel.Moderate => Get("risk.moderate"),
+        CAO.Shared.RiskLevel.High => Get("risk.high"),
+        CAO.Shared.RiskLevel.Critical => Get("risk.critical"),
         _ => risk.ToString()
     };
 
@@ -417,5 +491,65 @@ public static class Localizer
         _ => Get("evidence.unknown")
     };
 
-    public static string GetSecurityLabel(CAO.Shared.SecurityImpact imp) => imp.ToString();
+    public static string GetSecurityLabel(CAO.Shared.SecurityImpact imp) => imp switch
+    {
+        CAO.Shared.SecurityImpact.None => Get("security.none"),
+        CAO.Shared.SecurityImpact.PrivacyOnly => Get("security.privacyOnly"),
+        CAO.Shared.SecurityImpact.ReducedProtection => Get("security.reducedProtection"),
+        CAO.Shared.SecurityImpact.IncreasedProtection => Get("security.increasedProtection"),
+        _ => Get("security.unknown")
+    };
+
+    public static string GetStateLabel(CAO.Shared.OptimizationState state) => state switch
+    {
+        CAO.Shared.OptimizationState.AppliedByCao => Get("state.appliedByCao"),
+        CAO.Shared.OptimizationState.NotApplied => Get("state.notApplied"),
+        CAO.Shared.OptimizationState.AppliedManually => Get("state.appliedManually"),
+        CAO.Shared.OptimizationState.PendingReboot => Get("state.pendingReboot"),
+        _ => Get("state.unknown")
+    };
+
+    public static string GetCompatibilityLabel(CAO.Shared.CompatibilityStatus compat) => compat switch
+    {
+        CAO.Shared.CompatibilityStatus.Compatible => Get("compat.compatible"),
+        CAO.Shared.CompatibilityStatus.NoKnownConflict => Get("compat.noKnownConflict"),
+        CAO.Shared.CompatibilityStatus.Conditional => Get("compat.conditional"),
+        CAO.Shared.CompatibilityStatus.PotentialConflict => Get("compat.potentialConflict"),
+        CAO.Shared.CompatibilityStatus.Incompatible => Get("compat.incompatible"),
+        _ => Get("compat.unknown")
+    };
+
+    public static string GetSeverityLabel(CAO.Shared.DiagnosticSeverity severity) => severity switch
+    {
+        CAO.Shared.DiagnosticSeverity.Information => Get("severity.information"),
+        CAO.Shared.DiagnosticSeverity.Warning => Get("severity.warning"),
+        CAO.Shared.DiagnosticSeverity.Critical => Get("severity.critical"),
+        _ => severity.ToString()
+    };
+
+    public static string GetDimensionLabel(CAO.Shared.HealthDimension dimension) => dimension switch
+    {
+        CAO.Shared.HealthDimension.System => Get("dim.system"),
+        CAO.Shared.HealthDimension.Thermals => Get("dim.thermals"),
+        CAO.Shared.HealthDimension.Network => Get("dim.network"),
+        CAO.Shared.HealthDimension.Storage => Get("dim.storage"),
+        CAO.Shared.HealthDimension.Security => Get("dim.security"),
+        CAO.Shared.HealthDimension.Input => Get("dim.input"),
+        CAO.Shared.HealthDimension.Gaming => Get("dim.gaming"),
+        CAO.Shared.HealthDimension.Startup => Get("dim.startup"),
+        CAO.Shared.HealthDimension.Stability => Get("dim.stability"),
+        CAO.Shared.HealthDimension.Drivers => Get("dim.drivers"),
+        _ => dimension.ToString()
+    };
+
+    /// <summary>Etiqueta humana para el ámbito de un cambio (preview diff).</summary>
+    public static string GetDiffKindLabel(string kind) => kind.ToLowerInvariant() switch
+    {
+        "registry" => Get("kind.registry"),
+        "service" => Get("kind.service"),
+        "power" => Get("kind.power"),
+        "boot" => Get("kind.boot"),
+        "network" => Get("kind.network"),
+        _ => kind
+    };
 }

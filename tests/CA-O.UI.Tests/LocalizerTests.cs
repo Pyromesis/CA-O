@@ -29,6 +29,18 @@ public sealed class LocalizerTests
             "restore.pointNote", "settings.expertMode", "settings.theme",
             "settings.language", "settings.serviceCheck",
             "common.workloadDependent", "common.noClaims",
+            "risk.safe", "risk.low", "risk.moderate", "risk.high", "risk.critical",
+            "security.none", "security.privacyOnly", "security.reducedProtection",
+            "security.increasedProtection", "security.unknown",
+            "state.unknown", "state.appliedByCao", "state.notApplied",
+            "state.appliedManually", "state.pendingReboot",
+            "compat.compatible", "compat.noKnownConflict", "compat.conditional",
+            "compat.potentialConflict", "compat.incompatible", "compat.unknown",
+            "severity.information", "severity.warning", "severity.critical",
+            "dim.system", "dim.thermals", "dim.network", "dim.storage",
+            "dim.security", "dim.input", "dim.gaming", "dim.startup",
+            "dim.stability", "dim.drivers",
+            "kind.registry", "kind.service", "kind.power", "kind.boot", "kind.network",
         ];
 
         Assert.NotEmpty(keys);

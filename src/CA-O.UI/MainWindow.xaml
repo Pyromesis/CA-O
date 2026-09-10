@@ -26,30 +26,28 @@
         </VisualStateManager.VisualStateGroups>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
+        <!-- Title bar nativa Win11: Mica + caption buttons del sistema -->
+        <TitleBar x:Name="AppTitleBar" Grid.Row="0" Title="CA-O" Subtitle="Plataforma de rendimiento para Windows"
+                  IsBackButtonVisible="False" IsPaneToggleButtonVisible="False">
+            <TitleBar.IconSource>
+                <ImageIconSource ImageSource="ms-appx:///Assets/app-icon.png" />
+            </TitleBar.IconSource>
+        </TitleBar>
+
         <!-- Top contextual bar -->
-        <Border x:Name="TopBar" Grid.Row="0" Padding="20,12" BorderThickness="0,0,0,1" BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+        <Border x:Name="TopBar" Grid.Row="1" Padding="16,8" BorderThickness="0,0,0,1" BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
                 Background="{ThemeResource SolidBackgroundFillColorTertiaryBrush}">
             <Grid ColumnSpacing="16">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
-                <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
-                    <Border Width="34" Height="34" CornerRadius="8" Background="{ThemeResource AccentFillColorDefaultBrush}">
-                        <TextBlock Text="CA" FontWeight="SemiBold" FontSize="14" Foreground="{ThemeResource TextOnAccentFillColorSelectedTextBrush}"
-                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                    </Border>
-                    <StackPanel Spacing="1" VerticalAlignment="Center">
-                        <TextBlock x:Name="TopBarTitle" Text="CA-O" FontWeight="SemiBold" FontSize="14"/>
-                        <TextBlock x:Name="TopBarSubtitle" Text="Performance &amp; System Intelligence" FontSize="11" Opacity="0.7"/>
-                    </StackPanel>
-                </StackPanel>
 
-                <Border Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center" CornerRadius="12" Padding="12,5,12,5"
+                <Border Grid.Column="0" HorizontalAlignment="Center" VerticalAlignment="Center" CornerRadius="12" Padding="12,5,12,5"
                         Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
                     <StackPanel Orientation="Horizontal" Spacing="16" VerticalAlignment="Center">
                         <StackPanel Orientation="Horizontal" Spacing="8">
@@ -66,7 +64,7 @@
                     </StackPanel>
                 </Border>
 
-                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                     <TextBlock x:Name="OperationTopText" FontSize="11" Opacity="0.6" VerticalAlignment="Center" Visibility="Collapsed"/>
                     <ProgressRing x:Name="OperationTopRing" Width="14" Height="14" IsActive="False" Visibility="Collapsed"/>
                 </StackPanel>
@@ -75,7 +73,7 @@
 
         <NavigationView
             x:Name="Nav"
-            Grid.Row="1"
+            Grid.Row="2"
             IsBackButtonVisible="Collapsed"
             PaneDisplayMode="Left"
             OpenPaneLength="260"
@@ -151,7 +149,13 @@
                     </StackPanel>
                 </StackPanel>
             </NavigationView.PaneFooter>
-            <Frame x:Name="ContentFrame" />
+            <Frame x:Name="ContentFrame">
+                <Frame.ContentTransitions>
+                    <TransitionCollection>
+                        <NavigationThemeTransition />
+                    </TransitionCollection>
+                </Frame.ContentTransitions>
+            </Frame>
         </NavigationView>
     </Grid>
 </Window>

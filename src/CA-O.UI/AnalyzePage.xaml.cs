@@ -210,11 +210,11 @@ public sealed partial class AnalyzePage : Page
         var measured = health.Scores.Where(score => score.IsMeasured && score.Score is not null).ToList();
         HealthScoresText.Text = measured.Count == 0
             ? "Sin puntuación — faltan mediciones."
-            : string.Join("  ·  ", measured.Select(score => $"{DimensionEs(score.Dimension)}: {score.Score}/100"));
+            : string.Join("  ·  ", measured.Select(score => $"{Localizer.GetDimensionLabel(score.Dimension)}: {score.Score}/100"));
         WhyScoresButton.Visibility = string.IsNullOrWhiteSpace(HealthScoresText.Text) ? Visibility.Collapsed : Visibility.Visible;
-        var findings = health.Findings.Select(f => new FindingRow(f.Severity.ToString(), f.MessageEs, BrushFor(f.Severity.ToString()))).ToList();
-        var critCount = findings.Count(f => f.SeverityLabel.Equals("Critical", StringComparison.OrdinalIgnoreCase));
-        var warnCount = findings.Count(f => f.SeverityLabel.Equals("Warning", StringComparison.OrdinalIgnoreCase));
+        var findings = health.Findings.Select(f => new FindingRow(Localizer.GetSeverityLabel(f.Severity), f.MessageEs, BrushFor(f.Severity.ToString()))).ToList();
+        var critCount = health.Findings.Count(f => f.Severity == DiagnosticSeverity.Critical);
+        var warnCount = health.Findings.Count(f => f.Severity == DiagnosticSeverity.Warning);
         FindingsCountText.Text = findings.Count == 0
             ? "Sin hallazgos = sin problemas detectados."
             : $"{critCount} críticas · {warnCount} avisos · {findings.Count} en total.";
@@ -243,20 +243,6 @@ public sealed partial class AnalyzePage : Page
         catch { }
     }
 
-    private static string DimensionEs(object dimension) => dimension.ToString() switch
-    {
-        "System" => "Sistema",
-        "Thermals" => "Térmica",
-        "Network" => "Red",
-        "Storage" => "Disco",
-        "Security" => "Seguridad",
-        "Input" => "Entrada",
-        "Gaming" => "Gaming",
-        "Startup" => "Inicio",
-        "Stability" => "Estabilidad",
-        _ => dimension.ToString() ?? "?",
-    };
-
     private static Brush BrushFor(string severity) => severity.ToLowerInvariant() switch
     {
         "error" or "critical" => (Brush)Application.Current.Resources["SystemFillColorCriticalBrush"],
@@ -280,7 +266,7 @@ public sealed partial class AnalyzePage : Page
     private async void OnWhyScoresClick(object sender, RoutedEventArgs e)
     {
         if (_viewModel.Health is null) return;
-        var detail = string.Join("\n", _viewModel.Health.Scores.Where(s => s.IsMeasured).Select(s => $"• {s.Dimension}: {s.Score}/100 — {s.ReasonEs}"));
+        var detail = string.Join("\n", _viewModel.Health.Scores.Where(s => s.IsMeasured).Select(s => $"• {Localizer.GetDimensionLabel(s.Dimension)}: {s.Score}/100 — {s.ReasonEs}"));
         if (string.IsNullOrWhiteSpace(detail)) detail = "No hay dimensiones medidas suficientes para un score. Ejecute más diagnósticos.";
         var dialog = new ContentDialog
         {

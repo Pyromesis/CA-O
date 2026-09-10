@@ -1,15 +1,17 @@
 using CAO.UI.Pages;
+using Microsoft.UI;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Animation;
+using Microsoft.UI.Windowing;
 using Windows.Foundation;
 using CAO.Shared;
 using System.IO;
 
 namespace CAO.UI;
 
-/// <summary>WinUI 3 shell (spec 76-78): NavigationView, Mica, page routing, TopBar + sidebar context.</summary>
+/// <summary>WinUI 3 shell (spec 76-78): TitleBar nativa + Mica, NavigationView, page routing, TopBar + sidebar context.</summary>
 public sealed partial class MainWindow : Window
 {
     /// <summary>Lets any page re-theme every window root.</summary>
@@ -35,6 +37,17 @@ public sealed partial class MainWindow : Window
         Current = this;
         InitializeComponent();
         SystemBackdrop = new MicaBackdrop();
+        try
+        {
+            // Chrome Win11: el contenido se extiende bajo una TitleBar real
+            // (caption buttons nativos + Mica) en vez de la legacy Win32.
+            ExtendsContentIntoTitleBar = true;
+            SetTitleBar(AppTitleBar);
+        }
+        catch { }
+        UpdateCaptionButtonColors();
+        if (Content is FrameworkElement root)
+            root.ActualThemeChanged += (_, _) => UpdateCaptionButtonColors();
         TrySetWindowIcon();
         var uiState = AppHost.Resolve<ViewModels.UiState>();
         uiState.LanguageChanged += (_, language) => ApplyLocalization();
@@ -57,6 +70,7 @@ public sealed partial class MainWindow : Window
                     _ => ElementTheme.Default,
                 };
             }
+            DispatcherQueue.TryEnqueue(UpdateCaptionButtonColors);
         };
 
         Nav.SelectedItem = Nav.MenuItems[0];
@@ -146,8 +160,8 @@ public sealed partial class MainWindow : Window
             }
         }
 
-        TopBarTitle.Text = Localizer.Get("app.title");
-        TopBarSubtitle.Text = Localizer.Get("app.subtitle");
+        AppTitleBar.Title = Localizer.Get("app.title");
+        AppTitleBar.Subtitle = Localizer.Get("app.subtitle");
         Title = $"{Localizer.Get("app.title")} — {Localizer.Get("app.subtitle")}";
         RefreshChrome();
     }
@@ -279,6 +293,31 @@ public sealed partial class MainWindow : Window
         ctx?.PendingReboot == true && ctx.PendingRebootReasons.Any(r =>
             r.Contains("Windows Update", StringComparison.OrdinalIgnoreCase) ||
             r.Contains("Component Based Servicing", StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>
+    /// Botones de caption transparentes sobre Mica, con foreground según tema.
+    /// Sin esto, al extender el contenido los botones quedan con fondo sólido legacy.
+    /// </summary>
+    private void UpdateCaptionButtonColors()
+    {
+        try
+        {
+            if (!AppWindowTitleBar.IsCustomizationSupported()) return;
+            var dark = (Content as FrameworkElement)?.ActualTheme != ElementTheme.Light;
+            var fg = dark ? Colors.White : Colors.Black;
+            var hoverBg = dark ? Windows.UI.Color.FromArgb(24, 255, 255, 255) : Windows.UI.Color.FromArgb(16, 0, 0, 0);
+            var tb = AppWindow.TitleBar;
+            tb.ButtonBackgroundColor = Colors.Transparent;
+            tb.ButtonInactiveBackgroundColor = Colors.Transparent;
+            tb.ButtonForegroundColor = fg;
+            tb.ButtonHoverForegroundColor = fg;
+            tb.ButtonPressedForegroundColor = fg;
+            tb.ButtonInactiveForegroundColor = dark ? Colors.Gray : Colors.DarkGray;
+            tb.ButtonHoverBackgroundColor = hoverBg;
+            tb.ButtonPressedBackgroundColor = hoverBg;
+        }
+        catch { }
+    }
 
     private void TrySetWindowIcon()
     {

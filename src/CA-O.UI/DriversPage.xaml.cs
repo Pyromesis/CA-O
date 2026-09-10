@@ -6,7 +6,7 @@ using CAO.UI.Helpers;
 
 namespace CAO.UI.Pages;
 
-/// <summary>Pestaña Controladores (fase 1): inventario WMI + conflictos, solo lectura.</summary>
+/// <summary>Pestaña Controladores: inventario total SetupAPI + WMI, conflictos y fixes. Solo lectura salvo fix/inf.</summary>
 public sealed partial class DriversPage : Page
 {
     private sealed record DriverRow(string Title, string Detail);
@@ -33,7 +33,7 @@ public sealed partial class DriversPage : Page
         ScanButton.IsEnabled = false;
         ScanRing.IsActive = true;
         ScanRing.Visibility = Visibility.Visible;
-        ScanStatusText.Text = "Leyendo drivers instalados (WMI)...";
+        ScanStatusText.Text = "Leyendo todos los dispositivos (SetupAPI + WMI)...";
         try
         {
             var report = await new DriverDiagnosticsProvider().MeasureAsync(_cts.Token);
@@ -45,11 +45,11 @@ public sealed partial class DriversPage : Page
             RenderConflicts();
             RenderInventory();
             await RenderOemAsync(_cts.Token);
-            ScanStatusText.Text = $"Escaneo completo: {_drivers.Count} drivers ({report.TimestampUtc.ToLocalTime():g}). Solo lectura.";
+            ScanStatusText.Text = $"Escaneo completo: {_drivers.Count} dispositivos ({report.TimestampUtc.ToLocalTime():g}). Incluye ocultos y sin controlador. Solo lectura.";
         }
         catch (OperationCanceledException)
         {
-            ScanStatusText.Text = "Escaneo cancelado (30 s sin respuesta de WMI). Reintenta.";
+            ScanStatusText.Text = "Escaneo cancelado (30 s sin respuesta). Reintenta.";
         }
         catch (Exception ex)
         {
@@ -284,6 +284,7 @@ public sealed partial class DriversPage : Page
         DriversList.ItemsSource = filtered.Select(d => new DriverRow(
             string.IsNullOrWhiteSpace(d.DeviceClass) ? d.Name : $"{d.Name} [{d.DeviceClass}]",
             $"{d.Manufacturer} · v{d.Version} · {DriverConflicts.FormatDriverDate(d.Date)} · {DriverConflicts.SignedLabel(d.IsSigned)}" +
+            (d.IsPresent ? string.Empty : " · Oculto/no presente") +
             (d.ProblemCode != 0 ? $" · {DriverConflicts.DescribeProblem(d.ProblemCode)}" : string.Empty) +
             DriverIdsLine(d))).ToList();
         InventoryCountText.Text = _drivers.Count == 0

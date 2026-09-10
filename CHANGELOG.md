@@ -2,6 +2,19 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
+## [2.1.21] - 2026-09-10
+
+### Añadido
+- Inventario total de drivers vía SetupAPI (paridad con Administrador de dispositivos): presentes + ocultos/fantasma, con y sin controlador, firmados o no. WMI (`Win32_PnPSignedDriver`) queda como enriquecimiento (versión/fecha/firma/INF). En este equipo: 163 → 214 dispositivos; los código 28 (sin driver) ahora sí aparecen con fix Re-detectar/Reinstalar.
+- Tests nuevos de inventario SetupAPI (enumeración viva, merge, fechas, multi-sz): 11 tests.
+- Title bar nativa de Windows 11: contenido extendido (`ExtendsContentIntoTitleBar` + control `TitleBar` con icono), caption buttons transparentes sobre Mica que siguen al tema, y barra superior adelgazada (el logo vive ahora en la title bar).
+- Transición de navegación entre páginas y contador animado en el índice global del Panel (respetan movimiento reducido).
+- Etiquetas humanas en español/inglés para estado (`No aplicado`, `Reinicio pendiente`…), compatibilidad (`Sin conflictos conocidos`…), riesgo (`Seguro`, `Crítico`), seguridad (`Solo privacidad`…), severidad, dimensiones y ámbito de cambios en vista previa. Antes se veían los nombres crudos del enum.
+
+### Corregido
+- Ajustes mostraba "Modo Expert" dos veces seguidas (etiqueta estática + header del ToggleSwitch).
+- El Panel nunca contaba hallazgos críticos (comparaba contra `"Error"`, valor que no existe en `DiagnosticSeverity`); ahora cuenta `Critical`/`Warning` por enum.
+
 ## [2.1.20] - 2026-09-10
 
 ### Añadido

@@ -138,9 +138,10 @@ public sealed partial class DashboardPage : Page
             ScoreDetailText.Text = recCount > 0
                 ? $"{recCount} optimizaciones recomendadas con evidencia."
                 : "Sin recomendaciones pendientes.";
-            MeasuredNoteText.Text = $"{measured.Count} dimensiones medidas · {string.Join(" · ", measured.Select(s => $"{s.Dimension}: {s.Score}"))}";
-            var crit = report!.Findings.Count(f => f.Severity.ToString().Equals("Error", StringComparison.OrdinalIgnoreCase));
-            var warn = report.Findings.Count(f => f.Severity.ToString().Equals("Warning", StringComparison.OrdinalIgnoreCase));
+            MeasuredNoteText.Text = $"{measured.Count} dimensiones medidas · {string.Join(" · ", measured.Select(s => $"{Localizer.GetDimensionLabel(s.Dimension)}: {s.Score}"))}";
+            // Nota: el enum es DiagnosticSeverity (Critical/Warning); "Error" nunca coincidía y los críticos no se contaban.
+            var crit = report!.Findings.Count(f => f.Severity == DiagnosticSeverity.Critical);
+            var warn = report.Findings.Count(f => f.Severity == DiagnosticSeverity.Warning);
             FindingsLineText.Text = crit + warn == 0 ? "Sin hallazgos" : $"{crit} críticas · {warn} avisos";
         }
 
@@ -249,7 +250,7 @@ public sealed partial class DashboardPage : Page
         }
         ScoreArc.Visibility = Visibility.Visible;
         var v = Math.Clamp(avg.Value, 0, 100);
-        ScoreValueText.Text = $"{(int)Math.Round(v)}";
+        Helpers.UiAnimations.CountUp(ScoreValueText, (int)Math.Round(v));
         var angle = Math.Min(v / 100 * 360, 359.99);
         var rad = (angle - 90) * Math.PI / 180;
         ScoreSegment.Point = new Point(60 + 54 * Math.Cos(rad), 60 + 54 * Math.Sin(rad));

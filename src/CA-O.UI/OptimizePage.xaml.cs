@@ -146,8 +146,8 @@ public sealed partial class OptimizePage : Page
                 Localizer.GetEvidenceLabel(recommendation.Evidence),
                 Localizer.GetRiskLabel(recommendation.Risk),
                 Localizer.GetSecurityLabel(recommendation.SecurityImpact),
-                recommendation.Compatibility.ToString(),
-                recommendation.CurrentState.ToString(),
+                Localizer.GetCompatibilityLabel(recommendation.Compatibility),
+                Localizer.GetStateLabel(recommendation.CurrentState),
                 recommendation.Score?.ToString() ?? "n/a",
                 recommendation.Reason.MessageEs,
                 recommendation.Bucket,
@@ -297,7 +297,7 @@ public sealed partial class OptimizePage : Page
                     Margin = new Thickness(0, 4, 0, 0),
                 };
                 var inner = new StackPanel { Spacing = 4 };
-                inner.Children.Add(new TextBlock { Text = $"{line.Kind}  ·  {line.Target}", FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, FontSize = 12 });
+                inner.Children.Add(new TextBlock { Text = $"{Localizer.GetDiffKindLabel(line.Kind)}  ·  {line.Target}", FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, FontSize = 12 });
                 var grid = new Grid { ColumnSpacing = 8 };
                 grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
                 grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
@@ -314,7 +314,7 @@ public sealed partial class OptimizePage : Page
             }
             diffPanel.Children.Add(new TextBlock
             {
-                Text = $"Riesgo: {preview.Risk} · Seguridad: {preview.SecurityImpact} · Reversible: {(preview.Reversible ? "sí" : "NO — irreversible aun con snapshot")} · Reinicio: {(preview.RequiresReboot ? "sí" : "no")}",
+                Text = $"Riesgo: {Localizer.GetRiskLabel(preview.Risk)} · Seguridad: {Localizer.GetSecurityLabel(preview.SecurityImpact)} · Reversible: {(preview.Reversible ? "sí" : "NO — irreversible aun con snapshot")} · Reinicio: {(preview.RequiresReboot ? "sí" : "no")}",
                 FontSize = 11, Opacity = 0.7, Margin = new Thickness(0, 8, 0, 0), TextWrapping = TextWrapping.Wrap
             });
 
