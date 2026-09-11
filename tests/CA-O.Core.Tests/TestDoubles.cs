@@ -41,7 +41,23 @@ public sealed class MemoryRegistry : IRegistryAccessor
 
     public IReadOnlyList<string> GetValueNames(RegistryHive2 hive, string keyPath) => [];
 
-    public IReadOnlyList<string> GetSubKeyNames(RegistryHive2 hive, string keyPath) => [];
+    /// <summary>
+    /// Deriva subclaves de las rutas guardadas: el primer segmento bajo
+    /// keyPath cuenta como subclave solo si anida valores (un valor directo
+    /// no es una subclave).
+    /// </summary>
+    public IReadOnlyList<string> GetSubKeyNames(RegistryHive2 hive, string keyPath)
+    {
+        var prefix = $"{hive}:{keyPath}\\".ToLowerInvariant();
+        return Store.Keys
+            .Where(k => k.StartsWith(prefix, StringComparison.Ordinal))
+            .Select(k => k[prefix.Length..])
+            .Where(rest => rest.Contains('\\'))
+            .Select(rest => rest.Split('\\')[0])
+            .Where(s => s.Length > 0)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
 }
 
 public sealed class MemorySnapshotStore : ISnapshotStore

@@ -6,7 +6,9 @@ public sealed record StorageVolumeReport(
     string FileSystem,
     long TotalBytes,
     long FreeBytes,
-    bool IsSystemVolume);
+    bool IsSystemVolume,
+    // Medio físico ("HDD"/"SSD"/"SCM"; vacío si desconocido).
+    string Media = "");
 
 public sealed record StorageDiagnosticsReport(
     IReadOnlyList<StorageVolumeReport> Volumes,

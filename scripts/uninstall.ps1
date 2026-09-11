@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     CA-O Uninstaller
 .DESCRIPTION

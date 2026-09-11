@@ -93,4 +93,34 @@ public sealed class WuDriverMappingTests
         Assert.Contains("InvalidOperationException", WindowsUpdateDrivers.DescribeFailure(new InvalidOperationException("nope")));
     }
 #pragma warning restore CA2201
+
+    /// <summary>
+    /// Regresión CAO-TXN-003: la colección se crea por su propio ProgID
+    /// (IUpdateSession no tiene CreateUpdateCollection). Vivo pero sin
+    /// efectos: solo crea objetos COM vacíos, sin red ni instalación.
+    /// </summary>
+    [Fact]
+    public void ComFactories_CreateSessionSearcherAndCollection()
+    {
+        object? session = null;
+        object? collection = null;
+        try
+        {
+            dynamic dynSession = WindowsUpdateDrivers.CreateSession();
+            session = dynSession;
+            dynSession.ClientApplicationID = "CA-O Tests";
+            dynamic searcher = dynSession.CreateUpdateSearcher();
+            Assert.NotNull((object)searcher);
+            try { if (Marshal.IsComObject(searcher)) Marshal.FinalReleaseComObject(searcher); } catch { }
+
+            dynamic dynCollection = WindowsUpdateDrivers.CreateCollection();
+            collection = dynCollection;
+            Assert.Equal(0, (int)dynCollection.Count);
+        }
+        finally
+        {
+            try { if (collection is not null && Marshal.IsComObject(collection)) Marshal.FinalReleaseComObject(collection); } catch { }
+            try { if (session is not null && Marshal.IsComObject(session)) Marshal.FinalReleaseComObject(session); } catch { }
+        }
+    }
 }

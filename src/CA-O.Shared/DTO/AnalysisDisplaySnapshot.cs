@@ -9,7 +9,7 @@ namespace CAO.Shared;
 /// </summary>
 public sealed record DnsRowSnapshot(string Resolver, double Ms);
 
-public sealed record StorageRowSnapshot(string Name, double UsedPct, double FreeGb);
+public sealed record StorageRowSnapshot(string Name, double UsedPct, double FreeGb, string Media = "");
 
 public sealed record AnalysisDisplaySnapshot(
     string? Network,

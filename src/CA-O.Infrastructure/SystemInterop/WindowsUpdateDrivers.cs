@@ -11,6 +11,28 @@ public static class WindowsUpdateDrivers
 {
     public const int MaxUpdates = 50;
 
+    /// <summary>Crea IUpdateSession (ProgID Microsoft.Update.Session).</summary>
+    public static dynamic CreateSession()
+    {
+        var type = Type.GetTypeFromProgID("Microsoft.Update.Session")
+            ?? throw new InvalidOperationException("Agente de Windows Update no disponible en este equipo.");
+        return Activator.CreateInstance(type)
+            ?? throw new InvalidOperationException("No se pudo iniciar el agente de Windows Update.");
+    }
+
+    /// <summary>
+    /// Crea IUpdateCollection VACÍA (ProgID Microsoft.Update.UpdateColl).
+    /// OJO: IUpdateSession NO tiene CreateUpdateCollection (regresión
+    /// CAO-TXN-003): la colección tiene su propio coclass.
+    /// </summary>
+    public static dynamic CreateCollection()
+    {
+        var type = Type.GetTypeFromProgID("Microsoft.Update.UpdateColl")
+            ?? throw new InvalidOperationException("Agente de Windows Update no disponible en este equipo.");
+        return Activator.CreateInstance(type)
+            ?? throw new InvalidOperationException("No se pudo crear la colección de actualizaciones.");
+    }
+
     public static DriverUpdateInfo MapUpdateInfo(dynamic update)
     {
         string id = (string)update.Identity.UpdateID;

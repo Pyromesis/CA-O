@@ -53,6 +53,14 @@ Nunca se deshabilita silenciosamente Secure Boot/TPM/VBS/HVCI/Defender/firewall.
 | disable-vbs | Performance | WorkloadDependent | Vendor | Critical | PotentialConflict | Si | ExpertOnly, SecurityTradeoff, RequiresReboot |
 | normalize-tcp-autotuning | Network | WorkloadDependent | Official | Low | Conditional | Si | — |
 | optimize-system-drive | Storage | None | Official | Low | Compatible | No | NotReversible |
+| disable-nagle-tcp-acks | Network | Small | Official | Moderate | Conditional | Si | RequiresReboot |
+| disable-wifi-background-scan | Network | Small | Official | Moderate | Conditional | Si | ExpertOnly |
+| disable-pointer-precision | Gaming | Small | Official | Safe | Compatible | Si | — |
+| mouse-driver-queue-trim | Gaming | Tiny | Empirical | Moderate | Conditional | Si | RequiresReboot |
+| mmcss-system-responsiveness | Gaming | Small | Empirical | Low | Compatible | Si | — |
+| defragment-hdd-only | Storage | Small | Official | Low | Compatible | No | NotReversible |
+| cleanup-windows-update-cache | Storage | Small | Official | Low | Compatible | No | NotReversible |
+| disable-dynamic-tick | Performance | Small | Empirical | Moderate | Conditional | Si | RequiresReboot |
 
 *49 optimizaciones históricas retiradas del catálogo de producción; permanecen en `AllLegacy` solo para trazabilidad. Ver `OptimizationCatalog.AllLegacy`.*
 
@@ -108,6 +116,18 @@ Nunca se deshabilita silenciosamente Secure Boot/TPM/VBS/HVCI/Defender/firewall.
 - optimize-startup-recovery-state
 
 ## Detailed definitions
+
+### disable-pointer-precision
+Ratón 1:1 sin aceleración
+
+### mouse-driver-queue-trim
+Cola de ratón 32
+
+### mmcss-system-responsiveness
+Prioridad MMCSS al juego
+
+### disable-dynamic-tick
+Tick estable bcdedit
 
 ### enable-game-mode
 
@@ -260,6 +280,12 @@ Temporales Windows
 ### cleanup-delivery-optimization-cache
 Cache DO
 
+### defragment-hdd-only
+Desfragmenta HDD, jamás SSD
+
+### cleanup-windows-update-cache
+Caché WU (para + borra + arranca)
+
 ### windows-component-store-cleanup
 DISM StartComponentCleanup
 
@@ -304,6 +330,12 @@ Winsock/TCP
 
 ### delivery-optimization-bandwidth-profile
 DO perfil
+
+### disable-nagle-tcp-acks
+Sin Nagle: ACK inmediato
+
+### disable-wifi-background-scan
+Wi-Fi sin barridos (Expert)
 
 ### disable-unnecessary-startup-apps
 Startup classification

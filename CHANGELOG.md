@@ -2,6 +2,16 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
+## [2.1.24] - 2026-09-11
+
+### Añadido
+- Medio físico visible: Panel y Analizar muestran HDD/SSD por volumen (datos que ya medía el detector de desfragmentación).
+- 8 optimizaciones nuevas (catálogo 81→89): Nagle/ACK inmediato, sin escaneos Wi-Fi (Expert), ratón 1:1 sin aceleración, cola de ratón 32, MMCSS al juego, desfragmentar solo HDD (SSD jamás), limpiar caché de Windows Update, tick estable bcdedit.
+
+### Corregido
+- Instalar drivers de Windows Update fallaba (CAO-TXN-003): la colección se creaba con `session.CreateUpdateCollection`, que no existe en WUApi; ahora usa su ProgID propio (`Microsoft.Update.UpdateColl`), con test vivo de regresión.
+- Scripts de instalación no corrían en PowerShell 5.1 (UTF-8 sin BOM mal leído como ANSI): ahora con BOM; verificado que parsean.
+
 ## [2.1.23] - 2026-09-10
 
 ### Añadido

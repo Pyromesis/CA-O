@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     CA-O Inno Setup: asistente de un solo .exe (CA-O-Instalador.exe).
 .DESCRIPTION

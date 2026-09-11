@@ -31,6 +31,7 @@ public static class OptimizationCatalog
     public static readonly DisableBackgroundApps DisableBackgroundApps = new();
     public static readonly ZeroMenuDelay ZeroMenuDelay = new();
     public static readonly DisableTransparency DisableTransparency = new();
+    public static readonly DisableDynamicTick DisableDynamicTick = new();
 
     // Privacy & security (existing)
     public static readonly DisableTelemetry DisableTelemetry = new();
@@ -44,6 +45,9 @@ public static class OptimizationCatalog
     public static readonly DisableGameBarDvr DisableGameBarDvr = new();
     public static readonly EnableGpuScheduling EnableGpuScheduling = new();
     public static readonly EnableGameMode EnableGameMode = new();
+    public static readonly DisablePointerPrecision DisablePointerPrecision = new();
+    public static readonly MouseDriverQueueTrim MouseDriverQueueTrim = new();
+    public static readonly MmcssSystemResponsiveness MmcssSystemResponsiveness = new();
 
     // Historical retired entries retained only for traceability; they are intentionally excluded from All.
     public static readonly EnableWindowedGameOptimizations EnableWindowedGameOptimizations = new();
@@ -81,6 +85,8 @@ public static class OptimizationCatalog
     public static readonly DiskCleanupSystemFiles DiskCleanupSystemFiles = new();
     public static readonly FreeLowStorageSpace FreeLowStorageSpace = new();
     public static readonly RestoreSystemManagedPagefile RestoreSystemManagedPagefile = new();
+    public static readonly DefragmentHddOnly DefragmentHddOnly = new();
+    public static readonly CleanupWindowsUpdateCache CleanupWindowsUpdateCache = new();
 
     // Network (existing + new)
     public static readonly NormalizeTcpAutoTuning NormalizeTcpAutoTuning = new();
@@ -94,6 +100,8 @@ public static class OptimizationCatalog
     public static readonly FlushDnsCache FlushDnsCache = new();
     public static readonly ResetNetworkStackRepair ResetNetworkStackRepair = new();
     public static readonly DeliveryOptimizationBandwidthProfile DeliveryOptimizationBandwidthProfile = new();
+    public static readonly DisableNagleTcpAcks DisableNagleTcpAcks = new();
+    public static readonly DisableWifiBackgroundScan DisableWifiBackgroundScan = new();
 
     // Startup (new)
     public static readonly DisableUnnecessaryStartupApps DisableUnnecessaryStartupApps = new();
@@ -124,7 +132,7 @@ public static class OptimizationCatalog
     public static readonly RestartWindowsExplorer RestartWindowsExplorer = new();
     public static readonly RecoverWindowsExplorer RecoverWindowsExplorer = new();
 
-    /// <summary>Production catalog: 66 verified optimizations (19 core + 7 gaming + 7 power + 14 storage + 11 network + 5 startup + 2 system) - all phases promoted from legacy. All optimizations are now in production.</summary>
+    /// <summary>Production catalog: 89 verified optimizations. All optimizations are now in production.</summary>
     public static IReadOnlyList<IOptimization> All { get; } = new IOptimization[]
     {
         DisableBackgroundApps,
@@ -138,9 +146,13 @@ public static class OptimizationCatalog
         DisableWidgets,
         EnableGameMode,
         EnableGpuScheduling,
+        DisablePointerPrecision,
+        MouseDriverQueueTrim,
+        MmcssSystemResponsiveness,
         EnableWindowedGameOptimizations,
         EnableVrr,
         ZeroMenuDelay,
+        DisableDynamicTick,
         DisableOneDriveAutostart,
         DisableSearchIndexing,
         MaximumPowerPlan,
@@ -178,6 +190,8 @@ public static class OptimizationCatalog
         DiskCleanupSystemFiles,
         FreeLowStorageSpace,
         RestoreSystemManagedPagefile,
+        DefragmentHddOnly,
+        CleanupWindowsUpdateCache,
         // Network Phase 4: promoted from legacy
         EnableRss,
         RestoreTcpChecksumOffload,
@@ -189,6 +203,8 @@ public static class OptimizationCatalog
         FlushDnsCache,
         ResetNetworkStackRepair,
         DeliveryOptimizationBandwidthProfile,
+        DisableNagleTcpAcks,
+        DisableWifiBackgroundScan,
         // Startup Phase 5: promoted from legacy
         DisableUnnecessaryStartupApps,
         DisableHeavyStartupApps,

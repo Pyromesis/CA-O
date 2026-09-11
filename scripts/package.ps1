@@ -1,4 +1,4 @@
-<# 
+﻿<# 
 .SYNOPSIS
     CA-O Package Release Output + SHA-256 Checksums
 .DESCRIPTION

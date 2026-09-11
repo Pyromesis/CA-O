@@ -1,4 +1,4 @@
-# CA-O 2.0 - Windows E2E scenario (FASE 32 level 4).
+﻿# CA-O 2.0 - Windows E2E scenario (FASE 32 level 4).
 # Run on a disposable elevated VM:
 #   powershell -NoProfile -ExecutionPolicy Bypass -File scripts\e2e-windows.ps1
 # Covers: install service -> launch UI -> detect -> snapshot -> apply -> verify

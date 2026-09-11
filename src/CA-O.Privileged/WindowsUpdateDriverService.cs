@@ -26,10 +26,7 @@ internal sealed class WindowsUpdateDriverService
             object? session = null;
             try
             {
-                var sessionType = Type.GetTypeFromProgID("Microsoft.Update.Session")
-                    ?? throw new InvalidOperationException("Agente de Windows Update no disponible en este equipo.");
-                session = Activator.CreateInstance(sessionType)
-                    ?? throw new InvalidOperationException("No se pudo iniciar el agente de Windows Update.");
+                session = WindowsUpdateDrivers.CreateSession();
                 dynamic dynSession = session;
                 dynSession.ClientApplicationID = "CA-O Driver Update";
                 dynamic searcher = dynSession.CreateUpdateSearcher();
@@ -90,10 +87,7 @@ internal sealed class WindowsUpdateDriverService
                 catch { rpNote = "Sin punto de restauración (no disponible). "; }
 
                 ct.ThrowIfCancellationRequested();
-                var sessionType = Type.GetTypeFromProgID("Microsoft.Update.Session")
-                    ?? throw new InvalidOperationException("Agente de Windows Update no disponible.");
-                session = Activator.CreateInstance(sessionType)
-                    ?? throw new InvalidOperationException("No se pudo iniciar el agente de Windows Update.");
+                session = WindowsUpdateDrivers.CreateSession();
                 dynamic dynSession = session;
                 dynSession.ClientApplicationID = "CA-O Driver Update";
 
@@ -118,7 +112,7 @@ internal sealed class WindowsUpdateDriverService
                     return new InstallOutcome(false, rpNote + "Los drivers elegidos ya no están ofertados (quizá se instalaron). Re-busca.", 0, 0, false);
 
                 ct.ThrowIfCancellationRequested();
-                dynamic collection = dynSession.CreateUpdateCollection();
+                dynamic collection = WindowsUpdateDrivers.CreateCollection();
                 foreach (var update in offered.Values) collection.Add(update);
 
                 dynamic downloader = dynSession.CreateUpdateDownloader();

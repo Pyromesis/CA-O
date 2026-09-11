@@ -452,7 +452,7 @@ public sealed partial class AnalyzePage : Page
                 const double gib = 1024d * 1024 * 1024;
                 var storage = new StorageDiagnosticsProvider().Measure();
                 StorageText.Text = string.Join("\n", storage.Volumes.Select(volume =>
-                    $"• {volume.Name} {volume.FileSystem}: libre {volume.FreeBytes / gib:0.0} de {volume.TotalBytes / gib:0.0} GB{(volume.IsSystemVolume ? " [sistema]" : "")}"));
+                    $"• {volume.Name} {volume.FileSystem}: libre {volume.FreeBytes / gib:0.0} de {volume.TotalBytes / gib:0.0} GB{(volume.IsSystemVolume ? " [sistema]" : "")}{(string.IsNullOrEmpty(volume.Media) ? "" : $" · {volume.Media}")}"));
                 RenderStorageBars(storage.Volumes);
             }
         }
@@ -509,10 +509,11 @@ public sealed partial class AnalyzePage : Page
             _lastStorageRows = rows.Select(volume => new StorageRowSnapshot(
                 volume.Name,
                 (1 - (double)volume.FreeBytes / volume.TotalBytes) * 100,
-                volume.FreeBytes / 1024d / 1024 / 1024)).ToList();
+                volume.FreeBytes / 1024d / 1024 / 1024,
+                volume.Media)).ToList();
             foreach (var row in _lastStorageRows)
             {
-                AddBarRow(StorageBarsPanel, row.Name, row.UsedPct, 100, $"{row.FreeGb:0} GB libres");
+                AddBarRow(StorageBarsPanel, string.IsNullOrEmpty(row.Media) ? row.Name : $"{row.Name} · {row.Media}", row.UsedPct, 100, $"{row.FreeGb:0} GB libres");
             }
         }
         catch (Exception ex) { App.WriteCrashLog(ex); }
@@ -794,7 +795,7 @@ public sealed partial class AnalyzePage : Page
             if (snap.StorageRows?.Count > 0)
             {
                 foreach (var r in snap.StorageRows)
-                    AddBarRow(StorageBarsPanel, r.Name, r.UsedPct, 100, $"{r.FreeGb:0} GB libres");
+                    AddBarRow(StorageBarsPanel, string.IsNullOrEmpty(r.Media) ? r.Name : $"{r.Name} · {r.Media}", r.UsedPct, 100, $"{r.FreeGb:0} GB libres");
             }
         }
         catch (Exception ex) { App.WriteCrashLog(ex); }

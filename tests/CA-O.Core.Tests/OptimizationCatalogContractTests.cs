@@ -25,7 +25,7 @@ public sealed class OptimizationCatalogContractTests
     public void IdsAreUnique()
     {
         var ids = OptimizationCatalog.All.Select(o => o.Definition.Id).ToList();
-        Assert.Equal(81, ids.Count); // 80 previas + recover-windows-explorer (solo relanza el shell si falta, sin matar nada)
+        Assert.Equal(89, ids.Count); // 81 previas + 8 nuevas (nagle, wifi-scan, pointer, mouse-queue, mmcss, defrag-hdd, wu-cache, dynamic-tick)
         Assert.Equal(ids.Count, ids.Distinct(StringComparer.Ordinal).Count());
     }
 

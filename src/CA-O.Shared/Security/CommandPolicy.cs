@@ -61,6 +61,12 @@ public enum SystemCommandKey
     PnPUtilEnumDevice,
     PnPUtilExportDriver,
     ExpandCab,
+    DefragAnalyze,
+    DefragHdd,
+    NetShWlanAutoconfig,
+    BcdEditDynamicTickYes,
+    BcdEditDynamicTickNo,
+    BcdEditDynamicTickDelete,
 }
 
 /// <summary>Normalized result captured by the gateway.</summary>
@@ -100,6 +106,7 @@ public static partial class CommandPolicy
             or SystemCommandKey.PnPUtilEnumDevice
             or SystemCommandKey.PnPUtilExportDriver
             or SystemCommandKey.ExpandCab
+            or SystemCommandKey.NetShWlanAutoconfig
             or SystemCommandKey.PnPUtilAddDriver;
         if (!customValidatedKey && arguments.Any(arg => string.IsNullOrWhiteSpace(arg) || !SafeArg().IsMatch(arg)))
         {
@@ -291,6 +298,40 @@ public static partial class CommandPolicy
             SystemCommandKey.DefragC when Eq(arguments, "C:", "/O") =>
                 Path.Combine(system32, "defrag.exe"),
 
+            // Desfragmentación honesta: analizar y desfragmentar SOLO el
+            // volumen indicado (letra A-Z). El que decide HDD vs SSD es el
+            // motor (DiskMediaDetector); aquí solo la forma es fija.
+            SystemCommandKey.DefragAnalyze when arguments.Count == 2 &&
+                IsValidDriveVolume(arguments[0]) && arguments[1] == "/A" =>
+                Path.Combine(system32, "defrag.exe"),
+
+            SystemCommandKey.DefragHdd when arguments.Count == 2 &&
+                IsValidDriveVolume(arguments[0]) && arguments[1] == "/D" =>
+                Path.Combine(system32, "defrag.exe"),
+
+            // Wi-Fi: solo autoconfig on/off en una interfaz con nombre sano.
+            // El nombre viaja como un único argumento interface="..." (sin
+            // shell: ArgumentList nunca interpreta las comillas).
+            SystemCommandKey.NetShWlanAutoconfig when arguments.Count == 5 &&
+                arguments[0] == "wlan" && arguments[1] == "set" &&
+                arguments[2] == "autoconfig" &&
+                (arguments[3] == "enabled=no" || arguments[3] == "enabled=yes") &&
+                IsValidNetshInterfaceArg(arguments[4]) =>
+                Path.Combine(system32, "netsh.exe"),
+
+            // Dynamic tick: valores documentados sí/no + borrado (default).
+            SystemCommandKey.BcdEditDynamicTickYes when Eq(arguments,
+                "/set", "{current}", "disabledynamictick", "yes") =>
+                Path.Combine(system32, "bcdedit.exe"),
+
+            SystemCommandKey.BcdEditDynamicTickNo when Eq(arguments,
+                "/set", "{current}", "disabledynamictick", "no") =>
+                Path.Combine(system32, "bcdedit.exe"),
+
+            SystemCommandKey.BcdEditDynamicTickDelete when Eq(arguments,
+                "/deletevalue", "{current}", "disabledynamictick") =>
+                Path.Combine(system32, "bcdedit.exe"),
+
             // FASE 20: kernel trace lifecycle (DPC/ISR). Fixed profile and
             // fixed output location; cleanup is guaranteed by the collector.
             SystemCommandKey.WprStartCpuFileMode when Eq(arguments,
@@ -377,6 +418,30 @@ public static partial class CommandPolicy
 
     [GeneratedRegex(@"^[A-Za-z0-9\\&_\-+#.(){}]+$", RegexOptions.CultureInvariant)]
     private static partial Regex PnpInstanceId();
+
+    /// <summary>Volumen fijo para defrag: una letra A-Z + dos puntos.</summary>
+    public static bool IsValidDriveVolume(string volume) =>
+        !string.IsNullOrWhiteSpace(volume) && volume.Length == 2 &&
+        volume[0] is >= 'A' and <= 'Z' && volume[1] == ':';
+
+    [GeneratedRegex(@"^[A-Za-z0-9 _\-()]+$", RegexOptions.CultureInvariant)]
+    private static partial Regex NetshInterfaceName();
+
+    /// <summary>
+    /// Nombre de interfaz netsh sano ("Wi-Fi", "Wi‑Fi 2"): sin metacaracteres
+    /// de shell, sin barras (rutas), sin puntos suspensivos. El argumento
+    /// completo es interface="nombre" y se valida entero.
+    /// </summary>
+    public static bool IsValidNetshInterfaceArg(string arg)
+    {
+        const string prefix = "interface=\"";
+        if (string.IsNullOrWhiteSpace(arg) || arg.Length > 80) return false;
+        if (!arg.StartsWith(prefix, StringComparison.Ordinal) || !arg.EndsWith('"')) return false;
+        var name = arg[prefix.Length..^1];
+        if (name.Length == 0 || name.Length > 64 || name.Contains("..")) return false;
+        if (name[0] == ' ' || name[^1] == ' ') return false;
+        return NetshInterfaceName().IsMatch(name);
+    }
 
     /// <summary>
     /// Instance ID PNP estricto (p. ej. HDAUDIO\FUNC_01&amp;VEN_10EC&amp;DEV_0283...,

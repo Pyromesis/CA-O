@@ -227,7 +227,7 @@ public sealed partial class DashboardPage : Page
             var usedPct = (1 - (double)drive.TotalFreeSpace / drive.TotalSize) * 100;
             DiskFreeText.Text = $"{freeGb:0} GB";
             DiskTotalText.Text = $"libres en {drive.Name.TrimEnd('\\')} ({totalGb:0} GB)";
-            DiskSpecText.Text = $"{drive.DriveFormat} · {drive.VolumeLabel}";
+            DiskSpecText.Text = $"{drive.DriveFormat} · {drive.VolumeLabel}{SystemDiskMediaSuffix(drive.Name)}";
             DiskUseBar.Value = usedPct;
             DiskUsePctText.Text = $"{usedPct:0}%";
             DiskTitleText.Text = $"Disco {drive.Name.TrimEnd('\\')}";
@@ -239,6 +239,24 @@ public sealed partial class DashboardPage : Page
     }
 
     private static string NormalizeRoot(string root) => root.TrimEnd('\\', '/').ToUpperInvariant();
+
+    /// <summary>Medio del disco del sistema (" · SSD"/" · HDD"/""). Nunca lanza.</summary>
+    private static string SystemDiskMediaSuffix(string driveName)
+    {
+        try
+        {
+            var volume = driveName.TrimEnd('\\', '/').ToUpperInvariant();
+            if (volume.Length == 1) volume += ":";
+            return CAO.Core.Optimization.DiskMediaDetector.ResolveVolumeMedia(volume) switch
+            {
+                CAO.Core.Optimization.DiskMedia.Hdd => " · HDD",
+                CAO.Core.Optimization.DiskMedia.Ssd => " · SSD",
+                CAO.Core.Optimization.DiskMedia.Scm => " · SCM",
+                _ => string.Empty,
+            };
+        }
+        catch { return string.Empty; }
+    }
 
     private void UpdateScoreRing(double? avg)
     {
