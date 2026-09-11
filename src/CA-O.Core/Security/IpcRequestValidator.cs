@@ -57,8 +57,9 @@ public static class IpcRequestValidator
         }
 
         // Ping, GetServiceStatus, SetDns, SetTimerResolution, FixDriver,
-        // InstallDriver, RemovePhantomDevices, SearchDriverUpdates e
-        // InstallDriverUpdates no llevan OptimizationId (§10, FASE 8)
+        // InstallDriver, RemovePhantomDevices, SearchDriverUpdates,
+        // InstallDriverUpdates, ExportDriver, SearchCatalogDrivers y
+        // DownloadCatalogDriver no llevan OptimizationId (§10, FASE 8)
         if (request.Operation is PrivilegedOperationKind.Ping or PrivilegedOperationKind.GetServiceStatus)
         {
             var pingExpected = request.Operation == PrivilegedOperationKind.Ping ? typeof(global::CAO.Shared.IPC.PingPayload) : typeof(global::CAO.Shared.IPC.GetServiceStatusPayload);
@@ -181,6 +182,56 @@ public static class IpcRequestValidator
                 !updates.UpdateIds.All(global::CAO.Shared.Security.CommandPolicy.IsValidWindowsUpdateId))
             {
                 error = "InstallDriverUpdates: lista vacía, excesiva o con IDs no válidos.";
+                return false;
+            }
+            error = string.Empty;
+            return true;
+        }
+        if (request.Operation is PrivilegedOperationKind.ExportDriver)
+        {
+            if (request.Payload is not global::CAO.Shared.IPC.ExportDriverPayload export)
+            {
+                errorCode = ErrorCodes.IpcPayloadSchemaInvalid;
+                error = "Payload de ExportDriver inválido.";
+                return false;
+            }
+            if (!global::CAO.Shared.Security.CommandPolicy.IsValidPnpInstanceId(export.InstanceId))
+            {
+                error = "ExportDriver InstanceId no válido.";
+                return false;
+            }
+            error = string.Empty;
+            return true;
+        }
+        if (request.Operation is PrivilegedOperationKind.SearchCatalogDrivers)
+        {
+            if (request.Payload is not global::CAO.Shared.IPC.SearchCatalogDriversPayload search)
+            {
+                errorCode = ErrorCodes.IpcPayloadSchemaInvalid;
+                error = "Payload de SearchCatalogDrivers inválido.";
+                return false;
+            }
+            if (!global::CAO.Shared.Security.CommandPolicy.IsValidCatalogHardwareId(search.HardwareId) ||
+                search.DeviceName is null || search.DeviceName.Length > 120 || search.DeviceName.Any(char.IsControl))
+            {
+                error = "SearchCatalogDrivers HardwareId/DeviceName no válido.";
+                return false;
+            }
+            error = string.Empty;
+            return true;
+        }
+        if (request.Operation is PrivilegedOperationKind.DownloadCatalogDriver)
+        {
+            if (request.Payload is not global::CAO.Shared.IPC.DownloadCatalogDriverPayload download)
+            {
+                errorCode = ErrorCodes.IpcPayloadSchemaInvalid;
+                error = "Payload de DownloadCatalogDriver inválido.";
+                return false;
+            }
+            if (!global::CAO.Shared.Security.CommandPolicy.IsValidWindowsUpdateId(download.UpdateId) ||
+                ((download.HardwareId ?? string.Empty).Length > 0 && !global::CAO.Shared.Security.CommandPolicy.IsValidCatalogHardwareId(download.HardwareId)))
+            {
+                error = "DownloadCatalogDriver UpdateId/HardwareId no válido.";
                 return false;
             }
             error = string.Empty;

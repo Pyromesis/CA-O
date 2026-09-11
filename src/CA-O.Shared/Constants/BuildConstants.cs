@@ -11,10 +11,10 @@ namespace CAO.Shared.Constants;
 public static class BuildConstants
 {
     // Version - SINGLE SOURCE OF TRUTH
-    public const string ProductVersion = "2.1.22";
+    public const string ProductVersion = "2.1.23";
     public const string ProductVersionMajor = "2";
     public const string ProductVersionMinor = "1";
-    public const string ProductVersionPatch = "22";
+    public const string ProductVersionPatch = "23";
 
     // Product Identity
     public const string ProductName = "CA-O";

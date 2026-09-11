@@ -2,6 +2,17 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
+## [2.1.23] - 2026-09-10
+
+### Añadido
+- Respaldo de drivers: exporta los archivos reales (INF+SYS+DLL+CAT) a `%ProgramData%\CA-O\DriverBackup` con `pnputil /export-driver` y abre la carpeta. Botón Respaldar por dispositivo. Nueva op IPC `ExportDriver`.
+- Descarga oficial del Catálogo de Microsoft: busca por HWID (con fallbacks a VEN&DEV y nombre), descarga el .cab firmado (solo hosts Microsoft), extrae con expand.exe y ofrece los .inf para instalar con el flujo verificado. El botón INF… ahora da a elegir Descargar oficial / archivo local. Nuevas ops IPC `SearchCatalogDrivers` + `DownloadCatalogDriver`.
+- Actualizar todo: un clic actualiza todos los drivers con problema (busca la oferta más nueva, omite si ya es la misma versión, descarga, instala, resume). Punto de restauración único previo.
+- Botón ID por fila: copia el HWID y muestra el enlace oficial del catálogo. El .inf se auto-elige por coincidencia de HWID cuando hay varios.
+
+### Corregido
+- Limpieza de fantasmas rechazada (CAO-IPC-002): los IDs con `{GUID}` (HID Bluetooth, volúmenes, WPD) no pasaban el validador y tumbaban todo el lote. Las llaves ya son legítimas.
+
 ## [2.1.22] - 2026-09-10
 
 ### Añadido

@@ -246,7 +246,10 @@ catch (Exception ex)
         (request?.Payload is IOptimizationIdPayload p && HeavyOptimizationIds.Contains(p.OptimizationId)) ||
         request?.Operation is PrivilegedOperationKind.SearchDriverUpdates
             or PrivilegedOperationKind.InstallDriverUpdates
-            or PrivilegedOperationKind.RemovePhantomDevices;
+            or PrivilegedOperationKind.RemovePhantomDevices
+            or PrivilegedOperationKind.ExportDriver
+            or PrivilegedOperationKind.SearchCatalogDrivers
+            or PrivilegedOperationKind.DownloadCatalogDriver;
 
     /// <summary>
     /// Ejecuta el despacho suplantando al llamante autorizado para que HKCU y
@@ -396,6 +399,62 @@ catch (Exception ex)
                 catch (Exception ex)
                 {
                     return IpcResponse.Rejected(ErrorCodes.TxnApplyFailed, $"Error instalando drivers: {ex.Message}");
+                }
+            }
+
+            if (request.Operation == PrivilegedOperationKind.ExportDriver && request.Payload is ExportDriverPayload export)
+            {
+                try
+                {
+                    var backup = await engine.ExportDriverAsync(export.InstanceId, ct);
+                    if (!backup.Success) return IpcResponse.Rejected(ErrorCodes.TxnApplyFailed, backup.MessageEs);
+                    return IpcResponse.Ok(JsonSerializer.Serialize(new
+                    {
+                        path = backup.Directory,
+                        files = backup.Files,
+                        message = backup.MessageEs,
+                    }, JsonOptions));
+                }
+                catch (Exception ex)
+                {
+                    return IpcResponse.Rejected(ErrorCodes.TxnApplyFailed, $"Error respaldando driver: {ex.Message}");
+                }
+            }
+
+            if (request.Operation == PrivilegedOperationKind.SearchCatalogDrivers && request.Payload is SearchCatalogDriversPayload catalogSearch)
+            {
+                try
+                {
+                    var found = await engine.SearchCatalogDriversAsync(catalogSearch.HardwareId, catalogSearch.DeviceName ?? string.Empty, ct);
+                    if (!found.Success) return IpcResponse.Rejected(ErrorCodes.TxnApplyFailed, found.MessageEs);
+                    return IpcResponse.Ok(JsonSerializer.Serialize(new
+                    {
+                        message = found.MessageEs,
+                        offers = found.Offers,
+                    }, JsonOptions));
+                }
+                catch (Exception ex)
+                {
+                    return IpcResponse.Rejected(ErrorCodes.TxnApplyFailed, $"Error buscando en el catálogo: {ex.Message}");
+                }
+            }
+
+            if (request.Operation == PrivilegedOperationKind.DownloadCatalogDriver && request.Payload is DownloadCatalogDriverPayload catalogDownload)
+            {
+                try
+                {
+                    var pkg = await engine.DownloadCatalogDriverAsync(catalogDownload.UpdateId, ct);
+                    if (!pkg.Success) return IpcResponse.Rejected(ErrorCodes.TxnApplyFailed, pkg.MessageEs);
+                    return IpcResponse.Ok(JsonSerializer.Serialize(new
+                    {
+                        message = pkg.MessageEs,
+                        directory = pkg.Directory,
+                        infs = pkg.InfPaths,
+                    }, JsonOptions));
+                }
+                catch (Exception ex)
+                {
+                    return IpcResponse.Rejected(ErrorCodes.TxnApplyFailed, $"Error descargando driver: {ex.Message}");
                 }
             }
 

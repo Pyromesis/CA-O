@@ -59,6 +59,8 @@ public enum SystemCommandKey
     PnPUtilRemoveDevice,
     PnPUtilAddDriver,
     PnPUtilEnumDevice,
+    PnPUtilExportDriver,
+    ExpandCab,
 }
 
 /// <summary>Normalized result captured by the gateway.</summary>
@@ -96,6 +98,8 @@ public static partial class CommandPolicy
         var customValidatedKey = key is SystemCommandKey.PnPUtilEnableDevice
             or SystemCommandKey.PnPUtilRemoveDevice
             or SystemCommandKey.PnPUtilEnumDevice
+            or SystemCommandKey.PnPUtilExportDriver
+            or SystemCommandKey.ExpandCab
             or SystemCommandKey.PnPUtilAddDriver;
         if (!customValidatedKey && arguments.Any(arg => string.IsNullOrWhiteSpace(arg) || !SafeArg().IsMatch(arg)))
         {
@@ -322,6 +326,15 @@ public static partial class CommandPolicy
                 arguments[0] == "/enum-devices" && arguments[1] == "/instanceid" && IsValidPnpInstanceId(arguments[2]) =>
                 Path.Combine(system32, "pnputil.exe"),
 
+            SystemCommandKey.PnPUtilExportDriver when arguments.Count == 3 &&
+                arguments[0] == "/export-driver" && IsValidPnpInstanceId(arguments[1]) && IsExportDriverDest(arguments[2]) =>
+                Path.Combine(system32, "pnputil.exe"),
+
+            SystemCommandKey.ExpandCab when arguments.Count == 3 &&
+                arguments[0].EndsWith(".cab", StringComparison.OrdinalIgnoreCase) && IsCatalogPackagePath(arguments[0]) &&
+                arguments[1] == "-F:*" && IsCatalogPackagePath(arguments[2]) =>
+                Path.Combine(system32, "expand.exe"),
+
             SystemCommandKey.PnPUtilAddDriver when arguments.Count == 3 &&
                 arguments[0] == "/add-driver" && IsValidInfPath(arguments[1]) && arguments[2] == "/install" =>
                 Path.Combine(system32, "pnputil.exe"),
@@ -362,13 +375,15 @@ public static partial class CommandPolicy
         !string.IsNullOrWhiteSpace(name) && name.Length <= 256 &&
         name.StartsWith('\\') && !name.Contains("..") && SafeArg().IsMatch(name);
 
-    [GeneratedRegex(@"^[A-Za-z0-9\\&_\-+#.()]+$", RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"^[A-Za-z0-9\\&_\-+#.(){}]+$", RegexOptions.CultureInvariant)]
     private static partial Regex PnpInstanceId();
 
     /// <summary>
-    /// Instance ID PNP estricto (p. ej. HDAUDIO\FUNC_01&amp;VEN_10EC&amp;DEV_0283...).
-    /// Permite '&amp;' y '\' legítimos; veta espacios, comillas, ';', '|', '%', '^',
-    /// '$', '`', saltos y '..'. El token viaja por ArgumentList (sin shell).
+    /// Instance ID PNP estricto (p. ej. HDAUDIO\FUNC_01&amp;VEN_10EC&amp;DEV_0283...,
+    /// HID\{00001812-...}_DEV_... de Bluetooth, STORAGE\VOLUME\{guid}...).
+    /// Las llaves son legítimas en IDs reales; siguen vetados espacios,
+    /// comillas, ';', '|', '%', '^', '$', '`', saltos y '..'. El token viaja
+    /// por ArgumentList (sin shell).
     /// </summary>
     public static bool IsValidPnpInstanceId(string id) =>
         !string.IsNullOrWhiteSpace(id) && id.Length <= 256 && !id.Contains("..") && PnpInstanceId().IsMatch(id);
@@ -380,6 +395,72 @@ public static partial class CommandPolicy
     /// </summary>
     public static bool IsValidWindowsUpdateId(string id) =>
         !string.IsNullOrWhiteSpace(id) && id.Length <= 64 && Guid.TryParse(id, out _);
+
+    /// <summary>Raíz canónica del respaldo de drivers (%ProgramData%\CA-O\DriverBackup).</summary>
+    public static string ExportDriverBackupRoot() =>
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "CA-O", "DriverBackup");
+
+    /// <summary>
+    /// Destino de /export-driver: SIEMPRE bajo la raíz canónica, un solo
+    /// nivel, charset de archivo seguro, sin '..'. El servicio construye el
+    /// destino; esto es defensa en profundidad.
+    /// </summary>
+    public static bool IsExportDriverDest(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path) || path.Length > 260) return false;
+        var root = ExportDriverBackupRoot() + Path.DirectorySeparatorChar;
+        if (!path.StartsWith(root, StringComparison.OrdinalIgnoreCase)) return false;
+        var leaf = path[root.Length..];
+        if (leaf.Length == 0 || leaf.Length > 80 || leaf.Contains("..")) return false;
+        if (leaf.Any(c => c is '\\' or '/' or ':' or '"' or '\'' || char.IsControl(c))) return false;
+        return leaf.All(c => char.IsLetterOrDigit(c) || c is '_' or '-' || c == '.');
+    }
+
+    /// <summary>
+    /// Hardware ID para buscar en el catálogo (p. ej. PCI\VEN_8086&amp;DEV_AE50...).
+    /// Mismo charset que Instance ID pero sin espacios ni '..'. Solo viaja en
+    /// la query URL (escaped), nunca a procesos.
+    /// </summary>
+    public static bool IsValidCatalogHardwareId(string? id) =>
+        !string.IsNullOrWhiteSpace(id) && id.Length <= 256 && !id.Contains("..") && PnpInstanceId().IsMatch(id);
+
+    /// <summary>Raíz canónica de descargas del catálogo (%ProgramData%\CA-O\DriverDownloads).</summary>
+    public static string CatalogDriverDownloadRoot() =>
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "CA-O", "DriverDownloads");
+
+    /// <summary>
+    /// Ruta de paquete del catálogo: bajo la raíz canónica (.cab descargado o
+    /// carpeta extraída). El servicio construye ambas desde el UpdateId GUID.
+    /// </summary>
+    public static bool IsCatalogPackagePath(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path) || path.Length > 260) return false;
+        var root = CatalogDriverDownloadRoot() + Path.DirectorySeparatorChar;
+        if (!path.StartsWith(root, StringComparison.OrdinalIgnoreCase)) return false;
+        var rel = path[root.Length..];
+        if (rel.Length == 0 || rel.Length > 120 || rel.Contains("..")) return false;
+        return rel.All(c => char.IsLetterOrDigit(c) || c is '_' or '-' || c is '.' || c == '\\');
+    }
+
+    private static readonly HashSet<string> CatalogDownloadHosts = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "download.windowsupdate.com",
+        "catalog.s.download.windowsupdate.com",
+        "catalog.download.windowsupdate.com",
+        "dl.delivery.mp.microsoft.com",
+        "download.microsoft.com",
+    };
+
+    /// <summary>
+    /// Solo HTTPS en hosts de descarga de Microsoft. La URL viene del
+    /// catálogo, pero se valida igual: nada fuera de Microsoft se descarga.
+    /// </summary>
+    public static bool IsAllowedCatalogHost(string url)
+    {
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri)) return false;
+        if (!uri.Scheme.Equals("https", StringComparison.OrdinalIgnoreCase)) return false;
+        return CatalogDownloadHosts.Contains(uri.Host);
+    }
 
     /// <summary>
     /// Ruta INF estricta para pnputil /add-driver: absoluta, extensión .inf,

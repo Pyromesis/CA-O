@@ -34,6 +34,9 @@ public enum PrivilegedOperationKind
     RemovePhantomDevices,
     SearchDriverUpdates,
     InstallDriverUpdates,
+    ExportDriver,
+    SearchCatalogDrivers,
+    DownloadCatalogDriver,
 }
 
 /// <summary>
@@ -61,6 +64,9 @@ public interface IOptimizationIdPayload : ITypedPayload
 [JsonDerivedType(typeof(RemovePhantomDevicesPayload), "removephantoms")]
 [JsonDerivedType(typeof(SearchDriverUpdatesPayload), "searchdrivers")]
 [JsonDerivedType(typeof(InstallDriverUpdatesPayload), "installdrivers")]
+[JsonDerivedType(typeof(ExportDriverPayload), "exportdriver")]
+[JsonDerivedType(typeof(SearchCatalogDriversPayload), "searchcatalog")]
+[JsonDerivedType(typeof(DownloadCatalogDriverPayload), "downloadcatalog")]
 public interface ITypedPayload
 {
 }
@@ -121,6 +127,19 @@ public sealed record SearchDriverUpdatesPayload() : ITypedPayload;
 /// re-busca y solo instala los que sigan ofertados).
 /// </summary>
 public sealed record InstallDriverUpdatesPayload(IReadOnlyList<string> UpdateIds) : ITypedPayload;
+
+/// <summary>
+/// Respalda los archivos reales del driver (INF+SYS+DLL+CAT vía
+/// pnputil /export-driver) a la carpeta de respaldo de CA-O. Para
+/// reinstalar "bien hecho" o guardar antes de tocar nada.
+/// </summary>
+public sealed record ExportDriverPayload(string InstanceId) : ITypedPayload;
+
+/// <summary>Busca drivers oficiales en el Catálogo de Microsoft por HWID.</summary>
+public sealed record SearchCatalogDriversPayload(string HardwareId, string DeviceName = "") : ITypedPayload;
+
+/// <summary>Descarga+extrae una oferta del catálogo (solo GUIDs de búsqueda).</summary>
+public sealed record DownloadCatalogDriverPayload(string UpdateId, string HardwareId = "") : ITypedPayload;
 
 public sealed record PingResponse(string ServiceVersion, int ProtocolVersion, int ProcessId, bool IsSystem, string Status);
 public sealed record ServiceStatusResponse(string ServiceVersion, int ProtocolVersion, int ProcessId, bool IsSystem, string Status, IReadOnlyList<string> Capabilities);

@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using CAO.Core.Optimization;
 using CAO.Infrastructure.SystemInterop;
 using CAO.Shared;
 using CAO.UI.Helpers;
@@ -13,6 +14,8 @@ public sealed partial class DriversPage : Page
     private sealed record DriverRow(string Title, string Detail);
 
     private sealed record DriverUpdateRow(string UpdateId, string Title, string Detail);
+
+    private sealed record ExportDriverResult(string Path, int Files, string Message);
 
     private static readonly JsonSerializerOptions CaseInsensitiveJson = new() { PropertyNameCaseInsensitive = true };
 
@@ -81,7 +84,7 @@ public sealed partial class DriversPage : Page
         MissingText.Text = _drivers.Count(DriverConflicts.IsMissing).ToString();
     }
 
-    private sealed record ConflictRow(string InstanceId, string Title, string Detail, string FixLabel, string FixAction, bool CanFix);
+    private sealed record ConflictRow(string InstanceId, string Title, string Detail, string FixLabel, string FixAction, bool CanFix, string HwId, string Name);
 
     private static (string Label, string Action) SuggestFix(DriverDiagnostic d) => d.ProblemCode switch
     {
@@ -100,6 +103,8 @@ public sealed partial class DriversPage : Page
                 ? "Sin escanear: pulsa Escanear para detectar conflictos."
                 : "✓ Sin conflictos: todos los dispositivos arrancan bien.";
             ConflictsList.Visibility = Visibility.Collapsed;
+            UpdateAllButton.IsEnabled = false;
+            UpdateAllButton.Content = "Actualizar todo";
             return;
         }
         ConflictsText.Visibility = Visibility.Collapsed;
@@ -114,8 +119,149 @@ public sealed partial class DriversPage : Page
                 ($"{DriverConflicts.DescribeProblem(d.ProblemCode)} · {provider} v{d.Version} · {d.InfName}".Trim(' ', '·') +
                  DriverIdsLine(d)).Trim(),
                 label, action,
-                CanFix: !string.IsNullOrWhiteSpace(d.PnpDeviceId));
+                CanFix: !string.IsNullOrWhiteSpace(d.PnpDeviceId),
+                d.HardwareId, d.Name);
         }).ToList();
+        var updatable = problems.Count(d => !string.IsNullOrWhiteSpace(d.HardwareId));
+        UpdateAllButton.IsEnabled = updatable > 0;
+        UpdateAllButton.Content = updatable > 0 ? $"Actualizar todo ({updatable})" : "Actualizar todo";
+    }
+
+    /// <summary>
+    /// Copia el HWID y muestra el enlace oficial del catálogo (página
+    /// confiable de Microsoft). No abre navegador (la UI no lanza procesos).
+    /// </summary>
+    private void OnCopyHwidClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: ConflictRow row } || string.IsNullOrWhiteSpace(row.HwId)) return;
+        try
+        {
+            var package = new Windows.ApplicationModel.DataTransfer.DataPackage();
+            package.SetText(row.HwId);
+            Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(package);
+            var url = "https://www.catalog.update.microsoft.com/Search.aspx?q=" + Uri.EscapeDataString(row.HwId);
+            FixStatusText.Visibility = Visibility.Visible;
+            FixStatusText.Text = $"HWID copiado: {row.HwId}\nBúscalo en la página oficial: {url}";
+        }
+        catch (Exception ex) { App.WriteCrashLog(ex); }
+    }
+
+    /// <summary>
+    /// Modo automático: por cada dispositivo con problema y HWID, busca la
+    /// oferta oficial más nueva, la descarga y la instala. Una confirmación,
+    /// un punto de restauración, resumen final. Lo que no se puede resolver
+    /// solo se reporta con su motivo (sin oferta, misma versión, sin INF…).
+    /// </summary>
+    private async void OnUpdateAllClick(object sender, RoutedEventArgs e)
+    {
+        var candidates = _drivers
+            .Where(d => DriverConflicts.IsProblem(d) && !string.IsNullOrWhiteSpace(d.HardwareId))
+            .ToList();
+        if (candidates.Count == 0) return;
+        var preview = string.Join("\n", candidates.Take(8).Select(d => $"• {d.Name}"));
+        var confirm = new ContentDialog
+        {
+            Title = $"Actualizar {candidates.Count} drivers automáticamente",
+            Content = new TextBlock
+            {
+                Text = $"Se buscará el driver oficial más nuevo por dispositivo, se descargará del catálogo de Microsoft y se instalará:\n{preview}" +
+                    (candidates.Count > 8 ? $"\n…y {candidates.Count - 8} más." : string.Empty) +
+                    "\n\nSe crea un punto de restauración antes (si el sistema lo permite). Puede tardar y pedir reinicio. ¿Continuar?",
+                TextWrapping = TextWrapping.Wrap,
+            },
+            PrimaryButtonText = "Actualizar todo",
+            CloseButtonText = "Cancelar",
+            DefaultButton = ContentDialogButton.Close,
+            XamlRoot = Content.XamlRoot,
+        };
+        if (await confirm.ShowAsync() != ContentDialogResult.Primary) return;
+
+        UpdateAllButton.IsEnabled = false;
+        UpdateAllStatusText.Visibility = Visibility.Visible;
+        var pipe = AppHost.Resolve<PrivilegedPipeClient>();
+        using var master = new CancellationTokenSource(TimeSpan.FromMinutes(45));
+
+        try
+        {
+            UpdateAllStatusText.Text = "Creando punto de restauración…";
+            string rpNote;
+            try
+            {
+                using var rpCts = new CancellationTokenSource(TimeSpan.FromMinutes(5));
+                var (created, reason) = await new WmiRestorePointService()
+                    .CreateAsync("CA-O: actualización automática de drivers", rpCts.Token);
+                rpNote = created ? "Punto de restauración creado. " : $"Sin punto ({reason}). ";
+            }
+            catch { rpNote = "Sin punto de restauración. "; }
+
+            int done = 0, skipped = 0, failed = 0;
+            var failures = new List<string>();
+            for (int i = 0; i < candidates.Count; i++)
+            {
+                master.Token.ThrowIfCancellationRequested();
+                var d = candidates[i];
+                UpdateAllStatusText.Text = $"{rpNote}{i + 1}/{candidates.Count}: {d.Name}… (buscando)";
+                CatalogSearchResult? search = await SearchCatalogQuietAsync(pipe, d, master.Token);
+                if (search is null || search.Offers.Count == 0) { skipped++; failures.Add($"{d.Name}: sin oferta oficial"); continue; }
+                var best = search.Offers[0];
+                if (!CatalogDriverProtocol.ShouldTryOffer(d.Version, best.Version)) { skipped++; continue; }
+                UpdateAllStatusText.Text = $"{i + 1}/{candidates.Count}: {d.Name}… (descargando {best.Version})";
+                CatalogDownloadResult? pkg = await DownloadCatalogQuietAsync(pipe, best.UpdateId, d.HardwareId, master.Token);
+                if (pkg is null || pkg.InfPaths.Count == 0) { skipped++; failures.Add($"{d.Name}: sin INF utilizable"); continue; }
+                var inf = CatalogDriverProtocol.PickBestInfMatch(pkg.InfPaths, d.HardwareId) ?? pkg.InfPaths[0];
+                UpdateAllStatusText.Text = $"{i + 1}/{candidates.Count}: {d.Name}… (instalando)";
+                try
+                {
+                    using var installCts = new CancellationTokenSource(TimeSpan.FromMinutes(5));
+                    var installed = await pipe.InstallDriverAsync(inf, d.PnpDeviceId, installCts.Token);
+                    if (installed is { Accepted: true }) done++;
+                    else { failed++; failures.Add($"{d.Name}: {installed?.SafeMessage ?? "rechazado"}"); }
+                }
+                catch (Exception ex) { failed++; failures.Add($"{d.Name}: {ex.Message}"); }
+            }
+            var summary = $"Hecho: {done} actualizados, {skipped} omitidos, {failed} fallidos.";
+            if (failures.Count > 0)
+                summary += "\n" + string.Join("\n", failures.Take(10)) + (failures.Count > 10 ? $"\n…y {failures.Count - 10} más." : string.Empty);
+            UpdateAllStatusText.Text = summary + " Re-escaneando…";
+        }
+        catch (OperationCanceledException)
+        {
+            UpdateAllStatusText.Text = "Actualización cancelada o tiempo agotado. Re-escaneando…";
+        }
+        catch (Exception ex)
+        {
+            UpdateAllStatusText.Text = $"Error ({ex.Message}). Re-escaneando…";
+            App.WriteCrashLog(ex);
+        }
+        OnScanClick(ScanButton, new RoutedEventArgs());
+    }
+
+    private static async Task<CatalogSearchResult?> SearchCatalogQuietAsync(
+        PrivilegedPipeClient pipe, DriverDiagnostic d, CancellationToken ct)
+    {
+        try
+        {
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            cts.CancelAfter(TimeSpan.FromMinutes(5));
+            var response = await pipe.SearchCatalogDriversAsync(d.HardwareId, d.Name, cts.Token);
+            if (response is not { Accepted: true } || string.IsNullOrWhiteSpace(response.DetailJson)) return null;
+            return JsonSerializer.Deserialize<CatalogSearchResult>(response.DetailJson, CaseInsensitiveJson);
+        }
+        catch { return null; }
+    }
+
+    private static async Task<CatalogDownloadResult?> DownloadCatalogQuietAsync(
+        PrivilegedPipeClient pipe, string updateId, string hardwareId, CancellationToken ct)
+    {
+        try
+        {
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            cts.CancelAfter(TimeSpan.FromMinutes(30));
+            var response = await pipe.DownloadCatalogDriverAsync(updateId, hardwareId, cts.Token);
+            if (response is not { Accepted: true } || string.IsNullOrWhiteSpace(response.DetailJson)) return null;
+            return JsonSerializer.Deserialize<CatalogDownloadResult>(response.DetailJson, CaseInsensitiveJson);
+        }
+        catch { return null; }
     }
 
     /// <summary>
@@ -319,6 +465,71 @@ public sealed partial class DriversPage : Page
         _ => $"{bytes / 1024.0 / 1024:0.#} MB",
     };
 
+    /// <summary>
+    /// Respalda los archivos reales del driver (INF+SYS+DLL+CAT) a
+    /// %ProgramData%\CA-O\DriverBackup y abre la carpeta. Solo lectura del
+    /// sistema: ideal antes de tocar nada o para reinstalar "bien hecho".
+    /// </summary>
+    private async void OnBackupDriverClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: ConflictRow row } || !row.CanFix) return;
+        var confirm = new ContentDialog
+        {
+            Title = $"Respaldar: {row.Title}",
+            Content = new TextBlock
+            {
+                Text = "Se exportarán los archivos reales del driver (INF, SYS, DLL) a la carpeta de respaldo de CA-O. No cambia nada del sistema. ¿Continuar?",
+                TextWrapping = TextWrapping.Wrap,
+            },
+            PrimaryButtonText = "Respaldar",
+            CloseButtonText = "Cancelar",
+            DefaultButton = ContentDialogButton.Close,
+            XamlRoot = Content.XamlRoot,
+        };
+        if (await confirm.ShowAsync() != ContentDialogResult.Primary) return;
+
+        FixStatusText.Visibility = Visibility.Visible;
+        FixStatusText.Text = $"Respaldando {row.Title}…";
+        try
+        {
+            using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(15));
+            var pipe = AppHost.Resolve<PrivilegedPipeClient>();
+            var response = await pipe.ExportDriverAsync(row.InstanceId, cts.Token);
+            if (response is not { Accepted: true } || string.IsNullOrWhiteSpace(response.DetailJson))
+            {
+                FixStatusText.Text = $"{row.Title}: rechazado [{response?.ErrorCode}]: {response?.SafeMessage ?? "sin respuesta"}";
+                return;
+            }
+            ExportDriverResult? backup = null;
+            try { backup = JsonSerializer.Deserialize<ExportDriverResult>(response.DetailJson, CaseInsensitiveJson); } catch { }
+            if (backup is null || string.IsNullOrWhiteSpace(backup.Path) || backup.Files <= 0)
+            {
+                FixStatusText.Text = $"{row.Title}: respuesta inesperada del servicio.";
+                return;
+            }
+            FixStatusText.Text = $"✓ {row.Title}: {backup.Files} archivos en {backup.Path}. Abriendo carpeta…";
+            OpenBackupFolder(backup.Path);
+        }
+        catch (Exception ex)
+        {
+            FixStatusText.Text = $"{row.Title}: servicio no disponible ({ex.Message})";
+            App.WriteCrashLog(ex);
+        }
+    }
+
+    /// <summary>Abre la carpeta solo si está bajo la raíz de respaldo (nunca rutas ajenas).</summary>
+    private static void OpenBackupFolder(string path)
+    {
+        try
+        {
+            var root = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "CA-O", "DriverBackup")
+                + Path.DirectorySeparatorChar;
+            if (!path.StartsWith(root, StringComparison.OrdinalIgnoreCase) || !Directory.Exists(path)) return;
+            System.Diagnostics.Process.Start("explorer.exe", $"\"{path}\"");
+        }
+        catch (Exception ex) { App.WriteCrashLog(ex); }
+    }
+
     private async void OnFixDriverClick(object sender, RoutedEventArgs e)
     {
         if (sender is not Button { Tag: ConflictRow row } || !row.CanFix) return;
@@ -426,9 +637,173 @@ public sealed partial class DriversPage : Page
     private async void OnRowInfClick(object sender, RoutedEventArgs e)
     {
         if (sender is not Button { Tag: ConflictRow row } || !row.CanFix) return;
-        var path = await PickInfAsync();
-        if (string.IsNullOrWhiteSpace(path)) return;
-        await InstallInfAsync(path, row.InstanceId, row.Title);
+        var choice = new ContentDialog
+        {
+            Title = $"Driver para {row.Title}",
+            Content = new TextBlock
+            {
+                Text = "Descarga el paquete oficial del Catálogo de Microsoft (firmado: INF+SYS+DLL) o elige un .inf que ya tengas del fabricante.",
+                TextWrapping = TextWrapping.Wrap,
+            },
+            PrimaryButtonText = "Descargar oficial",
+            SecondaryButtonText = "Elegir archivo…",
+            CloseButtonText = "Cancelar",
+            DefaultButton = ContentDialogButton.Primary,
+            XamlRoot = Content.XamlRoot,
+        };
+        var picked = await choice.ShowAsync();
+        if (picked == ContentDialogResult.Primary)
+        {
+            await DownloadOfficialFlowAsync(row);
+        }
+        else if (picked == ContentDialogResult.Secondary)
+        {
+            var path = await PickInfAsync();
+            if (!string.IsNullOrWhiteSpace(path)) await InstallInfAsync(path, row.InstanceId, row.Title);
+        }
+    }
+
+    private sealed record CatalogOfferRow(string UpdateId, string Title, string Detail);
+
+    private sealed record CatalogInfRow(string FullPath, string FileName);
+
+    /// <summary>
+    /// Flujo Driver-Booster honesto: busca el HWID en el catálogo de
+    /// Microsoft, descarga el .cab firmado, extrae y ofrece los .inf para
+    /// instalar con el flujo verificado (pnputil + comprobación).
+    /// </summary>
+    private async Task DownloadOfficialFlowAsync(ConflictRow row)
+    {
+        if (string.IsNullOrWhiteSpace(row.HwId))
+        {
+            InfStatusText.Visibility = Visibility.Visible;
+            InfStatusText.Text = "Este dispositivo no expone ID de hardware: usa Elegir archivo… o el enlace del fabricante.";
+            return;
+        }
+        InfStatusText.Visibility = Visibility.Visible;
+        InfStatusText.Text = $"Buscando '{row.HwId}' en el catálogo de Microsoft…";
+        CatalogSearchResult? search;
+        try
+        {
+            using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(5));
+            var pipe = AppHost.Resolve<PrivilegedPipeClient>();
+            var response = await pipe.SearchCatalogDriversAsync(row.HwId, row.Name, cts.Token);
+            if (response is not { Accepted: true } || string.IsNullOrWhiteSpace(response.DetailJson))
+            {
+                InfStatusText.Text = $"Catálogo sin respuesta [{response?.ErrorCode}]: {response?.SafeMessage ?? "sin respuesta"}";
+                return;
+            }
+            try { search = JsonSerializer.Deserialize<CatalogSearchResult>(response.DetailJson, CaseInsensitiveJson); }
+            catch { search = null; }
+            if (search is null || search.Offers.Count == 0)
+            {
+                InfStatusText.Text = search?.Message ?? "El catálogo no ofrece drivers para este hardware. Usa Elegir archivo… o el enlace del fabricante.";
+                return;
+            }
+        }
+        catch (Exception ex)
+        {
+            InfStatusText.Text = $"Servicio no disponible ({ex.Message})";
+            App.WriteCrashLog(ex);
+            return;
+        }
+
+        var offersList = new ListView
+        {
+            SelectionMode = ListViewSelectionMode.Single,
+            MaxHeight = 300,
+            ItemsSource = search.Offers.Select(o => new CatalogOfferRow(
+                o.UpdateId, o.Title,
+                string.IsNullOrWhiteSpace(o.Version) ? "versión desconocida" : $"Versión {o.Version}")).ToList(),
+        };
+        offersList.ItemTemplate = (DataTemplate)Application.Current.Resources["CatalogOfferTemplate"];
+        var offerDialog = new ContentDialog
+        {
+            Title = $"{search.Offers.Count} oficiales encontrados",
+            Content = new StackPanel
+            {
+                Spacing = 8,
+                Children =
+                {
+                    new TextBlock { Text = "Elige el paquete a descargar (firmado por Microsoft):", TextWrapping = TextWrapping.Wrap },
+                    offersList,
+                },
+            },
+            PrimaryButtonText = "Descargar",
+            CloseButtonText = "Cancelar",
+            DefaultButton = ContentDialogButton.Primary,
+            XamlRoot = Content.XamlRoot,
+        };
+        if (await offerDialog.ShowAsync() != ContentDialogResult.Primary) return;
+        if (offersList.SelectedItem is not CatalogOfferRow offer)
+        {
+            InfStatusText.Text = "Elige una oferta primero.";
+            return;
+        }
+
+        InfStatusText.Text = $"Descargando '{offer.Title}' (puede tardar minutos)…";
+        CatalogDownloadResult? pkg;
+        try
+        {
+            using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(30));
+            var pipe = AppHost.Resolve<PrivilegedPipeClient>();
+            var response = await pipe.DownloadCatalogDriverAsync(offer.UpdateId, row.HwId, cts.Token);
+            if (response is not { Accepted: true } || string.IsNullOrWhiteSpace(response.DetailJson))
+            {
+                InfStatusText.Text = $"Descarga fallida [{response?.ErrorCode}]: {response?.SafeMessage ?? "sin respuesta"}";
+                return;
+            }
+            try { pkg = JsonSerializer.Deserialize<CatalogDownloadResult>(response.DetailJson, CaseInsensitiveJson); }
+            catch { pkg = null; }
+            if (pkg is null || pkg.InfPaths.Count == 0)
+            {
+                InfStatusText.Text = "Descarga sin .inf utilizables.";
+                return;
+            }
+        }
+        catch (Exception ex)
+        {
+            InfStatusText.Text = $"Servicio no disponible ({ex.Message})";
+            App.WriteCrashLog(ex);
+            return;
+        }
+
+        string infPath;
+        var autoPick = pkg.InfPaths.Count > 1
+            ? CatalogDriverProtocol.PickBestInfMatch(pkg.InfPaths, row.HwId)
+            : null;
+        if (pkg.InfPaths.Count == 1)
+        {
+            infPath = pkg.InfPaths[0];
+        }
+        else if (autoPick is not null)
+        {
+            InfStatusText.Text = $"INF elegido automáticamente por HWID: {Path.GetFileName(autoPick)}.";
+            infPath = autoPick;
+        }
+        else
+        {
+            var infList = new ListView
+            {
+                SelectionMode = ListViewSelectionMode.Single,
+                MaxHeight = 300,
+                ItemsSource = pkg.InfPaths.Select(p => new CatalogInfRow(p, Path.GetFileName(p))).ToList(),
+            };
+            infList.ItemTemplate = (DataTemplate)Application.Current.Resources["CatalogInfTemplate"];
+            var infDialog = new ContentDialog
+            {
+                Title = "Elige el .inf a instalar",
+                Content = infList,
+                PrimaryButtonText = "Instalar este",
+                CloseButtonText = "Cancelar",
+                DefaultButton = ContentDialogButton.Primary,
+                XamlRoot = Content.XamlRoot,
+            };
+            if (await infDialog.ShowAsync() != ContentDialogResult.Primary) return;
+            if (infList.SelectedItem is not CatalogInfRow infRow) return;
+            infPath = infRow.FullPath;
+        }
+        await InstallInfAsync(infPath, row.InstanceId, row.Title);
     }
 
     private async Task InstallInfAsync(string infPath, string instanceId, string? deviceTitle)

@@ -2,6 +2,7 @@ using System.Security;
 using System.Security.Principal;
 using CAO.Core.Abstractions;
 using CAO.Core.Catalog;
+using CAO.Core.Optimization;
 using CAO.Core.Rollback;
 using CAO.Core.Optimizations.Performance;
 using CAO.Shared;
@@ -581,6 +582,203 @@ public sealed class OptimizationEngine
                 return true;
         }
         return false;
+    }
+
+    /// <summary>
+    /// Respalda los archivos reales del driver (INF+SYS+DLL+CAT) con
+    /// pnputil /export-driver a %ProgramData%\CA-O\DriverBackup\&lt;dispositivo&gt;.
+    /// El destino lo construye el servicio (nunca el cliente) y pasa por la
+    /// allowlist. Éxito solo si queda al menos un .inf. Nunca lanza
+    /// (salvo cancelación).
+    /// </summary>
+    public async Task<ExportDriverOutcome> ExportDriverAsync(string instanceId, CancellationToken ct = default)
+    {
+        if (!global::CAO.Shared.Security.CommandPolicy.IsValidPnpInstanceId(instanceId))
+            return new ExportDriverOutcome(false, "ID de instancia no válido.", string.Empty, 0, "invalid-id");
+        if (!IsRunningAsAdmin())
+            return new ExportDriverOutcome(false, "Se requieren privilegios.", string.Empty, 0, "not-admin");
+        if (_executor is null)
+            return new ExportDriverOutcome(false, "Ejecutor no disponible.", string.Empty, 0, "no-executor");
+
+        try
+        {
+            var root = global::CAO.Shared.Security.CommandPolicy.ExportDriverBackupRoot();
+            Directory.CreateDirectory(root);
+            var dest = Path.Combine(root, SanitizeDeviceDir(instanceId));
+            Directory.CreateDirectory(dest);
+            var export = await _executor.ExecuteAsync(
+                global::CAO.Shared.Security.SystemCommandKey.PnPUtilExportDriver,
+                ["/export-driver", instanceId, dest], ct);
+            if (!export.Success)
+                return new ExportDriverOutcome(false, $"No se pudo exportar el driver: {export.StdErr}", string.Empty, 0, "export-failed");
+            var files = Directory.EnumerateFiles(dest, "*", SearchOption.AllDirectories).Count();
+            var infs = Directory.EnumerateFiles(dest, "*.inf", SearchOption.AllDirectories).Count();
+            if (infs == 0)
+                return new ExportDriverOutcome(false, "pnputil terminó pero no dejó ningún .inf: el dispositivo quizá no tiene driver instalado.", string.Empty, 0, "empty");
+            return new ExportDriverOutcome(true, $"Respaldo completo: {files} archivos en {dest}.", dest, files);
+        }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception ex)
+        {
+            return new ExportDriverOutcome(false, $"Error respaldando el driver ({ex.GetType().Name}: {ex.Message}).", string.Empty, 0, "unexpected");
+        }
+    }
+
+    /// <summary>
+    /// Nombre de carpeta seguro derivado del Instance ID: solo [letra/dígito
+    /// _ - .], máx. 80, sin "..". La salida SIEMPRE pasa IsExportDriverDest.
+    /// </summary>
+    internal static string SanitizeDeviceDir(string instanceId)
+    {
+        var sb = new System.Text.StringBuilder(instanceId.Length);
+        foreach (var c in instanceId)
+            sb.Append(char.IsLetterOrDigit(c) || c is '_' or '-' || c == '.' ? c : '_');
+        var name = sb.ToString().Trim('.', ' ', '_');
+        while (name.Contains("..", StringComparison.Ordinal)) name = name.Replace("..", "__", StringComparison.Ordinal);
+        if (name.Length > 80) name = name[..80].TrimEnd('.', '_');
+        while (name.Contains("..", StringComparison.Ordinal)) name = name.Replace("..", "__", StringComparison.Ordinal);
+        return string.IsNullOrWhiteSpace(name) ? "device" : name;
+    }
+
+    /// <summary>
+    /// Busca drivers oficiales en el Catálogo de Microsoft (Search.aspx por
+    /// HWID, con fallbacks a VEN&amp;DEV y nombre). Solo lectura: no requiere
+    /// elevación. Nunca lanza (salvo cancelación).
+    /// </summary>
+    public async Task<CatalogSearchOutcome> SearchCatalogDriversAsync(string hardwareId, string deviceName, CancellationToken ct = default)
+    {
+        if (!global::CAO.Shared.Security.CommandPolicy.IsValidCatalogHardwareId(hardwareId))
+            return new CatalogSearchOutcome(false, "ID de hardware no válido.", Array.Empty<CatalogDriverOffer>(), "invalid-hwid");
+        deviceName ??= string.Empty;
+        if (deviceName.Length > 120 || deviceName.Any(char.IsControl))
+            return new CatalogSearchOutcome(false, "Nombre de dispositivo no válido.", Array.Empty<CatalogDriverOffer>(), "invalid-name");
+
+        try
+        {
+            using var http = new System.Net.Http.HttpClient(new System.Net.Http.SocketsHttpHandler
+            {
+                AutomaticDecompression = System.Net.DecompressionMethods.All,
+            });
+            http.DefaultRequestHeaders.UserAgent.ParseAdd(CatalogDriverProtocol.BrowserUserAgent);
+            foreach (var query in CatalogDriverProtocol.BuildQueries(hardwareId, deviceName))
+            {
+                ct.ThrowIfCancellationRequested();
+                string html;
+                try
+                {
+                    html = await http.GetStringAsync(CatalogDriverProtocol.SearchUrl(query), ct);
+                }
+                catch (OperationCanceledException) { throw; }
+                catch (Exception ex)
+                {
+                    return new CatalogSearchOutcome(false, $"Sin conexión con el catálogo ({ex.GetType().Name}). Revisa internet.", Array.Empty<CatalogDriverOffer>(), "offline");
+                }
+                var offers = CatalogDriverProtocol.ParseOffers(html);
+                if (offers.Count > 0)
+                    return new CatalogSearchOutcome(true, $"{offers.Count} drivers oficiales encontrados para '{query}'.", offers);
+            }
+            return new CatalogSearchOutcome(true, "El catálogo no ofrece drivers para este hardware. Prueba con el enlace del fabricante.", Array.Empty<CatalogDriverOffer>());
+        }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception ex)
+        {
+            return new CatalogSearchOutcome(false, $"Error buscando en el catálogo ({ex.GetType().Name}: {ex.Message}).", Array.Empty<CatalogDriverOffer>(), "unexpected");
+        }
+    }
+
+    /// <summary>
+    /// Descarga un .cab del catálogo (solo hosts Microsoft) y lo extrae con
+    /// expand.exe a %ProgramData%\CA-O\DriverDownloads\&lt;guid&gt;. Devuelve
+    /// los .inf listos para el flujo de instalación verificado. Nunca lanza
+    /// (salvo cancelación).
+    /// </summary>
+    public async Task<CatalogDownloadOutcome> DownloadCatalogDriverAsync(string updateId, CancellationToken ct = default)
+    {
+        if (!global::CAO.Shared.Security.CommandPolicy.IsValidWindowsUpdateId(updateId))
+            return new CatalogDownloadOutcome(false, "ID de actualización no válido.", string.Empty, Array.Empty<string>(), "invalid-id");
+        if (!IsRunningAsAdmin())
+            return new CatalogDownloadOutcome(false, "Se requieren privilegios.", string.Empty, Array.Empty<string>(), "not-admin");
+        if (_executor is null)
+            return new CatalogDownloadOutcome(false, "Ejecutor no disponible.", string.Empty, Array.Empty<string>(), "no-executor");
+
+        try
+        {
+            var dir = Path.Combine(
+                global::CAO.Shared.Security.CommandPolicy.CatalogDriverDownloadRoot(),
+                updateId.ToLowerInvariant());
+            var cab = Path.Combine(dir, "pkg.cab");
+            var extracted = Path.Combine(dir, "extracted");
+            Directory.CreateDirectory(extracted);
+
+            using var http = new System.Net.Http.HttpClient(new System.Net.Http.SocketsHttpHandler
+            {
+                AutomaticDecompression = System.Net.DecompressionMethods.All,
+            });
+            http.DefaultRequestHeaders.UserAgent.ParseAdd(CatalogDriverProtocol.BrowserUserAgent);
+            http.DefaultRequestHeaders.Referrer = new Uri(CatalogDriverProtocol.CatalogBaseUrl + "/");
+
+            string dialog;
+            try
+            {
+                using var form = new System.Net.Http.FormUrlEncodedContent(new Dictionary<string, string>
+                {
+                    ["updateIDs"] = $"[{{\"size\":0,\"updateID\":\"{updateId}\",\"uidInfo\":\"{updateId}\"}}]",
+                });
+                using var dialogResponse = await http.PostAsync(
+                    CatalogDriverProtocol.CatalogBaseUrl + "/DownloadDialog.aspx", form, ct);
+                dialogResponse.EnsureSuccessStatusCode();
+                dialog = await dialogResponse.Content.ReadAsStringAsync(ct);
+            }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception ex)
+            {
+                return new CatalogDownloadOutcome(false, $"Sin conexión con el catálogo ({ex.GetType().Name}). Revisa internet.", string.Empty, Array.Empty<string>(), "offline");
+            }
+            var cabUrl = CatalogDriverProtocol.PickCabUrl(CatalogDriverProtocol.ParseDownloadUrls(dialog));
+            if (cabUrl is null)
+                return new CatalogDownloadOutcome(false, "El catálogo no devolvió descarga para esta oferta.", string.Empty, Array.Empty<string>(), "no-links");
+
+            long totalBytes;
+            try
+            {
+                using var download = await http.GetAsync(cabUrl, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, ct);
+                download.EnsureSuccessStatusCode();
+                var length = download.Content.Headers.ContentLength;
+                if (length.HasValue && length.Value > CatalogDriverProtocol.MaxCabBytes)
+                    return new CatalogDownloadOutcome(false, $"Paquete excesivo ({CatalogDriverProtocol.FormatSize(length.Value)}, máx. 1.5 GB).", string.Empty, Array.Empty<string>(), "too-big");
+                await using var content = await download.Content.ReadAsStreamAsync(ct);
+                await using var file = File.Create(cab);
+                await content.CopyToAsync(file, ct);
+                totalBytes = new FileInfo(cab).Length;
+            }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception ex)
+            {
+                return new CatalogDownloadOutcome(false, $"Descarga fallida ({ex.GetType().Name}: {ex.Message}).", string.Empty, Array.Empty<string>(), "download-failed");
+            }
+            if (totalBytes == 0)
+                return new CatalogDownloadOutcome(false, "Descarga vacía.", string.Empty, Array.Empty<string>(), "empty");
+
+            var expand = await _executor.ExecuteAsync(
+                global::CAO.Shared.Security.SystemCommandKey.ExpandCab,
+                [cab, "-F:*", extracted], ct);
+            if (!expand.Success)
+                return new CatalogDownloadOutcome(false, $"No se pudo extraer el paquete: {expand.StdErr}", string.Empty, Array.Empty<string>(), "extract-failed");
+
+            var infs = Directory.EnumerateFiles(extracted, "*.inf", SearchOption.AllDirectories)
+                .Take(CatalogDriverProtocol.MaxInfs + 1).ToList();
+            if (infs.Count == 0)
+                return new CatalogDownloadOutcome(false, "El paquete no trae ningún .inf.", string.Empty, Array.Empty<string>(), "empty");
+            var shown = infs.Take(CatalogDriverProtocol.MaxInfs).ToList();
+            return new CatalogDownloadOutcome(true,
+                $"Descargado {CatalogDriverProtocol.FormatSize(totalBytes)} con {shown.Count} INF listos para instalar.",
+                extracted, shown);
+        }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception ex)
+        {
+            return new CatalogDownloadOutcome(false, $"Error descargando el driver ({ex.GetType().Name}: {ex.Message}).", string.Empty, Array.Empty<string>(), "unexpected");
+        }
     }
 
     private async Task RollbackDnsExact(string interfaceName, bool wasDhcp, string[] beforeDnsV4, string[] beforeDnsV6, CancellationToken ct)

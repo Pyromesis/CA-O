@@ -29,6 +29,10 @@ public sealed class ArchitectureDependencyTests
             // misma integridad que pulsar Win+R → explorer.exe) y no puede vivir en el
             // gateway: ese corre en sesión 0 y no alcanza el escritorio interactivo.
             if (file.EndsWith("ExplorerRecovery.cs", StringComparison.Ordinal)) continue;
+            // DriversPage abre explorer.exe SOLO en la carpeta de respaldo creada por
+            // el servicio (%ProgramData%\CA-O\DriverBackup, verificada por prefijo):
+            // misma integridad que Win+E, sin privilegios ni parámetros externos.
+            if (file.EndsWith("DriversPage.xaml.cs", StringComparison.Ordinal)) continue;
             var text = File.ReadAllText(file);
             Assert.DoesNotContain("Process.Start", text);
             Assert.DoesNotContain("new Process", text);
@@ -74,6 +78,7 @@ public sealed class ArchitectureDependencyTests
                 if ((text.Contains("Process.Start") || text.Contains("new Process {")) &&
                     !file.EndsWith("SystemCommandGateway.cs", StringComparison.Ordinal) &&
                     !file.EndsWith("SettingsPage.xaml.cs", StringComparison.Ordinal) &&
+                    !file.EndsWith("DriversPage.xaml.cs", StringComparison.Ordinal) &&
                     !file.EndsWith("ExplorerRecovery.cs", StringComparison.Ordinal))
                 {
                     offenders.Add(file);

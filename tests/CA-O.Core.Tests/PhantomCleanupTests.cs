@@ -64,6 +64,35 @@ public sealed class PhantomCleanupTests
         Assert.Equal(expected, OptimizationEngine.IsStartedStatus(output));
     }
 
+    [Theory]
+    [InlineData("x;calc")]
+    [InlineData("")]
+    public async Task ExportInvalidIdFailsWithoutElevation(string id)
+    {
+        var result = await Engine().ExportDriverAsync(id);
+        Assert.False(result.Success);
+        Assert.Equal("invalid-id", result.Error);
+        Assert.Equal(string.Empty, result.Directory);
+    }
+
+    [Theory]
+    [InlineData(@"HDAUDIO\FUNC_01&VEN_10EC&DEV_0283&SUBSYS_10EC0000&REV_1000\4&1234ABCD&0&0001")]
+    [InlineData(@"HID\{00001812-0000-1000-8000-00805F9B34FB}_DEV_VID&0002044D_PID&000065AB\8&2D0E7D8C&0&0000")]
+    [InlineData(@"STORAGE\VOLUME\{8f3b2c1a-0000-0000-0000-100000000000}\0000000000100000")]
+    [InlineData("...")]
+    [InlineData("   ")]
+    [InlineData("a/b\\c:d")]
+    public void SanitizeDeviceDir_AlwaysPassesDestPolicy(string instanceId)
+    {
+        var leaf = OptimizationEngine.SanitizeDeviceDir(instanceId);
+        Assert.False(string.IsNullOrWhiteSpace(leaf));
+        Assert.True(leaf.Length <= 80);
+        Assert.DoesNotContain("..", leaf);
+        var dest = System.IO.Path.Combine(
+            CAO.Shared.Security.CommandPolicy.ExportDriverBackupRoot(), leaf);
+        Assert.True(CAO.Shared.Security.CommandPolicy.IsExportDriverDest(dest));
+    }
+
     [Fact]
     public async Task PresentDeviceIds_ReturnsSetWithoutThrowing()
     {

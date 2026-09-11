@@ -30,6 +30,23 @@ public sealed record DriverUpdateInfo(
     long SizeBytes,
     bool RebootRequired);
 
+/// <summary>Una oferta del Catálogo de Microsoft Update para un hardware.</summary>
+public sealed record CatalogDriverOffer(
+    string UpdateId,
+    string Title,
+    string Version);
+
+/// <summary>Paquete descargado+extraído del catálogo, listo para instalar.</summary>
+public sealed record CatalogDownloadResult(
+    string Directory,
+    IReadOnlyList<string> InfPaths,
+    string Message);
+
+/// <summary>Resultado de búsqueda en el catálogo.</summary>
+public sealed record CatalogSearchResult(
+    IReadOnlyList<CatalogDriverOffer> Offers,
+    string Message);
+
 /// <summary>
 /// Identidad del equipo (fase drivers 3: originales del fabricante).
 /// Los equipos clónicos/VM devuelven "Default string" en sistema: por eso

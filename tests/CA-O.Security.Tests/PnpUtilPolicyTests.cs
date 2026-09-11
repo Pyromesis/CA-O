@@ -66,6 +66,15 @@ public sealed class PnpUtilPolicyTests
     }
 
     [Theory]
+    [InlineData(@"HID\{00001812-0000-1000-8000-00805F9B34FB}_DEV_VID&0002044D_PID&000065AB\8&2D0E7D8C&0&0000")]
+    [InlineData(@"STORAGE\VOLUME\{8f3b2c1a-0000-0000-0000-100000000000}\0000000000100000")]
+    [InlineData(@"SWD\WPDBUSENUM\{8f3b2c1a-0000-0000-0000-100000000000}#0000000000100000")]
+    public void InstanceIdValidatorAcceptsGuidBraces(string id)
+    {
+        Assert.True(CommandPolicy.IsValidPnpInstanceId(id));
+    }
+
+    [Theory]
     [InlineData(null)]
     [InlineData("")]
     [InlineData("   ")]
@@ -273,5 +282,192 @@ public sealed class PnpUtilPolicyTests
     public void UpdateIdValidatorIsStrict(string id, bool expected)
     {
         Assert.Equal(expected, CommandPolicy.IsValidWindowsUpdateId(id));
+    }
+
+    private static string BackupDest(string leaf) =>
+        Path.Combine(CommandPolicy.ExportDriverBackupRoot(), leaf);
+
+    [Theory]
+    [InlineData(SystemCommandKey.PnPUtilExportDriver)]
+    public void PnpUtilExportDriverResolvesToCanonicalExecutable(SystemCommandKey key)
+    {
+        var args = new[] { "/export-driver", RealId, BackupDest("HDAUDIO_FUNC_01") };
+        Assert.Equal(System32("pnputil.exe"), CommandPolicy.Resolve(key, args));
+    }
+
+    [Theory]
+    [InlineData("/export-driver", "x|whoami", "HDAUDIO_FUNC_01")]
+    [InlineData("/export-driver", RealId, @"C:\Windows\Temp\x")]
+    [InlineData("/export-driver", RealId, "relativo\\x")]
+    [InlineData("/export-driver", RealId, "con espacios")]
+    [InlineData("/add-driver", RealId, "HDAUDIO_FUNC_01")]
+    public void PnpUtilExportDriverDeviationResolvesToNull(string verb, string id, string leaf)
+    {
+        var dest = leaf.Contains('\\') || leaf.Contains(' ') || leaf.Contains(':')
+            ? leaf
+            : BackupDest(leaf);
+        Assert.Null(CommandPolicy.Resolve(
+            SystemCommandKey.PnPUtilExportDriver, new[] { verb, id, dest }));
+    }
+
+    [Fact]
+    public void ExportDestValidatorIsStrict()
+    {
+        Assert.True(CommandPolicy.IsExportDriverDest(BackupDest("USB_VID_046D")));
+        Assert.False(CommandPolicy.IsExportDriverDest(BackupDest("..\\evil")));
+        Assert.False(CommandPolicy.IsExportDriverDest(BackupDest("")));
+        Assert.False(CommandPolicy.IsExportDriverDest(@"C:\Windows\Temp\x"));
+        Assert.False(CommandPolicy.IsExportDriverDest("relativo\\x"));
+    }
+
+    private static IpcRequest ExportRequest(string instanceId, object? payloadOverride = null) => new(
+        ProtocolVersion: IpcProtocol.Version,
+        RequestId: Guid.NewGuid(),
+        Nonce: Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(16)),
+        CreatedAtUtc: DateTime.UtcNow,
+        Operation: PrivilegedOperationKind.ExportDriver,
+        Payload: (ITypedPayload)(payloadOverride ?? new ExportDriverPayload(instanceId)));
+
+    [Fact]
+    public void ExportDriverAcceptsValidRequest()
+    {
+        Assert.True(IpcRequestValidator.TryValidate(ExportRequest(RealId), out _, out _));
+        Assert.True(IpcRequestValidator.TryValidate(
+            ExportRequest(@"HID\{00001812-0000-1000-8000-00805F9B34FB}_DEV_VID&0002044D_PID&000065AB\8&2D0E7D8C&0&0000"), out _, out _));
+    }
+
+    [Fact]
+    public void ExportDriverRejectsBadIdAndWrongPayload()
+    {
+        Assert.False(IpcRequestValidator.TryValidate(ExportRequest("x;rm"), out _, out _));
+        Assert.False(IpcRequestValidator.TryValidate(ExportRequest(RealId, new PingPayload()), out _, out _));
+    }
+
+    [Theory]
+    [InlineData(@"PCI\VEN_8086&DEV_AE50&SUBSYS_60071E50&REV_31\3&11583659&0&20")]
+    [InlineData(@"HID\VID_3151&PID_4026&MI_01&COL02\7&2D0E7D8C&0&0001")]
+    public void CatalogHardwareIdAcceptsRealShapes(string id)
+    {
+        Assert.True(CommandPolicy.IsValidCatalogHardwareId(id));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("tiene espacios")]
+    [InlineData("x;calc")]
+    [InlineData("con\"comilla")]
+    public void CatalogHardwareIdRejectsUnsafe(string? id)
+    {
+        Assert.False(CommandPolicy.IsValidCatalogHardwareId(id));
+        Assert.False(CommandPolicy.IsValidCatalogHardwareId(new string('A', 300)));
+    }
+
+    [Theory]
+    [InlineData("https://download.windowsupdate.com/d/msdownload/update/driver/drvs/2024/10/x.cab", true)]
+    [InlineData("https://catalog.s.download.windowsupdate.com/d/x.cab", true)]
+    [InlineData("https://dl.delivery.mp.microsoft.com/filestreaming/x.cab", true)]
+    [InlineData("https://download.microsoft.com/download/x.cab", true)]
+    [InlineData("http://download.windowsupdate.com/x.cab", false)]
+    [InlineData("https://evil.com/x.cab", false)]
+    [InlineData("https://download.windowsupdate.evil.com/x.cab", false)]
+    [InlineData("not-a-url", false)]
+    public void CatalogHostAllowlistIsStrict(string url, bool expected)
+    {
+        Assert.Equal(expected, CommandPolicy.IsAllowedCatalogHost(url));
+    }
+
+    [Fact]
+    public void ExpandCabResolvesToCanonicalExecutable()
+    {
+        var root = CommandPolicy.CatalogDriverDownloadRoot();
+        var cab = Path.Combine(root, "11111111-2222-3333-4444-555555555555", "pkg.cab");
+        var dest = Path.Combine(root, "11111111-2222-3333-4444-555555555555", "extracted");
+        Assert.Equal(
+            Path.Combine(Environment.ExpandEnvironmentVariables(@"%SystemRoot%\System32"), "expand.exe"),
+            CommandPolicy.Resolve(SystemCommandKey.ExpandCab, new[] { cab, "-F:*", dest }));
+    }
+
+    [Theory]
+    [InlineData("/export-driver")]
+    [InlineData("-F:x")]
+    public void ExpandCabDeviationResolvesToNull(string verbOrFlag)
+    {
+        var root = CommandPolicy.CatalogDriverDownloadRoot();
+        var args = verbOrFlag.StartsWith("/export")
+            ? new[] { verbOrFlag, Path.Combine(root, "x", "pkg.cab"), "-F:*" }
+            : new[] { Path.Combine(root, "x", "pkg.cab"), verbOrFlag, Path.Combine(root, "x", "extracted") };
+        Assert.Null(CommandPolicy.Resolve(SystemCommandKey.ExpandCab, args));
+    }
+
+    [Fact]
+    public void ExpandCabRejectsOutsideRoot()
+    {
+        Assert.Null(CommandPolicy.Resolve(SystemCommandKey.ExpandCab,
+            new[] { @"C:\Temp\x.cab", "-F:*", @"C:\Temp\out" }));
+    }
+
+    private static IpcRequest CatalogSearchRequest(string hwid, string name = "", object? payloadOverride = null) => new(
+        ProtocolVersion: IpcProtocol.Version,
+        RequestId: Guid.NewGuid(),
+        Nonce: Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(16)),
+        CreatedAtUtc: DateTime.UtcNow,
+        Operation: PrivilegedOperationKind.SearchCatalogDrivers,
+        Payload: (ITypedPayload)(payloadOverride ?? new SearchCatalogDriversPayload(hwid, name)));
+
+    [Fact]
+    public void CatalogSearchAcceptsValidRequest()
+    {
+        Assert.True(IpcRequestValidator.TryValidate(
+            CatalogSearchRequest(@"PCI\VEN_8086&DEV_AE50&SUBSYS_60071E50&REV_31\3&11583659&0&20", "Intel Smart Sound"), out _, out _));
+    }
+
+    [Theory]
+    [InlineData("x;rm")]
+    [InlineData("")]
+    public void CatalogSearchRejectsBadHardwareId(string hwid)
+    {
+        Assert.False(IpcRequestValidator.TryValidate(CatalogSearchRequest(hwid), out _, out _));
+    }
+
+    [Fact]
+    public void CatalogSearchRejectsWrongPayloadAndBadName()
+    {
+        Assert.False(IpcRequestValidator.TryValidate(
+            CatalogSearchRequest(@"PCI\VEN_8086&DEV_AE50", "x", new PingPayload()), out _, out _));
+        Assert.False(IpcRequestValidator.TryValidate(
+            CatalogSearchRequest(@"PCI\VEN_8086&DEV_AE50", new string('A', 121)), out _, out _));
+    }
+
+    private static IpcRequest CatalogDownloadRequest(string updateId, string hwid = "", object? payloadOverride = null) => new(
+        ProtocolVersion: IpcProtocol.Version,
+        RequestId: Guid.NewGuid(),
+        Nonce: Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(16)),
+        CreatedAtUtc: DateTime.UtcNow,
+        Operation: PrivilegedOperationKind.DownloadCatalogDriver,
+        Payload: (ITypedPayload)(payloadOverride ?? new DownloadCatalogDriverPayload(updateId, hwid)));
+
+    [Fact]
+    public void CatalogDownloadAcceptsValidRequest()
+    {
+        Assert.True(IpcRequestValidator.TryValidate(
+            CatalogDownloadRequest("30fe5516-a254-49c5-aaad-5643e00d0da6", @"PCI\VEN_8086&DEV_AE50"), out _, out _));
+    }
+
+    [Theory]
+    [InlineData("not-a-guid")]
+    [InlineData("")]
+    public void CatalogDownloadRejectsBadUpdateId(string updateId)
+    {
+        Assert.False(IpcRequestValidator.TryValidate(CatalogDownloadRequest(updateId), out _, out _));
+    }
+
+    [Fact]
+    public void CatalogDownloadRejectsBadHardwareIdAndWrongPayload()
+    {
+        Assert.False(IpcRequestValidator.TryValidate(
+            CatalogDownloadRequest("30fe5516-a254-49c5-aaad-5643e00d0da6", "x;rm"), out _, out _));
+        Assert.False(IpcRequestValidator.TryValidate(
+            CatalogDownloadRequest("30fe5516-a254-49c5-aaad-5643e00d0da6", "", new PingPayload()), out _, out _));
     }
 }

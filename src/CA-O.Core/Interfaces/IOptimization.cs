@@ -11,6 +11,15 @@ public sealed record OperationResult(bool Success, string MessageEs, string? Err
     public static OperationResult Fail(string messageEs, string? error = null) => new(false, messageEs, error);
 }
 
+/// <summary>Resultado del respaldo de un driver (archivos reales exportados).</summary>
+public sealed record ExportDriverOutcome(bool Success, string MessageEs, string Directory, int Files, string? Error = null);
+
+/// <summary>Resultado de buscar drivers en el catálogo (solo lectura).</summary>
+public sealed record CatalogSearchOutcome(bool Success, string MessageEs, IReadOnlyList<CatalogDriverOffer> Offers, string? Error = null);
+
+/// <summary>Resultado de descargar+extraer un paquete del catálogo.</summary>
+public sealed record CatalogDownloadOutcome(bool Success, string MessageEs, string Directory, IReadOnlyList<string> InfPaths, string? Error = null);
+
 /// <summary>
 /// Contract implemented by every optimization in the catalog (spec 8).
 ///
