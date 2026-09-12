@@ -2,6 +2,11 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
+## [2.1.26] - 2026-09-12
+
+### Corregido
+- Limpieza de fantasmas rechazada otra vez (CAO-IPC-002): los IDs DLNA `SWD\...\UUID:...` llevan dos puntos, vetados por el validador. Ahora `:` es legítimo y la UI pre-filtra con las mismas reglas: un ID raro se omite con aviso en vez de tumbar el lote.
+
 ## [2.1.25] - 2026-09-12
 
 ### Eliminado

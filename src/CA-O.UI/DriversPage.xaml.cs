@@ -300,14 +300,26 @@ public sealed partial class DriversPage : Page
     private async void OnCleanPhantomsClick(object sender, RoutedEventArgs e)
     {
         if (_phantoms.Count == 0) return;
+        // Pre-filtro local con las mismas reglas del servicio: un ID raro
+        // jamás debe tumbar el lote entero (se reporta y se omite).
+        var ids = _phantoms.Select(d => d.PnpDeviceId).ToList();
+        var valid = ids.Where(CAO.Shared.Security.CommandPolicy.IsValidPnpInstanceId).ToList();
+        var skipped = ids.Count - valid.Count;
+        if (valid.Count == 0)
+        {
+            PhantomStatusText.Visibility = Visibility.Visible;
+            PhantomStatusText.Text = "Ningún fantasma con ID válido para limpiar.";
+            return;
+        }
         var sample = string.Join("\n", _phantoms.Take(6).Select(d => $"• {d.Name}"));
         var confirm = new ContentDialog
         {
-            Title = $"Limpiar {_phantoms.Count} fantasmas",
+            Title = $"Limpiar {valid.Count} fantasmas",
             Content = new TextBlock
             {
                 Text = $"Se desinstalarán estos restos (el driver NO se borra):\n{sample}" +
-                    (_phantoms.Count > 6 ? $"\n…y {_phantoms.Count - 6} más." : string.Empty) +
+                    (valid.Count > 6 ? $"\n…y {valid.Count - 6} más." : string.Empty) +
+                    (skipped > 0 ? $"\n{skipped} omitidos por ID no válido." : string.Empty) +
                     "\n\nSolo se toca lo no presente y no arrancado; lo en uso se omite. ¿Continuar?",
                 TextWrapping = TextWrapping.Wrap,
             },
@@ -319,16 +331,16 @@ public sealed partial class DriversPage : Page
         if (await confirm.ShowAsync() != ContentDialogResult.Primary) return;
 
         PhantomStatusText.Visibility = Visibility.Visible;
-        PhantomStatusText.Text = $"Limpiando {_phantoms.Count} fantasmas…";
+        PhantomStatusText.Text = $"Limpiando {valid.Count} fantasmas…";
         CleanPhantomsButton.IsEnabled = false;
         try
         {
             using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(10));
             var pipe = AppHost.Resolve<PrivilegedPipeClient>();
-            var ids = _phantoms.Select(d => d.PnpDeviceId).ToList();
-            var response = await pipe.RemovePhantomDevicesAsync(ids, cts.Token);
+            var response = await pipe.RemovePhantomDevicesAsync(valid, cts.Token);
             PhantomStatusText.Text = response is { Accepted: true }
-                ? $"✓ {response.DetailJson ?? "Limpieza completada."}"
+                ? $"✓ {response.DetailJson ?? "Limpieza completada."}" +
+                  (skipped > 0 ? $" ({skipped} omitidos por ID no válido.)" : string.Empty)
                 : $"Rechazado [{response?.ErrorCode}]: {response?.SafeMessage ?? "sin respuesta"}";
         }
         catch (Exception ex)

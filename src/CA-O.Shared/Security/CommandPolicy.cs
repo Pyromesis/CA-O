@@ -416,7 +416,7 @@ public static partial class CommandPolicy
         !string.IsNullOrWhiteSpace(name) && name.Length <= 256 &&
         name.StartsWith('\\') && !name.Contains("..") && SafeArg().IsMatch(name);
 
-    [GeneratedRegex(@"^[A-Za-z0-9\\&_\-+#.(){}]+$", RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"^[A-Za-z0-9\\&_\-+#.(){}:]+$", RegexOptions.CultureInvariant)]
     private static partial Regex PnpInstanceId();
 
     /// <summary>Volumen fijo para defrag: una letra A-Z + dos puntos.</summary>
@@ -445,10 +445,11 @@ public static partial class CommandPolicy
 
     /// <summary>
     /// Instance ID PNP estricto (p. ej. HDAUDIO\FUNC_01&amp;VEN_10EC&amp;DEV_0283...,
-    /// HID\{00001812-...}_DEV_... de Bluetooth, STORAGE\VOLUME\{guid}...).
-    /// Las llaves son legítimas en IDs reales; siguen vetados espacios,
-    /// comillas, ';', '|', '%', '^', '$', '`', saltos y '..'. El token viaja
-    /// por ArgumentList (sin shell).
+    /// HID\{00001812-...}_DEV_... de Bluetooth, SWD\...\UUID:... de DLNA).
+    /// Llaves y dos puntos son legítimos en IDs reales; siguen vetados
+    /// espacios, comillas, ';', '|', '%', '^', '$', '`', saltos y '..'.
+    /// El token viaja por ArgumentList (sin shell): aquí ':' no es ADS
+    /// (no es una ruta) y pnputil lo trata como parte del ID.
     /// </summary>
     public static bool IsValidPnpInstanceId(string id) =>
         !string.IsNullOrWhiteSpace(id) && id.Length <= 256 && !id.Contains("..") && PnpInstanceId().IsMatch(id);
