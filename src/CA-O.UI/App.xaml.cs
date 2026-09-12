@@ -86,6 +86,22 @@ public partial class App : Application
         WriteCrashLog(e.Exception);
     }
 
+    /// <summary>
+    /// Anti disk-fill: si el log pasa de 512 KB se rota a .bak (un bucle de
+    /// crash al arrancar no debe llenar el disco). Nunca lanza.
+    /// </summary>
+    internal static void RotateCrashLogIfNeeded(string path, long maxBytes = 512 * 1024)
+    {
+        try
+        {
+            var info = new FileInfo(path);
+            if (!info.Exists || info.Length <= maxBytes) return;
+            var backup = path + ".bak";
+            try { File.Delete(backup); } catch { }
+            File.Move(path, backup);
+        }
+        catch { }
+    }
     /// <summary>Startup/crash diagnostics written to %LocalAppData%\CA-O\logs (Fase 26). Never under Program Files.</summary>
     internal static void WriteCrashLog(Exception ex)
     {
@@ -96,14 +112,17 @@ public partial class App : Application
                 "CA-O", "logs");
             Directory.CreateDirectory(logDir);
             var path = Path.Combine(logDir, "cao-ui-crash.log");
+            RotateCrashLogIfNeeded(path);
             var sb = new StringBuilder()
                 .AppendLine("---- " + DateTime.UtcNow.ToString("o") + " ----")
                 .AppendLine(ex.GetType().FullName)
                 .AppendLine(ex.Message)
                 .AppendLine(ex.StackTrace);
             var inner = ex.InnerException;
-            while (inner != null)
+            int depth = 0;
+            while (inner != null && depth < 10)
             {
+                depth++;
                 sb.AppendLine("--- Inner ---");
                 sb.AppendLine(inner.GetType().FullName);
                 sb.AppendLine(inner.Message);

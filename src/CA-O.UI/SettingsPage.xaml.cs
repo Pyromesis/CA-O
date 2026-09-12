@@ -419,7 +419,12 @@ public sealed partial class SettingsPage : Page
                 // Sin ConfigureAwait(false): lo que sigue toca UI (TextBlock,
                 // diálogos) y debe continuar en el hilo UI. El trabajo pesado
                 // vive dentro (Task.Run + ConfigureAwait(false) internos).
-                await Task.Run(() => Helpers.AppUpdater.DownloadAsync(downloadUrl, zipPath, progress, cts.Token), cts.Token);
+                // Tope anti disk-fill: tamaño anunciado + 64 MB, techo 2 GB.
+                var announcedBytes = _uiState.LatestAssetBytes;
+                var maxBytes = announcedBytes > 0
+                    ? Math.Min(2L * 1024 * 1024 * 1024, announcedBytes + 64L * 1024 * 1024)
+                    : 2L * 1024 * 1024 * 1024;
+                await Task.Run(() => Helpers.AppUpdater.DownloadAsync(downloadUrl, zipPath, progress, cts.Token, maxBytes), cts.Token);
 
                 // Verifica integridad: el tamaño debe coincidir con el anunciado por el release.
                 var expectedBytes = _uiState.LatestAssetBytes;
@@ -428,6 +433,26 @@ public sealed partial class SettingsPage : Page
                 {
                     try { File.Delete(zipPath); } catch { }
                     throw new InvalidOperationException($"Descarga incompleta ({actualBytes} de {expectedBytes} bytes). Reintenta.");
+                }
+                // Verifica hash SHA-256 contra el sidecar publicado junto al
+                // asset (detecta corrupción o sustitución en tránsito). Sin
+                // sidecar (releases antiguos) solo vale el tamaño + tu
+                // confirmación: se avisa y se sigue.
+                UpdateDetailText.Text = "Verificando hash SHA-256...";
+                var expectedHash = await Task.Run(() => Helpers.AppUpdater.TryFetchExpectedHashAsync(downloadUrl, cts.Token), cts.Token);
+                if (!string.IsNullOrWhiteSpace(expectedHash))
+                {
+                    var hashOk = await Task.Run(() => Helpers.AppUpdater.VerifyFileHash(zipPath, expectedHash), cts.Token);
+                    if (!hashOk)
+                    {
+                        try { File.Delete(zipPath); } catch { }
+                        throw new InvalidOperationException("El hash SHA-256 no coincide: descarga corrupta o manipulada. Borrada por seguridad, reintenta.");
+                    }
+                }
+                else
+                {
+                    UpdateDetailText.Text = "Sin hash publicado para esta versión (release antiguo): verificado solo el tamaño. Continúo bajo tu confirmación...";
+                    await Task.Delay(TimeSpan.FromSeconds(2), cts.Token);
                 }
                 // Quita Mark-of-the-Web del ZIP para que lo extraído no lo herede
                 // (SmartScreen frenaba el instalador auto-lanzado en silencio).

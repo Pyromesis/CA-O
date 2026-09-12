@@ -47,6 +47,149 @@ public sealed class AppUpdaterTests
     }
 
     [Fact]
+    public void SelectFullPackageAsset_RejectsNonHttps()
+    {
+        var assets = new[]
+        {
+            ("CA-O-2.1.6-win-x64.zip", "http://example.com/full.zip", 2L),
+        };
+
+        Assert.Null(AppUpdater.SelectFullPackageAsset(assets));
+    }
+
+    [Theory]
+    [InlineData("ABCDEF0123456789abcdef0123456789ABCDEF0123456789abcdef0123456789  CA-O-2.1.6-win-x64.zip\n", "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789")]
+    [InlineData("abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789", "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789")]
+    [InlineData("", null)]
+    [InlineData("not-a-hash  file.zip", null)]
+    [InlineData("xyz  file.zip", null)]
+    [InlineData("abc", null)]
+    public void TryParseSha256Sidecar_ParsesOrRejects(string content, string? expected)
+    {
+        Assert.Equal(expected, AppUpdater.TryParseSha256Sidecar(content));
+    }
+
+    [Fact]
+    public void VerifyFileHash_MatchesAndRejectsTampered()
+    {
+        var path = Path.Combine(Path.GetTempPath(), "CA-O-Test-" + Guid.NewGuid().ToString("N") + ".bin");
+        try
+        {
+            File.WriteAllBytes(path, new byte[] { 1, 2, 3, 4 });
+            var hex = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(new byte[] { 1, 2, 3, 4 }));
+            Assert.True(AppUpdater.VerifyFileHash(path, hex));
+            Assert.True(AppUpdater.VerifyFileHash(path, hex.ToLowerInvariant()));
+            Assert.False(AppUpdater.VerifyFileHash(path, new string('0', 64)));
+            Assert.False(AppUpdater.VerifyFileHash(path, ""));
+            File.WriteAllBytes(path, new byte[] { 9 });
+            Assert.False(AppUpdater.VerifyFileHash(path, hex));
+        }
+        finally
+        {
+            try { File.Delete(path); } catch { }
+        }
+    }
+
+    [Fact]
+    public async Task DownloadAsync_AbortsOverCapAndDeletesPartial()
+    {
+        using var server = new LoopbackInfiniteServer();
+        var dest = Path.Combine(Path.GetTempPath(), "CA-O-Test-" + Guid.NewGuid().ToString("N") + ".bin");
+        try
+        {
+            var ex = await Record.ExceptionAsync(() =>
+                AppUpdater.DownloadAsync(server.Url, dest, progress: null, CancellationToken.None, maxBytes: 256 * 1024));
+            Assert.IsType<InvalidOperationException>(ex);
+            Assert.False(File.Exists(dest));
+        }
+        finally
+        {
+            try { File.Delete(dest); } catch { }
+        }
+    }
+
+    [Fact]
+    public async Task DownloadAsync_RejectsNonPositiveCap()
+    {
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
+            AppUpdater.DownloadAsync("https://example.com/x.zip", "nul", null, CancellationToken.None, 0));
+    }
+
+    [Fact]
+    public async Task ExtractWithProgressAsync_CapsEntriesAndBytes()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "CA-O-Test-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        try
+        {
+            var zipPath = Path.Combine(dir, "test.zip");
+            using (var archive = System.IO.Compression.ZipFile.Open(zipPath, System.IO.Compression.ZipArchiveMode.Create))
+            {
+                for (int i = 0; i < 3; i++)
+                {
+                    var entry = archive.CreateEntry($"file{i}.bin");
+                    using var writer = new StreamWriter(entry.Open());
+                    writer.Write(new string('A', 1000));
+                }
+            }
+            // Tope de entradas: 3 entradas con tope 2 debe fallar.
+            await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                AppUpdater.ExtractWithProgressAsync(zipPath, Path.Combine(dir, "out1"), null, CancellationToken.None, maxTotalBytes: long.MaxValue, maxEntries: 2));
+            // Tope de bytes: ~3 KB con tope de 10 B debe fallar.
+            await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                AppUpdater.ExtractWithProgressAsync(zipPath, Path.Combine(dir, "out2"), null, CancellationToken.None, maxTotalBytes: 10, maxEntries: 60000));
+            // Sin topes restrictivos extrae bien (no regresión).
+            await AppUpdater.ExtractWithProgressAsync(zipPath, Path.Combine(dir, "out3"), null, CancellationToken.None);
+            Assert.Equal(3, Directory.GetFiles(Path.Combine(dir, "out3")).Length);
+        }
+        finally
+        {
+            try { Directory.Delete(dir, true); } catch { }
+        }
+    }
+
+    /// <summary>Servidor HTTP loopback que sirve bytes infinitos sin Content-Length.</summary>
+    private sealed class LoopbackInfiniteServer : IDisposable
+    {
+        private readonly System.Net.Sockets.TcpListener _listener;
+        private readonly CancellationTokenSource _cts = new();
+        private readonly Task _serve;
+
+        public LoopbackInfiniteServer()
+        {
+            _listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+            _listener.Start();
+            var port = ((System.Net.IPEndPoint)_listener.LocalEndpoint).Port;
+            Url = $"http://127.0.0.1:{port}/pkg.zip";
+            _serve = Task.Run(async () =>
+            {
+                try
+                {
+                    using var client = await _listener.AcceptTcpClientAsync(_cts.Token);
+                    using var stream = client.GetStream();
+                    var header = "HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\nConnection: close\r\n\r\n";
+                    var headerBytes = System.Text.Encoding.ASCII.GetBytes(header);
+                    await stream.WriteAsync(headerBytes, _cts.Token);
+                    var chunk = new byte[65536];
+                    while (!_cts.IsCancellationRequested)
+                        await stream.WriteAsync(chunk, _cts.Token);
+                }
+                catch { }
+            });
+        }
+
+        public string Url { get; }
+
+        public void Dispose()
+        {
+            try { _cts.Cancel(); } catch { }
+            try { _listener.Stop(); } catch { }
+            try { _serve.Wait(TimeSpan.FromSeconds(5)); } catch { }
+            _cts.Dispose();
+        }
+    }
+
+    [Fact]
     public async Task ExecuteWithRetry_RetriesSharingViolationThenSucceeds()
     {
         var attempts = 0;

@@ -65,6 +65,27 @@ public sealed class PhantomCleanupTests
     }
 
     [Theory]
+    // Rutas absolutas o con separadores jamás deben escapar de la raíz.
+    [InlineData(@"C:\evil")]
+    [InlineData(@"..\..\evil")]
+    [InlineData("a/b")]
+    [InlineData("...")]
+    [InlineData("   ")]
+    [InlineData("")]
+    public void SanitizeDeviceDir_NeverEscapesBackupRoot(string instanceId)
+    {
+        var leaf = OptimizationEngine.SanitizeDeviceDir(instanceId);
+        Assert.False(string.IsNullOrWhiteSpace(leaf));
+        Assert.DoesNotContain("\\", leaf);
+        Assert.DoesNotContain("/", leaf);
+        Assert.DoesNotContain(":", leaf);
+        Assert.DoesNotContain("..", leaf);
+        var dest = System.IO.Path.Combine(
+            CAO.Shared.Security.CommandPolicy.ExportDriverBackupRoot(), leaf);
+        Assert.True(CAO.Shared.Security.CommandPolicy.IsExportDriverDest(dest));
+    }
+
+    [Theory]
     [InlineData("x;calc")]
     [InlineData("")]
     public async Task ExportInvalidIdFailsWithoutElevation(string id)

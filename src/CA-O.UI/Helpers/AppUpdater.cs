@@ -38,7 +38,10 @@ public static class AppUpdater
         return Version.TryParse(cleaned, out version!) && version.Major > 0;
     }
 
-    /// <summary>Elige el ZIP completo (no el GUI online) de la lista de assets.</summary>
+    /// <summary>
+    /// Elige el ZIP completo (no el GUI online) de la lista de assets.
+    /// Solo HTTPS: un asset por HTTP se rechaza aunque venga de la API.
+    /// </summary>
     public static (string Name, string Url, long Bytes)? SelectFullPackageAsset(
         IEnumerable<(string Name, string Url, long Bytes)> assets)
     {
@@ -46,7 +49,8 @@ public static class AppUpdater
         {
             if (asset.Name.EndsWith("-win-x64.zip", StringComparison.OrdinalIgnoreCase) &&
                 !asset.Name.StartsWith("CA-O-Setup-GUI", StringComparison.OrdinalIgnoreCase) &&
-                Uri.TryCreate(asset.Url, UriKind.Absolute, out _))
+                Uri.TryCreate(asset.Url, UriKind.Absolute, out var uri) &&
+                uri.Scheme.Equals("https", StringComparison.OrdinalIgnoreCase))
             {
                 return asset;
             }
@@ -94,54 +98,71 @@ public static class AppUpdater
     }
 
     /// <summary>
-    /// Descarga con progreso 0..1. Nunca continúa en el hilo de UI
+    /// Descarga con progreso 0..1 y TOPE de bytes (anti disk-fill: un servidor
+    /// mintiendo Content-Length o sirviendo infinito se corta y se borra el
+    /// parcial). Nunca continúa en el hilo de UI
     /// (<c>ConfigureAwait(false)</c>) y limita los reportes de progreso
     /// (cada ≥0,5 % o ≥500 ms) para no inundar el dispatcher con los
     /// ~5000 trozos de un paquete de ~400 MB — eso congelaba la app.
-    /// Lanza si la red falla.
+    /// Lanza si la red falla o se supera el tope.
     /// </summary>
-    public static async Task DownloadAsync(string url, string destinationPath, IProgress<double>? progress, CancellationToken ct)
+    public static async Task DownloadAsync(string url, string destinationPath, IProgress<double>? progress, CancellationToken ct, long maxBytes)
     {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxBytes);
         using var http = CreateClient(TimeSpan.FromMinutes(30));
         using var response = await http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
         var total = response.Content.Headers.ContentLength;
+        if (total.HasValue && total.Value > maxBytes)
+            throw new InvalidOperationException($"Paquete excesivo ({total.Value} bytes, tope {maxBytes}).");
         await using var network = await response.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
-        await using var file = new FileStream(destinationPath, FileMode.Create, FileAccess.Write, FileShare.None, 81920, FileOptions.Asynchronous | FileOptions.SequentialScan);
-        var buffer = new byte[81920];
-        long read = 0;
-        var lastReported = 0.0;
-        var lastReportAt = Environment.TickCount64;
-        int n;
-        while ((n = await network.ReadAsync(buffer.AsMemory(0, buffer.Length), ct).ConfigureAwait(false)) > 0)
+        try
         {
-            await file.WriteAsync(buffer.AsMemory(0, n), ct).ConfigureAwait(false);
-            read += n;
-            if (total.HasValue && total.Value > 0 && progress is not null)
+            await using var file = new FileStream(destinationPath, FileMode.Create, FileAccess.Write, FileShare.None, 81920, FileOptions.Asynchronous | FileOptions.SequentialScan);
+            var buffer = new byte[81920];
+            long read = 0;
+            var lastReported = 0.0;
+            var lastReportAt = Environment.TickCount64;
+            int n;
+            while ((n = await network.ReadAsync(buffer.AsMemory(0, buffer.Length), ct).ConfigureAwait(false)) > 0)
             {
-                var ratio = (double)read / total.Value;
-                var now = Environment.TickCount64;
-                if (ratio - lastReported >= 0.005 || now - lastReportAt >= 500 || ratio >= 1.0)
+                read += n;
+                if (read > maxBytes)
+                    throw new InvalidOperationException($"Descarga excede el tope ({maxBytes} bytes).");
+                await file.WriteAsync(buffer.AsMemory(0, n), ct).ConfigureAwait(false);
+                if (total.HasValue && total.Value > 0 && progress is not null)
                 {
-                    lastReported = ratio;
-                    lastReportAt = now;
-                    progress.Report(Math.Min(ratio, 1.0));
+                    var ratio = (double)read / total.Value;
+                    var now = Environment.TickCount64;
+                    if (ratio - lastReported >= 0.005 || now - lastReportAt >= 500 || ratio >= 1.0)
+                    {
+                        lastReported = ratio;
+                        lastReportAt = now;
+                        progress.Report(Math.Min(ratio, 1.0));
+                    }
                 }
             }
+            if (total.HasValue && total.Value > 0)
+                progress?.Report(1.0);
         }
-        if (total.HasValue && total.Value > 0)
-            progress?.Report(1.0);
+        catch
+        {
+            try { File.Delete(destinationPath); } catch { }
+            throw;
+        }
     }
 
     /// <summary>
     /// Extrae el ZIP entrada por entrada con progreso 0..1 (limitado a ≥0,5 % o
     /// ≥500 ms) para que la UI muestre porcentaje real en vez de una espera
     /// indeterminada de varios minutos. Corre fuera del hilo UI, protege
-    /// contra Zip-Slip y propaga cancelación. Lanza si falla.
+    /// contra Zip-Slip y contra bombas ZIP (topes de entradas y bytes
+    /// descomprimidos) y propaga cancelación. Lanza si falla.
     /// </summary>
     public static async Task ExtractWithProgressAsync(
         string zipPath, string destinationDir,
-        IProgress<(double Ratio, int Done, int Total)>? progress, CancellationToken ct)
+        IProgress<(double Ratio, int Done, int Total)>? progress, CancellationToken ct,
+        long maxTotalBytes = 8L * 1024 * 1024 * 1024, int maxEntries = 60000)
     {
         await Task.Run(() =>
         {
@@ -149,9 +170,12 @@ public static class AppUpdater
             var entries = archive.Entries
                 .Where(e => !string.IsNullOrEmpty(e.Name))
                 .ToList();
+            if (entries.Count > maxEntries)
+                throw new InvalidOperationException($"ZIP con {entries.Count} entradas (tope {maxEntries}): posible bomba.");
             var total = Math.Max(entries.Count, 1);
             var root = Path.GetFullPath(destinationDir) + Path.DirectorySeparatorChar;
             var done = 0;
+            long written = 0;
             var lastReported = 0.0;
             var lastReportAt = Environment.TickCount64;
             foreach (var entry in entries)
@@ -162,6 +186,9 @@ public static class AppUpdater
                     throw new IOException($"Entrada ZIP fuera del destino: {entry.FullName}");
                 Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
                 entry.ExtractToFile(dest, overwrite: true);
+                written += new FileInfo(dest).Length;
+                if (written > maxTotalBytes)
+                    throw new InvalidOperationException($"Extracción supera el tope ({maxTotalBytes} bytes): posible bomba.");
                 done++;
                 if (progress is not null)
                 {
@@ -238,6 +265,53 @@ public static class AppUpdater
                 attempt++;
                 await Task.Delay(baseDelayMs * attempt, ct).ConfigureAwait(false);
             }
+        }
+    }
+
+    /// <summary>
+    /// Parsea un sidecar "<hex64>  <nombre>" (formato .sha256 de releases).
+    /// null si no hay un hash válido.
+    /// </summary>
+    public static string? TryParseSha256Sidecar(string? content)
+    {
+        if (string.IsNullOrWhiteSpace(content)) return null;
+        var firstLine = content.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
+        var token = firstLine?.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
+        if (token is not null && token.Length == 64 &&
+            token.All(c => (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')))
+            return token.ToLowerInvariant();
+        return null;
+    }
+
+    /// <summary>SHA-256 de un fichero comparado con el esperado. Puro.</summary>
+    public static bool VerifyFileHash(string path, string expectedHex)
+    {
+        if (string.IsNullOrWhiteSpace(expectedHex)) return false;
+        using var sha = System.Security.Cryptography.SHA256.Create();
+        using var stream = File.OpenRead(path);
+        var actual = Convert.ToHexString(sha.ComputeHash(stream));
+        return actual.Equals(expectedHex.Trim(), StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// Descarga el sidecar "<zipUrl>.sha256" publicado junto al asset.
+    /// null si no existe (releases antiguos) o falla la red: el llamante
+    /// decide (verificar tamaño + aviso, nunca instalar a ciegas sin avisar).
+    /// </summary>
+    public static async Task<string?> TryFetchExpectedHashAsync(string zipUrl, CancellationToken ct = default)
+    {
+        try
+        {
+            using var http = CreateClient(TimeSpan.FromSeconds(30));
+            using var response = await http.GetAsync(zipUrl + ".sha256", ct).ConfigureAwait(false);
+            if (!response.IsSuccessStatusCode) return null;
+            var content = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+            if (content.Length > 4096) return null;
+            return TryParseSha256Sidecar(content);
+        }
+        catch
+        {
+            return null;
         }
     }
 

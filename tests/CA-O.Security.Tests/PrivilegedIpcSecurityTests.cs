@@ -75,6 +75,20 @@ public sealed class PrivilegedIpcSecurityTests
     }
 
     [Theory]
+    [InlineData(PrivilegedOperationKind.Ping)]
+    [InlineData(PrivilegedOperationKind.GetServiceStatus)]
+    public void RejectsNullPayloadWithoutThrowing(PrivilegedOperationKind operation)
+    {
+        // GetType() sobre null reventaba con NRE: debe ser rechazo limpio.
+        var request = ValidRequest(r => r with { Operation = operation, Payload = null! });
+        string code = "";
+        var ex = Record.Exception(() => IpcRequestValidator.TryValidate(request, out code, out _));
+        Assert.Null(ex);
+        Assert.False(IpcRequestValidator.TryValidate(request, out code, out _));
+        Assert.Equal(ErrorCodes.IpcPayloadSchemaInvalid, code);
+    }
+
+    [Theory]
     [InlineData(5000u)]
     [InlineData(10000u)]
     [InlineData(156250u)]

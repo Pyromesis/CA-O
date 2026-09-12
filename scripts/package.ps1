@@ -45,6 +45,15 @@ $hash = (Get-FileHash $zip -Algorithm SHA256).Hash
 "$hash  $(Split-Path $zip -Leaf)" | Set-Content "$zip.sha256"
 Get-Content "$zip.sha256"
 
+# Copia estable para Releases (el auto-update la busca por nombre fijo) CON
+# su sidecar: el updater verifica este hash antes de instalar.
+$stableName = $FullPackageName -f $ProductVersion
+$stableZip = Join-Path "artifacts" $stableName
+Copy-Item $zip $stableZip -Force
+$stableHash = (Get-FileHash $stableZip -Algorithm SHA256).Hash
+"$stableHash  $stableName" | Set-Content "$stableZip.sha256"
+Write-Host "== Estable: $stableName + .sha256 ==" -ForegroundColor Green
+
 # SBOM estándar (FASE 31): CycloneDX vía dotnet-CycloneDX si está instalada;
 # sin la herramienta, se advierte y el release NO debe publicarse sin SBOM.
 $hasTool = (dotnet tool list --global | Select-String -Quiet "cyclonedx")

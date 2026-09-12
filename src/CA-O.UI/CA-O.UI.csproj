@@ -17,6 +17,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="CA-O.UI.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Content Include="..\..\assets\app-icon-minimal.ico" Link="Assets\app-icon.ico" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\..\assets\app-icon-minimal.png" Link="Assets\app-icon.png" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>

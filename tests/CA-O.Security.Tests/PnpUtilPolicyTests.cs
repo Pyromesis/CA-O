@@ -84,6 +84,17 @@ public sealed class PnpUtilPolicyTests
     [InlineData("   ")]
     [InlineData("tiene espacios")]
     [InlineData("con\"comilla")]
+    [InlineData("con'comilla")]
+    [InlineData("a;b")]
+    [InlineData("a|b")]
+    [InlineData("a%00b")]
+    [InlineData("a$b")]
+    [InlineData("a`b")]
+    [InlineData("a\rb")]
+    [InlineData("a\nb")]
+    [InlineData("a\tb")]
+    [InlineData("..\\x")]
+    [InlineData("x\\..\\y")]
     public void InstanceIdValidatorRejectsUnsafe(string? id)
     {
         Assert.False(CommandPolicy.IsValidPnpInstanceId(id!));

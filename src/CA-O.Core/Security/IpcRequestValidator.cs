@@ -56,6 +56,13 @@ public static class IpcRequestValidator
             return false;
         }
 
+        if (request.Payload is null)
+        {
+            errorCode = ErrorCodes.IpcPayloadSchemaInvalid;
+            error = "Payload ausente.";
+            return false;
+        }
+
         // Ping, GetServiceStatus, SetDns, SetTimerResolution, FixDriver,
         // InstallDriver, RemovePhantomDevices, SearchDriverUpdates,
         // InstallDriverUpdates, ExportDriver, SearchCatalogDrivers y

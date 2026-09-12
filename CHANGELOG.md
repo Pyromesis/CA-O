@@ -2,6 +2,13 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
+## [2.1.28] - 2026-09-12
+
+### Seguridad
+- Auto-update endurecido: solo HTTPS, tope de descarga (anunciado + 64 MB, techo 2 GB, borra parciales), topes anti-bomba en extracción (entradas y bytes), y verificación SHA-256 contra el sidecar publicado (aborta y borra si no coincide; avisa si el release no trae hash). `package.ps1` ya genera el sidecar del ZIP estable.
+- Validador IPC: payload nulo ahora es rechazo limpio `CAO-IPC-002` (antes NRE interno).
+- Crash-log con rotación (512 KB → .bak) y tope de 10 niveles inner: un bucle de crash ya no llena el disco.
+
 ## [2.1.27] - 2026-09-12
 
 ### Añadido
