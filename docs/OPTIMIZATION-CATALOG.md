@@ -60,6 +60,7 @@ Nunca se deshabilita silenciosamente Secure Boot/TPM/VBS/HVCI/Defender/firewall.
 | mmcss-system-responsiveness | Gaming | Small | Empirical | Low | Compatible | Si | — |
 | defragment-hdd-only | Storage | Small | Official | Low | Compatible | No | NotReversible |
 | cleanup-windows-update-cache | Storage | Small | Official | Low | Compatible | No | NotReversible |
+| cleanup-app-caches | Storage | Small | Vendor | Low | Compatible | No | NotReversible |
 | disable-dynamic-tick | Performance | Small | Empirical | Moderate | Conditional | Si | RequiresReboot |
 
 *49 optimizaciones históricas retiradas del catálogo de producción; permanecen en `AllLegacy` solo para trazabilidad. Ver `OptimizationCatalog.AllLegacy`.*
@@ -285,6 +286,9 @@ Desfragmenta HDD, jamás SSD
 
 ### cleanup-windows-update-cache
 Caché WU (para + borra + arranca)
+
+### cleanup-app-caches
+Cachés Discord/Spotify/Slack (nunca sesiones)
 
 ### windows-component-store-cleanup
 DISM StartComponentCleanup

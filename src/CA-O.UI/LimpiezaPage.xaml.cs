@@ -25,6 +25,7 @@ public sealed partial class LimpiezaPage : Page
         "cleanup-delivery-optimization-cache",
         "disk-cleanup-system-files",
         "stale-crash-dump-cleanup",
+        "cleanup-app-caches",
     ];
 
     private static readonly HashSet<string> HeavyIds = new(StringComparer.Ordinal)
@@ -33,6 +34,7 @@ public sealed partial class LimpiezaPage : Page
         "windows-component-store-resetbase",
         "optimize-system-drive",
         "retrim-system-ssd",
+        "cleanup-app-caches",
     };
 
     private static TimeSpan TimeoutFor(string id) =>
@@ -137,7 +139,7 @@ public sealed partial class LimpiezaPage : Page
         var dialog = new ContentDialog
         {
             Title = "Limpieza rápida",
-            Content = "Se limpiarán temporales de Windows, caché Delivery Optimization, restos de Windows Update y minidumps antiguos. ¿Continuar?",
+            Content = "Se limpiarán temporales de Windows, caché Delivery Optimization, restos de Windows Update, minidumps antiguos y cachés de apps (Discord, Spotify, Slack; con cada app cerrada). ¿Continuar?",
             PrimaryButtonText = "Limpiar todo",
             CloseButtonText = "Cancelar",
             DefaultButton = ContentDialogButton.Close,

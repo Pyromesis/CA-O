@@ -95,7 +95,15 @@
                                 </StackPanel>
                                 <Button Grid.Column="1" Content="Limpiar" Tag="stale-crash-dump-cleanup" Click="OnCleanClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="128" VerticalAlignment="Center" AutomationProperties.Name="Limpiar minidumps antiguos" ToolTipService.ToolTip="Borra minivolcados (*.dmp) de más de 30 días. Los recientes se conservan."/>
                             </Grid>
-                            <Button x:Name="CleanAllButton" Content="Ejecutar todo" Click="OnCleanAllClick" Style="{StaticResource CaoGradientButtonStyle}" MinHeight="40" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Margin="0,8,0,0" AutomationProperties.Name="Ejecutar toda la limpieza" ToolTipService.ToolTip="Ejecuta seguidas las 4 limpiezas de temporales de esta tarjeta."/>
+                            <Grid ColumnSpacing="12" Padding="0,8,0,8">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                <StackPanel Spacing="2" VerticalAlignment="Center">
+                                    <TextBlock Text="Cachés de apps" FontWeight="SemiBold" FontSize="13"/>
+                                    <TextBlock Text="Discord, Spotify, Slack. Cierra cada app antes." FontSize="11" Opacity="0.7" TextWrapping="Wrap"/>
+                                </StackPanel>
+                                <Button Grid.Column="1" Content="Limpiar" Tag="cleanup-app-caches" Click="OnCleanClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="128" VerticalAlignment="Center" AutomationProperties.Name="Limpiar cachés de Discord Spotify Slack" ToolTipService.ToolTip="Vacía cachés de Discord, Spotify y Slack (solo Cache/Code Cache/GPUCache; nunca sesiones ni música offline). Cierra cada app primero o se omite."/>
+                            </Grid>
+                            <Button x:Name="CleanAllButton" Content="Ejecutar todo" Click="OnCleanAllClick" Style="{StaticResource CaoGradientButtonStyle}" MinHeight="40" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Margin="0,8,0,0" AutomationProperties.Name="Ejecutar toda la limpieza" ToolTipService.ToolTip="Ejecuta seguidas las 5 limpiezas de temporales de esta tarjeta."/>
                         </StackPanel>
                         <TextBlock Grid.Row="2" x:Name="CleanupStatusText" FontSize="11" Opacity="0.75" TextWrapping="Wrap" VerticalAlignment="Bottom" AutomationProperties.LiveSetting="Polite"/>
                     </Grid>

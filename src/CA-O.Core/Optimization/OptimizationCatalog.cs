@@ -93,6 +93,7 @@ public static class OptimizationCatalog
     public static readonly RestoreSystemManagedPagefile RestoreSystemManagedPagefile = new();
     public static readonly DefragmentHddOnly DefragmentHddOnly = new();
     public static readonly CleanupWindowsUpdateCache CleanupWindowsUpdateCache = new();
+    public static readonly CleanupAppCaches CleanupAppCaches = new();
 
     // Network (existing + new)
     public static readonly NormalizeTcpAutoTuning NormalizeTcpAutoTuning = new();
@@ -138,7 +139,7 @@ public static class OptimizationCatalog
     public static readonly RestartWindowsExplorer RestartWindowsExplorer = new();
     public static readonly RecoverWindowsExplorer RecoverWindowsExplorer = new();
 
-    /// <summary>Production catalog: 87 verified optimizations. All optimizations are now in production.</summary>
+    /// <summary>Production catalog: 88 verified optimizations. All optimizations are now in production.</summary>
     public static IReadOnlyList<IOptimization> All { get; } = new IOptimization[]
     {
         DisableBackgroundApps,
@@ -196,6 +197,7 @@ public static class OptimizationCatalog
         RestoreSystemManagedPagefile,
         DefragmentHddOnly,
         CleanupWindowsUpdateCache,
+        CleanupAppCaches,
         // Network Phase 4: promoted from legacy
         EnableRss,
         RestoreTcpChecksumOffload,

@@ -2,6 +2,14 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
+## [2.1.27] - 2026-09-12
+
+### Añadido
+- Limpieza de cachés de apps en Limpieza: Discord, Spotify y Slack (solo Cache/Code Cache/GPUCache + Browser; nunca sesiones ni música offline; con la app abierta se omite). Nueva optimización `cleanup-app-caches` (catálogo 87→88), con botón y en Limpieza rápida.
+
+### Corregido
+- Fantasmas con `?` y `[serie]` (USBSTOR `_??_`, Apple `[DX3D...]`) tumbaban el lote: ya son legítimos, con test de IDs reales.
+
 ## [2.1.26] - 2026-09-12
 
 ### Corregido
