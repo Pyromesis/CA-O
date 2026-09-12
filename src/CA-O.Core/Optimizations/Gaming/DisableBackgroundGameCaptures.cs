@@ -32,7 +32,7 @@ public sealed class DisableBackgroundGameCaptures : RegistryOptimizationBase
         NameEn = "Disable background Game DVR captures",
         DescriptionEs = "Deshabilita la grabación histórica en segundo plano de Game DVR. Reduce overhead si no graba.",
         DescriptionEn = "Disables Game DVR background historical recording. Reduces overhead when not recording.",
-        TooltipEs = "Establece HistoricalCaptureEnabled=0 e HistoricalCaptureOnBattery=0. Reversible via snapshot.",
+        TooltipEs = "Establece HistoricalCaptureEnabled=0 e HistoricalCaptureOnBattery=0. Reversible via snapshot. Si ya desactivaste Game Bar DVR por completo, esta sobra.",
         Category = OptimizationCategory.Gaming,
         ExpectedImpact = PerformanceImpact.Small,
         Evidence = EvidenceLevel.Vendor,

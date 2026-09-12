@@ -2,6 +2,14 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
+## [2.1.25] - 2026-09-12
+
+### Eliminado
+- 2 duplicados exactos retirados del catálogo (87 activos): `optimize-hdd-media-aware` (idéntico a `optimize-system-drive`, mismo `defrag C: /O`) y `set-best-performance-ac` (idéntico a `maximum-power-plan`, mismo plan). Siguen trazables en legacy; la UI apunta a las canónicas.
+
+### Corregido
+- Solapes aclarados con referencias cruzadas en tooltips: Game Bar DVR vs capturas en segundo plano, inicio agresivo vs pesadas, transparencias vs efectos visuales, y escalera defrag (/O rápido, ReTrim aislado, desfragmentación profunda con umbral).
+
 ## [2.1.24] - 2026-09-11
 
 ### Añadido

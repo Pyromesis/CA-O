@@ -26,7 +26,7 @@ public sealed class DefragmentHddOnly : IOptimization
         NameEn = "Defragment HDDs (never SSDs)",
         DescriptionEs = "Analiza y desfragmenta solo discos mecánicos; los SSD se omiten siempre.",
         DescriptionEn = "Analyzes and defragments only mechanical drives; SSDs are always skipped.",
-        TooltipEs = "Detecta HDD vs SSD por disco. Solo desfragmenta HDD con 5 por ciento o más fragmentado. Un SSD jamás recibe /D (para SSD usa ReTrim). Mantenimiento no reversible.",
+        TooltipEs = "Detecta HDD vs SSD por disco. Solo desfragmenta HDD con 5 por ciento o más fragmentado. Un SSD jamás recibe /D (para SSD usa ReTrim). Para un repaso rápido de C: existe Optimizar disco del sistema. Mantenimiento no reversible.",
         Category = OptimizationCategory.Storage,
         ExpectedImpact = PerformanceImpact.Small,
         Evidence = EvidenceLevel.Official,

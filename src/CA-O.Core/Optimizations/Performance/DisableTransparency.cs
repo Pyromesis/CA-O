@@ -16,7 +16,7 @@ public sealed class DisableTransparency : RegistryOptimizationBase
         NameEn = "Disable transparency",
         DescriptionEs = "Desactiva acrílico/transparencias del sistema para ahorrar composición GPU.",
         DescriptionEn = "Turns off system acrylic/transparency effects to save GPU composition work.",
-        TooltipEs = "EnableTransparency=0. Nota: también apaga el estilo visual Fluent translúcido (preferencia estética).",
+        TooltipEs = "EnableTransparency=0. Nota: también apaga el estilo visual Fluent translúcido (preferencia estética). Si ya priorizas rendimiento sobre apariencia, esa opción ya quita la transparencia.",
         Category = OptimizationCategory.Performance,
         ExpectedImpact = PerformanceImpact.Tiny,
         Evidence = EvidenceLevel.Empirical,

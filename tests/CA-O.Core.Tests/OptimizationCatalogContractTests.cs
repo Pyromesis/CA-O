@@ -21,11 +21,29 @@ public sealed class OptimizationCatalogContractTests
         Assert.NotEmpty(OptimizationCatalog.All);
     }
 
+    /// <summary>
+    /// Duplicados exactos retirados: fuera de producción, trazables en
+    /// legacy, con su canónica viva. El usuario nunca ve dos veces lo mismo.
+    /// </summary>
+    [Theory]
+    [InlineData("optimize-hdd-media-aware", "optimize-system-drive")]
+    [InlineData("set-best-performance-ac", "maximum-power-plan")]
+    public void RetiredDuplicatesStayOutOfProductionButTraceable(string retiredId, string canonicalId)
+    {
+        Assert.Contains(retiredId, OptimizationCatalog.LegacyIds);
+        Assert.DoesNotContain(OptimizationCatalog.All,
+            o => o.Definition.Id.Equals(retiredId, StringComparison.Ordinal));
+        Assert.Contains(OptimizationCatalog.AllLegacy,
+            o => o.Definition.Id.Equals(retiredId, StringComparison.Ordinal));
+        Assert.Contains(OptimizationCatalog.All,
+            o => o.Definition.Id.Equals(canonicalId, StringComparison.Ordinal));
+    }
+
     [Fact]
     public void IdsAreUnique()
     {
         var ids = OptimizationCatalog.All.Select(o => o.Definition.Id).ToList();
-        Assert.Equal(89, ids.Count); // 81 previas + 8 nuevas (nagle, wifi-scan, pointer, mouse-queue, mmcss, defrag-hdd, wu-cache, dynamic-tick)
+        Assert.Equal(87, ids.Count); // 81 previas + 8 nuevas - 2 duplicados retirados (hdd-media-aware, set-best-performance-ac)
         Assert.Equal(ids.Count, ids.Distinct(StringComparer.Ordinal).Count());
     }
 

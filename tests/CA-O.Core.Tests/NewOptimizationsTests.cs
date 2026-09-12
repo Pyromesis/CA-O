@@ -164,7 +164,7 @@ public sealed class NewOptimizationsTests
             Assert.False(string.IsNullOrWhiteSpace(optimization.Definition.NameEs));
             Assert.False(string.IsNullOrWhiteSpace(optimization.Definition.TooltipEs));
         }
-        Assert.Equal(89, OptimizationCatalog.All.Count);
+        Assert.Equal(87, OptimizationCatalog.All.Count); // 81 + 8 nuevas - 2 duplicados retirados
     }
 
     [Theory]

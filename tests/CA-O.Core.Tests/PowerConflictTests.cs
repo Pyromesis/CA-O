@@ -14,7 +14,7 @@ public sealed class PowerConflictTests
     public void SamePlanActive_IsAlreadyApplied()
     {
         var r = OptimizationConflicts.EvaluatePowerScheme(
-            "set-best-performance-ac", PowerSchemes.HighPerformanceGuid);
+            "maximum-power-plan", PowerSchemes.HighPerformanceGuid);
         Assert.Equal(OptimizationConflicts.ConflictOutcome.AlreadyApplied, r.Outcome);
     }
 

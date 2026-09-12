@@ -19,7 +19,7 @@ public sealed class DisableUnnecessaryStartupApps : StartupRunKeyOptimization
         NameEn = "Disable unnecessary startup apps",
         DescriptionEs = "Desactiva entradas de inicio de terceros no esenciales. Excluye antivirus, drivers y Microsoft.",
         DescriptionEn = "Disables non-essential third-party startup entries. Excludes antivirus, drivers and Microsoft.",
-        TooltipEs = "Elimina valores en HKCU/HKLM Run tras clasificar publicador. Reversible exacto.",
+        TooltipEs = "Elimina valores en HKCU/HKLM Run tras clasificar publicador. Es la versión agresiva (todo lo no esencial); para solo actualizadores/lanzadores usa Desactivar apps inicio pesadas. Reversible exacto.",
         Category = OptimizationCategory.Performance,
         ExpectedImpact = PerformanceImpact.Small,
         Evidence = EvidenceLevel.Empirical,

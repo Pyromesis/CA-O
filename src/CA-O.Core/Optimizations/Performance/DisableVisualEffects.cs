@@ -18,7 +18,7 @@ public sealed class DisableVisualEffects : RegistryOptimizationBase
         NameEn = "Disable visual effects",
         DescriptionEs = "Prioriza rendimiento sobre apariencia en la configuración de efectos de Windows.",
         DescriptionEn = "Prefers performance over appearance in Windows effects settings.",
-        TooltipEs = "Cambia VisualFXSetting a 2 (mejor rendimiento). Las animaciones y sombras se reducen. Reversible desde Restauración.",
+        TooltipEs = "Cambia VisualFXSetting a 2 (mejor rendimiento). Las animaciones y sombras se reducen, incluida la transparencia (no necesitas Desactivar transparencias además). Reversible desde Restauración.",
         Category = OptimizationCategory.Performance,
         ExpectedImpact = PerformanceImpact.Tiny,
         Evidence = EvidenceLevel.Empirical,

@@ -16,7 +16,7 @@ public sealed class RetrimSystemSsd : IOptimization
         NameEn = "Retrim system SSD",
         DescriptionEs = "Ejecuta ReTrim inmediato en la unidad C: para liberar bloques no usados del SSD.",
         DescriptionEn = "Runs an immediate ReTrim on drive C: to free unused SSD blocks.",
-        TooltipEs = "Ejecuta defrag C: /L. Acción de mantenimiento no reversible; puede tardar.",
+        TooltipEs = "Ejecuta defrag C: /L (ReTrim inmediato aislado). defrag C: /O ya incluye retrim; esto es solo el retrim sin repaso. Mantenimiento no reversible; puede tardar.",
         Category = OptimizationCategory.Storage,
         ExpectedImpact = PerformanceImpact.Small,
         Evidence = EvidenceLevel.Official,

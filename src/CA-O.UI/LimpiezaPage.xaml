@@ -145,7 +145,7 @@
                                     <TextBlock Text="Optimizar HDD" FontWeight="SemiBold" FontSize="13"/>
                                     <TextBlock Text="Desfragmentado según el medio." FontSize="11" Opacity="0.7" TextWrapping="Wrap"/>
                                 </StackPanel>
-                                <Button Grid.Column="1" Content="Optimizar" Tag="optimize-hdd-media-aware" Click="OnCleanClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="128" VerticalAlignment="Center" AutomationProperties.Name="Optimizar HDD según medio" ToolTipService.ToolTip="Desfragmenta el disco duro según su medio para lecturas más rápidas. Tarda minutos."/>
+                                <Button Grid.Column="1" Content="Optimizar" Tag="optimize-system-drive" Click="OnCleanClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="128" VerticalAlignment="Center" AutomationProperties.Name="Optimizar unidad del sistema" ToolTipService.ToolTip="Optimización media-aware de C: (retrim SSD, repaso HDD). Para desfragmentación profunda con umbral usa Desfragmentar HDD en Optimizar."/>
                             </Grid>
                             <Grid ColumnSpacing="12" Padding="0,8,0,8">
                                 <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>

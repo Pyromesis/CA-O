@@ -524,7 +524,7 @@ public sealed partial class OptimizePage : Page
     private static TimeSpan TimeoutFor(string optimizationId) => optimizationId switch
     {
         "windows-component-store-cleanup" or "windows-component-store-resetbase"
-            or "optimize-system-drive" or "optimize-hdd-media-aware" or "retrim-system-ssd"
+            or "optimize-system-drive" or "retrim-system-ssd" or "defragment-hdd-only"
             or "disk-cleanup-system-files" or "reset-network-stack-repair" or "repair-windows-update" => TimeSpan.FromMinutes(20),
         _ => TimeSpan.FromSeconds(60),
     };

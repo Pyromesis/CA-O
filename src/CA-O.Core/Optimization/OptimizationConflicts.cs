@@ -16,7 +16,6 @@ public static class OptimizationConflicts
         new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
             ["maximum-power-plan"] = PowerSchemes.HighPerformanceGuid,
-            ["set-best-performance-ac"] = PowerSchemes.HighPerformanceGuid,
             ["configure-gaming-power-mode-ac"] = PowerSchemes.UltimatePerformanceGuid,
             ["restore-balanced-power-dc"] = PowerSchemes.BalancedGuid,
             ["restore-power-plan-after-gaming"] = PowerSchemes.BalancedGuid,

@@ -20,7 +20,7 @@ public sealed class OptimizeSystemDrive : IOptimization
         NameEn = "Optimize system drive",
         DescriptionEs = "Desfragmenta (HDD) o hace ReTrim (SSD) de la unidad C: según su tipo real.",
         DescriptionEn = "Defrags (HDD) or re-trims (SSD) the C: drive based on its actual media type.",
-        TooltipEs = "Ejecuta defrag C: /O (optimiza según el tipo real de disco: HDD o SSD). Acción de mantenimiento; puede tardar minutos.",
+        TooltipEs = "Ejecuta defrag C: /O (repaso rápido según el tipo real de disco). Para desfragmentación profunda con umbral en todos los discos usa Desfragmentar HDD. Mantenimiento; puede tardar minutos.",
         Category = OptimizationCategory.Storage,
         ExpectedImpact = PerformanceImpact.None,
         Evidence = EvidenceLevel.Official,

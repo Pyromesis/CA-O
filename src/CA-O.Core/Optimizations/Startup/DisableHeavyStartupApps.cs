@@ -22,7 +22,7 @@ public sealed class DisableHeavyStartupApps : StartupRunKeyOptimization
         NameEn = "Disable heavy startup apps",
         DescriptionEs = "Desactiva actualizadores, lanzadores y clientes pesados del inicio. Excluye antivirus y drivers.",
         DescriptionEn = "Disables updaters, launchers and heavy clients at startup. Excludes antivirus and drivers.",
-        TooltipEs = "Elimina valores en HKCU/HKLM Run que coinciden con patrones pesados. Reversible exacto.",
+        TooltipEs = "Elimina valores en HKCU/HKLM Run que coinciden con patrones pesados. Es la versión conservadora; para todo lo no esencial usa Desactivar apps inicio innecesarias. Reversible exacto.",
         Category = OptimizationCategory.Performance,
         ExpectedImpact = PerformanceImpact.Small,
         Evidence = EvidenceLevel.Empirical,

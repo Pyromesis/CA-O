@@ -18,7 +18,11 @@ public static class OptimizationCatalog
 {
     public static readonly IReadOnlySet<string> LegacyIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
     {
-        // All optimizations now promoted to production (phases 1-6)
+        // Duplicados exactos retirados: mismo efecto que otra entrada.
+        // optimize-hdd-media-aware == optimize-system-drive (defrag C: /O).
+        // set-best-performance-ac == maximum-power-plan (plan Alto rendimiento).
+        "optimize-hdd-media-aware",
+        "set-best-performance-ac",
     };
 
     public static bool IsProductionId(string id) => !LegacyIds.Contains(id);
@@ -49,7 +53,9 @@ public static class OptimizationCatalog
     public static readonly MouseDriverQueueTrim MouseDriverQueueTrim = new();
     public static readonly MmcssSystemResponsiveness MmcssSystemResponsiveness = new();
 
-    // Historical retired entries retained only for traceability; they are intentionally excluded from All.
+    // Historical entries retained only for traceability (AllLegacy + LegacyIds);
+    // solo optimize-hdd-media-aware y set-best-performance-ac están
+    // realmente retirados (duplicados exactos). El resto sigue en All.
     public static readonly EnableWindowedGameOptimizations EnableWindowedGameOptimizations = new();
     public static readonly EnableVrr EnableVrr = new();
     public static readonly SetGamesHighPerformanceGpu SetGamesHighPerformanceGpu = new();
@@ -132,7 +138,7 @@ public static class OptimizationCatalog
     public static readonly RestartWindowsExplorer RestartWindowsExplorer = new();
     public static readonly RecoverWindowsExplorer RecoverWindowsExplorer = new();
 
-    /// <summary>Production catalog: 89 verified optimizations. All optimizations are now in production.</summary>
+    /// <summary>Production catalog: 87 verified optimizations. All optimizations are now in production.</summary>
     public static IReadOnlyList<IOptimization> All { get; } = new IOptimization[]
     {
         DisableBackgroundApps,
@@ -169,7 +175,6 @@ public static class OptimizationCatalog
         EnableAutoHdr,
         GamingDisplayRefreshRateAudit,
         // Power Phase 2: promoted from legacy
-        SetBestPerformanceAc,
         RestoreBalancedPowerDc,
         DisableUsbSelectiveSuspendAc,
         DisablePcieLinkStatePowerSavingAc,
@@ -179,7 +184,6 @@ public static class OptimizationCatalog
         // Storage Phase 3: promoted from legacy
         EnsureTrimEnabled,
         RetrimSystemSsd,
-        OptimizeHddMediaAware,
         EnableStorageSense,
         StorageSenseTempCleanup,
         StorageSenseRecycleBinPolicy,

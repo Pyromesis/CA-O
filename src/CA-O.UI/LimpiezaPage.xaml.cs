@@ -32,7 +32,6 @@ public sealed partial class LimpiezaPage : Page
         "windows-component-store-cleanup",
         "windows-component-store-resetbase",
         "optimize-system-drive",
-        "optimize-hdd-media-aware",
         "retrim-system-ssd",
     };
 
@@ -79,7 +78,7 @@ public sealed partial class LimpiezaPage : Page
         "flush-dns-cache" => NetworkStatusText,
         "windows-component-store-cleanup" or "windows-component-store-resetbase" => MaintenanceStatusText,
         "ensure-trim-enabled" or "retrim-system-ssd" or "optimize-system-drive"
-            or "optimize-hdd-media-aware" or "restore-system-managed-pagefile"
+            or "restore-system-managed-pagefile"
             or "disable-hibernate" => DiskStatusText,
         "enable-storage-sense" or "storage-sense-temp-cleanup"
             or "storage-sense-recycle-bin-policy" => SenseStatusText,
@@ -95,7 +94,7 @@ public sealed partial class LimpiezaPage : Page
                 "Ejecuta DISM /StartComponentCleanup. Tarda varios minutos y no se puede cancelar a la mitad. ¿Continuar?"),
             "windows-component-store-resetbase" => ("ResetBase irreversible",
                 "IRREVERSIBLE: elimina la posibilidad de desinstalar actualizaciones de Windows. Solo para expertos con copia de seguridad. ¿Continuar?"),
-            "optimize-system-drive" or "optimize-hdd-media-aware" => ("Optimizar unidad",
+            "optimize-system-drive" => ("Optimizar unidad",
                 "Ejecuta desfragmentado/TRIM en C:. Tarda varios minutos y es mejor no usar el disco mientras tanto. ¿Continuar?"),
             "disable-hibernate" => ("Desactivar hibernación",
                 "Libera varios GB (hiberfil.sys) pero desactiva hibernación e inicio rápido. Reversible. ¿Continuar?"),
