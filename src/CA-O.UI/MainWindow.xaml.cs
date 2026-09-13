@@ -353,8 +353,12 @@ public sealed partial class MainWindow : Window
         try
         {
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-            var resp = await pipe.DetectAsync("disable-transparency", cts.Token);
-            uiState.ServiceStatus = resp is { Accepted: true } ? "connected" : "rejected";
+            var resp = await pipe.PingAsync(cts.Token);
+            // Pipe inalcanzable (servicio detenido/no instalado) devuelve
+            // rejection CAO-IPC-007/008: "unavailable", no "rejected".
+            uiState.ServiceStatus = resp is { Accepted: true } ? "connected"
+                : resp is { ErrorCode: ErrorCodes.IpcPipeNotFound or ErrorCodes.IpcTimeout } ? "unavailable"
+                : "rejected";
             uiState.ServiceCheckedUtc = DateTime.UtcNow;
             if (uiState.ServiceStatus == "connected")
                 uiState.ServiceVersion = await Helpers.ServiceVersionProbe.FetchAsync(pipe, cts.Token) ?? string.Empty;

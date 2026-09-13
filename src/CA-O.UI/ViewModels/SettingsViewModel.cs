@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using CAO.Shared;
 
 namespace CAO.UI.ViewModels;
 
@@ -50,9 +51,16 @@ public sealed partial class SettingsViewModel : ObservableObject
         IsCheckingService = true;
         try
         {
-            var response = await _pipe.DetectAsync("disable-transparency", ct);
+            var response = await _pipe.PingAsync(ct);
             // Estados canónicos en inglés: los muestra MainWindow/Dashboard/Settings sin bifurcar por idioma.
-            ServiceStatus = response is { Accepted: true } ? "connected" : "rejected";
+            // Un pipe inalcanzable (servicio detenido/no instalado) devuelve
+            // rejection CAO-IPC-007/008: eso es "unavailable", no "rejected".
+            if (response is { Accepted: true })
+                ServiceStatus = "connected";
+            else if (response is { ErrorCode: ErrorCodes.IpcPipeNotFound or ErrorCodes.IpcTimeout })
+                ServiceStatus = "unavailable";
+            else
+                ServiceStatus = "rejected";
             ServiceCheckedUtc = DateTime.UtcNow;
             _state.ServiceStatus = ServiceStatus;
             _state.ServiceCheckedUtc = ServiceCheckedUtc;

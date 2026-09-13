@@ -2,6 +2,13 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
+## [2.1.29] - 2026-09-13
+
+### Corregido
+- El botón "Instalar ahora" (Servicio privilegiado) abría PowerShell, mostraba letras rojas y se cerraba sin arrancar el servicio: el wrapper generado por la UI tenía escapes `\$` que producían sintaxis de PowerShell inválida (`\$identity = ...` no se puede asignar). Salía del script antes de llegar a `sc.exe start`, así que el servicio quedaba instalado pero nunca iniciado (SCM exit 1077). Ahora genera PowerShell válido y la ventana se queda abierta con `Read-Host` para poder leer el resultado.
+- La verificación del servicio reportaba "rechazado" cuando en realidad el servicio estaba detenido o no instalado: el health check usaba `DetectOptimization` en vez de `Ping`, y un pipe inalcanzable (CAO-IPC-007/008) caía en `rejected` en vez de `unavailable`. Ahora usa `PingAsync` y distingue `connected` / `unavailable` (servicio detenido o ausente) / `rejected` (servicio responde pero deniega la llamada). Aplicado en Ajustes y en la sonda de arranque (`MainWindow`).
+- Rutas absolutas de otra máquina (`C:\Users\berna\...`) en `install-and-launch.ps1` y en los fallbacks de búsqueda del script de instalación: ahora se derivan del propio repositorio (`$PSScriptRoot` / `Environment.CurrentDirectory`).
+
 ## [2.1.28] - 2026-09-12
 
 ### Seguridad

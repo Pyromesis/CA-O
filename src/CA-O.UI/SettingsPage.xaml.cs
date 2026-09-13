@@ -609,10 +609,10 @@ public sealed partial class SettingsPage : Page
 $ErrorActionPreference = 'Stop'
 
 # Verificar si es admin
-\$identity = [Security.Principal.WindowsIdentity]::GetCurrent()
-\$principal = [Security.Principal.WindowsPrincipal]::new(\$identity)
+$identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+$principal = [Security.Principal.WindowsPrincipal]::new($identity)
 
-if (-not \$principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {{
+if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {{
     Write-Host '[X] Este script requiere permisos de administrador.' -ForegroundColor Red
     Read-Host 'Presiona Enter para salir'
     exit 1
@@ -635,12 +635,13 @@ try {{
     Write-Host '[OK] Servicio iniciado.' -ForegroundColor Green
 }}
 catch {{
-    Write-Host ('[X] Error: ' + \$_ ) -ForegroundColor Red
+    Write-Host ('[X] Error: ' + $_) -ForegroundColor Red
     Read-Host 'Presiona Enter para salir'
     exit 1
 }}
 
-Write-Host '[OK] La app se reiniciará automáticamente.' -ForegroundColor Green
+Write-Host '[OK] La app se reiniciara automaticamente.' -ForegroundColor Green
+Read-Host 'Presiona Enter para continuar'
 exit 0
 ";
 
@@ -700,7 +701,8 @@ exit 0
         {
             Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "scripts", "install-privileged-service.ps1"),
             Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "scripts", "install-privileged-service.ps1"),
-            @"C:\Users\berna\OneDrive\Documentos\CA-O\scripts\install-privileged-service.ps1",
+            Path.Combine(Environment.CurrentDirectory, "scripts", "install-privileged-service.ps1"),
+            Path.Combine(Environment.CurrentDirectory, "install-privileged-service.ps1"),
         };
         
         foreach (var path in knownPaths)
