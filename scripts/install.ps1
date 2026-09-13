@@ -24,10 +24,10 @@ if (-not (Test-Path $constantsPath)) {
 function Get-BuildConstant {
     param([string]$Name)
     $content = Get-Content $constantsPath -Raw
-    $pattern = "public const string $Name = \"([^\"]+)\""
+    $pattern = 'public const string {0} = "([^"]+)"' -f [regex]::Escape($Name)
     $match = [regex]::Match($content, $pattern)
     if ($match.Success) { return $match.Groups[1].Value }
-    $pattern = "public const int $Name = (\d+)"
+    $pattern = 'public const int {0} = (\d+)' -f [regex]::Escape($Name)
     $match = [regex]::Match($content, $pattern)
     if ($match.Success) { return $match.Groups[1].Value }
     throw "Constant $Name not found in BuildConstants.cs"
