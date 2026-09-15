@@ -54,8 +54,10 @@ public static class BuildConstants
     public const string GuiInstallerPackageName = "CA-O-Setup-GUI-x64.zip";
     public const string GuiInstallerExeName = "CA-O-Setup-GUI-x64.exe";
     public const string SetupPackageName = "CA-O.Setup.exe";
-    // Descargador de un solo .exe autocontenido (para la página de Releases:
-    // bajar solo este archivo; descarga el paquete y abre el setup gráfico).
+    // Instalador de un solo .exe con asistente, generado EXCLUSIVAMENTE por
+    // scripts/build-inno.ps1 (Inno Setup, installer/CA-O.iss) en artifacts/.
+    // No generar ningún otro archivo con este nombre: un alias de CA-O.Setup.exe
+    // con el mismo nombre provocó que el release v2.1.30 publicara un Inno viejo.
     public const string SetupSingleExeName = "CA-O-Instalador.exe";
 
     // Manifest Files

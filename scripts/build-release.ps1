@@ -135,8 +135,10 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 $setupExePath = Join-Path $setupOutput (Get-BuildConstant 'SetupExecutable')
 if (-not (Test-Path $setupExePath)) { throw "Setup executable not found at $setupExePath" }
 Copy-Item $setupExePath (Join-Path $artifactRoot "CA-O.Setup.exe") -Force
-# Alias estable para Releases: un solo .exe descargable que instala todo.
-Copy-Item $setupExePath (Join-Path $artifactRoot (Get-BuildConstant 'SetupSingleExeName')) -Force
+# NOTA: no crear aquí ningún alias "CA-O-Instalador.exe". Ese nombre es
+# propiedad exclusiva del instalador Inno (scripts/build-inno.ps1): un alias
+# con el mismo nombre y distinto contenido provocó que el release v2.1.30
+# publicara el Inno viejo (2.1.28) junto al ZIP nuevo.
 
 Write-Host '== Signing ==' -ForegroundColor Cyan
 $signScript = Join-Path $scriptRoot 'sign.ps1'
