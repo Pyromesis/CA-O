@@ -198,9 +198,25 @@ public sealed partial class SettingsPage : Page
         ServiceDetailText.Text = "";
         try
         {
+            // Tras un reinicio el servicio (start=demand) queda detenido: el ping
+            // falla y parece "perdido para siempre". Intento best-effort de
+            // levantarlo antes de reportar, la UI corre elevada (requireAdministrator).
+            if (IsAdmin())
+            {
+                try { TryStartServiceBestEffort(); } catch { }
+                if (!IsServiceRunning())
+                    await Task.Delay(800);
+            }
             await _vm.CheckServiceCommand.ExecuteAsync(null);
             SyncViewModelFromSharedState();
             RenderServiceState();
+            // Si sigue no disponible pero el binario existe, guiar hacia reparación.
+            if (!IsConnected(_vm.ServiceStatus) && ResolveInstalledServiceExe() is not null)
+            {
+                ServiceDetailText.Text = string.IsNullOrWhiteSpace(ServiceDetailText.Text)
+                    ? "El servicio está detenido o sin registrar. Pulsa 'Instalar ahora' para repararlo (no necesitas el repo)."
+                    : ServiceDetailText.Text + " Pulsa 'Instalar ahora' para repararlo.";
+            }
         }
         catch (Exception ex)
         {
@@ -209,6 +225,52 @@ public sealed partial class SettingsPage : Page
             if (ServiceInstallButton != null) ServiceInstallButton.Visibility = Visibility.Visible;
         }
         finally { ServiceRing.IsActive = false; }
+    }
+
+    /// <summary>
+    /// Best-effort, sin lanzar: si el servicio existe pero está detenido, arrancarlo.
+    /// No crea nada; la creación/reparación vive en el flujo de instalación.
+    /// </summary>
+    private static void TryStartServiceBestEffort()
+    {
+        try
+        {
+            using var q = Process.Start(new ProcessStartInfo("sc.exe", "query CAO.Privileged")
+            {
+                UseShellExecute = false, RedirectStandardOutput = true, CreateNoWindow = true,
+            });
+            if (q is null) return;
+            var out1 = q.StandardOutput.ReadToEnd();
+            q.WaitForExit(5000);
+            if (out1.Contains("does not exist", StringComparison.OrdinalIgnoreCase)) return;
+            if (out1.Contains("RUNNING", StringComparison.OrdinalIgnoreCase)) return;
+            try
+            {
+                using var s = Process.Start(new ProcessStartInfo("sc.exe", "start CAO.Privileged")
+                {
+                    UseShellExecute = false, RedirectStandardOutput = true, CreateNoWindow = true,
+                });
+                s?.WaitForExit(8000);
+            }
+            catch { }
+        }
+        catch { }
+    }
+
+    private static bool IsServiceRunning()
+    {
+        try
+        {
+            using var q = Process.Start(new ProcessStartInfo("sc.exe", "query CAO.Privileged")
+            {
+                UseShellExecute = false, RedirectStandardOutput = true, CreateNoWindow = true,
+            });
+            if (q is null) return false;
+            var o = q.StandardOutput.ReadToEnd();
+            q.WaitForExit(5000);
+            return o.Contains("RUNNING", StringComparison.OrdinalIgnoreCase);
+        }
+        catch { return false; }
     }
 
     private void OnExpertToggled(object sender, RoutedEventArgs e)
@@ -250,14 +312,17 @@ public sealed partial class SettingsPage : Page
         ServiceInstallButton.IsEnabled = false;
         ServiceCheckButton.IsEnabled = false;
 
+        string? wrapperScript = null;
         try
         {
             // Crear script wrapper para instalación con auto-reinicio
-            var wrapperScript = await CreateInstallWrapperScriptAsync();
+            wrapperScript = await CreateInstallWrapperScriptAsync();
             if (string.IsNullOrWhiteSpace(wrapperScript))
             {
+                var expectedExe = ResolveInstalledServiceExe()
+                    ?? CAO.Shared.Constants.BuildConstants.GetServiceExecutablePath();
                 ServiceStatusText.Text = "❌ Error: No se pudo crear el script de instalación";
-                ServiceDetailText.Text = "Verifica que exista install-privileged-service.ps1";
+                ServiceDetailText.Text = $"No se encontró ni scripts/install-privileged-service.ps1 (modo dev) ni el binario instalado ({expectedExe}). Reinstala la app desde el instalador.";
                 return;
             }
 
@@ -310,6 +375,12 @@ public sealed partial class SettingsPage : Page
         }
         finally
         {
+            // El wrapper vive en %TEMP% con el binario embebido: borrarlo siempre
+            // para no dejar scripts Bypass firmables por terceros.
+            if (!string.IsNullOrWhiteSpace(wrapperScript))
+            {
+                try { File.Delete(wrapperScript); } catch { }
+            }
             ServiceRing.IsActive = false;
             ServiceInstallButton.IsEnabled = true;
             ServiceCheckButton.IsEnabled = true;
@@ -591,21 +662,21 @@ public sealed partial class SettingsPage : Page
         try
         {
             var script = FindPrivilegedSetupScript();
-            if (string.IsNullOrWhiteSpace(script) || !File.Exists(script))
+
+            // Caso dev/repo: usar el script del repositorio si existe.
+            if (!string.IsNullOrWhiteSpace(script) && File.Exists(script))
             {
-                return null;
-            }
+                var scriptDir = Path.GetDirectoryName(script) ?? "";
+                var repoPath = scriptDir.Contains("scripts", StringComparison.OrdinalIgnoreCase)
+                    ? Path.GetDirectoryName(scriptDir)
+                    : scriptDir;
+                // Escapar comilla simple PS: ' -> '' para evitar inyección.
+                var repoEsc = (repoPath ?? "").Replace("'", "''");
+                var scriptEsc = script.Replace("'", "''");
 
-            // Obtener ruta del repositorio desde la ruta del script
-            var scriptDir = Path.GetDirectoryName(script) ?? "";
-            var repoPath = scriptDir.Contains("scripts", StringComparison.OrdinalIgnoreCase) 
-                ? Path.GetDirectoryName(scriptDir) 
-                : scriptDir;
+                var tempScript = Path.Combine(Path.GetTempPath(), $"cao-install-{Guid.NewGuid()}.ps1");
 
-            // Crear script wrapper temporal con auto-reinicio
-            var tempScript = Path.Combine(Path.GetTempPath(), $"cao-install-{Guid.NewGuid()}.ps1");
-            
-            var wrapperContent = @$"
+                var wrapperContent = @$"
 $ErrorActionPreference = 'Stop'
 
 # Verificar si es admin
@@ -621,8 +692,8 @@ if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administra
 Write-Host '[*] CA-O: Instalando servicio privilegiado...' -ForegroundColor Cyan
 
 try {{
-    Push-Location '{repoPath}'
-    & '{script}'
+    Push-Location '{repoEsc}'
+    & '{scriptEsc}'
     Pop-Location
     Write-Host '[OK] Servicio instalado exitosamente.' -ForegroundColor Green
     Write-Host '[*] Esperando a que se registre en el sistema...' -ForegroundColor Gray
@@ -645,13 +716,134 @@ Read-Host 'Presiona Enter para continuar'
 exit 0
 ";
 
-            await File.WriteAllTextAsync(tempScript, wrapperContent);
-            return tempScript;
+                await File.WriteAllTextAsync(tempScript, wrapperContent);
+                return tempScript;
+            }
+
+            // Caso app instalada (C:\Program Files\CA-O): no hay scripts/*.ps1.
+            // Instalar/reparar directamente con sc.exe usando el binario instalado.
+            var svcExe = ResolveInstalledServiceExe();
+            if (string.IsNullOrWhiteSpace(svcExe) || !File.Exists(svcExe))
+            {
+                return null;
+            }
+
+            return await CreateDirectInstallWrapperAsync(svcExe);
         }
         catch
         {
             return null;
         }
+    }
+
+    /// <summary>
+    /// Localiza CA-O.Privileged.exe en una instalación real (Program Files\CA-O\service)
+    /// o junto a la UI en layouts dev/payload. No depende del repo.
+    /// </summary>
+    private static string? ResolveInstalledServiceExe()
+    {
+        var candidates = new List<string>();
+        try { candidates.Add(CAO.Shared.Constants.BuildConstants.GetServiceExecutablePath()); } catch { }
+        try
+        {
+            var baseDir = AppContext.BaseDirectory;
+            candidates.Add(Path.Combine(baseDir, "service", "CA-O.Privileged.exe"));
+            var parent = Directory.GetParent(baseDir.TrimEnd(Path.DirectorySeparatorChar));
+            if (parent is not null)
+            {
+                candidates.Add(Path.Combine(parent.FullName, "service", "CA-O.Privileged.exe"));
+                // Layout UI en ui\: <install>\ui -> <install>\service
+                if (parent.Name.Equals("ui", StringComparison.OrdinalIgnoreCase) && parent.Parent is not null)
+                    candidates.Add(Path.Combine(parent.Parent.FullName, "service", "CA-O.Privileged.exe"));
+            }
+            var programFiles = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
+            candidates.Add(Path.Combine(programFiles, "CA-O", "service", "CA-O.Privileged.exe"));
+        }
+        catch { }
+
+        foreach (var c in candidates)
+        {
+            try
+            {
+                var full = Path.GetFullPath(c);
+                if (File.Exists(full)) return full;
+            }
+            catch { }
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Wrapper que recrea CAO.Privileged con sc.exe (stop/delete/create/failure/start)
+    /// sin necesitar install-privileged-service.ps1. Sobrevive a reinicios porque el
+    /// binario vive en Program Files y el servicio se re-registra si fue borrado.
+    /// El servicio es start=demand por diseño: aquí además se arranca (sc start) para
+    /// que tras un reinicio (servicio detenido) "Instalar ahora" lo levante de nuevo.
+    /// </summary>
+    private static async Task<string> CreateDirectInstallWrapperAsync(string svcExe)
+    {
+        var tempScript = Path.Combine(Path.GetTempPath(), $"cao-install-{Guid.NewGuid()}.ps1");
+        var version = CAO.Shared.AppVersion.Semantic;
+        var svcEsc = svcExe.Replace("'", "''");
+        var wrapperContent = @$"
+$ErrorActionPreference = 'Stop'
+$serviceName = 'CAO.Privileged'
+$svcExe = '{svcEsc}'
+
+$identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+$principal = [Security.Principal.WindowsPrincipal]::new($identity)
+if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {{
+    Write-Host '[X] Este script requiere permisos de administrador.' -ForegroundColor Red
+    Read-Host 'Presiona Enter para salir'
+    exit 1
+}}
+
+Write-Host '[*] CA-O: Reparando servicio privilegiado...' -ForegroundColor Cyan
+Write-Host ('[*] Binario: ' + $svcExe) -ForegroundColor Gray
+if (-not (Test-Path $svcExe)) {{
+    Write-Host ('[X] No existe el binario del servicio: ' + $svcExe) -ForegroundColor Red
+    Read-Host 'Presiona Enter para salir'
+    exit 1
+}}
+
+# Si el servicio existe pero está detenido (caso típico tras reinicio: start=demand),
+# basta con arrancarlo.
+$qc = sc.exe query $serviceName 2>&1 | Out-String
+$exists = $LASTEXITCODE -eq 0 -or ($qc -notmatch 'does not exist' -and $qc -match 'CAO')
+if ($exists) {{
+    Write-Host '[*] Servicio existente: intentando arranque...' -ForegroundColor Cyan
+    sc.exe start $serviceName 2>&1 | Out-Host
+    Start-Sleep -Seconds 2
+    $q2 = sc.exe query $serviceName 2>&1 | Out-String
+    if ($q2 -match 'RUNNING') {{
+        Write-Host '[OK] Servicio arrancado.' -ForegroundColor Green
+        exit 0
+    }}
+    Write-Host '[*] Re-creando servicio (estaba corrupto o detenido)...' -ForegroundColor Yellow
+    sc.exe stop $serviceName 2>&1 | Out-Null
+    Start-Sleep -Seconds 1
+    sc.exe delete $serviceName 2>&1 | Out-Null
+    Start-Sleep -Seconds 1
+}}
+
+sc.exe create $serviceName binPath= ""$svcExe"" start= demand DisplayName= ""CA-O Privileged Service"" | Out-Host
+if ($LASTEXITCODE -ne 0) {{ throw 'sc create falló' }}
+sc.exe failure $serviceName reset= 86400 actions= restart/5000/restart/10000/reboot/60000 | Out-Host
+sc.exe description $serviceName ""CA-O {version} servicio privilegiado"" | Out-Host
+sc.exe start $serviceName | Out-Host
+Start-Sleep -Seconds 2
+$q = sc.exe query $serviceName 2>&1 | Out-String
+Write-Host $q
+if ($q -notmatch 'RUNNING') {{
+    Write-Host '[!] El servicio se registró pero no está en RUNNING. Revisa el Visor de eventos.' -ForegroundColor Yellow
+}} else {{
+    Write-Host '[OK] Servicio instalado e iniciado.' -ForegroundColor Green
+}}
+Read-Host 'Presiona Enter para continuar'
+exit 0
+";
+        await File.WriteAllTextAsync(tempScript, wrapperContent);
+        return tempScript;
     }
 
     private async Task VerifyServiceInstalledAsync()

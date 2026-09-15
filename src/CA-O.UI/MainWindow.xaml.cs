@@ -352,8 +352,17 @@ public sealed partial class MainWindow : Window
         var pipe = AppHost.Resolve<PrivilegedPipeClient>();
         try
         {
+            // Nota arquitectura: la UI no spawnea procesos (regla
+            // ArchitectureDependencyTests). El auto-arranque tras reinicio
+            // (sc start) vive en SettingsPage (allowlist) y en el instalador.
+            // Aquí solo ping con un reintento para servicios en arranque lento.
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
             var resp = await pipe.PingAsync(cts.Token);
+            if (resp is not { Accepted: true })
+            {
+                try { await Task.Delay(1200, cts.Token); } catch { }
+                try { resp = await pipe.PingAsync(cts.Token); } catch { }
+            }
             // Pipe inalcanzable (servicio detenido/no instalado) devuelve
             // rejection CAO-IPC-007/008: "unavailable", no "rejected".
             uiState.ServiceStatus = resp is { Accepted: true } ? "connected"
@@ -361,7 +370,10 @@ public sealed partial class MainWindow : Window
                 : "rejected";
             uiState.ServiceCheckedUtc = DateTime.UtcNow;
             if (uiState.ServiceStatus == "connected")
-                uiState.ServiceVersion = await Helpers.ServiceVersionProbe.FetchAsync(pipe, cts.Token) ?? string.Empty;
+            {
+                try { uiState.ServiceVersion = await Helpers.ServiceVersionProbe.FetchAsync(pipe, cts.Token) ?? string.Empty; }
+                catch { }
+            }
         }
         catch
         {

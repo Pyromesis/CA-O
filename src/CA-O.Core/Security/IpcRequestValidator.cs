@@ -36,10 +36,11 @@ public static class IpcRequestValidator
         }
 
         if (string.IsNullOrWhiteSpace(request.Nonce) ||
+            request.Nonce.Length < 16 ||
             request.Nonce.Length > 128 ||
             request.Nonce.Any(char.IsControl))
         {
-            error = "Nonce ausente o con formato inválido.";
+            error = "Nonce ausente o con formato inválido (mínimo 16 caracteres).";
             return false;
         }
 

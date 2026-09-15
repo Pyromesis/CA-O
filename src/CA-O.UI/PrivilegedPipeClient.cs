@@ -110,15 +110,15 @@ public sealed class PrivilegedPipeClient
         }
         catch (OperationCanceledException)
         {
-            return IpcResponse.Rejected(ErrorCodes.IpcTimeout, "Servicio no disponible: tiempo de espera agotado (CAO-IPC-004). Verifique que CA-O Privileged Service esté instalado e iniciado.");
+            return IpcResponse.Rejected(ErrorCodes.IpcTimeout, "Servicio no disponible: tiempo de espera agotado (CAO-IPC-007). Verifique que CA-O Privileged Service esté instalado e iniciado.");
         }
         catch (IOException)
         {
-            return IpcResponse.Rejected(ErrorCodes.IpcPipeNotFound, "Servicio no disponible: pipe no encontrado (CAO-IPC-004). Instale/inicie el servicio privilegiado con scripts/install-privileged-service.ps1.");
+            return IpcResponse.Rejected(ErrorCodes.IpcPipeNotFound, "Servicio no disponible: pipe no encontrado (CAO-IPC-008). Instale/inicie el servicio privilegiado con scripts/install-privileged-service.ps1.");
         }
         catch (TimeoutException)
         {
-            return IpcResponse.Rejected(ErrorCodes.IpcTimeout, "Servicio no disponible: timeout al conectar (CAO-IPC-004).");
+            return IpcResponse.Rejected(ErrorCodes.IpcTimeout, "Servicio no disponible: timeout al conectar (CAO-IPC-007).");
         }
 
         var request = new IpcRequest(

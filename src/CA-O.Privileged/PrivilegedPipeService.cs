@@ -169,15 +169,18 @@ internal sealed class PrivilegedPipeService(
 
         try
         {
-            // Leer primero para permitir RunAsClient (requiere datos leÃ­dos, ERROR 536)
+            // Leer primero para permitir RunAsClient (requiere datos leídos, ERROR 536)
+            // Lectura acotada: ReadLineAsync alojaría una línea ilimitada antes del
+            // chequeo de 64KB (OOM). Se lee por trozos con techo duro.
             string? line;
             using (var reader = new StreamReader(pipe, System.Text.Encoding.UTF8, false, 1024, leaveOpen: true))
             {
-                var readTask = reader.ReadLineAsync(timeout.Token).AsTask();
-                var completed = await Task.WhenAny(readTask, Task.Delay(RequestTimeout, timeout.Token));
-                if (completed != readTask)
-                    throw new OperationCanceledException("Timeout leyendo request");
-                line = await readTask;
+                line = await ReadBoundedLineAsync(reader, IpcProtocol.MaxRequestBytes + 1024, timeout.Token);
+            }
+            if (line is null)
+            {
+                await WriteResponse(pipe, IpcResponse.Rejected(ErrorCodes.IpcRequestTooLarge, "Solicitud excede 64KB."), stoppingToken);
+                return;
             }
 if (string.IsNullOrWhiteSpace(line))
             {
@@ -250,6 +253,34 @@ catch (Exception ex)
             or PrivilegedOperationKind.ExportDriver
             or PrivilegedOperationKind.SearchCatalogDrivers
             or PrivilegedOperationKind.DownloadCatalogDriver;
+
+    /// <summary>
+    /// Lee una línea con techo duro de caracteres. Devuelve null si se supera
+    /// el máximo (el llamante responde RequestTooLarge en vez de alojar MBs).
+    /// </summary>
+    private static async Task<string?> ReadBoundedLineAsync(StreamReader reader, int maxChars, CancellationToken ct)
+    {
+        var sb = new System.Text.StringBuilder(4096);
+        var buf = new char[1024];
+        var gotData = false;
+        while (true)
+        {
+            ct.ThrowIfCancellationRequested();
+            var n = await reader.ReadAsync(buf.AsMemory(0, buf.Length), ct);
+            if (n == 0) break; // EOF
+            gotData = true;
+            for (var i = 0; i < n; i++)
+            {
+                var c = buf[i];
+                if (c == '\n') return sb.ToString().TrimEnd('\r');
+                sb.Append(c);
+                if (sb.Length > maxChars) return null;
+            }
+            // Sin \n tras maxChars+datos: cortar.
+            if (sb.Length > maxChars) return null;
+        }
+        return gotData ? sb.ToString() : string.Empty;
+    }
 
     /// <summary>
     /// Ejecuta el despacho suplantando al llamante autorizado para que HKCU y

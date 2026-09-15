@@ -19,12 +19,41 @@ internal static class UninstallService
         var serviceName = "CAO.Privileged";
 
         log("[1/5] Deteniendo servicio...");
+        // Cerrar procesos primero: si la UI o el servicio siguen vivos,
+        // Directory.Delete falla por file-lock y el servicio queda huérfano.
+        foreach (var name in new[] { "CA-O.UI", "CA-O.Privileged" })
+        {
+            try
+            {
+                foreach (var p in Process.GetProcessesByName(name))
+                {
+                    try { p.Kill(); } catch (Exception ex) { log($"  No se pudo cerrar {name}: {ex.Message}"); }
+                }
+            }
+            catch (Exception ex) { log($"  Enumerando {name}: {ex.Message}"); }
+        }
         Run("sc.exe", $"stop {serviceName}", true, log);
-        Thread.Sleep(1000);
+        for (var i = 0; i < 16; i++)
+        {
+            Thread.Sleep(500);
+            var q = RunCapture("sc.exe", $"query {serviceName}", log);
+            if (q.Contains("STOPPED", StringComparison.OrdinalIgnoreCase) ||
+                q.Contains("does not exist", StringComparison.OrdinalIgnoreCase)) break;
+        }
+        foreach (var p in Process.GetProcessesByName("CA-O.Privileged"))
+        {
+            try { p.Kill(); } catch { }
+        }
+        Thread.Sleep(500);
 
         log("[2/5] Eliminando servicio...");
         Run("sc.exe", $"delete {serviceName}", true, log);
         Thread.Sleep(800);
+        var afterDelete = RunCapture("sc.exe", $"query {serviceName}", log);
+        if (!afterDelete.Contains("does not exist", StringComparison.OrdinalIgnoreCase))
+            log("  WARN: el servicio sigue registrado tras 'sc delete'. Reintenta como admin o reinicia.");
+        else
+            log("  Servicio eliminado (verificado).");
 
         log("[3/5] Eliminando accesos directos...");
         foreach (var lnk in new[]
@@ -92,6 +121,23 @@ internal static class UninstallService
         if (stdout.Length > 0) log(stdout.Trim());
         if (stderr.Length > 0) log(stderr.Trim());
         if (p.ExitCode != 0 && !ignoreError) throw new InvalidOperationException($"{file} {args} salió {p.ExitCode}: {stderr}");
+    }
+
+    private static string RunCapture(string file, string args, Action<string> log)
+    {
+        try
+        {
+            var psi = new ProcessStartInfo(file, args) { UseShellExecute = false, RedirectStandardOutput = true, CreateNoWindow = true };
+            using var p = Process.Start(psi)!;
+            var stdout = p.StandardOutput.ReadToEnd();
+            p.WaitForExit(5000);
+            return stdout;
+        }
+        catch (Exception ex)
+        {
+            log($"  Captura {file} {args}: {ex.Message}");
+            return string.Empty;
+        }
     }
 
     public static bool IsAdmin()

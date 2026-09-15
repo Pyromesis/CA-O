@@ -15,6 +15,7 @@ public sealed class ReplayCache : IIpcReplayGuard
     private readonly int _capacity;
     private readonly Func<DateTimeOffset> _utcNow;
     private DateTimeOffset _lastSweep;
+    private readonly object _acceptLock = new();
 
     public ReplayCache(TimeSpan? ttl = null, int capacity = 10_000, Func<DateTimeOffset>? utcNow = null)
     {
@@ -32,24 +33,30 @@ public sealed class ReplayCache : IIpcReplayGuard
         var idKey = "id:" + requestId.ToString("N");
         var nonceKey = "n:" + nonce;
 
-        // Entries written before `now - ttl` are expired even if the sweep
-        // hasn't run yet: check timestamps explicitly.
-        if (_seen.TryGetValue(idKey, out var idTime) && now - idTime < _ttl)
+        lock (_acceptLock)
         {
-            return false;
-        }
-        if (_seen.TryGetValue(nonceKey, out var nonceTime) && now - nonceTime < _ttl)
-        {
-            return false;
-        }
+            // Entries written before `now - ttl` are expired even if the sweep
+            // hasn't run yet: check timestamps explicitly.
+            if (_seen.TryGetValue(idKey, out var idTime) && now - idTime < _ttl)
+            {
+                return false;
+            }
+            if (_seen.TryGetValue(nonceKey, out var nonceTime) && now - nonceTime < _ttl)
+            {
+                return false;
+            }
 
-        if (!_seen.TryAdd(idKey, now) || !_seen.TryAdd(nonceKey, now))
-        {
-            return false;
-        }
+            if (!_seen.TryAdd(idKey, now) || !_seen.TryAdd(nonceKey, now))
+            {
+                // Rollback parcial: si el segundo TryAdd falla, quitar el primero
+                // para no dejar medio-par aceptado.
+                _seen.TryRemove(idKey, out _);
+                return false;
+            }
 
-        EvictOverflowIfAny(now);
-        return true;
+            EvictOverflowIfAny(now);
+            return true;
+        }
     }
 
     internal int Count => _seen.Count;

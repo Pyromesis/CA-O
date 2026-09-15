@@ -374,32 +374,46 @@ internal void OnCancelClick(object sender, RoutedEventArgs e)
         UpdateProgress(5, "Descargando payload (451 MB)...", $"Descargando desde GitHub Release v{payloadVersion}");
         var zipUrl = $"https://github.com/Pyromesis/CA-O/releases/download/v{payloadVersion}/CA-O-{payloadVersion}-win-x64.zip";
         var fallbackUrl = $"https://github.com/Pyromesis/CA-O/releases/latest/download/CA-O-{payloadVersion}-win-x64.zip";
-        var fallbackOld = "https://github.com/Pyromesis/CA-O/releases/download/v2.1.5/CA-O-2.1.5-win-x64.zip";
+        const long maxBytes = 2L * 1024 * 1024 * 1024;
         var tmpZip = Path.Combine(Path.GetTempPath(), "CA-O-payload.zip");
         var tmpDir = Path.Combine(Path.GetTempPath(), "CA-O-payload-gui");
 
         // Descarga por streaming para 300+ MB (evita ByteArray truncado/OOM y EndOfCentralDirectory)
+        // Con tope anti disk-fill + borrado del parcial ante fallo.
         async Task DownloadToFileAsync(string url, string dest, CancellationToken cts)
         {
-            using var resp = await _httpClient.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, cts);
-            resp.EnsureSuccessStatusCode();
-            var total = resp.Content.Headers.ContentLength;
-            await using var net = await resp.Content.ReadAsStreamAsync(cts);
-            await using var file = File.Create(dest);
-            var buffer = new byte[81920];
-            long read = 0;
-            int n;
-            while ((n = await net.ReadAsync(buffer.AsMemory(0, buffer.Length), cts)) > 0)
+            try
             {
-                await file.WriteAsync(buffer.AsMemory(0, n), cts);
-                read += n;
-                if (total.HasValue && read % (10 * 1024 * 1024) < 81920) Log($"  Descargando... {read / 1024 / 1024} / {total.Value / 1024 / 1024} MB");
+                using var resp = await _httpClient.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, cts);
+                resp.EnsureSuccessStatusCode();
+                var total = resp.Content.Headers.ContentLength;
+                if (total.HasValue && total.Value > maxBytes)
+                    throw new InvalidOperationException($"Paquete excesivo ({total.Value} bytes, tope {maxBytes}).");
+                await using var net = await resp.Content.ReadAsStreamAsync(cts);
+                await using var file = File.Create(dest);
+                var buffer = new byte[81920];
+                long read = 0;
+                int n;
+                while ((n = await net.ReadAsync(buffer.AsMemory(0, buffer.Length), cts)) > 0)
+                {
+                    read += n;
+                    if (read > maxBytes)
+                        throw new InvalidOperationException($"Descarga excede el tope ({maxBytes} bytes).");
+                    await file.WriteAsync(buffer.AsMemory(0, n), cts);
+                    if (total.HasValue && read % (10 * 1024 * 1024) < 81920) Log($"  Descargando... {read / 1024 / 1024} / {total.Value / 1024 / 1024} MB");
+                }
+                Log($"Descargado {dest} ({new FileInfo(dest).Length / 1024 / 1024} MB)");
             }
-            Log($"Descargado {dest} ({new FileInfo(dest).Length / 1024 / 1024} MB)");
+            catch
+            {
+                try { File.Delete(dest); } catch { }
+                throw;
+            }
         }
 
         if (File.Exists(tmpZip)) try { File.Delete(tmpZip); } catch { }
-        // Intentar descarga con fallbacks y API latest si todo 404 (releases antiguos borrados)
+        // Intentar descarga con fallbacks y API latest si todo 404 (releases antiguos borrados).
+        // Sin downgrade a versiones antiguas hardcodeadas: solo la versión actual o latest.
         async Task<bool> TryDownload(string url)
         {
             try { await DownloadToFileAsync(url, tmpZip, ct); return true; }
@@ -410,43 +424,55 @@ internal void OnCancelClick(object sender, RoutedEventArgs e)
             Log($"Probando {fallbackUrl}...");
             if (!await TryDownload(fallbackUrl))
             {
-                Log($"Probando {fallbackOld}...");
-                if (!await TryDownload(fallbackOld))
+                // Último recurso: consultar API GitHub para tag latest y construir URL
+                try
                 {
-                    // Último recurso: consultar API GitHub para tag latest y construir URL
-                    try
+                    Log("Consultando API GitHub para latest tag...");
+                    using var apiResp = await _httpClient.GetAsync("https://api.github.com/repos/Pyromesis/CA-O/releases/latest", ct);
+                    apiResp.EnsureSuccessStatusCode();
+                    var json = await apiResp.Content.ReadAsStringAsync(ct);
+                    var tag = System.Text.Json.JsonDocument.Parse(json).RootElement.GetProperty("tag_name").GetString();
+                    if (!string.IsNullOrWhiteSpace(tag))
                     {
-                        Log("Consultando API GitHub para latest tag...");
-                        using var apiResp = await _httpClient.GetAsync("https://api.github.com/repos/Pyromesis/CA-O/releases/latest", ct);
-                        apiResp.EnsureSuccessStatusCode();
-                        var json = await apiResp.Content.ReadAsStringAsync(ct);
-                        var tag = System.Text.Json.JsonDocument.Parse(json).RootElement.GetProperty("tag_name").GetString();
-                        if (!string.IsNullOrWhiteSpace(tag))
-                        {
-                             var apiUrl = $"https://github.com/Pyromesis/CA-O/releases/download/{tag}/CA-O-{tag}-win-x64.zip";
-                             var altUrl = $"https://github.com/Pyromesis/CA-O/releases/download/{tag}/CA-O-2.1.1-win-x64.zip";
-                            Log($"Probando API latest {tag} -> {apiUrl}");
-                            if (!await TryDownload(apiUrl))
-                            {
-                                Log($"Probando alt {altUrl}");
-                                await DownloadToFileAsync(altUrl, tmpZip, ct);
-                            }
-                        }
-                        else throw new InvalidOperationException("Tag vacío en API");
+                         var apiUrl = $"https://github.com/Pyromesis/CA-O/releases/download/{tag}/CA-O-{tag}-win-x64.zip";
+                        Log($"Probando API latest {tag} -> {apiUrl}");
+                        await DownloadToFileAsync(apiUrl, tmpZip, ct);
                     }
-                    catch (Exception ex2)
-                    {
-                        throw new InvalidOperationException($"No se pudo descargar payload (todas las URLs 404). Último error: {ex2.Message}. Descarga manualmente CA-O-{CAO.Shared.Constants.BuildConstants.ProductVersion}-win-x64.zip o usa el ZIP completo offline.", ex2);
-                    }
+                    else throw new InvalidOperationException("Tag vacío en API");
+                }
+                catch (Exception ex2)
+                {
+                    throw new InvalidOperationException($"No se pudo descargar payload (todas las URLs 404). Último error: {ex2.Message}. Descarga manualmente CA-O-{CAO.Shared.Constants.BuildConstants.ProductVersion}-win-x64.zip o usa el ZIP completo offline.", ex2);
                 }
             }
         }
         if (Directory.Exists(tmpDir)) Directory.Delete(tmpDir, true);
-        ZipFile.ExtractToDirectory(tmpZip, tmpDir);
+        ExtractZipSafe(tmpDir, tmpZip);
         var foundUi = Directory.GetFiles(tmpDir, "CA-O.UI.exe", SearchOption.AllDirectories).FirstOrDefault() ?? throw new InvalidOperationException("ZIP sin CA-O.UI.exe");
         var foundSvc = Directory.GetFiles(tmpDir, "CA-O.Privileged.exe", SearchOption.AllDirectories).FirstOrDefault() ?? throw new InvalidOperationException("ZIP sin service");
         Log($"Payload extraido: {foundUi}");
         return (foundUi, foundSvc);
+    }
+
+    private void ExtractZipSafe(string destinationDir, string zipPath, long maxTotalBytes = 8L * 1024 * 1024 * 1024, int maxEntries = 60000)
+    {
+        using var archive = ZipFile.OpenRead(zipPath);
+        var entries = archive.Entries.Where(e => !string.IsNullOrEmpty(e.Name)).ToList();
+        if (entries.Count > maxEntries)
+            throw new InvalidOperationException($"ZIP con {entries.Count} entradas (tope {maxEntries}): posible bomba.");
+        var root = Path.GetFullPath(destinationDir) + Path.DirectorySeparatorChar;
+        long written = 0;
+        foreach (var entry in entries)
+        {
+            var dest = Path.GetFullPath(Path.Combine(destinationDir, entry.FullName));
+            if (!dest.StartsWith(root, StringComparison.Ordinal))
+                throw new IOException($"Entrada ZIP fuera del destino: {entry.FullName}");
+            Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
+            entry.ExtractToFile(dest, overwrite: true);
+            written += new FileInfo(dest).Length;
+            if (written > maxTotalBytes)
+                throw new InvalidOperationException($"Extracción supera el tope ({maxTotalBytes} bytes): posible bomba.");
+        }
     }
 
     internal void UpdateProgress(int value, string status, string? detail = null)

@@ -2,6 +2,14 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
+## [2.1.30] - 2026-09-15
+
+### Corregido
+- Servicio privilegiado perdido tras reinicio: "Instalar ahora" fallaba con "No se pudo crear el script de instalación" porque dependía de `scripts/install-privileged-service.ps1` (solo existe en dev). Ahora repara directo con `sc.exe` desde `Program Files\CA-O\service` y `Comprobar` intenta `sc start` (el servicio es `demand` por diseño).
+- IPC: códigos de error con texto `CAO-IPC-004` erróneo en timeouts/pipe → `007/008`; lectura del pipe acotada anti-OOM; `ReplayCache` atómico con lock; nonce mínimo 16 caracteres.
+- Instaladores: Zip-Slip + topes de descarga en `CA-O.Setup` e `InstallerGui`; eliminado fallback de downgrade a v2.1.5; `CA-O.iss` avisa si `sc create` falla; desinstalador cierra procesos y verifica borrado del servicio.
+- Wrapper PowerShell: escapa comillas simples en rutas y borra el script temporal de `%TEMP%`.
+
 ## [2.1.29] - 2026-09-13
 
 ### Corregido

@@ -40,8 +40,8 @@ public sealed class NetworkDiagnosticsProvider
         await Task.WhenAll(gatewayTasks.Concat(dnsTasks));
 
         var measurements = new List<NetworkEndpointMeasurement>();
-        measurements.AddRange(gatewayTasks.Select(t => t.Result));
-        measurements.AddRange(dnsTasks.Select(t => t.Result));
+        foreach (var t in gatewayTasks) measurements.Add(await t);
+        foreach (var t in dnsTasks) measurements.Add(await t);
 
         return new NetworkDiagnosticsReport(
             interfaceNames,

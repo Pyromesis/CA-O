@@ -3,7 +3,7 @@
 ; (lee la versión de BuildConstants.cs y firma con CAO_SIGN_THUMBPRINT si existe)
 
 #ifndef AppVersion
-  #define AppVersion "2.1.29"
+  #define AppVersion "2.1.30"
 #endif
 #ifndef RepoRoot
   #define RepoRoot ".."
@@ -94,12 +94,18 @@ procedure RegisterService();
 var
   SvcExe: string;
   Res: Integer;
+  Qc: string;
 begin
   // Limpieza era pre-Inno: su clave ARP apuntaba al desinstalador propio
   // (ya no se instala) y duplicaba "Programas y características".
   RegDeleteKeyIncludingSubkeys(HKLM, 'SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\CA-O');
   RegDeleteKeyIncludingSubkeys(HKLM, 'SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\CA-O');
   SvcExe := ExpandConstant('{app}\service\CA-O.Privileged.exe');
+  if not FileExists(SvcExe) then
+  begin
+    MsgBox('No se encontró el servicio privilegiado en:' + #13#10 + SvcExe + #13#10 + 'La instalación continuará, pero deberá reinstalar.', mbError, MB_OK);
+    Exit;
+  end;
   // Reinstalación limpia: si existía de una versión anterior, fuera.
   Exec(ExpandConstant('{sys}\sc.exe'), 'stop ' + ServiceName, '', SW_HIDE, ewWaitUntilTerminated, Res);
   Sleep(800);
@@ -107,12 +113,16 @@ begin
   Sleep(800);
   Exec(ExpandConstant('{sys}\sc.exe'), 'create ' + ServiceName + ' binPath= "' + SvcExe + '" start= demand DisplayName= "CA-O Privileged Service"', '', SW_HIDE, ewWaitUntilTerminated, Res);
   if Res <> 0 then
-    Log('WARN: sc create devolvió ' + IntToStr(Res));
+  begin
+    Log('ERROR: sc create devolvió ' + IntToStr(Res));
+    MsgBox('No se pudo registrar el servicio CAO.Privileged (sc create=' + IntToStr(Res) + '). Ejecute el instalador como administrador.', mbError, MB_OK);
+    Exit;
+  end;
   Exec(ExpandConstant('{sys}\sc.exe'), 'failure ' + ServiceName + ' reset= 86400 actions= restart/5000/restart/10000/reboot/60000', '', SW_HIDE, ewWaitUntilTerminated, Res);
   Exec(ExpandConstant('{sys}\sc.exe'), 'description ' + ServiceName + ' "CA-O servicio privilegiado - IPC Named Pipe con ACL + replay guard"', '', SW_HIDE, ewWaitUntilTerminated, Res);
   Exec(ExpandConstant('{sys}\sc.exe'), 'start ' + ServiceName, '', SW_HIDE, ewWaitUntilTerminated, Res);
   if Res <> 0 then
-    Log('WARN: sc start devolvió ' + IntToStr(Res));
+    Log('WARN: sc start devolvió ' + IntToStr(Res) + ' (servicio registrado pero detenido: la app lo arrancará).');
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);

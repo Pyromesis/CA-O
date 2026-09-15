@@ -92,7 +92,7 @@ static async Task<int> RunInstallAsync(SetupForm ui, string productVersion, stri
         {
             $"https://github.com/Pyromesis/CA-O/releases/download/v{productVersion}/CA-O-{productVersion}-win-x64.zip",
         };
-        var latestAsset = GetLatestFullAssetUrl(msg => ui.Report(null, null, msg));
+        var latestAsset = await GetLatestFullAssetUrlAsync(msg => ui.Report(null, null, msg), ct);
         if (latestAsset != null) candidates.Add(latestAsset);
         Exception? lastError = null;
         var downloaded = false;
@@ -124,7 +124,7 @@ static async Task<int> RunInstallAsync(SetupForm ui, string productVersion, stri
         await Task.Run(() =>
         {
             if (Directory.Exists(tmpDir)) Directory.Delete(tmpDir, true);
-            System.IO.Compression.ZipFile.ExtractToDirectory(tmpZip, tmpDir);
+            ExtractZipSafe(tmpZip, tmpDir);
         }, ct);
         var foundUi = Directory.GetFiles(tmpDir, "CA-O.UI.exe", SearchOption.AllDirectories).FirstOrDefault();
         var foundSvc = Directory.GetFiles(tmpDir, "CA-O.Privileged.exe", SearchOption.AllDirectories).FirstOrDefault();
@@ -263,40 +263,75 @@ static async Task<int> RunInstallAsync(SetupForm ui, string productVersion, stri
 }
 
 // Descarga por streaming con progreso en MB (nunca el ZIP entero en RAM).
-static async Task DownloadStreamingAsync(string url, string dest, Action<long, long> progress, CancellationToken ct)
+// Con tope anti disk-fill: corta y borra el parcial si se supera.
+static async Task DownloadStreamingAsync(string url, string dest, Action<long, long> progress, CancellationToken ct, long maxBytes = 2L * 1024 * 1024 * 1024)
 {
     using var http = new HttpClient() { Timeout = TimeSpan.FromMinutes(30) };
     http.DefaultRequestHeaders.UserAgent.ParseAdd("CA-O-Setup");
     using var resp = await http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct);
     resp.EnsureSuccessStatusCode();
     var total = resp.Content.Headers.ContentLength;
-    await using var net = await resp.Content.ReadAsStreamAsync(ct);
-    await using var file = File.Create(dest);
-    var buffer = new byte[81920];
-    long read = 0, lastShown = -1;
-    int n;
-    while ((n = await net.ReadAsync(buffer.AsMemory(0, buffer.Length), ct)) > 0)
+    if (total.HasValue && total.Value > maxBytes)
+        throw new InvalidOperationException($"Paquete excesivo ({total.Value} bytes, tope {maxBytes}).");
+    try
     {
-        await file.WriteAsync(buffer.AsMemory(0, n), ct);
-        read += n;
-        var mb = read / 1024 / 1024;
-        if (mb - lastShown >= 10)
+        await using var net = await resp.Content.ReadAsStreamAsync(ct);
+        await using var file = File.Create(dest);
+        var buffer = new byte[81920];
+        long read = 0, lastShown = -1;
+        int n;
+        while ((n = await net.ReadAsync(buffer.AsMemory(0, buffer.Length), ct)) > 0)
         {
-            lastShown = mb;
-            progress(mb, (total ?? 0) / 1024 / 1024);
+            read += n;
+            if (read > maxBytes)
+                throw new InvalidOperationException($"Descarga excede el tope ({maxBytes} bytes).");
+            await file.WriteAsync(buffer.AsMemory(0, n), ct);
+            var mb = read / 1024 / 1024;
+            if (mb - lastShown >= 10)
+            {
+                lastShown = mb;
+                progress(mb, (total ?? 0) / 1024 / 1024);
+            }
         }
+    }
+    catch
+    {
+        try { File.Delete(dest); } catch { }
+        throw;
+    }
+}
+
+// Extracción ZIP con protección Zip-Slip + topes anti-bomba.
+static void ExtractZipSafe(string zipPath, string destinationDir, long maxTotalBytes = 8L * 1024 * 1024 * 1024, int maxEntries = 60000)
+{
+    using var archive = System.IO.Compression.ZipFile.OpenRead(zipPath);
+    var entries = archive.Entries.Where(e => !string.IsNullOrEmpty(e.Name)).ToList();
+    if (entries.Count > maxEntries)
+        throw new InvalidOperationException($"ZIP con {entries.Count} entradas (tope {maxEntries}): posible bomba.");
+    var root = Path.GetFullPath(destinationDir) + Path.DirectorySeparatorChar;
+    long written = 0;
+    foreach (var entry in entries)
+    {
+        var dest = Path.GetFullPath(Path.Combine(destinationDir, entry.FullName));
+        if (!dest.StartsWith(root, StringComparison.Ordinal))
+            throw new IOException($"Entrada ZIP fuera del destino: {entry.FullName}");
+        Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
+        entry.ExtractToFile(dest, overwrite: true);
+        written += new FileInfo(dest).Length;
+        if (written > maxTotalBytes)
+            throw new InvalidOperationException($"Extracción supera el tope ({maxTotalBytes} bytes): posible bomba.");
     }
 }
 
 // Último recurso: el asset completo del release latest vía API de GitHub.
-static string? GetLatestFullAssetUrl(Action<string> log)
+static async Task<string?> GetLatestFullAssetUrlAsync(Action<string> log, CancellationToken ct)
 {
     try
     {
         using var http = new HttpClient() { Timeout = TimeSpan.FromSeconds(30) };
         http.DefaultRequestHeaders.UserAgent.ParseAdd("CA-O-Setup");
         http.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github.v3+json");
-        var json = http.GetStringAsync("https://api.github.com/repos/Pyromesis/CA-O/releases/latest").GetAwaiter().GetResult();
+        var json = await http.GetStringAsync("https://api.github.com/repos/Pyromesis/CA-O/releases/latest", ct);
         using var doc = System.Text.Json.JsonDocument.Parse(json);
         foreach (var asset in doc.RootElement.GetProperty("assets").EnumerateArray())
         {
