@@ -2,6 +2,12 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
+## [2.1.31] - 2026-09-15
+
+### Corregido
+- Pipeline de release: `build-release.ps1` ya no genera un alias `CA-O-Instalador.exe` a partir de `CA-O.Setup.exe`. Ese alias compartía nombre (pero no contenido) con el instalador Inno y provocó que el release 2.1.30 publicara el Inno viejo (2.1.28) junto al ZIP nuevo. `SetupSingleExeName` queda documentado como propiedad exclusiva del instalador Inno (`scripts/build-inno.ps1`).
+- Release 2.1.31 recompilado desde cero (UI + servicio + setup + instalador Inno) con la versión correcta en todos los artefactos; el release 2.1.30 se retira.
+
 ## [2.1.30] - 2026-09-15
 
 ### Corregido
