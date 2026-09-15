@@ -316,7 +316,7 @@ static void ExtractZipSafe(string zipPath, string destinationDir, long maxTotalB
         if (!dest.StartsWith(root, StringComparison.Ordinal))
             throw new IOException($"Entrada ZIP fuera del destino: {entry.FullName}");
         Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
-        entry.ExtractToFile(dest, overwrite: true);
+        System.IO.Compression.ZipFileExtensions.ExtractToFile(entry, dest, overwrite: true);
         written += new FileInfo(dest).Length;
         if (written > maxTotalBytes)
             throw new InvalidOperationException($"Extracción supera el tope ({maxTotalBytes} bytes): posible bomba.");
