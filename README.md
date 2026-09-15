@@ -1,4 +1,4 @@
-# CA-O 2.1.28 — Plataforma nativa de rendimiento, diagnóstico y optimización para Windows 11
+# CA-O 2.1.30 — Plataforma nativa de rendimiento, diagnóstico y optimización para Windows 11
 
 > **Principio operativo:** diagnosticar primero → recomendar con evidencia → aplicar en transacción → verificar → revertir si falla. Sin promesas numéricas falsas, solo hechos medibles.
 
@@ -6,11 +6,11 @@
 [![.NET 10](https://img.shields.io/badge/.NET%2010-512BD4?style=flat-square&logo=dotnet&logoColor=white)](global.json)
 [![WinUI 3](https://img.shields.io/badge/WinUI%203-00B7C3?style=flat-square&logo=windows&logoColor=white)](https://microsoft.github.io/microsoft-ui-xaml/)
 [![Build](https://img.shields.io/badge/build-passing-brightgreen?style=flat-square)](https://github.com/Pyromesis/CA-O/actions)
-[![Tests](https://img.shields.io/badge/tests-974%20passed-brightgreen?style=flat-square)](#-pruebas)
-[![Release](https://img.shields.io/badge/release-v2.1.28-blue?style=flat-square)](https://github.com/Pyromesis/CA-O/releases/tag/v2.1.28)
+[![Tests](https://img.shields.io/badge/tests-976%20passed-brightgreen?style=flat-square)](#-pruebas)
+[![Release](https://img.shields.io/badge/release-v2.1.30-blue?style=flat-square)](https://github.com/Pyromesis/CA-O/releases/tag/v2.1.30)
 [![License](https://img.shields.io/badge/license-privado-lightgrey?style=flat-square)](#licencia)
 
-**Descargas v2.1.28:** [CA-O-Instalador.exe (64 MB, asistente Inno Setup: licencia, destino, iconos, servicio)](https://github.com/Pyromesis/CA-O/releases/download/v2.1.28/CA-O-Instalador.exe) | [CA-O-Setup-GUI-x64.zip (92 MB, instalador GUI)](https://github.com/Pyromesis/CA-O/releases/download/v2.1.28/CA-O-Setup-GUI-x64.zip) | [CA-O-2.1.28-win-x64.zip (394 MB, paquete completo offline)](https://github.com/Pyromesis/CA-O/releases/download/v2.1.28/CA-O-2.1.28-win-x64.zip) | [Notas de la versión](https://github.com/Pyromesis/CA-O/releases/tag/v2.1.28) | [Documentación](docs/ARCHITECTURE.md)
+**Descargas v2.1.30:** [CA-O-Instalador.exe (64 MB, asistente Inno Setup: licencia, destino, iconos, servicio)](https://github.com/Pyromesis/CA-O/releases/download/v2.1.30/CA-O-Instalador.exe) | [CA-O.Setup.exe (135 MB, descargador de un solo exe: baja el paquete y abre el instalador)](https://github.com/Pyromesis/CA-O/releases/download/v2.1.30/CA-O.Setup.exe) | [CA-O-2.1.30-win-x64.zip (508 MB, paquete completo offline + `.sha256`)](https://github.com/Pyromesis/CA-O/releases/download/v2.1.30/CA-O-2.1.30-win-x64.zip) | [Notas de la versión](https://github.com/Pyromesis/CA-O/releases/tag/v2.1.30) | [Documentación](docs/ARCHITECTURE.md)
 
 ---
 
@@ -22,7 +22,7 @@
 4. [Arquitectura profunda](#arquitectura-profunda)
 5. [Estructura del repositorio](#estructura-del-repositorio)
 6. [Modelo de seguridad](#modelo-de-seguridad)
-7. [Catálogo completo de optimizaciones (75)](#catálogo-completo-de-optimizaciones-75)
+7. [Catálogo completo de optimizaciones (88)](#catálogo-completo-de-optimizaciones-88)
 8. [Cómo funciona la app — viaje del usuario](#cómo-funciona-la-app--viaje-del-usuario)
 9. [Motores internos](#motores-internos)
 10. [Persistencia y rutas de datos](#persistencia-y-rutas-de-datos)
@@ -42,14 +42,14 @@
 
 ## Resumen ejecutivo
 
-**CA-O 2.1.28** es una aplicación **100% nativa Windows** escrita en **.NET 10 + WinUI 3 (Windows App SDK 2.4)**. No es una colección de tweaks: **mide** hardware, térmicas, red, almacenamiento, drivers y postura de seguridad **antes** de recomendar. Cada cambio pertenece a un **bucket analizado-primero** (`Recommended` / `Optional` / `Experimental` / `SecuritySensitive` / `NotApplicable` / `Blocked`) y se ejecuta bajo el flujo transaccional `PRECHECK → SNAPSHOT → APPLY → VERIFY → COMMIT` con **rollback automático y verificación post-reversión**.
+**CA-O 2.1.30** es una aplicación **100% nativa Windows** escrita en **.NET 10 + WinUI 3 (Windows App SDK 2.4)**. No es una colección de tweaks: **mide** hardware, térmicas, red, almacenamiento, drivers y postura de seguridad **antes** de recomendar. Cada cambio pertenece a un **bucket analizado-primero** (`Recommended` / `Optional` / `Experimental` / `SecuritySensitive` / `NotApplicable` / `Blocked`) y se ejecuta bajo el flujo transaccional `PRECHECK → SNAPSHOT → APPLY → VERIFY → COMMIT` con **rollback automático y verificación post-reversión**.
 
-La UI **siempre eleva** (`app.manifest` `requireAdministrator` → UAC en cada inicio) pero **toda mutación privilegiada cruza** al servicio Windows `CAO.Privileged` (SYSTEM) vía **Named Pipe autenticado** con ACL restrictiva, validación de esquema tipado, ventana de 30 s, nonce y protección anti-replay. Sin el servicio, la app opera en **modo solo lectura** (diagnóstico + benchmark disponibles).
+La UI **siempre eleva** (`app.manifest` `requireAdministrator` → UAC en cada inicio) pero **toda mutación privilegiada cruza** al servicio Windows `CAO.Privileged` (SYSTEM) vía **Named Pipe autenticado** con ACL restrictiva, validación de esquema tipado, ventana de 30 s, nonce y protección anti-replay. Sin el servicio, la app opera en **modo solo lectura** (diagnóstico + benchmark disponibles). El servicio es `start= demand` por diseño: tras un reinicio queda detenido y la propia app lo levanta (`sc start`) al comprobar, o lo re-registra con `Ajustes → Instalar ahora` sin necesitar el repositorio.
 
 **En números:**
-- **75 optimizaciones** con efecto real verificado (transaccionales) + `AllLegacy` para trazabilidad
-- **11 páginas** WinUI 3 con Mica, `NavigationView`, animaciones de entrada, i18n `es-ES`/`en-US` instantáneo
-- **697 tests** en 6 suites (Core 457 · Integration 48 · Security 118 · Infra 17 · Benchmark 7 · UI 50)
+- **88 optimizaciones** con efecto real verificado (transaccionales) + `AllLegacy` para trazabilidad
+- **12 páginas** WinUI 3 con Mica, `NavigationView`, animaciones de entrada, i18n `es-ES`/`en-US` instantáneo
+- **976 tests** en 6 suites (Core 568 · Security 236 · Integration 48 · Infra 48 · Benchmark 7 · UI 69)
 - **0 telemetría externa**, 0 dependencias web, 0 comandos arbitrarios
 
 ---
@@ -78,8 +78,8 @@ La UI **siempre eleva** (`app.manifest` `requireAdministrator` → UAC en cada i
 | **WMI** | System.Management | **10.0.0** | Lectura hardware/termal/batería |
 | **Perf** | System.Diagnostics.PerformanceCounter | **10.0.0** | `% DPC Time` / `% Interrupt Time` |
 | **Servicios** | System.ServiceProcess.ServiceController | **8.0.1** | `CAO.Privileged` como `BackgroundService` |
-| **Build** | `Directory.Packages.props` + `Directory.Build.props` + `Version.props` (single source `2.1.28`) | Centralizado | Un lugar para bump de versión/paquetes |
-| **Tests** | xUnit 2.9.2 + Microsoft.NET.Test.Sdk 17.11.1 | — | 697 tests en Release |
+| **Build** | `Directory.Packages.props` + `Directory.Build.props` + `Version.props` (single source `2.1.30`) | Centralizado | Un lugar para bump de versión/paquetes |
+| **Tests** | xUnit 2.9.2 + Microsoft.NET.Test.Sdk 17.11.1 | — | 976 tests en Release |
 | **Seguridad** | CodeQL + `dotnet audit` + Dependabot + CycloneDX SBOM | CI | Cadena de suministro auditada |
 
 > **Self-contained:** los artefactos de release no requieren runtime instalado. El instalador es `self-contained` sin `single-file` (requisito WinUI 3).
@@ -108,18 +108,18 @@ La UI **siempre eleva** (`app.manifest` `requireAdministrator` → UAC en cada i
 ```
 
 - **UI siempre elevada** pero **toda escritura cruza el pipe** aun elevada → modelo de privilegio mínimo auditado
-- **Servicio valida:** versión protocolo (must = 2), identidad cliente (`GetImpersonationUserName` vía `RunAsClient()`), GUID único + nonce (replay), esquema `OperationParameters`, solo 9 operaciones allowlist
+- **Servicio valida:** versión protocolo (must = 2), identidad cliente (`GetImpersonationUserName` vía `RunAsClient()`), GUID único + nonce (mín. 16 caracteres, replay), esquema `OperationParameters`, solo 17 operaciones allowlist
 - **Sin HTTP**, sin ejecución de cadenas arbitrarias, sin PowerShell en el path de ejecución (solo `CommandPolicy` con rutas absolutas `%SystemRoot%\System32`)
 
 ### Capas de código
 
 | Proyecto | Responsabilidad | Depende de |
 |---|---|---|
-| `CA-O.Shared` | DTOs, contratos IPC v2 (`IpcProtocol` v2, `Ping`, `GetServiceStatus`), `CaOPaths`, `ErrorCodes CAO-XXX-nnn`, `AppVersion 2.1.28`, `BuildConstants`, `Constants/IpcConstants` | — |
-| `CA-O.Core` | `OptimizationCatalog` (75), `OptimizationEngine` transaccional, `RecommendationEngine` + `OptimizationScoreCalculator` (0-100), `GameCompatibilityPolicy` (matriz SAFE/CAUTION/BLOCKED `CAO-GAME-001`), `HealthEngine`, `KnownIssueMatcher`, `CrashRecoveryService`, `Rollback/*` | Shared |
+| `CA-O.Shared` | DTOs, contratos IPC v2 (`IpcProtocol` v2, `Ping`, `GetServiceStatus`), `CaOPaths`, `ErrorCodes CAO-XXX-nnn`, `AppVersion 2.1.30`, `BuildConstants`, `Constants/IpcConstants` | — |
+| `CA-O.Core` | `OptimizationCatalog` (88), `OptimizationEngine` transaccional, `RecommendationEngine` + `OptimizationScoreCalculator` (0-100), `GameCompatibilityPolicy` (matriz SAFE/CAUTION/BLOCKED `CAO-GAME-001`), `HealthEngine`, `KnownIssueMatcher`, `CrashRecoveryService`, `Rollback/*` | Shared |
 | `CA-O.Infrastructure` | WMI 5 s timeout + `SystemAnalysisService` + `AnalysisStateStore` (atómico, 24 h TTL) + `SnapshotRepository`/`FileSnapshotStore` (TX identity + SHA-256) + `JsonHistoryLogger` (hash-chain) + `SystemBenchmarkRunner` + `Gaming/*` + `Networking/*` + `Storage/*` + `Security/*` + `Windows/*` | Core, Shared |
 | `CA-O.Privileged` | Servicio `SYSTEM` + `PrivilegedPipeService` (Named Pipe `CA-O.Privileged.v1`, ACL + `ReplayCache` 30 s, timeout 15 s/conn) + `OptimizationEngine` hosteado + `AdministratorsOnlyAuthorizer` | Core, Infrastructure, Shared |
-| `CA-O.UI` | WinUI 3 Mica + ViewModels DI (`AppHost` + `UiState`) + `Controls` (`MetricCard`/`RiskBadge`/`ScoreRing`/`Diagnostic*`) + `PrivilegedPipeClient` + `ErrorTranslator` + `Helpers/{LocalizationHelper,UiAnimations}` + 11 páginas con `VisualState` y animaciones | Core, Infrastructure, Shared |
+| `CA-O.UI` | WinUI 3 Mica + ViewModels DI (`AppHost` + `UiState`) + `Controls` (`MetricCard`/`RiskBadge`/`ScoreRing`/`Diagnostic*`) + `PrivilegedPipeClient` + `ErrorTranslator` + `Helpers/{LocalizationHelper,UiAnimations,AppUpdater}` + 12 páginas con `VisualState` y animaciones | Core, Infrastructure, Shared |
 | `CA-O.InstallerGui` | Instalador gráfico **680×620**, Mica, progress, `requireAdministrator`, registro servicio + atajos | — |
 | `CA-O.Setup` | Instalador consola fallback, `requireAdministrator` | — |
 | `CA-O.Uninstaller` | Desinstalador + entrada ARP (`Programs and Features`), `UninstallService` | — |
@@ -154,23 +154,23 @@ BENCHMARK → post-commit, fallo no invalida commit   // eventos separados
 CA-O.sln  (.NET 10 · LangVersion 13 · WinUI 3)
 ├── src/
 │   ├── CA-O.Shared/                 # Contratos puros, sin IO
-│   │   ├── Constants/               # AppVersion (2.1.28), BuildConstants, CaOPaths, IpcConstants
+│   │   ├── Constants/               # AppVersion (2.1.30), BuildConstants, CaOPaths, IpcConstants
 │   │   ├── IPC/                     # IpcProtocol v2, IpcRequest/Response, Payloads (9 ops)
 │   │   ├── Security/                # CommandPolicy, ErrorCodes, CallerIdentity
 │   │   ├── Enums/                   # RecommendationBucket, RiskLevel, EvidenceLevel, etc.
 │   │   └── DTO/                     # OptimizationDefinition, SystemContext, HealthScore
 │   ├── CA-O.Core/                   # Lógica de negocio, sin WMI
-│   │   ├── Optimization/            # OptimizationCatalog (75), RegistryOptimizationBase, Engine
-│   │   ├── Optimizations/           # 75 clases por carpeta (+ bases compartidas):
-│   │   │   ├── Performance/         # DisableVbs, MaximumPowerPlan, DisableVisualEffects…
+│   │   ├── Optimization/            # OptimizationCatalog (88), RegistryOptimizationBase, Engine
+│   │   ├── Optimizations/           # 88 clases por carpeta (+ bases compartidas):
+│   │   │   ├── Performance/         # DisableVbs, MaximumPowerPlan, DisableVisualEffects, DisableDynamicTick…
 │   │   │   ├── Power/               # powercfg real + bases PowerAcSetting/PowerSchemeSwitch…
-│   │   │   ├── Storage/             # borrado real + base TempFileCleanup…
-│   │   │   ├── Network/             # netsh real + base NicAdvancedProperty…
-│   │   │   ├── Gaming/              # EnableGameMode, DisableGameBarDvr…
+│   │   │   ├── Storage/             # borrado real + base TempFileCleanup… + AppCaches/WU-cache/HDD-only…
+│   │   │   ├── Network/             # netsh real + base NicAdvancedProperty… + Nagle/WiFi-scan…
+│   │   │   ├── Gaming/              # EnableGameMode, DisableGameBarDvr, PointerPrecision, MouseQueue, MMCSS…
 │   │   │   ├── PrivacySecurity/     # DisableTelemetry, DisableCopilot…
 │   │   │   ├── Startup/             # base StartupRunKey + servicios + schtasks…
 │   │   │   ├── System/              # restore-point WMI, auditorías DiagnosticOnly…
-│   │   │   └── Troubleshoot/        # audio, video, WU, reloj (7 solucionadores)
+│   │   │   └── Troubleshoot/        # audio, video, WU, reloj, DNS, BT, Search, Explorer (13 solucionadores)
 │   │   ├── Scoring/                 # RecommendationEngine, OptimizationScoreCalculator
 │   │   ├── Gaming/                  # GameCompatibilityPolicy (24 entradas)
 │   │   ├── Diagnostics/             # HealthEngine, CaoHealthCheck
@@ -204,20 +204,20 @@ CA-O.sln  (.NET 10 · LangVersion 13 · WinUI 3)
 │   ├── CA-O.InstallerGui/           # 680×620 GUI installer (WinUI 3, requireAdministrator)
 │   ├── CA-O.Setup/                  # Consola fallback (sc.exe create/start)
 │   └── CA-O.Uninstaller/            # ARP uninstaller (sc stop/delete + rmdir)
-├── tests/                           # 540 tests, Release
-│   ├── CA-O.Core.Tests/             # 389: catalog (75), AnalysisStateStore, GameCompatibility, transacciones
-│   ├── CA-O.Integration.Tests/      # 48: E2E 10 flujos + TransactionJournalRecovery
-│   ├── CA-O.Security.Tests/         # 71: IpcValidator (+timer), ReplayCache, CommandPolicy
-│   ├── CA-O.Infrastructure.Tests/   # 17: HistoryRobustness, SnapshotRepository
+├── tests/                           # 976 tests, Release
+│   ├── CA-O.Core.Tests/             # 568: catalog (88), AnalysisStateStore, GameCompatibility, transacciones
+│   ├── CA-O.Integration.Tests/      # 48: E2E 10 flujos + TransactionJournalRecovery + ArchitectureDependency
+│   ├── CA-O.Security.Tests/         # 236: IpcValidator (+timer/nonce), ReplayCache, CommandPolicy (incl. `@` ACPI)
+│   ├── CA-O.Infrastructure.Tests/   # 48: HistoryRobustness, SnapshotRepository, PhantomBatchValidation
 │   ├── CA-O.Benchmark.Tests/        # 7:  suelo 3%, mediana
-│   ├── CA-O.UI.Tests/               # 8:  ViewModels
+│   ├── CA-O.UI.Tests/               # 69:  ViewModels, Localizer, AppUpdater (Zip-Slip), DriverConflicts
 │   └── CA-O.Benchmark.Tests/
 ├── docs/                            # ARCHITECTURE.md, SECURITY.md, THREAT-MODEL.md, OPTIMIZATION-CATALOG.md, IPC_PROTOCOL.md, TRANSACTIONS.md
 ├── scripts/                         # build.ps1, test.ps1, verify.ps1, build-release.ps1, package.ps1, install-privileged-service.ps1, harden-data-acls.ps1, …
 ├── .github/workflows/ci.yml         # build + test + CodeQL + dotnet audit
 ├── Directory.Packages.props         # Versiones centralizadas
 ├── Directory.Build.props            # Propiedades MSBuild comunes
-├── Version.props                    # Single source 2.1.28
+├── Version.props                    # Single source 2.1.30
 ├── global.json                      # SDK 10.0.400
 └── CA-O.sln
 ```
@@ -230,15 +230,15 @@ CA-O.sln  (.NET 10 · LangVersion 13 · WinUI 3)
 
 ```
 CA-O.UI (WinUI 3, requireAdministrator — UAC siempre)
-   │  IpcRequest { ProtocolVersion 2, RequestId GUID, Nonce 16B hex, CreatedAtUtc, Operation, TypedPayload }
+   │  IpcRequest { ProtocolVersion 2, RequestId GUID, Nonce 32 hex (mín. 16), CreatedAtUtc, Operation, TypedPayload }
    │  Validación en servicio: versión, frescura 30 s, tamaño 64 KB, esquema, anti-replay, auth
    ▼
 Named Pipe  \\.\pipe\CA-O.Privileged.v1  — ACL: SYSTEM Full, Administrators R/W, Interactive R/W
    │  (conectar ≠ autorizar) → GetCallerIdentity() via RunAsClient() — SID real + nombre + SessionId + elevación
    │  IpcRequestValidator + ReplayCache + AdministratorsOnlyAuthorizer
    ▼
-CA-O.Privileged (SYSTEM) — solo 9 operaciones tipadas:
-   ApplyOptimization / RevertOptimization / DetectOptimization / VerifyOptimization / CaptureSnapshot / Ping / GetServiceStatus / SetDns / SetTimerResolution
+CA-O.Privileged (SYSTEM) — 17 operaciones tipadas:
+   ApplyOptimization / RevertOptimization / DetectOptimization / VerifyOptimization / CaptureSnapshot / Ping / GetServiceStatus / SetDns / SetTimerResolution / FixDriver / InstallDriver / RemovePhantomDevices / SearchDriverUpdates / InstallDriverUpdates / ExportDriver / SearchCatalogDrivers / DownloadCatalogDriver
    → Catalogo estatico CommandPolicy — UseShellExecute=false, timeout 60 s, rutas absolutas %SystemRoot%\System32
 ```
 
@@ -247,14 +247,14 @@ CA-O.Privileged (SYSTEM) — solo 9 operaciones tipadas:
 | Superficie | Control | Detalle |
 |---|---|---|
 | **Canal privilegiado v2** | Named Pipe ACL + impersonation | `NamedPipeServerStreamAcl.Create(PipeName, Byte, 1, ACL)`. `GetCallerIdentity()` vía `RunAsClient()` + `WindowsCallerInspector` (SID, nombre, `SessionId`, `IsElevated`, `IsInRole(Administrators)`). `P1-8` probado |
-| **Validación request** | `IpcRequestValidator` (§10) | `ProtocolVersion==2` (CAO-IPC-001), `RequestId!=Empty`, `Nonce` 1..128 sin control chars, `CreatedAtUtc` ±30 s / +1 min futuro (CAO-IPC-003), `Operation` enum, `Payload` polimórfico exacto, `OptimizationId` regex `[a-z0-9-]{1,80}`, tamaño ≤64 KB request / ≤256 KB response |
+| **Validación request** | `IpcRequestValidator` (§10) | `ProtocolVersion==2` (CAO-IPC-001), `RequestId!=Empty`, `Nonce` 16..128 sin control chars, `CreatedAtUtc` ±30 s / +1 min futuro (CAO-IPC-003), `Operation` enum, `Payload` polimórfico exacto, `OptimizationId` regex `[a-z0-9-]{1,80}`, tamaño ≤64 KB request / ≤256 KB response |
 | **Health sin OptimizationId** | `Ping` / `GetServiceStatus` (§10) | No usan optimización real como ping. Devuelven `ServiceVersion, ProtocolVersion, ProcessId, IsSystem, Status, Capabilities` |
-| **Anti-replay** | `ReplayCache` | `RequestId+Nonce` single-use por vida de servicio, `MaxAge 30 s`, reloj inyectable. `CAO-IPC-004` si repetido |
+| **Anti-replay** | `ReplayCache` | `RequestId+Nonce` single-use con TTL y capacidad acotada (aceptación atómica bajo lock), `MaxAge 30 s`, reloj inyectable. `CAO-IPC-004` si repetido |
 | **Autorización** | `AdministratorsOnlyAuthorizer` (FASE 2 + SessionId) | Permitido: token elevado + `IsInRole(Administrators)` o SID en lista. Denegado: estándar `CAO-SEC-005`, filtrado sin elevación `CAO-SEC-003`, SID inválido `CAO-SEC-004`. Auditoría `requestedBy SID/Name → executedBy SYSTEM` |
 | **Protocolo tipado v2** | `IpcProtocol.Version=2` | Envelope versionado, `RequestId` GUID, nonce alfanumérico, `CreatedAtUtc` 30 s. Errores estructurados `CAO-XXX-nnn` |
 | **Gateway ejecución** | `IPrivilegedCommandExecutor → CommandPolicy.Resolve` | Rutas absolutas `%SystemRoot%` (anti PATH-hijacking), tokens exactos sin metacaracteres (anti `& | ; < > " ' % ^ \n`), sin shell, sin `PATH` lookup. Desviación → `CAO-SEC-010` |
 | **Comandos permitidos** | `SystemCommandKey` (32 claves) | `powercfg`, `bcdedit`, `netsh`, `ipconfig`, `defrag`, `wpr`, `logman` con patrones de argumentos cerrados. `bcdedit` nunca por runner genérico |
-| **Allowlist operaciones** | Solo 7 | `Apply/Revert/Detect/Verify/CaptureSnapshot/Ping/GetServiceStatus`. No existe "ejecutar comando" |
+| **Allowlist operaciones** | Solo 17 tipadas | `Apply/Revert/Detect/Verify/CaptureSnapshot/Ping/GetServiceStatus/SetDns/SetTimerResolution/FixDriver/InstallDriver/RemovePhantomDevices/SearchDriverUpdates/InstallDriverUpdates/ExportDriver/SearchCatalogDrivers/DownloadCatalogDriver`. No existe "ejecutar comando" |
 | **Timeout** | 15 s por conexión, 60 s por comando, 10 s UI | `PrivilegedPipeService:27` + `SystemCommandGateway:DefaultTimeout` + `PrivilegedPipeClient:CallTimeout` |
 | **Cancelación segura** | FASE 6 | Solo antes de `SNAPSHOT`/`APPLY`; durante `APPLY` es atómica → `CancellationDeferred` |
 | **Verificación estricta** | FASE 10 | `VerificationStatus { Passed, Failed, Unknown, NotApplicable }`. `Unknown` nunca es éxito → rollback `CAO-VERIFY-002` |
@@ -269,11 +269,11 @@ Ver detalles completos en [docs/SECURITY.md](docs/SECURITY.md) y [docs/THREAT-MO
 
 ---
 
-## Catálogo completo de optimizaciones (75)
+## Catálogo completo de optimizaciones (88)
 
 > **Calidad sobre cantidad.** Cada entrada responde *qué cambia*, *por qué*, *con qué evidencia*, *qué riesgo/seguridad afecta*, *si es reversible* y *cómo se verifica*. Todas implementan `IOptimization` (`Definition` + `Detect` + `Capture` + `ApplyAsync` + `RevertAsync` + `PreviewAsync` + `VerifyAsync` cuando aplica).
 
-### Tabla maestra (75) — `OptimizationCatalog.All`
+### Tabla maestra (88) — `OptimizationCatalog.All` (+ 2 legacy retiradas: `optimize-hdd-media-aware`, `set-best-performance-ac`)
 
 | # | Id | Categoría | Impacto | Evidencia | Riesgo | Compat. | Reversible | Flags | Qué hace |
 |---|---|---|---|---|---|---|---|---|---|
@@ -352,12 +352,27 @@ Ver detalles completos en [docs/SECURITY.md](docs/SECURITY.md) y [docs/THREAT-MO
 | 71 | `clear-icon-thumbnail-cache` | Troubleshoot | Tiny | Official | Low | Compatible | ❌ | NotReversible | iconcache/thumbcache por perfil |
 | 72 | `repair-windows-update` | Troubleshoot | Small | Official | Moderate | Compatible | ✅ | — | Renombra SoftwareDistribution/Catroot2 |
 | 73 | `resync-system-clock` | Troubleshoot | Tiny | Official | Low | Compatible | ❌ | NotReversible | w32tm /resync |
+| 74 | `disable-dynamic-tick` | Performance | Tiny | Official | Low | Compatible | ✅ | — | `bcdedit /set disabledynamictick yes` (tick dinámico off, latencia estable) |
+| 75 | `disable-pointer-precision` | Gaming | Tiny | Empirical | Safe | Compatible | ✅ | — | Precisión de puntero off (1:1 para shooters) |
+| 76 | `mouse-driver-queue-trim` | Gaming | Small | Vendor | Low | Compatible | ✅ | — | Recorta la cola del driver del ratón (menos input lag) |
+| 77 | `mmcss-system-responsiveness` | Gaming | Small | Official | Low | Compatible | ✅ | — | `SystemResponsiveness=0` (prioriza el juego sobre el fondo) |
+| 78 | `defragment-hdd-only` | Storage | None | Official | Low | Compatible | ✅ | — | Desfragmenta solo HDD mecánicos; los SSD se omiten siempre |
+| 79 | `cleanup-windows-update-cache` | Storage | Small | Official | Low | Compatible | ✅ | — | Limpia la caché de Windows Update |
+| 80 | `cleanup-app-caches` | Storage | Small | Official | Low | Compatible | ✅ | — | Cachés de Discord/Spotify/Slack (nunca sesiones ni descargas) |
+| 81 | `disable-nagle-tcp-acks` | Network | Small | Official | Low | Conditional | ✅ | — | Desactiva Nagle + delayed ACKs (menos latencia TCP) |
+| 82 | `disable-wifi-background-scan` | Network | Tiny | Official | Low | Compatible | ✅ | — | Escaneos Wi-Fi en segundo plano off (menos picos de ping) |
+| 83 | `restart-print-spooler` | Troubleshoot | Small | Official | Low | Compatible | ✅ | — | Reinicia la cola de impresión |
+| 84 | `restart-bluetooth-service` | Troubleshoot | Small | Official | Low | Compatible | ✅ | — | Reinicia el servicio Bluetooth |
+| 85 | `restart-dns-client` | Troubleshoot | Tiny | Official | Low | Compatible | ✅ | — | Reinicia el cliente DNS |
+| 86 | `restart-windows-search` | Troubleshoot | Small | Official | Low | Compatible | ✅ | — | Reinicia Windows Search |
+| 87 | `restart-windows-explorer` | Troubleshoot | Small | Official | Moderate | Compatible | ✅ | — | Reinicia el Explorador (vuelve solo) |
+| 88 | `recover-windows-explorer` | Troubleshoot | Small | Official | Low | Compatible | ✅ | — | Restaura barra y escritorio si desaparecieron |
 
 > **Nota:** `optimize-system-drive` y `windows-component-store-resetbase` son **no reversibles** (`NotReversible`) — se auditan como `VerificationStatus.NotApplicable` y no eliminan snapshot tras éxito.
 
 ### Detalle por categoría
 
-#### Performance (7)
+#### Performance (8)
 
 | Id | Clave / Registro | Verifica |
 |---|---|---|
@@ -373,9 +388,9 @@ Ver detalles completos en [docs/SECURITY.md](docs/SECURITY.md) y [docs/THREAT-MO
 
 Todas son `RegistryOptimizationBase` puras (reversión exacta). Ej. `disable-telemetry` → `HKLM\SOFTWARE\Policies\Microsoft\Windows\DataCollection\AllowTelemetry=0`.
 
-#### Gaming (11)
+#### Gaming (14)
 
-- **GameMode** (`AllowAutoGameMode=1`), **HAGS** (`HwSchMode=2`, RequiresReboot), **Windowed Optimizations** (`SwapEffectUpgradeEnable=1;`), **VRR** (si display), **GPU high perf** por juego detectado.
+- **GameMode** (`AllowAutoGameMode=1`), **HAGS** (`HwSchMode=2`, RequiresReboot), **Windowed Optimizations** (`SwapEffectUpgradeEnable=1;`), **VRR** (si display), **GPU high perf** por juego detectado, **precisión 1:1** (`disable-pointer-precision`), **cola de ratón** (`mouse-driver-queue-trim`), **MMCSS** (`mmcss-system-responsiveness`).
 - `disable-vbs` es **CRITICAL + SecurityTradeoff + ExpertOnly** y se **bloquea** con `CAO-GAME-001` si Vanguard/EAC/BattlEye presentes (validado en Core **y** Privileged).
 
 #### Power (7)
@@ -384,22 +399,23 @@ Todas son `RegistryOptimizationBase` puras (reversión exacta). Ej. `disable-tel
 - `disable-pcie-link-state-power-saving-ac` → `HKLM\SYSTEM\CurrentControlSet\Services\pci\Parameters\DisableLinkStateThrottling=1`
 - Resto: políticas de `USB selective suspend`, `Wireless max performance`, limpieza de planes huérfanos
 
-#### Storage (14)
+#### Storage (17)
 
 - `disable-hibernate` → `powercfg /h off` (libera `hiberfil.sys`)
 - `ensure-trim-enabled` / `retrim-system-ssd` / `optimize-system-drive` → `fsutil` + `defrag /O` (para desfragmentación profunda con umbral: `defragment-hdd-only`)
 - `Storage Sense` (enable + temp + recycle bin 7-90 d) → `HKCU\Software\Microsoft\Windows\CurrentVersion\StorageSense`
 - `windows-component-store-*` → `DISM` (`ResetBase` irreversible)
-- `cleanup-windows-temp` / `delivery-optimization-cache` / `disk-cleanup` → file + DO cache
+- `cleanup-windows-temp` / `delivery-optimization-cache` / `cleanup-windows-update-cache` / `cleanup-app-caches` (Discord/Spotify/Slack) / `disk-cleanup` → file + DO cache
 - `restore-system-managed-pagefile` → `HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management`
 
-#### Network (11)
+#### Network (13)
 
 - `enable-rss`, `restore-*-offload`, `configure-interrupt-moderation` → Registry `HKLM\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters` + `netsh`
 - `normalize-tcp-autotuning` → `netsh int tcp set global autotuninglevel=normal`
 - `disable-nic-power-saving-ac` → `HKLM\SYSTEM\CurrentControlSet\Control\Class\{4d36e972…}\*`
 - `flush-dns-cache` → `ipconfig /flushdns` (siempre Safe)
 - `reset-network-stack-repair` → `netsh winsock reset` + `netsh int ip reset` (RequiresReboot)
+- `disable-nagle-tcp-acks`, `disable-wifi-background-scan` → latencia TCP/Wi-Fi para gaming
 
 #### Startup (6)
 
@@ -436,7 +452,7 @@ Descarga ZIP → Descomprime → gui-installer/CA-O.InstallerGui.exe (UAC)
 
 - `App.xaml.cs` → `AppHost` DI → `AnalysisStateStore.Load()` → si existe y `fresh` (≤7 d) hidrata `UiState` (no re-analiza)
 - Usuario nuevo (sin ningún análisis): **análisis inicial obligatorio** — diálogo no descartable + navegación limitada a Panel/Analizar hasta completarlo
-- `MainWindow` (Mica) → `NavigationView` 11 páginas → `DashboardPage` muestra health, último análisis, conteo buckets, SecureBoot/VBS/HVCI, juegos, `ServiceStatus: connected/rejected` (InfoBar "Modo solo lectura" si no hay servicio)
+- `MainWindow` (Mica) → `NavigationView` 12 páginas → `DashboardPage` muestra health, último análisis, conteo buckets, SecureBoot/VBS/HVCI, juegos, `ServiceStatus: connected/unavailable/rejected` (InfoBar "Modo solo lectura" si no hay servicio)
 
 ### 3. Analizar
 
@@ -565,7 +581,7 @@ Cada perfil es **dinámico** — no es lista fija. Ej. `maximum-power-plan` solo
 
 | Página | Ruta | Qué muestra |
 |---|---|---|
-| **Panel** | `DashboardPage.xaml` | Centro: info del programa (versión, protocolo, optimizaciones), accesos a las 10 pestañas, próximo paso, servicio y avisos globales |
+| **Panel** | `DashboardPage.xaml` | Centro: info del programa (versión, protocolo, optimizaciones), accesos a las 11 pestañas, próximo paso, servicio y avisos globales |
 | **Analizar** | `AnalyzePage.xaml` | Análisis completo + salud 0-100 por dimensión, tarjetas CPU/GPU/RAM/seguridad, hallazgos con refresco, freshness, DPC sampler 5 s, DNS `Apply` si servicio |
 | **Optimizar** | `OptimizePage.xaml` | Tarjetas con bucket/evidencia/riesgo/seguridad/compat, diff Before/After, `ProgressRing` + `TxText` (`Precheck…Commit`), filtros `Todas/Recomendadas/Opcionales/Experimentales`, `Aplicar recomendadas` (batch) |
 | **Gaming** | `GamingPage.xaml` | Juegos detectados + anti-cheats + matriz `SAFE/CAUTION/BLOCKED` + guidance Reflex/Anti-Lag + contadores `bloqueadas/permitidas/en revisión` |
@@ -578,7 +594,7 @@ Cada perfil es **dinámico** — no es lista fija. Ej. `maximum-power-plan` solo
 | **Drivers** | `DriversPage.xaml` | Inventario WMI (versión/fecha/firma), conflictos con significado, corrección por dispositivo (`pnputil`: habilitar/re-detectar/reinstalar con verificación) y originales del fabricante (enlace oficial + instalación de INF) |
 | **Ajustes** | `SettingsPage.xaml` | Tema (Sistema/Claro/Oscuro), idioma (es-ES/en-US), `ExpertMode` + `InfoBar` warning, **Servicio privilegiado** con `InfoBar` explicativo + `ProgressRing` + `ServiceCheck` + `Instalar ahora` (auto-eleva, wrapper PS1, start service, verify, restart app) + `VersionsText` + `PrivilegeText`, **Actualizaciones** (chequeo en arranque + aviso en Panel, descarga con progreso y auto-instalación con `--auto-update`) |
 
-### Capturas (v2.1.28, tema oscuro)
+### Capturas (v2.1.30, tema oscuro)
 
 ![Panel — Centro de Control y Rendimiento](capturas/01-panel.png)
 
@@ -618,7 +634,7 @@ Cada perfil es **dinámico** — no es lista fija. Ej. `maximum-power-plan` solo
 - **Runtime:** .NET SDK **10.0.400** (`global.json`, `rollForward: latestFeature`). Artefactos release son **self-contained** (no requieren runtime)
 - **Dependencias:** Windows App SDK **2.4.0**, `Microsoft.WindowsAppRuntime` incluido en builds self-contained. Sin MSIX ni registro de paquete
 - **Privilegios:** instalación y ejecución requieren **cuenta de administrador con UAC habilitado**. Servicio `CAO.Privileged` corre como `LocalSystem`
-- **Hardware:** 4 GB RAM, 500 MB disco (+ 394 MB ZIP release), resolución 1280×720 mínima
+- **Hardware:** 4 GB RAM, 700 MB disco (+ 508 MB ZIP release), resolución 1280×720 mínima
 
 ---
 
@@ -626,14 +642,14 @@ Cada perfil es **dinámico** — no es lista fija. Ej. `maximum-power-plan` solo
 
 ### Opción A — Un solo exe (lo más fácil)
 
-1. Descarga [CA-O-Instalador.exe (64 MB)](https://github.com/Pyromesis/CA-O/releases/download/v2.1.28/CA-O-Instalador.exe) — es el único archivo que necesitas (firmado CA)
+1. Descarga [CA-O-Instalador.exe (64 MB)](https://github.com/Pyromesis/CA-O/releases/download/v2.1.30/CA-O-Instalador.exe) — es el único archivo que necesitas
 2. Ejecútalo (pide UAC) → asistente en español: licencia, carpeta, icono de escritorio, instala app + servicio y abre CA-O. Sin consola, sin descargas extra: lo trae todo dentro
 
 > Autocontenido (no pide .NET), log en `%TEMP%\CA-O-Setup.log`
 
 ### Opción B — Instalador GUI (offline)
 
-1. Descarga [CA-O-2.1.28-win-x64.zip (394 MB)](https://github.com/Pyromesis/CA-O/releases/download/v2.1.28/CA-O-2.1.28-win-x64.zip)
+1. Descarga [CA-O-2.1.30-win-x64.zip (508 MB)](https://github.com/Pyromesis/CA-O/releases/download/v2.1.30/CA-O-2.1.30-win-x64.zip) y verifica el hash con `CA-O-2.1.30-win-x64.zip.sha256`
 2. Descomprime (mantén `ui/`, `service/`, `gui-installer/`, `uninstall/`, `setup/`)
 3. Entra en `gui-installer/` → clic derecho **Ejecutar como administrador** en `CA-O.InstallerGui.exe` → UAC Sí
 4. Elige destino (`C:\Program Files\CA-O`), atajos Escritorio/Inicio, progress → registra `CAO.Privileged` (`demand`, `failure 86400`) + ARP
@@ -641,13 +657,12 @@ Cada perfil es **dinámico** — no es lista fija. Ej. `maximum-power-plan` solo
 
 > Log instalador: `%TEMP%\CA-O-Setup-Gui.log`
 
-### Opción C — Instalador GUI online (92 MB)
+### Opción C — Descargador online de un solo exe (135 MB)
 
-1. Descarga [CA-O-Setup-GUI-x64.zip (92 MB)](https://github.com/Pyromesis/CA-O/releases/download/v2.1.28/CA-O-Setup-GUI-x64.zip)
-2. Descomprime → `CA-O.InstallerGui.exe` como admin
-3. Si no hay payload local (`ui/`+`service/` adyacentes), descarga `CA-O-2.1.28-win-x64.zip` desde GitHub Releases (requiere internet) y continúa
+1. Descarga [CA-O.Setup.exe (135 MB)](https://github.com/Pyromesis/CA-O/releases/download/v2.1.30/CA-O.Setup.exe)
+2. Ejecútalo como admin: descarga el paquete `CA-O-2.1.30-win-x64.zip` desde GitHub Releases (requiere internet), deriva al instalador gráfico y continúa solo
 
-> El exe suelto de 295 KB fuera del ZIP **no inicia** (faltan DLLs WindowsAppSDK)
+> Log: `%TEMP%\CA-O-Setup.log`
 
 ### Opción D — Portable ZIP (sin instalador)
 
@@ -666,7 +681,7 @@ sc.exe qfailure CAO.Privileged # 86400 restart/5000/...
 
 ### Desde la app (Ajustes)
 
-`Ajustes → Servicio privilegiado` → **Instalar ahora** → ventana PowerShell elevada (wrapper `cao-install-{guid}.ps1`) → `Install → Start → Verify → Restart app` automático. El botón se oculta si `connected`; si `rejected` muestra "Haz clic en 'Instalar ahora'".
+`Ajustes → Servicio privilegiado` → **Comprobar** intenta levantar el servicio si quedó detenido tras un reinicio (`sc start`, la UI es elevada). **Instalar ahora** repara sin necesitar el repositorio: si el servicio existe pero está detenido lo arranca; si no, lo re-crea con `sc.exe` desde `C:\Program Files\CA-O\service\CA-O.Privileged.exe` (`demand` + `failure 86400`), lo inicia, verifica y reinicia la app. El wrapper temporal de `%TEMP%` se borra siempre. El botón se oculta si `connected`.
 
 ### Desinstalación
 
@@ -699,7 +714,7 @@ powershell -ExecutionPolicy Bypass -File scripts/build-release.ps1
 
 # Empaquetar
 powershell -ExecutionPolicy Bypass -File scripts/package.ps1
-# → artifacts/CA-O-2.1.28-win-x64.zip + .sha256
+# → artifacts/CA-O-2.1.30-win-x64.zip + .sha256
 
 # Endurecer ACLs de datos
 powershell -ExecutionPolicy Bypass -File scripts/harden-data-acls.ps1
@@ -713,17 +728,17 @@ powershell -ExecutionPolicy Bypass -File scripts/harden-data-acls.ps1
 
 ## Pruebas
 
-**697 pruebas en 6 suites, todas en Release:**
+**976 pruebas en 6 suites, todas en Release:**
 
 | Suite | Cubre | Cant. |
 |---|---|---|
-| `CA-O.Core.Tests` | Contratos catálogo (75), `AnalysisStateStore` (save/load/corrupt/schema), `GameCompatibility` (VBS bloqueado), `OptimizationTransaction` (snapshot/apply/verify/rollback), `RecommendationEngine`, `KnownIssueMatcher`, `HealthEngine`, 75 definiciones `IOptimization` + `FixDriver`/`InstallDriver` motor | **457** |
-| `CA-O.Security.Tests` | `IpcRequestValidator` (version/nonce/freshness/size/schema, timer, SetDns 1–2 IPs, FixDriver/InstallDriver), `ReplayCache` (30 s, single-use), `CommandPolicy` (allowlist, PATH-hijacking, injection, pnputil), `WindowsCallerInspector` (SID/SessionId/elevación), `PrivilegedIpcSecurityTests` (oversized/malformed/flood) | **118** |
+| `CA-O.Core.Tests` | Contratos catálogo (88), `AnalysisStateStore` (save/load/corrupt/schema), `GameCompatibility` (VBS bloqueado), `OptimizationTransaction` (snapshot/apply/verify/rollback), `RecommendationEngine`, `KnownIssueMatcher`, `HealthEngine`, 88 definiciones `IOptimization` + `FixDriver`/`InstallDriver` motor | **568** |
+| `CA-O.Security.Tests` | `IpcRequestValidator` (version/nonce mín. 16/freshness/size/schema, timer, SetDns 1–2 IPs, FixDriver/InstallDriver), `ReplayCache` (TTL, single-use atómico), `CommandPolicy` (allowlist, PATH-hijacking, injection, pnputil, `@` ACPI), `WindowsCallerInspector` (SID/SessionId/elevación), `PrivilegedIpcSecurityTests` (oversized/malformed/flood) | **236** |
 | `CA-O.Integration.Tests` | `E2EFlowsTests` 10 flujos (Abrir→Analizar→Persistir→Vanguard→Restore→Benchmark→History→Cancel→Recovery), `TransactionJournalRecovery` (Incomplete→RollbackRequired), `ArchitectureDependencyTests` | **48** |
-| `CA-O.Infrastructure.Tests` | `HistoryRobustness` (líneas malformadas), `SnapshotRepository` (TX identity), `SystemContextCache` dual-TTL, `DnsBenchmark` | **17** |
+| `CA-O.Infrastructure.Tests` | `HistoryRobustness` (líneas malformadas), `SnapshotRepository` (TX identity), `SystemContextCache` dual-TTL, `DnsBenchmark`, `PhantomBatchValidation` (IDs reales + barrido vivo) | **48** |
 | `CA-O.Benchmark.Tests` | `SystemBenchmarkRunner` (suelo 3 %, mediana, trials) | **7** |
-| `CA-O.UI.Tests` | `ViewModelTests` (Analyze/Dashboard con `SystemAnalysisService` + `CorrelationId`), `LocalizerTests`, `AppUpdater` (extracción con progreso + Zip-Slip), `DriverConflicts`, `VendorDriverSupport`, `UnblockTree` | **50** |
-| **Total** | **Gates 1-5 `verify.ps1` + `build-release` con `gui-installer`** | **697** |
+| `CA-O.UI.Tests` | `ViewModelTests` (Analyze/Dashboard con `SystemAnalysisService` + `CorrelationId`), `LocalizerTests`, `AppUpdater` (extracción con progreso + Zip-Slip), `DriverConflicts`, `VendorDriverSupport`, `UnblockTree` | **69** |
+| **Total** | **Gates 1-5 `verify.ps1` + `build-release` con `gui-installer`** | **976** |
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts/test.ps1
@@ -733,21 +748,22 @@ dotnet test CA-O.sln -c Release
 dotnet test --filter "FullyQualifiedName~GameCompatibility"
 ```
 
-> Nota: `ArchitectureDependencyTests` (2 tests) validan `Process.Start` solo en `SystemCommandGateway` y `UI` sin `NamedPipeServerStream` — fueron pre-existentes y se mantienen como guard de capas.
+> Nota: `ArchitectureDependencyTests` validan `Process.Start` solo en `SystemCommandGateway` (+ `SettingsPage`/`DriversPage`/`ExplorerRecovery` como excepciones documentadas) y `UI` sin `NamedPipeServerStream` — guard de capas.
 
 ---
 
 ## Release y verificación
 
-- **Versión actual:** **2.1.28** — [Releases](https://github.com/Pyromesis/CA-O/releases/tag/v2.1.28)
+- **Versión actual:** **2.1.30** — [Releases](https://github.com/Pyromesis/CA-O/releases/tag/v2.1.30) (solo se conserva el último release)
 - **Artefactos:**
-  - `CA-O-Setup-GUI-x64.zip` (92 MB, GUI online)
-  - `CA-O-2.1.28-win-x64.zip` (343 MB, paquete completo offline con `ui/`, `service/`, `gui-installer/`, `setup/`, `uninstall/`)
+  - `CA-O-Instalador.exe` (64 MB, asistente Inno Setup)
+  - `CA-O.Setup.exe` (135 MB, descargador single-file con handoff al GUI)
+  - `CA-O-2.1.30-win-x64.zip` (508 MB, paquete completo offline con `ui/`, `service/`, `gui-installer/`, `setup/`, `uninstall/`) + `.sha256`
 - **Manifests:** `artifacts/release/SHA256SUMS.txt` + `artifacts/sbom/bom.json` (CycloneDX 1.7, 71 paquetes) cuando `CycloneDX` instalado (`dotnet tool install --global CycloneDX`)
 - **Empaquetado:** `scripts/package.ps1` genera ZIP versionado + hash SHA-256. `scripts/build-release.ps1` publica `ui` y `service` como self-contained y `gui-installer` como self-contained **sin single-file** (requisito WinUI 3)
 
 ```powershell
-Get-FileHash artifacts/CA-O-2.1.28-win-x64.zip -Algorithm SHA256
+Get-FileHash artifacts/CA-O-2.1.30-win-x64.zip -Algorithm SHA256
 Get-Content artifacts/release/SHA256SUMS.txt
 cat artifacts/sbom/bom.json | ConvertFrom-Json | select -ExpandProperty components | measure
 ```
@@ -761,8 +777,9 @@ cat artifacts/sbom/bom.json | ConvertFrom-Json | select -ExpandProperty componen
 | Síntoma | Causa | Solución |
 |---|---|---|
 | **App no abre / no muestra ventana** | Falta WindowsAppSDK o ejecución sin admin; `XAML parsing failed` | Verifica `%LOCALAPPDATA%\CA-O\logs\cao-ui-crash.log` y `cao-installer-crash.log`. Usa ZIP completo descomprimido, **Ejecutar como administrador**. Exe suelto 295 KB fuera de carpeta no inicia. `taskkill /F /IM CA-O.UI.exe` (elevado) si cuelgue |
-| **Error 404 al instalar con GUI** | URL obsoleta (v2.0.4 y anteriores `v2.0.1/CA-O-2.0.0-…`) | Corregido v2.1.6 con fallback a `latest`. Usa `CA-O-2.1.28-win-x64.zip` offline o `CA-O-Setup-GUI-x64.zip` con internet |
-| **Servicio no disponible / `CAO-IPC-004`** | `CAO.Privileged` no instalado o detenido | `sc.exe query CAO.Privileged` → `STATE: 1 STOPPED` → `powershell -ExecutionPolicy Bypass -File scripts/install-privileged-service.ps1` (admin) → `sc.exe start CAO.Privileged`. O `Ajustes → Instalar ahora` |
+| **Error 404 al instalar con GUI** | URL obsoleta o asset movido | Usa el ZIP offline `CA-O-2.1.30-win-x64.zip` o `CA-O.Setup.exe`. Desde 2.1.30 sin downgrades a versiones antiguas |
+| **Servicio perdido tras reinicio** | `CAO.Privileged` es `DEMAND_START`: tras reiniciar queda detenido y parece ausente | Normal. Abre la app (intenta `sc start` solo) o `Ajustes → Comprobar` / `Instalar ahora` para levantarlo o re-registrarlo. Corregido en 2.1.30: ya no pide `install-privileged-service.ps1` |
+| **Servicio no disponible / `CAO-IPC-007/008`** | `CAO.Privileged` no instalado o detenido | `sc.exe query CAO.Privileged` → `STOPPED` → `sc.exe start CAO.Privileged`, o `Ajustes → Instalar ahora`. Manual (admin): `sc.exe create CAO.Privileged binPath= "\"C:\Program Files\CA-O\service\CA-O.Privileged.exe\"" start= demand` |
 | **Access is denied al `sc.exe start`** | Falta elevación | Ejecuta `cmd`/`PowerShell` como admin. `CA-O.UI` ya pide UAC; el servicio requiere `LocalSystem` |
 | **`Build Release falla CA1806`** | `MessageBoxW` HRESULT ignorado | Corregido v2.1.4 con `_ = MessageBoxW(...)` |
 | **Análisis siempre "no disponible"** | WMI bloqueado / provider timeout | Revisa `cao-ui-structured.log` (`%LOCALAPPDATA%\CA-O\logs\`) — providers con 5 s timeout marcan `Warning`, no crash |
@@ -797,7 +814,7 @@ Consulta [CONTRIBUTING.md](CONTRIBUTING.md).
 2. Tests que **fallen sin el parche** (TDD)
 3. Toda optimización nueva implementa `IOptimization` con `Definition` completa + reversibilidad exacta + `PreviewAsync`
 4. Si usa comando externo → patrón exacto en `CommandPolicy` + test en `CommandPolicyTests` (anti-inyección)
-5. `scripts/verify.ps1` en verde (5 gates + 540 tests)
+5. `scripts/verify.ps1` en verde (5 gates + 976 tests)
 6. PR con evidencia, impacto seguridad/compatibilidad, captura `OptimizePage` Before/After
 
 ---
@@ -808,4 +825,4 @@ Proyecto privado. Todos los derechos reservados. No se concede licencia de uso, 
 
 ---
 
-<p align="center"><i>CA-O 2.1.28 — Diagnóstico primero, evidencia después, transacción siempre. Sin promesas, solo hechos medibles.</i></p>
+<p align="center"><i>CA-O 2.1.30 — Diagnóstico primero, evidencia después, transacción siempre. Sin promesas, solo hechos medibles.</i></p>
