@@ -19,6 +19,7 @@ public sealed class PhantomBatchValidationTests
     [InlineData(@"SWD\WPDBUSENUM\{8f3b2c1a-0000-0000-0000-100000000000}#0000000000100000")]
     [InlineData(@"USB\VID_05AC&PID_12A8&MI_00\6&2A7B76EC&0&0000")]
     [InlineData(@"HID\VID_3151&PID_4026&MI_01&COL02\7&2A412A00&D0&0001")]
+    [InlineData(@"ACPI\GENUINEINTEL_-_INTEL64_FAMILY_6_MODEL_85_-_INTEL(R)_XEON(R)_PLATINUM_8272CL_CPU_@_2.60GHZ\1")]
     public void RealWorldIdsPassValidation(string id)
     {
         Assert.True(CommandPolicy.IsValidPnpInstanceId(id));

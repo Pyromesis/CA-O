@@ -416,7 +416,7 @@ public static partial class CommandPolicy
         !string.IsNullOrWhiteSpace(name) && name.Length <= 256 &&
         name.StartsWith('\\') && !name.Contains("..") && SafeArg().IsMatch(name);
 
-    [GeneratedRegex(@"^[A-Za-z0-9\\&_\-+#.(){}:?[\]]+$", RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"^[A-Za-z0-9\\&_\-+#.(){}:?[\]@]+$", RegexOptions.CultureInvariant)]
     private static partial Regex PnpInstanceId();
 
     /// <summary>Volumen fijo para defrag: una letra A-Z + dos puntos.</summary>
@@ -446,8 +446,8 @@ public static partial class CommandPolicy
     /// <summary>
     /// Instance ID PNP estricto (p. ej. HDAUDIO\FUNC_01&amp;VEN_10EC&amp;DEV_0283...,
     /// HID\{00001812-...}_DEV_... de Bluetooth, SWD\...\UUID:... de DLNA,
-    /// USBSTOR con _??_ e IDs Apple con [serie]).
-    /// Llaves, dos puntos, ? y corchetes son legítimos en IDs reales; siguen
+    /// USBSTOR con _??_ e IDs Apple con [serie], CPUs ACPI con @_frecuencia).
+    /// Llaves, dos puntos, ?, corchetes y @ son legítimos en IDs reales; siguen
     /// vetados espacios, comillas, ';', '|', '%', '^', '$', '`', saltos y
     /// '..'. El token viaja por ArgumentList (sin shell): aquí no hay globs
     /// (CreateProcess no expande) y pnputil trata el ID como literal.
