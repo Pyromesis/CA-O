@@ -5,6 +5,7 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 ## [2.1.31] - 2026-09-15
 
 ### Corregido
+- La app mostraba "2.1.29" en Panel/Ajustes/barra lateral aunque estuviera actualizada: `AppVersion.Semantic` estaba hardcodeado y nunca se subió con los releases 2.1.30/2.1.31. Ahora deriva siempre de `BuildConstants.ProductVersion` (un solo bump por release), con test de consistencia `AppVersionConsistencyTests` que lo impide en el futuro. El detector de updates (`AppUpdater`) ya usaba la fuente correcta, así que ahora lo mostrado y lo comprobado coinciden.
 - Pipeline de release: `build-release.ps1` ya no genera un alias `CA-O-Instalador.exe` a partir de `CA-O.Setup.exe`. Ese alias compartía nombre (pero no contenido) con el instalador Inno y provocó que el release 2.1.30 publicara el Inno viejo (2.1.28) junto al ZIP nuevo. `SetupSingleExeName` queda documentado como propiedad exclusiva del instalador Inno (`scripts/build-inno.ps1`).
 - Release 2.1.31 recompilado desde cero (UI + servicio + setup + instalador Inno) con la versión correcta en todos los artefactos; el release 2.1.30 se retira.
 

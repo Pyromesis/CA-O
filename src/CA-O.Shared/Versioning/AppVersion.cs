@@ -1,13 +1,26 @@
+using System.Runtime.Versioning;
+
 namespace CAO.Shared;
 
-/// <summary>Single source of truth for assembly/app versioning facts.</summary>
+/// <summary>
+/// Versión visible de la app (UI, servicio, snapshots, health).
+/// Deriva SIEMPRE de BuildConstants.ProductVersion: estaba hardcodeada
+/// ("2.1.29") y la UI mostraba versión vieja aunque el build estuviera al día.
+/// </summary>
+[SupportedOSPlatform("windows")]
 public static class AppVersion
 {
-    public const string Major = "2";
-    public const string Minor = "1";
-    public const string Patch = "29";
+    public static string Semantic => Constants.BuildConstants.ProductVersion;
 
-    public const string Semantic = $"{Major}.{Minor}.{Patch}";
+    public static string Major => VersionPart(0, "2");
+    public static string Minor => VersionPart(1, "1");
+    public static string Patch => VersionPart(2, "0");
+
+    private static string VersionPart(int index, string fallback)
+    {
+        var parts = Constants.BuildConstants.ProductVersion.Split('.');
+        return parts.Length > index ? parts[index] : fallback;
+    }
 
     /// <summary>Current IPC protocol version; bump on any wire-format change. Aligned with IpcProtocol.Version.</summary>
     public const int ProtocolVersion = 2;
