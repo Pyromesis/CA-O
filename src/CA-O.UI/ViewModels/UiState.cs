@@ -23,6 +23,7 @@ public sealed class UiState : ObservableObject
     private string _freshnessLabel = string.Empty;
     private string _staleReason = string.Empty;
     private string _analysisAgeLabel = string.Empty;
+    private string _mascotMood = "Idle";
 
     public SystemContext? Context
     {
@@ -140,6 +141,13 @@ public sealed class UiState : ObservableObject
     {
         get => _analysisAgeLabel;
         set => SetProperty(ref _analysisAgeLabel, value);
+    }
+
+    /// <summary>Mood actual de la mascota (Idle/Working/Celebrate/Warn/Sleep). Fuente de verdad para CaoCat.</summary>
+    public string MascotMood
+    {
+        get => _mascotMood;
+        set => SetProperty(ref _mascotMood, string.IsNullOrWhiteSpace(value) ? "Idle" : value);
     }
 
     /// <summary>
