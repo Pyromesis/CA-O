@@ -38,6 +38,7 @@
     <Page Include="SolucionarPage.xaml" />
     <Page Include="DriversPage.xaml" />
     <Page Include="SettingsPage.xaml" />
+    <Page Include="Controls\CaoCat.xaml" />
     <Page Include="Resources\DesignTokens.xaml" />
   </ItemGroup>
 
