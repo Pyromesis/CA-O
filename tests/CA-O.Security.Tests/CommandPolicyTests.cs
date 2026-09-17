@@ -29,13 +29,28 @@ public sealed class CommandPolicyTests
     [InlineData(SystemCommandKey.NetShTcpAutotuningNormal, new[] { "int", "tcp", "set", "global", "autotuninglevel=normal" }, "netsh.exe")]
     [InlineData(SystemCommandKey.DefragC, new[] { "C:", "/O" }, "defrag.exe")]
     [InlineData(SystemCommandKey.WprStartCpuFileMode, new[] { "-start", "CPU", "-filemode" }, "wpr.exe")]
-    [InlineData(SystemCommandKey.WprStopToDefaultFile, new[] { "-stop", "x.etl", "-overwrite" }, "wpr.exe")]
     [InlineData(SystemCommandKey.LogmanDeleteSession, new[] { "delete", "CAO-DPC", "-ets" }, "logman.exe")]
     [InlineData(SystemCommandKey.TaskKillExplorer, new[] { "/F", "/IM", "explorer.exe" }, "taskkill.exe")]
     public void KnownKeysResolveToCanonicalExecutable(SystemCommandKey key, string[] arguments, string tool)
     {
         var resolved = CommandPolicy.Resolve(key, arguments);
         Assert.Equal(System32(tool), resolved);
+    }
+
+    [Fact]
+    public void WprStopResolvesOnlyToCanonicalEtlPath()
+    {
+        // La única ruta aceptada es la del colector; cualquier otra (relativa,
+        // absoluta alternativa, traversal) debe resolverse a null.
+        var canonical = CommandPolicy.WprDefaultEtlPath();
+        Assert.Equal(System32("wpr.exe"), CommandPolicy.Resolve(
+            SystemCommandKey.WprStopToDefaultFile, ["-stop", canonical, "-overwrite"]));
+        Assert.Null(CommandPolicy.Resolve(
+            SystemCommandKey.WprStopToDefaultFile, ["-stop", "x.etl", "-overwrite"]));
+        Assert.Null(CommandPolicy.Resolve(
+            SystemCommandKey.WprStopToDefaultFile, ["-stop", @"C:\Windows\Temp\evil.etl", "-overwrite"]));
+        Assert.Null(CommandPolicy.Resolve(
+            SystemCommandKey.WprStopToDefaultFile, ["-stop", canonical + ".bak", "-overwrite"]));
     }
 
     [Theory]
@@ -69,5 +84,21 @@ public sealed class CommandPolicyTests
     public void BlankOrEmptyTokensResolveToNull(SystemCommandKey key, string[] arguments)
     {
         Assert.Null(CommandPolicy.Resolve(key, arguments));
+    }
+
+    [Fact]
+    public void InfPath_RejectsUnc_PreventsSmbCoercionAsSystem()
+    {
+        // UNC haría que pnputil (como SYSTEM) autenticara SMB saliente con la
+        // cuenta máquina: coerción/relay clásica. Solo unidades locales.
+        Assert.False(CommandPolicy.IsValidInfPath(@"\\attacker\share\evil.inf"));
+        Assert.False(CommandPolicy.IsValidInfPath(@"//attacker/share/evil.inf"));
+        Assert.False(CommandPolicy.IsValidInfPath(@"\\127.0.0.1\C$\x.inf"));
+    }
+
+    [Fact]
+    public void InfPath_AcceptsLocalAbsoluteInf()
+    {
+        Assert.True(CommandPolicy.IsValidInfPath(@"C:\Drivers\Oem (1)\driver.inf"));
     }
 }

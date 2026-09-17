@@ -40,7 +40,7 @@ public sealed partial class HistoryViewModel : ObservableObject
                 BuildDetail(entry),
                 $"TX: {entry.SnapshotId ?? "—"} · {entry.TimestampUtc:O}",
                 entry.Success ? "OK" : "FALLO",
-                entry.Success ? new SolidColorBrush(Colors.ForestGreen) : new SolidColorBrush(Colors.IndianRed),
+                StatusBrushFor(entry.Success),
                 $"{entry.OptimizationId} {entry.Operation} {entry.SnapshotId} {entry.Error}".ToLowerInvariant())).ToList();
             IsEmpty = Rows.Count == 0;
         }
@@ -48,7 +48,7 @@ public sealed partial class HistoryViewModel : ObservableObject
         {
             // Nunca cerrar la app (§19, §43)
             WarningMessage = $"No se pudo cargar el historial: {ex.GetType().Name} — se muestra lo recuperable.";
-            try { Rows = _history.ReadLast(200).Select(entry => new HistoryRow(entry.TimestampUtc.ToLocalTime().ToString("g"), entry.Operation, entry.OptimizationId, entry.Success, BuildDetail(entry), $"TX: {entry.SnapshotId ?? "—"}", entry.Success ? "OK" : "FALLO", new SolidColorBrush(entry.Success ? Colors.ForestGreen : Colors.IndianRed), "")).ToList(); } catch { Rows = Array.Empty<HistoryRow>(); }
+            try { Rows = _history.ReadLast(200).Select(entry => new HistoryRow(entry.TimestampUtc.ToLocalTime().ToString("g"), entry.Operation, entry.OptimizationId, entry.Success, BuildDetail(entry), $"TX: {entry.SnapshotId ?? "—"}", entry.Success ? "OK" : "FALLO", StatusBrushFor(entry.Success), "")).ToList(); } catch { Rows = Array.Empty<HistoryRow>(); }
             IsEmpty = Rows.Count == 0;
             try { App.WriteCrashLog(ex); } catch { }
         }
@@ -78,8 +78,7 @@ public sealed partial class HistoryViewModel : ObservableObject
     partial void OnFilterChanged(string value) => ApplyFilter();
     partial void OnSearchChanged(string value) => ApplyFilter();
 
-    private static string BuildDetail(HistoryEntry entry)
-    {
+    private static string BuildDetail(HistoryEntry entry) {
         var parts = new List<string>();
         if (!string.IsNullOrEmpty(entry.Precondition)) parts.Add($"precheck={entry.Precondition}");
         if (!string.IsNullOrEmpty(entry.ApplyResult)) parts.Add($"apply={entry.ApplyResult}");
@@ -88,5 +87,18 @@ public sealed partial class HistoryViewModel : ObservableObject
         if (!string.IsNullOrEmpty(entry.Error)) parts.Add($"error: {entry.Error}");
         if (!string.IsNullOrEmpty(entry.BenchmarkSummary)) parts.Add($"bench: {entry.BenchmarkSummary}");
         return string.Join(" · ", parts);
+    }
+
+    private static Brush StatusBrushFor(bool success)
+    {
+        // Respeta tema claro/oscuro y alto contraste: usa pinceles del sistema.
+        try
+        {
+            var app = Microsoft.UI.Xaml.Application.Current;
+            if (app?.Resources.TryGetValue(success ? "SystemFillColorSuccessBrush" : "SystemFillColorCriticalBrush", out var b) == true && b is Brush brush)
+                return brush;
+        }
+        catch { }
+        return new SolidColorBrush(success ? Colors.ForestGreen : Colors.IndianRed);
     }
 }

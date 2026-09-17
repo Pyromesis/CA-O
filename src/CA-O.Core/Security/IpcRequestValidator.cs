@@ -90,9 +90,9 @@ public static class IpcRequestValidator
             }
             var dnsParts = (dns.DnsIp ?? string.Empty).Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
             if (string.IsNullOrWhiteSpace(dns.InterfaceName) || dnsParts.Length == 0 || dnsParts.Length > 2 ||
-                !dnsParts.All(p => System.Net.IPAddress.TryParse(p, out _)))
+                !dnsParts.All(IsIPv4))
             {
-                error = "SetDns InterfaceName/DnsIp no valido.";
+                error = "SetDns InterfaceName/DnsIp no valido (solo IPv4).";
                 return false;
             }
             error = string.Empty;
@@ -106,9 +106,12 @@ public static class IpcRequestValidator
                 error = "Payload de SetTimerResolution inválido.";
                 return false;
             }
-            if (timer.Resolution100Ns is < 1000 or > 156250)
+            // Rango real del temporizador del sistema (TimerResolution.Minimum100Ns
+            // = 5000): por debajo se recortaría en silencio a 5000 y el éxito
+            // sería engañoso, así que se rechaza aquí con mensaje claro.
+            if (timer.Resolution100Ns is < 5000 or > 156250)
             {
-                error = "SetTimerResolution fuera de rango (1000..156250).";
+                error = "SetTimerResolution fuera de rango (5000..156250).";
                 return false;
             }
             error = string.Empty;
@@ -281,6 +284,14 @@ public static class IpcRequestValidator
         error = string.Empty;
         return true;
     }
+
+    /// <summary>
+    /// Solo IPv4: el ejecutor (netsh vía CommandPolicy.IsValidIp) no soporta
+    /// IPv6. Rechazar aquí evita un CAO-SEC-010 tardío tras pasar la validación.
+    /// </summary>
+    private static bool IsIPv4(string ip) =>
+        System.Net.IPAddress.TryParse(ip, out var addr) &&
+        addr.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork;
 }
 
 /// <summary>Replay guard: each RequestId and nonce is accepted exactly once.</summary>

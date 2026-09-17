@@ -2,6 +2,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using CAO.Core.Abstractions;
 using CAO.Core.Engine;
+using CAO.Core.Rollback;
+using CAO.Shared;
 using CAO.Infrastructure.Windows.Services;
 using CAO.Infrastructure.Gaming;
 using CAO.Infrastructure.Logging;
@@ -25,16 +27,35 @@ internal static class Program
             new SecurityDiagnosticsProvider(),
             new AntiCheatScanProvider()));
         builder.Services.AddSingleton<CAO.Core.Interfaces.IDnsConfigurationProvider, CAO.Infrastructure.Networking.WmiDnsConfigurationProvider>();
-        builder.Services.AddSingleton<OptimizationEngine>(services => new OptimizationEngine(
-            new RegistryAccessor(),
-            new WmiRestorePointService(),
-            new FileSnapshotStore(),
-            new JsonHistoryLogger(),
-            new ServiceManager(),
-            new CAO.Infrastructure.Windows.Execution.SystemCommandGateway(),
-            services.GetRequiredService<ISystemContextProvider>(),
-            null, null, null,
-            services.GetRequiredService<CAO.Core.Interfaces.IDnsConfigurationProvider>()));
+        // FASE 12 real: el journal y el gate de recuperación pendiente deben
+        // existir en producción, no solo en tests. El detectLive se resuelve
+        // de forma perezosa porque el motor aún no existe al registrar.
+        var journal = new FileTransactionJournal();
+        var snapshotStore = new FileSnapshotStore();
+        OptimizationEngine? engineRef = null;
+        var recovery = new CrashRecoveryService(
+            journal,
+            snapshotStore,
+            optimizationId => engineRef is null
+                ? OptimizationState.Unknown
+                : engineRef.Detect(optimizationId));
+        builder.Services.AddSingleton<ITransactionJournal>(journal);
+        builder.Services.AddSingleton(recovery);
+        builder.Services.AddSingleton<OptimizationEngine>(services =>
+        {
+            var engine = new OptimizationEngine(
+                new RegistryAccessor(),
+                new WmiRestorePointService(),
+                snapshotStore,
+                new JsonHistoryLogger(),
+                new ServiceManager(),
+                new CAO.Infrastructure.Windows.Execution.SystemCommandGateway(),
+                services.GetRequiredService<ISystemContextProvider>(),
+                journal, () => recovery.HasPendingRecovery(), null,
+                services.GetRequiredService<CAO.Core.Interfaces.IDnsConfigurationProvider>());
+            engineRef = engine;
+            return engine;
+        });
         builder.Services.AddSingleton<IPrivilegedCallerAuthorizer, AdministratorsOnlyAuthorizer>();
         builder.Services.AddHostedService<PrivilegedPipeService>();
         builder.Services.AddWindowsService(options => options.ServiceName = BuildConstants.ServiceName);

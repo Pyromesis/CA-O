@@ -15,12 +15,16 @@ public static class SnapshotComparison
 {
     /// <summary>
     /// Compares a fresh post-rollback capture against the original snapshot:
-    /// entry-by-entry existence + kind + value, both directions. Only an
-    /// ExactMatch verifies a rollback; Unknown never passes.
+    /// entry-by-entry existence + kind + value, both directions, PLUS service
+    /// start types. Only an ExactMatch verifies a rollback; Unknown never
+    /// passes. (Antes solo se miraba Registry: un cambio de servicio
+    /// revertido a medias daba falso ExactMatch y borraba el snapshot.
+    /// RawNotes se excluye a propósito: contiene marcas temporales, no estado.)
     /// </summary>
     public static SnapshotMatchLevel Compare(OptimizationSnapshot original, OptimizationSnapshot fresh)
     {
-        if (original.Registry.Count != fresh.Registry.Count)
+        if (original.Registry.Count != fresh.Registry.Count ||
+            !original.ServiceStartTypes.SequenceEqual(fresh.ServiceStartTypes, StringComparer.Ordinal))
         {
             return SnapshotMatchLevel.Mismatch;
         }

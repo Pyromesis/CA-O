@@ -227,6 +227,11 @@ public sealed partial class SettingsPage : Page
         finally { ServiceRing.IsActive = false; }
     }
 
+    private static string ScExe() =>
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "sc.exe");
+    private static string PowerShellExe() =>
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), @"WindowsPowerShell\v1.0\powershell.exe");
+
     /// <summary>
     /// Best-effort, sin lanzar: si el servicio existe pero está detenido, arrancarlo.
     /// No crea nada; la creación/reparación vive en el flujo de instalación.
@@ -235,7 +240,7 @@ public sealed partial class SettingsPage : Page
     {
         try
         {
-            using var q = Process.Start(new ProcessStartInfo("sc.exe", "query CAO.Privileged")
+            using var q = Process.Start(new ProcessStartInfo(ScExe(), "query CAO.Privileged")
             {
                 UseShellExecute = false, RedirectStandardOutput = true, CreateNoWindow = true,
             });
@@ -246,7 +251,7 @@ public sealed partial class SettingsPage : Page
             if (out1.Contains("RUNNING", StringComparison.OrdinalIgnoreCase)) return;
             try
             {
-                using var s = Process.Start(new ProcessStartInfo("sc.exe", "start CAO.Privileged")
+                using var s = Process.Start(new ProcessStartInfo(ScExe(), "start CAO.Privileged")
                 {
                     UseShellExecute = false, RedirectStandardOutput = true, CreateNoWindow = true,
                 });
@@ -261,7 +266,7 @@ public sealed partial class SettingsPage : Page
     {
         try
         {
-            using var q = Process.Start(new ProcessStartInfo("sc.exe", "query CAO.Privileged")
+            using var q = Process.Start(new ProcessStartInfo(ScExe(), "query CAO.Privileged")
             {
                 UseShellExecute = false, RedirectStandardOutput = true, CreateNoWindow = true,
             });
@@ -328,7 +333,7 @@ public sealed partial class SettingsPage : Page
 
             var startInfo = new ProcessStartInfo
             {
-                FileName = "powershell.exe",
+                FileName = PowerShellExe(),
                 Arguments = $"-NoProfile -ExecutionPolicy Bypass -File \"{wrapperScript}\"",
                 UseShellExecute = true,
                 Verb = IsAdmin() ? "" : "runas",
@@ -461,6 +466,21 @@ public sealed partial class SettingsPage : Page
             };
             if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
 
+            // La URL y el tag vienen de la API de GitHub: re-validar aquí
+            // (https + host GitHub, tag con forma de versión) antes de
+            // descargar o interpolar en una URL del navegador.
+            var downloadUrl = _uiState.LatestAssetUrl;
+            if (!IsTrustedReleaseTag(_uiState.LatestVersion))
+            {
+                UpdateDetailText.Text = "Versión remota no válida.";
+                return;
+            }
+            if (!IsTrustedDownloadUrl(downloadUrl))
+            {
+                UpdateDetailText.Text = "URL de descarga no válida (solo HTTPS de GitHub).";
+                return;
+            }
+
             if (!IsInstalledLocation())
             {
                 // Modo portable: abrir la release en el navegador para descarga manual.
@@ -486,7 +506,6 @@ public sealed partial class SettingsPage : Page
                 // Descarga fuera del hilo UI: con ConfigureAwait(false) dentro y
                 // progreso limitado, la ventana sigue respondiendo durante los
                 // varios minutos que tarda un paquete de ~400 MB.
-                var downloadUrl = _uiState.LatestAssetUrl;
                 // Sin ConfigureAwait(false): lo que sigue toca UI (TextBlock,
                 // diálogos) y debe continuar en el hilo UI. El trabajo pesado
                 // vive dentro (Task.Run + ConfigureAwait(false) internos).
@@ -506,24 +525,22 @@ public sealed partial class SettingsPage : Page
                     throw new InvalidOperationException($"Descarga incompleta ({actualBytes} de {expectedBytes} bytes). Reintenta.");
                 }
                 // Verifica hash SHA-256 contra el sidecar publicado junto al
-                // asset (detecta corrupción o sustitución en tránsito). Sin
-                // sidecar (releases antiguos) solo vale el tamaño + tu
-                // confirmación: se avisa y se sigue.
+                // asset (detecta corrupción o sustitución en tránsito).
+                // FAIL-CLOSED: sin sidecar no se instala nada (antes se
+                // seguía con "solo tamaño + aviso": un release comprometido
+                // colaba cualquier binario). Borra y manda a descarga manual.
                 UpdateDetailText.Text = "Verificando hash SHA-256...";
                 var expectedHash = await Task.Run(() => Helpers.AppUpdater.TryFetchExpectedHashAsync(downloadUrl, cts.Token), cts.Token);
-                if (!string.IsNullOrWhiteSpace(expectedHash))
+                if (string.IsNullOrWhiteSpace(expectedHash))
                 {
-                    var hashOk = await Task.Run(() => Helpers.AppUpdater.VerifyFileHash(zipPath, expectedHash), cts.Token);
-                    if (!hashOk)
-                    {
-                        try { File.Delete(zipPath); } catch { }
-                        throw new InvalidOperationException("El hash SHA-256 no coincide: descarga corrupta o manipulada. Borrada por seguridad, reintenta.");
-                    }
+                    try { File.Delete(zipPath); } catch { }
+                    throw new InvalidOperationException("Esta versión no publica hash SHA-256: no se puede verificar la descarga. Borrada por seguridad — descarga el ZIP a mano desde GitHub.");
                 }
-                else
+                var hashOk = await Task.Run(() => Helpers.AppUpdater.VerifyFileHash(zipPath, expectedHash), cts.Token);
+                if (!hashOk)
                 {
-                    UpdateDetailText.Text = "Sin hash publicado para esta versión (release antiguo): verificado solo el tamaño. Continúo bajo tu confirmación...";
-                    await Task.Delay(TimeSpan.FromSeconds(2), cts.Token);
+                    try { File.Delete(zipPath); } catch { }
+                    throw new InvalidOperationException("El hash SHA-256 no coincide: descarga corrupta o manipulada. Borrada por seguridad, reintenta.");
                 }
                 // Quita Mark-of-the-Web del ZIP para que lo extraído no lo herede
                 // (SmartScreen frenaba el instalador auto-lanzado en silencio).
@@ -558,6 +575,36 @@ public sealed partial class SettingsPage : Page
                     UpdateDetailText.Text = $"El paquete no trae instalador. Puedes ejecutarlo a mano desde: {payloadDir}";
                     return;
                 }
+                // El payload vive en un directorio escribible por el usuario:
+                // un symlink pre-plantado (payload/gui-installer -> otro sitio)
+                // redirigiría File.Exists al binario de un atacante. Exigir
+                // ruta canónica bajo payloadDir antes de confiar.
+                string canonicalInstaller;
+                try
+                {
+                    canonicalInstaller = Path.GetFullPath(installer);
+                    var payloadRoot = Path.GetFullPath(payloadDir) + Path.DirectorySeparatorChar;
+                    if (!canonicalInstaller.StartsWith(payloadRoot, StringComparison.OrdinalIgnoreCase))
+                    {
+                        UpdateDetailText.Text = "Ruta del instalador fuera del paquete (posible symlink). Abortado por seguridad.";
+                        return;
+                    }
+                }
+                catch
+                {
+                    UpdateDetailText.Text = "Ruta del instalador no válida. Abortado por seguridad.";
+                    return;
+                }
+                // El instalador se lanza elevado: exigir firma Authenticode
+                // válida ANTES del UAC. Sin firma (release comprometido o
+                // binario sustituido en %TEMP%) no se ejecuta nada.
+                UpdateDetailText.Text = "Verificando firma del instalador...";
+                var signatureOk = await Task.Run(() => Helpers.AppUpdater.HasValidAuthenticodeSignature(canonicalInstaller), cts.Token);
+                if (!signatureOk)
+                {
+                    UpdateDetailText.Text = $"El instalador no tiene firma Authenticode válida y no se ejecutará. Descarga el instalador a mano desde GitHub y verifica su hash: {canonicalInstaller}";
+                    return;
+                }
 
                 // Handoff con confirmación: antes la app se cerraba sola y si
                 // el instalador no aparecía (UAC cancelado, crash) el usuario
@@ -568,21 +615,21 @@ public sealed partial class SettingsPage : Page
                 Process? installerProcess;
                 try
                 {
-                    installerProcess = Process.Start(new ProcessStartInfo(installer)
+                    installerProcess = Process.Start(new ProcessStartInfo(canonicalInstaller)
                     {
                         UseShellExecute = true,
                         Arguments = $"--auto-update --payload-dir=\"{payloadDir}\"",
-                        WorkingDirectory = Path.GetDirectoryName(installer)!,
+                        WorkingDirectory = Path.GetDirectoryName(canonicalInstaller)!,
                     });
                 }
                 catch (Exception startEx)
                 {
-                    UpdateDetailText.Text = $"No se pudo abrir el instalador ({startEx.Message}). Ejecútalo a mano desde: {installer}";
+                    UpdateDetailText.Text = $"No se pudo abrir el instalador ({startEx.Message}). Ejecútalo a mano desde: {canonicalInstaller}";
                     return;
                 }
                 if (installerProcess is null)
                 {
-                    UpdateDetailText.Text = $"El instalador no arrancó. Ejecútalo a mano desde: {installer}";
+                    UpdateDetailText.Text = $"El instalador no arrancó. Ejecútalo a mano desde: {canonicalInstaller}";
                     return;
                 }
                 // Liveness REAL: no basta con que el proceso viva (atascado tras
@@ -606,12 +653,12 @@ public sealed partial class SettingsPage : Page
                 {
                     int code;
                     try { code = installerProcess.ExitCode; } catch { code = -1; }
-                    UpdateDetailText.Text = $"El instalador se cerró solo (código {code}) y no aplicó nada. Revisa el log: {installerLog} — o ejecútalo a mano desde: {installer}";
+                    UpdateDetailText.Text = $"El instalador se cerró solo (código {code}) y no aplicó nada. Revisa el log: {installerLog} — o ejecútalo a mano desde: {canonicalInstaller}";
                     return;
                 }
                 if (!hasWindow)
                 {
-                    UpdateDetailText.Text = $"El instalador arrancó pero no muestra ventana (¿lo frenó SmartScreen? Busca su aviso y acepta). Si no aparece, ejecútalo a mano desde: {installer} — log: {installerLog}";
+                    UpdateDetailText.Text = $"El instalador arrancó pero no muestra ventana (¿lo frenó SmartScreen? Busca su aviso y acepta). Si no aparece, ejecútalo a mano desde: {canonicalInstaller} — log: {installerLog}";
                     return;
                 }
                 var handoff = new ContentDialog
@@ -657,6 +704,30 @@ public sealed partial class SettingsPage : Page
         catch { return true; }
     }
 
+    /// <summary>
+    /// Tag de release confiable: forma de versión (v2.1.32, 2.1.32, con
+    /// opcional sufijo). Se interpola en URLs y nombres de archivo: cualquier
+    /// otra forma se rechaza antes de usarse.
+    /// </summary>
+    private static bool IsTrustedReleaseTag(string? tag) =>
+        !string.IsNullOrWhiteSpace(tag) &&
+        System.Text.RegularExpressions.Regex.IsMatch(
+            tag.Trim(), @"^v?\d+\.\d+\.\d+([-.+][0-9A-Za-z.\-]+)?$");
+
+    /// <summary>
+    /// URL de descarga confiable: solo HTTPS servido por GitHub (la URL del
+    /// asset puede redirigir a objetos de githubusercontent). Todo lo demás
+    /// (http, hosts ajenos) se rechaza antes de descargar.
+    /// </summary>
+    private static bool IsTrustedDownloadUrl(string? url)
+    {
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri)) return false;
+        if (!uri.Scheme.Equals("https", StringComparison.OrdinalIgnoreCase)) return false;
+        return uri.Host.Equals("github.com", StringComparison.OrdinalIgnoreCase) ||
+               uri.Host.Equals("githubusercontent.com", StringComparison.OrdinalIgnoreCase) ||
+               uri.Host.EndsWith(".githubusercontent.com", StringComparison.OrdinalIgnoreCase);
+    }
+
     private async Task<string?> CreateInstallWrapperScriptAsync()
     {
         try
@@ -673,8 +744,6 @@ public sealed partial class SettingsPage : Page
                 // Escapar comilla simple PS: ' -> '' para evitar inyección.
                 var repoEsc = (repoPath ?? "").Replace("'", "''");
                 var scriptEsc = script.Replace("'", "''");
-
-                var tempScript = Path.Combine(Path.GetTempPath(), $"cao-install-{Guid.NewGuid()}.ps1");
 
                 var wrapperContent = @$"
 $ErrorActionPreference = 'Stop'
@@ -716,8 +785,9 @@ Read-Host 'Presiona Enter para continuar'
 exit 0
 ";
 
-                await File.WriteAllTextAsync(tempScript, wrapperContent);
-                return tempScript;
+                // Escritura endurecida (anti-TOCTOU): %TEMP% es escribible por
+                // cualquier proceso del usuario y el wrapper se eleva con runas.
+                return await WriteSecureWrapperAsync(wrapperContent);
             }
 
             // Caso app instalada (C:\Program Files\CA-O): no hay scripts/*.ps1.
@@ -782,7 +852,6 @@ exit 0
     /// </summary>
     private static async Task<string> CreateDirectInstallWrapperAsync(string svcExe)
     {
-        var tempScript = Path.Combine(Path.GetTempPath(), $"cao-install-{Guid.NewGuid()}.ps1");
         var version = CAO.Shared.AppVersion.Semantic;
         var svcEsc = svcExe.Replace("'", "''");
         var wrapperContent = @$"
@@ -842,8 +911,87 @@ if ($q -notmatch 'RUNNING') {{
 Read-Host 'Presiona Enter para continuar'
 exit 0
 ";
-        await File.WriteAllTextAsync(tempScript, wrapperContent);
-        return tempScript;
+        // Igual que el wrapper de repo: escritura endurecida anti-TOCTOU.
+        return await WriteSecureWrapperAsync(wrapperContent);
+    }
+
+    /// <summary>
+    /// Escribe un wrapper de instalación fuera del alcance de otros procesos
+    /// del mismo usuario: directorio bajo %ProgramData%\CA-O con herencia
+    /// cortada (solo SYSTEM + Administradores), creación exclusiva
+    /// (CreateNew: no se sobrescribe un fichero pre-plantado) y
+    /// re-lectura de verificación. Sin esto, un malware del mismo usuario
+    /// podía sustituir el .ps1 entre la escritura y el runas y heredar la
+    /// elevación UAC consentida como "CA-O".
+    /// </summary>
+    private static async Task<string> WriteSecureWrapperAsync(string content)
+    {
+        var dir = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+            "CA-O", "install-scripts");
+        Directory.CreateDirectory(dir);
+        HardenAdminOnly(dir);
+        var path = Path.Combine(dir, $"cao-install-{Guid.NewGuid():N}.ps1");
+        await using (var fs = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+        {
+            await using var writer = new StreamWriter(fs, System.Text.Encoding.UTF8);
+            await writer.WriteAsync(content);
+        }
+        HardenAdminOnly(path);
+        var roundTrip = await File.ReadAllTextAsync(path);
+        if (!roundTrip.Equals(content, StringComparison.Ordinal))
+            throw new IOException("Wrapper de instalación alterado tras escribir. Abortado por seguridad.");
+        return path;
+    }
+
+    /// <summary>
+    /// Corta la herencia y deja solo SYSTEM + Administradores (SID, funciona
+    /// en Windows no ingleses). Best-effort: si falla se intenta seguir con
+    /// el ACL por defecto (el CreateNew + verificación siguen valiendo).
+    /// </summary>
+    private static void HardenAdminOnly(string path)
+    {
+        try
+        {
+            var system = new System.Security.Principal.SecurityIdentifier(
+                System.Security.Principal.WellKnownSidType.LocalSystemSid, null);
+            var admins = new System.Security.Principal.SecurityIdentifier(
+                System.Security.Principal.WellKnownSidType.BuiltinAdministratorsSid, null);
+            if (File.Exists(path))
+            {
+                var security = new System.Security.AccessControl.FileSecurity();
+                security.SetAccessRuleProtection(isProtected: true, preserveInheritance: false);
+                security.AddAccessRule(new System.Security.AccessControl.FileSystemAccessRule(
+                    system, System.Security.AccessControl.FileSystemRights.FullControl,
+                    System.Security.AccessControl.AccessControlType.Allow));
+                security.AddAccessRule(new System.Security.AccessControl.FileSystemAccessRule(
+                    admins, System.Security.AccessControl.FileSystemRights.FullControl,
+                    System.Security.AccessControl.AccessControlType.Allow));
+                new FileInfo(path).SetAccessControl(security);
+            }
+            else
+            {
+                var security = new System.Security.AccessControl.DirectorySecurity();
+                security.SetAccessRuleProtection(isProtected: true, preserveInheritance: false);
+                security.AddAccessRule(new System.Security.AccessControl.FileSystemAccessRule(
+                    system, System.Security.AccessControl.FileSystemRights.FullControl,
+                    System.Security.AccessControl.InheritanceFlags.ContainerInherit |
+                    System.Security.AccessControl.InheritanceFlags.ObjectInherit,
+                    System.Security.AccessControl.PropagationFlags.None,
+                    System.Security.AccessControl.AccessControlType.Allow));
+                security.AddAccessRule(new System.Security.AccessControl.FileSystemAccessRule(
+                    admins, System.Security.AccessControl.FileSystemRights.FullControl,
+                    System.Security.AccessControl.InheritanceFlags.ContainerInherit |
+                    System.Security.AccessControl.InheritanceFlags.ObjectInherit,
+                    System.Security.AccessControl.PropagationFlags.None,
+                    System.Security.AccessControl.AccessControlType.Allow));
+                new DirectoryInfo(path).SetAccessControl(security);
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"HardenAdminOnly falló en {path}: {ex.Message}");
+        }
     }
 
     private async Task VerifyServiceInstalledAsync()

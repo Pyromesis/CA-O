@@ -443,6 +443,7 @@ public sealed partial class OptimizePage : Page
 
         BusyRing.IsActive = true;
         TransactionProgressCard.Visibility = Visibility.Visible;
+        TxRing.IsActive = true;
         TxText.Text = operation == PrivilegedOperationKind.ApplyOptimization ? "Aplicando cambio transaccional…" : "Revirtiendo…";
         try
         {
@@ -516,6 +517,7 @@ public sealed partial class OptimizePage : Page
         finally
         {
             BusyRing.IsActive = false;
+            TxRing.IsActive = false;
             await Task.Delay(1200);
             TransactionProgressCard.Visibility = Visibility.Collapsed;
         }
@@ -577,7 +579,7 @@ public sealed partial class OptimizePage : Page
                 {
                     Text = failures.Count == 0
                         ? $"Se aplicaron y verificaron {appliedOk.Count} cambios.\nYa figuran como Activos y no se pueden volver a aplicar.\nSnapshots disponibles en Restaurar."
-                        : $"Se aplicaron {appliedOk.Count} antes del fallo y se revirtieron los reversibles.\nFallo: {string.Join("; ", failures)}",
+                        : $"Se aplicaron {appliedOk.Count} antes del fallo y el lote se DETUVO (los ya aplicados SIGUEN aplicados; revierte cada uno en Restaurar si lo necesitas).\nFallo: {string.Join("; ", failures)}",
                     TextWrapping = TextWrapping.Wrap
                 },
                 CloseButtonText = "Aceptar",

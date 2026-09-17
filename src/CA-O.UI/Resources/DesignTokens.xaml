@@ -28,6 +28,11 @@
     <Thickness x:Key="CaoPagePadding">32,24,32,32</Thickness>
     <Thickness x:Key="CaoSectionMargin">0,16,0,0</Thickness>
 
+    <!-- Ops brushes temprano: CaoStepCircleStyle los referencia vía StaticResource
+         (sin forward-reference permitida en el mismo diccionario). -->
+    <SolidColorBrush x:Key="CaoOpsCyanBrush" Color="#00C9B6"/>
+    <SolidColorBrush x:Key="CaoOpsCyanSoftBrush" Color="#00C9B6" Opacity="0.14"/>
+
     <!-- Tarjeta base: geometría Fluent (8px), capa y borde del sistema -->
     <Style x:Key="CaoCardStyle" TargetType="Border">
         <Setter Property="Background" Value="{ThemeResource CardBackgroundFillColorDefaultBrush}"/>
@@ -39,6 +44,11 @@
 
     <Style x:Key="CaoCardElevatedStyle" TargetType="Border" BasedOn="{StaticResource CaoCardStyle}">
         <Setter Property="Background" Value="{ThemeResource CardBackgroundFillColorSecondaryBrush}"/>
+        <Setter Property="Shadow">
+            <Setter.Value>
+                <ThemeShadow/>
+            </Setter.Value>
+        </Setter>
     </Style>
 
     <Style x:Key="CaoMetricCardStyle" TargetType="Border" BasedOn="{StaticResource CaoCardStyle}">
@@ -168,6 +178,11 @@
     <Style x:Key="CaoActionCardStyle" TargetType="Border" BasedOn="{StaticResource CaoCardStyle}">
         <Setter Property="Padding" Value="18,16,18,16"/>
         <Setter Property="CornerRadius" Value="8"/>
+        <Setter Property="Shadow">
+            <Setter.Value>
+                <ThemeShadow/>
+            </Setter.Value>
+        </Setter>
     </Style>
 
     <!-- Título de sección con jerarquía (izquierda, no centrado) -->
@@ -262,6 +277,20 @@
         <Setter Property="CornerRadius" Value="12"/>
         <Setter Property="MinHeight" Value="190"/>
         <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="Shadow">
+            <Setter.Value>
+                <ThemeShadow/>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Rail de acento vertical: lateral izquierdo premium para tarjetas héroe -->
+    <Style x:Key="CaoAccentRailStyle" TargetType="Border">
+        <Setter Property="Width" Value="4"/>
+        <Setter Property="CornerRadius" Value="2"/>
+        <Setter Property="HorizontalAlignment" Value="Left"/>
+        <Setter Property="VerticalAlignment" Value="Stretch"/>
+        <Setter Property="Background" Value="{StaticResource CaoAccentBarBrush}"/>
     </Style>
 
     <!-- Status Indicator Style -->
@@ -339,9 +368,15 @@
         <Setter Property="Spacing" Value="8"/>
     </Style>
 
-    <!-- Card with Hover Ready (base for transitions) -->
+    <!-- Card with hover depth (pairs with UiAnimations.CardHover for the
+         scale micro-interaction; shadow gives the lift). -->
     <Style x:Key="CaoInteractiveCardStyle" TargetType="Border" BasedOn="{StaticResource CaoCardStyle}">
         <Setter Property="Padding" Value="16"/>
+        <Setter Property="Shadow">
+            <Setter.Value>
+                <ThemeShadow/>
+            </Setter.Value>
+        </Setter>
     </Style>
 
     <!-- Section Container for grouped content -->
@@ -434,9 +469,8 @@
 
     <!-- ============ Ops-console (centro de control) ============ -->
     <!-- Cian de marca para superficies clave (el acento del sistema sigue
-         en controles estándar). Legible en claro y oscuro. -->
-    <SolidColorBrush x:Key="CaoOpsCyanBrush" Color="#00C9B6"/>
-    <SolidColorBrush x:Key="CaoOpsCyanSoftBrush" Color="#00C9B6" Opacity="0.14"/>
+         en controles estándar). Legible en claro y oscuro.
+         (CaoOpsCyanBrush/Soft definidos arriba por forward-reference.) -->
     <SolidColorBrush x:Key="CaoOpsGreenBrush" Color="#3DDC84"/>
     <SolidColorBrush x:Key="CaoOpsAmberBrush" Color="#FFB900"/>
     <SolidColorBrush x:Key="CaoOpsRedBrush" Color="#FF5A5A"/>

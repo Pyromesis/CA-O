@@ -45,7 +45,7 @@ function Assert-FileExists {
     param([string]$Path, [string]$Description)
     if (-not (Test-Path $Path)) {
         Write-Host "FAIL: $Description missing at $Path" -ForegroundColor Red
-        $global:failed = $true
+        $script:failed = $true
     } else {
         Write-Host "OK: $Description" -ForegroundColor Green
     }
@@ -59,7 +59,7 @@ function Assert-Gate {
         Write-Host "PASS: $Name" -ForegroundColor Green
     } catch {
         Write-Host "FAIL: $Name - $($_.Exception.Message)" -ForegroundColor Red
-        $global:failed = $true
+        $script:failed = $true
     }
     Write-Host ""
 }
@@ -100,16 +100,26 @@ Assert-Gate "E2E Flows" {
 
 # Gate 6: Packaging Integrity
 Assert-Gate "Packaging Integrity" {
-    $releaseDir = "artifacts/release"
-    Assert-FileExists (Join-Path $releaseDir "ui\$UiExecutable") "UI executable"
+    $releaseDir = Join-Path $artifactRoot ""
+    $releaseDir = $artifactRoot
+    $uiSub = "ui"; $svcSub = "service"; $unSub = "uninstall"; $guiSub = "gui-installer"; $setupSub = "setup"
+    try { $uiSub = Get-BuildConstant 'UiSubdirectory' } catch {}
+    try { $svcSub = Get-BuildConstant 'ServiceSubdirectory' } catch {}
+    try { $unSub = Get-BuildConstant 'UninstallSubdirectory' } catch {}
+    try { $guiSub = Get-BuildConstant 'GuiInstallerSubdirectory' } catch {}
+    try { $setupSub = Get-BuildConstant 'SetupSubdirectory' } catch {}
+    $guiExe = "CA-O-Setup-GUI-x64.exe"; $guiZip = "CA-O-Setup-GUI-x64.zip"
+    try { $guiExe = Get-BuildConstant 'GuiInstallerExeName' } catch {}
+    try { $guiZip = Get-BuildConstant 'GuiInstallerPackageName' } catch {}
+    Assert-FileExists (Join-Path $releaseDir "$uiSub\$UiExecutable") "UI executable"
     Assert-FileExists (Join-Path $releaseDir "ui\CA-O.UI.pri") "UI .pri"
-    Assert-FileExists (Join-Path $releaseDir "service\$ServiceExecutable") "Service executable"
-    Assert-FileExists (Join-Path $releaseDir "uninstall\$UninstallerExecutable") "Uninstaller executable"
-    Assert-FileExists (Join-Path $releaseDir "gui-installer\$GuiInstallerExecutable") "GUI Installer executable"
-    Assert-FileExists (Join-Path $releaseDir "setup\$SetupExecutable") "Console setup executable"
-    Assert-FileExists (Join-Path $releaseDir "CA-O-Setup-GUI-x64.exe") "GUI Installer standalone exe"
-    Assert-FileExists (Join-Path $releaseDir "CA-O-Setup-GUI-x64.zip") "GUI Installer zip"
-    Assert-FileExists (Join-Path $releaseDir "CA-O.Setup.exe") "Console setup standalone exe"
+    Assert-FileExists (Join-Path $releaseDir "$svcSub\$ServiceExecutable") "Service executable"
+    Assert-FileExists (Join-Path $releaseDir "$unSub\$UninstallerExecutable") "Uninstaller executable"
+    Assert-FileExists (Join-Path $releaseDir "$guiSub\$GuiInstallerExecutable") "GUI Installer executable"
+    Assert-FileExists (Join-Path $releaseDir "$setupSub\$SetupExecutable") "Console setup executable"
+    Assert-FileExists (Join-Path $releaseDir $guiExe) "GUI Installer standalone exe"
+    Assert-FileExists (Join-Path $releaseDir $guiZip) "GUI Installer zip"
+    Assert-FileExists (Join-Path $releaseDir $SetupExecutable) "Console setup standalone exe"
     
     # Verify NO root uninstall files
     if (Test-Path (Join-Path $releaseDir "uninstall.exe")) { throw "uninstall.exe found in root - must only be in uninstall\" }
@@ -121,7 +131,7 @@ Assert-Gate "Packaging Integrity" {
 Assert-Gate "SHA256 Manifest" {
     $manifest = Join-Path $artifactRoot $Sha256ManifestName
     if (-not (Test-Path $manifest)) { throw "SHA256SUMS.txt missing" }
-    $content = Get-Content $manifest
+    $content = Get-Content $manifest -Raw
     $lines = $content -split "`r?`n" | Where-Object { $_ -match '\S' }
     foreach ($line in $lines) {
         $parts = $line -split '\s+', 2
@@ -141,7 +151,7 @@ Assert-Gate "SHA256 Manifest" {
 Assert-Gate "SBOM CycloneDX" {
     $sbomPath = Join-Path $sbomDir $SbomFileName
     if (-not (Test-Path $sbomPath)) { throw "SBOM (bom.json) missing" }
-    $sbom = Get-Content $sbomPath | ConvertFrom-Json
+    $sbom = Get-Content $sbomPath -Raw | ConvertFrom-Json
     if (-not $sbom.bomFormat -or $sbom.bomFormat -ne 'CycloneDX') { throw "Invalid SBOM format" }
     if (-not $sbom.specVersion) { throw "SBOM missing specVersion" }
     if (-not $sbom.components) { throw "SBOM missing components" }
@@ -151,9 +161,9 @@ Assert-Gate "SBOM CycloneDX" {
 # Gate 9: Version Consistency
 Assert-Gate "Version Consistency" {
     $expected = $ProductVersion
-    $buildProps = Get-Content "Directory.Build.props" -Raw
+    $buildProps = Get-Content (Join-Path $repoRoot "Directory.Build.props") -Raw
     if ($buildProps -notmatch "<Version>$expected</Version>") { throw "Directory.Build.props version mismatch" }
-    $constants = Get-Content "src\CA-O.Shared\Constants\BuildConstants.cs" -Raw
+    $constants = Get-Content (Join-Path $repoRoot "src\CA-O.Shared\Constants\BuildConstants.cs") -Raw
     $pattern = 'public const string ProductVersion = "' + [regex]::Escape($expected) + '"'
     if ($constants -notmatch $pattern) { throw "BuildConstants version mismatch" }
     Write-Host "All versions consistent: $expected" -ForegroundColor Green
@@ -163,7 +173,7 @@ Assert-Gate "Version Consistency" {
 Assert-Gate "Service Name Consistency" {
     $expected = Get-BuildConstant 'ServiceName'
     $oldServiceName = 'CAO Privileged Service'
-    $files = Get-ChildItem -Recurse -Include "*.cs", "*.ps1", "*.md", "*.props" | Where-Object { $_ -notmatch '\\obj\\|\\bin\\' }
+    $files = Get-ChildItem -Path $repoRoot -Recurse -Include "*.cs", "*.ps1", "*.md", "*.props" | Where-Object { $_ -notmatch '\\obj\\|\\bin\\'}
     foreach ($file in $files) {
         $content = Get-Content $file.FullName -Raw
         if ($content -match [regex]::Escape($oldServiceName) -and $file.FullName -notmatch 'BuildConstants\.cs' -and $file.FullName -notmatch 'verify\.ps1') {
@@ -175,7 +185,7 @@ Assert-Gate "Service Name Consistency" {
 
 # Gate 11: No Hardcoded Paths
 Assert-Gate "No Developer Paths" {
-    $files = Get-ChildItem -Recurse -Include "*.cs", "*.ps1" | Where-Object { $_ -notmatch '\\obj\\|\\bin\\|\\.git\\' }
+    $files = Get-ChildItem -Path $repoRoot -Recurse -Include "*.cs", "*.ps1" | Where-Object { $_ -notmatch '\\obj\\|\\bin\\|\\.git\\' }
     foreach ($file in $files) {
         $content = Get-Content $file.FullName -Raw
         if ($content -match 'C:\\Users\\Hilo8' -or $content -match 'C:\\Users\\[^\\]+\\AppData\\Local\\Temp\\ipc_debug') {
@@ -187,7 +197,7 @@ Assert-Gate "No Developer Paths" {
 
 # Gate 12: Unknown != Success
 Assert-Gate "Unknown != Success" {
-    $files = Get-ChildItem -Recurse -Include "*.cs" | Where-Object { $_ -notmatch '\\obj\\|\\bin\\' }
+    $files = Get-ChildItem -Path $repoRoot -Recurse -Include "*.cs" | Where-Object { $_ -notmatch '\\obj\\|\\bin\\' }
     foreach ($file in $files) {
         $content = Get-Content $file.FullName -Raw
         if ($content -match 'VerificationStatus\.Unknown.*==.*true' -or $content -match '== VerificationStatus\.Unknown.*Success') {

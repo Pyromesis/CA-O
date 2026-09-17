@@ -38,7 +38,8 @@ public sealed class AntiCheatScanProvider
                 var hits = new List<string>();
                 foreach (var component in components)
                 {
-                    if (services.OpenSubKey(component) is not null)
+                    using var sub = services.OpenSubKey(component);
+                    if (sub is not null)
                     {
                         hits.Add(component);
                     }

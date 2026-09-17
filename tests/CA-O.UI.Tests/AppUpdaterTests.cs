@@ -167,6 +167,25 @@ public sealed class AppUpdaterTests
                 {
                     using var client = await _listener.AcceptTcpClientAsync(_cts.Token);
                     using var stream = client.GetStream();
+                    // Leer la petición HTTP completa antes de responder: un servidor
+                    // que escribe sin consumir el GET provoca RST en SocketsHttpHandler
+                    // (.NET 10 falla en FillForHeadersAsync con HttpRequestException
+                    // en vez de llegar al cuerpo infinito y al tope de bytes).
+                    var request = new List<byte>();
+                    var one = new byte[1];
+                    // Límite 64 KB de cabeceras: suficiente para un GET y evita
+                    // bloqueo si el cliente no completa la petición.
+                    while (request.Count < 65536 && !_cts.IsCancellationRequested)
+                    {
+                        var r = await stream.ReadAsync(one.AsMemory(0, 1), _cts.Token);
+                        if (r == 0) break;
+                        request.Add(one[0]);
+                        var n = request.Count;
+                        if (n >= 4 &&
+                            request[n - 4] == '\r' && request[n - 3] == '\n' &&
+                            request[n - 2] == '\r' && request[n - 1] == '\n')
+                            break;
+                    }
                     var header = "HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\nConnection: close\r\n\r\n";
                     var headerBytes = System.Text.Encoding.ASCII.GetBytes(header);
                     await stream.WriteAsync(headerBytes, _cts.Token);
@@ -305,6 +324,33 @@ public sealed class AppUpdaterTests
         {
             return false;
         }
+    }
+
+    [Fact]
+    public void Authenticode_UnsignedFileIsNotValid()
+    {
+        var file = Path.Combine(Path.GetTempPath(), "cao-unsigned-" + Guid.NewGuid().ToString("N") + ".exe");
+        File.WriteAllBytes(file, new byte[] { 0x4D, 0x5A, 0x00, 0x01 });
+        try
+        {
+            Assert.False(AppUpdater.HasValidAuthenticodeSignature(file));
+        }
+        finally { try { File.Delete(file); } catch { } }
+    }
+
+    [Fact]
+    public void Authenticode_MissingFileIsNotValid()
+    {
+        Assert.False(AppUpdater.HasValidAuthenticodeSignature(
+            Path.Combine(Path.GetTempPath(), "cao-nope-" + Guid.NewGuid().ToString("N") + ".exe")));
+    }
+
+    [Fact]
+    public void Authenticode_SystemBinaryIsValid()
+    {
+        // kernel32.dll lleva firma Microsoft válida en cualquier Windows real.
+        var system = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "kernel32.dll");
+        Assert.True(AppUpdater.HasValidAuthenticodeSignature(system));
     }
 
     [Fact]

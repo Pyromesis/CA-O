@@ -1,195 +1,154 @@
-# CA-O Optimization Inventory - 68 Total
+# CA-O Optimization Inventory — 88 production optimizations
 
-## Status Legend
-- **PRODUCTION** - Fully implemented with real Windows APIs, verified, tested, documented
-- **PARTIAL** - Real implementation but needs Verify robustness (marked experimental)
-- **STUB** - Only writes to HKCU\Software\CA-O\<id>, doesn't modify Windows
-- **MISSING** - Not yet implemented
+> **Estado verificado (revisado contra `OptimizationCatalog.All`):**
+> las **88** optimizaciones del catálogo están en **PRODUCTION**.
+> No queda ningún STUB. Cada una muta Windows de verdad (Registry API,
+> `powercfg`, `netsh`, `schtasks`, `defrag`, `fsutil`, `DISM`, SCM) bajo el
+> flujo transaccional `PRECHECK → SNAPSHOT → APPLY → VERIFY → COMMIT`.
+>
+> El recuento se valida automáticamente en los tests de catálogo
+> (`CA-O.Core.Tests`), por lo que este documento no puede volverse a desincronizar
+> del código sin que la CI lo detecte.
 
----
+## Status legend
 
-## Phase 1: Core Performance & Privacy (19) - Already Production/Partial
-
-| # | ID | Category | Type | Status | Implementation |
-|---|-----|----------|------|--------|----------------|
-| 1 | disable-background-apps | Performance | ConfigurationOptimization | PRODUCTION | Registry (HKCU\BackgroundAccessApplications) |
-| 2 | disable-copilot | PrivacySecurity | ConfigurationOptimization | PRODUCTION | Registry (HKCU\Policies\WindowsCopilot) |
-| 3 | disable-cortana | PrivacySecurity | ConfigurationOptimization | PRODUCTION | Registry (HKLM\Policies\Windows Search) |
-| 4 | disable-game-bar-dvr | Gaming | ConfigurationOptimization | PRODUCTION | Registry (2 keys) |
-| 5 | disable-suggestions | PrivacySecurity | ConfigurationOptimization | PRODUCTION | Registry (HKCU\ContentDeliveryManager) |
-| 6 | disable-telemetry | PrivacySecurity | ConfigurationOptimization | PRODUCTION | Registry (HKLM\Policies\DataCollection) |
-| 7 | disable-transparency | Performance | ConfigurationOptimization | PRODUCTION | Registry (HKCU\Themes\Personalize) |
-| 8 | disable-visual-effects | Performance | ConfigurationOptimization | PRODUCTION | Registry (HKCU\Explorer\VisualEffects) |
-| 9 | disable-widgets | PrivacySecurity | ConfigurationOptimization | PRODUCTION | Registry (HKLM\Policies\Dsh) |
-| 10 | enable-game-mode | Gaming | ConfigurationOptimization | PRODUCTION | Registry (HKCU\GameBar) |
-| 11 | enable-gpu-scheduling | Gaming | ConfigurationOptimization | PRODUCTION | Registry (HKLM\GraphicsDrivers) |
-| 12 | zero-menu-delay | Performance | ConfigurationOptimization | PRODUCTION | Registry (HKCU\Control Panel\Desktop) |
-| 13 | disable-onedrive-autostart | PrivacySecurity | ConfigurationOptimization | PRODUCTION | IOptimization direct (HKCU\Run) |
-| 14 | disable-search-indexing | Performance | ConfigurationOptimization | PRODUCTION | IOptimization direct (WSearch service) |
-| 15 | maximum-power-plan | Performance | ConfigurationOptimization | PRODUCTION | IOptimization direct (powercfg) |
-| 16 | disable-hibernate | Storage | ConfigurationOptimization | PARTIAL | IOptimization direct (powercfg) |
-| 17 | disable-vbs | Performance | SecuritySensitiveOptimization | PARTIAL | IOptimization direct (bcdedit) |
-| 18 | normalize-tcp-autotuning | Network | ConfigurationOptimization | PARTIAL | IOptimization direct (netsh) |
-| 19 | optimize-system-drive | Storage | MaintenanceAction | PARTIAL | IOptimization direct (defrag /O) |
+- **PRODUCTION** — Mutación real de Windows, con `Detect`/`Capture`/`ApplyAsync`/
+  `RevertAsync`/`VerifyAsync` implementados y reversibles (salvo `NotReversible`).
+- **LEGACY (retirada)** — Duplicado exacto de otra entrada. Solo existe en
+  `AllLegacy` para trazabilidad docs ↔ código. **No se aplica.**
 
 ---
 
-## Phase 2: Gaming (20-35) - 16 optimizations, ALL STUBS
-
-| # | ID | Category | Type | Status | Notes |
-|---|-----|----------|------|--------|-------|
-| 20 | enable-windowed-game-optimizations | Gaming | ConfigurationOptimization | PRODUCTION | Real implementation: HKCU\Software\Microsoft\DirectX\UserGpuPreferences\DirectXUserGlobalSettings |
-| 21 | enable-vrr | Gaming | ConfigurationOptimization | STUB | HKCU\Software\CA-O\enable-vrr |
-| 22 | set-games-high-performance-gpu | Gaming | ConfigurationOptimization | STUB | HKCU\Software\CA-O\set-games-high-performance-gpu |
-| 23 | disable-background-game-captures | Gaming | ConfigurationOptimization | STUB | HKCU\Software\CA-O\disable-background-game-captures |
-| 24 | disable-game-bar-auto-launch | Gaming | ConfigurationOptimization | STUB | HKCU\Software\CA-O\disable-game-bar-auto-launch |
-| 25 | configure-gaming-power-mode-ac | Gaming | ConfigurationOptimization | STUB | HKCU\Software\CA-O\configure-gaming-power-mode-ac |
-| 26 | restore-default-gpu-preference | Gaming | RestoreAction | STUB | HKCU\Software\CA-O\restore-default-gpu-preference |
-| 27 | enable-auto-hdr | Gaming | GamingDisplayFeature | STUB | HKCU\Software\CA-O\enable-auto-hdr |
-| 28 | gaming-display-refresh-rate-audit | Gaming | DiagnosticAction | STUB | HKCU\Software\CA-O\gaming-display-refresh-rate-audit |
-| 29 | set-best-performance-ac | Gaming | ConfigurationOptimization | STUB | HKCU\Software\CA-O\set-best-performance-ac |
-| 30 | restore-balanced-power-dc | Power | ConfigurationOptimization | STUB | HKCU\Software\CA-O\restore-balanced-power-dc |
-| 31 | disable-usb-selective-suspend-ac | Power | ConfigurationOptimization | STUB | HKCU\Software\CA-O\disable-usb-selective-suspend-ac |
-| 32 | disable-pcie-link-state-power-saving-ac | Power | ConfigurationOptimization | STUB | HKCU\Software\CA-O\disable-pcie-link-state-power-saving-ac |
-| 33 | set-wireless-adapter-max-performance-ac | Power | ConfigurationOptimization | STUB | HKCU\Software\CA-O\set-wireless-adapter-max-performance-ac |
-| 34 | restore-power-plan-after-gaming | Power | ConfigurationOptimization | STUB | HKCU\Software\CA-O\restore-power-plan-after-gaming |
-| 35 | remove-unused-custom-power-plans | Power | MaintenanceAction | STUB | HKCU\Software\CA-O\remove-unused-custom-power-plans |
-
----
-
-## Phase 3: Storage (36-48) - 13 optimizations, ALL STUBS
-
-| # | ID | Category | Type | Status | Notes |
-|---|-----|----------|------|--------|-------|
-| 36 | ensure-trim-enabled | Storage | ConfigurationOptimization | STUB | HKCU\Software\CA-O\ensure-trim-enabled |
-| 37 | retrim-system-ssd | Storage | MaintenanceAction | STUB | HKCU\Software\CA-O\retrim-system-ssd |
-| 38 | optimize-hdd-media-aware | Storage | MaintenanceAction | STUB | HKCU\Software\CA-O\optimize-hdd-media-aware |
-| 39 | enable-storage-sense | Storage | ConfigurationOptimization | STUB | HKCU\Software\CA-O\enable-storage-sense |
-| 40 | storage-sense-temp-cleanup | Storage | ConfigurationOptimization | STUB | HKCU\Software\CA-O\storage-sense-temp-cleanup |
-| 41 | storage-sense-recycle-bin-policy | Storage | ConfigurationOptimization | STUB | HKCU\Software\CA-O\storage-sense-recycle-bin-policy |
-| 42 | cleanup-windows-temp | Storage | MaintenanceAction | STUB | HKCU\Software\CA-O\cleanup-windows-temp |
-| 43 | cleanup-delivery-optimization-cache | Storage | MaintenanceAction | STUB | HKCU\Software\CA-O\cleanup-delivery-optimization-cache |
-| 44 | windows-component-store-cleanup | Storage | MaintenanceAction | STUB | HKCU\Software\CA-O\windows-component-store-cleanup |
-| 45 | windows-component-store-resetbase | Storage | ConfigurationOptimization | STUB | HKCU\Software\CA-O\windows-component-store-resetbase (IRREVERSIBLE) |
-| 46 | disk-cleanup-system-files | Storage | MaintenanceAction | STUB | HKCU\Software\CA-O\disk-cleanup-system-files |
-| 47 | free-low-storage-space | Storage | MaintenanceAction | STUB | HKCU\Software\CA-O\free-low-storage-space |
-| 48 | restore-system-managed-pagefile | Storage | ConfigurationOptimization | STUB | HKCU\Software\CA-O\restore-system-managed-pagefile |
-
----
-
-## Phase 4: Networking (49-58) - 10 optimizations, ALL STUBS
-
-| # | ID | Category | Type | Status | Notes |
-|---|-----|----------|------|--------|-------|
-| 49 | enable-rss | Network | ConfigurationOptimization | STUB | HKCU\Software\CA-O\enable-rss |
-| 50 | restore-tcp-checksum-offload | Network | ConfigurationOptimization | STUB | HKCU\Software\CA-O\restore-tcp-checksum-offload |
-| 51 | restore-udp-checksum-offload | Network | ConfigurationOptimization | STUB | HKCU\Software\CA-O\restore-udp-checksum-offload |
-| 52 | restore-large-send-offload | Network | ConfigurationOptimization | STUB | HKCU\Software\CA-O\restore-large-send-offload |
-| 53 | configure-interrupt-moderation-for-low-latency | Network | ConfigurationOptimization | STUB | HKCU\Software\CA-O\configure-interrupt-moderation-for-low-latency |
-| 54 | disable-nic-power-saving-ac | Network | ConfigurationOptimization | STUB | HKCU\Software\CA-O\disable-nic-power-saving-ac |
-| 55 | restore-windows-tcp-congestion-default | Network | ConfigurationOptimization | STUB | HKCU\Software\CA-O\restore-windows-tcp-congestion-default |
-| 56 | flush-dns-cache | Network | MaintenanceAction | STUB | HKCU\Software\CA-O\flush-dns-cache |
-| 57 | reset-network-stack-repair | Network | RepairAction | STUB | HKCU\Software\CA-O\reset-network-stack-repair |
-| 58 | delivery-optimization-bandwidth-profile | Network | ConfigurationOptimization | STUB | HKCU\Software\CA-O\delivery-optimization-bandwidth-profile |
-
----
-
-## Phase 5: Startup/Services (59-64) - 6 optimizations, ALL STUBS
-
-| # | ID | Category | Type | Status | Notes |
-|---|-----|----------|------|--------|-------|
-| 59 | disable-unnecessary-startup-apps | Startup | ConfigurationOptimization | STUB | HKCU\Software\CA-O\disable-unnecessary-startup-apps |
-| 60 | disable-heavy-startup-apps | Startup | ConfigurationOptimization | STUB | HKCU\Software\CA-O\disable-heavy-startup-apps |
-| 61 | delay-safe-third-party-service-start | Startup | ConfigurationOptimization | STUB | HKCU\Software\CA-O\delay-safe-third-party-service-start |
-| 62 | disable-selected-third-party-background-task | Startup | ConfigurationOptimization | STUB | HKCU\Software\CA-O\disable-selected-third-party-background-task |
-| 63 | restore-sysmain-default | Startup | RestoreAction | STUB | HKCU\Software\CA-O\restore-sysmain-default |
-| 64 | restore-windows-search-default | Startup | RestoreAction | STUB | HKCU\Software\CA-O\restore-windows-search-default |
-
----
-
-## Phase 6: Safety/Diagnostics (65-68) - 4 optimizations, ALL STUBS
-
-| # | ID | Category | Type | Status | Notes |
-|---|-----|----------|------|--------|-------|
-| 65 | create-restore-point-before-optimization-batch | System | SafetyInfrastructure | STUB | HKCU\Software\CA-O\create-restore-point-before-optimization-batch |
-| 66 | pending-reboot-maintenance | System | DiagnosticAction | STUB | HKCU\Software\CA-O\pending-reboot-maintenance |
-| 67 | stale-crash-dump-cleanup | System | MaintenanceAction | STUB | HKCU\Software\CA-O\stale-crash-dump-cleanup |
-| 68 | optimize-startup-recovery-state | System | DiagnosticAction | STUB | HKCU\Software\CA-O\optimize-startup-recovery-state |
-
----
-
-## Summary
+## Resumen
 
 | Status | Count |
 |--------|-------|
-| PRODUCTION | 16 |
-| PARTIAL | 4 |
-| STUB | 48 |
-| **Total** | **68** |
+| PRODUCTION | 88 |
+| LEGACY (retirada por duplicada) | 2 |
+| **STUB / falsa** | **0** |
+
+> **Nota histórica:** una versión anterior de este archivo listaba 48 entradas
+> como `STUB` ("solo escribe a `HKCU\Software\CA-O\<id>`"). Eso **ya no es
+> cierto**: aquellas entradas se implementaron de forma real y se promocionaron
+> a producción. Una búsqueda de `Software\CA-O` en `src/CA-O.Core/Optimizations`
+> devuelve un único resultado legítimo: el índice de revert de
+> `disable-selected-third-party-background-task` (la mutación real vive en el
+> Programador de tareas; la clave solo recuerda *qué* tareas reactivar).
 
 ---
 
-## Implementation Order (per spec)
+## Catálogo por categoría (88 producción)
 
-### FASE 2 — Gaming (20-35)
-1. enable-windowed-game-optimizations
-2. enable-vrr
-3. set-games-high-performance-gpu
-4. disable-background-game-captures
-5. disable-game-bar-auto-launch
-6. configure-gaming-power-mode-ac
-7. restore-default-gpu-preference
-8. enable-auto-hdr
-9. gaming-display-refresh-rate-audit
-10. set-best-performance-ac
-11. restore-balanced-power-dc
-12. disable-usb-selective-suspend-ac
-13. disable-pcie-link-state-power-saving-ac
-14. set-wireless-adapter-max-performance-ac
-15. restore-power-plan-after-gaming
-16. remove-unused-custom-power-plans
+### Performance (8)
 
-### FASE 3 — Storage (36-48)
-17. ensure-trim-enabled
-18. retrim-system-ssd
-19. optimize-hdd-media-aware
-20. enable-storage-sense
-21. storage-sense-temp-cleanup
-22. storage-sense-recycle-bin-policy
-23. cleanup-windows-temp
-24. cleanup-delivery-optimization-cache
-25. windows-component-store-cleanup
-26. windows-component-store-resetbase (IRREVERSIBLE)
-27. disk-cleanup-system-files
-28. free-low-storage-space
-29. restore-system-managed-pagefile
+| ID | Implementación real | Reversible |
+|---|---|---|
+| `disable-background-apps` | Registry `HKCU\BackgroundAccessApplications` + `GlobalUserDisabled` | ✅ |
+| `disable-visual-effects` | `VisualFXSetting=2` + ajustes avanzados | ✅ |
+| `disable-transparency` | `EnableTransparency=0` (DWM) | ✅ |
+| `zero-menu-delay` | `MenuShowDelay=0` | ✅ |
+| `disable-dynamic-tick` | `bcdedit /set disabledynamictick yes` | ✅ |
+| `disable-search-indexing` | Servicio `WSearch` (SCM) + Registry | ✅ |
+| `maximum-power-plan` | `powercfg /setactive` (GUID Alto rendimiento) | ✅ |
+| `disable-vbs` | `bcdedit /set hypervisorlaunchtype off` — **BLOCKED con Vanguard/EAC** | ✅ |
 
-### FASE 4 — Networking (49-58)
-30. enable-rss
-31. restore-tcp-checksum-offload
-32. restore-udp-checksum-offload
-33. restore-large-send-offload
-34. configure-interrupt-moderation-for-low-latency
-35. disable-nic-power-saving-ac
-36. restore-windows-tcp-congestion-default
-37. flush-dns-cache
-38. reset-network-stack-repair
-39. delivery-optimization-bandwidth-profile
+### Privacy & Security (6)
 
-### FASE 5 — Startup/Services (59-64)
-40. disable-unnecessary-startup-apps
-41. disable-heavy-startup-apps
-42. delay-safe-third-party-service-start
-43. disable-selected-third-party-background-task
-44. restore-sysmain-default
-45. restore-windows-search-default
+| ID | Implementación real | Reversible |
+|---|---|---|
+| `disable-telemetry` | `AllowTelemetry=0` (HKLM políticas) | ✅ |
+| `disable-cortana` | `AllowCortana=0` | ✅ |
+| `disable-widgets` | `TaskbarDa=0` | ✅ |
+| `disable-copilot` | HKCU+HKLM WindowsCopilot | ✅ |
+| `disable-suggestions` | `ContentDeliveryManager` | ✅ |
+| `disable-onedrive-autostart` | `Run` key | ✅ |
 
-### FASE 6 — Safety/Diagnostics (65-68)
-46. create-restore-point-before-optimization-batch
-47. pending-reboot-maintenance
-48. stale-crash-dump-cleanup
-49. optimize-startup-recovery-state
+### Gaming (14)
+
+`disable-game-bar-dvr`, `enable-gpu-scheduling` (HAGS, RequiresReboot),
+`enable-game-mode`, `disable-pointer-precision`, `mouse-driver-queue-trim`,
+`mmcss-system-responsiveness`, `enable-windowed-game-optimizations`,
+`enable-vrr` (`VRROptimizeEnable=1`), `set-games-high-performance-gpu`,
+`disable-background-game-captures`, `disable-game-bar-auto-launch`,
+`configure-gaming-power-mode-ac`, `restore-default-gpu-preference`,
+`enable-auto-hdr`, `gaming-display-refresh-rate-audit` (diagnóstico).
+
+### Power (6)
+
+`restore-balanced-power-dc`, `disable-usb-selective-suspend-ac`,
+`disable-pcie-link-state-power-saving-ac`,
+`set-wireless-adapter-max-performance-ac`, `restore-power-plan-after-gaming`,
+`remove-unused-custom-power-plans`.
+
+### Storage (17)
+
+`disable-hibernate` (`powercfg /h off`), `optimize-system-drive` (`defrag /O`,
+no reversible), `ensure-trim-enabled` (`fsutil`), `retrim-system-ssd`,
+`enable-storage-sense`, `storage-sense-temp-cleanup`,
+`storage-sense-recycle-bin-policy`, `cleanup-windows-temp`,
+`cleanup-delivery-optimization-cache`, `windows-component-store-cleanup` (DISM),
+`windows-component-store-resetbase` (DISM `/ResetBase`, **irreversible**),
+`disk-cleanup-system-files`, `free-low-storage-space`,
+`restore-system-managed-pagefile`, `defragment-hdd-only`,
+`cleanup-windows-update-cache`, `cleanup-app-caches`.
+
+### Network (13)
+
+`normalize-tcp-autotuning` (`netsh`), `enable-rss`,
+`restore-tcp-checksum-offload`, `restore-udp-checksum-offload`,
+`restore-large-send-offload`, `configure-interrupt-moderation-for-low-latency`,
+`disable-nic-power-saving-ac`, `restore-windows-tcp-congestion-default`,
+`flush-dns-cache` (`ipconfig /flushdns`), `reset-network-stack-repair`
+(`netsh winsock/tcp reset`, RequiresReboot),
+`delivery-optimization-bandwidth-profile`, `disable-nagle-tcp-acks`,
+`disable-wifi-background-scan`.
+
+### Startup (6)
+
+`disable-unnecessary-startup-apps`, `disable-heavy-startup-apps`,
+`delay-safe-third-party-service-start`, `disable-selected-third-party-background-task`
+(`schtasks /Change /DISABLE` real), `restore-sysmain-default`,
+`restore-windows-search-default`.
+
+### System / Maintenance (4)
+
+`create-restore-point-before-optimization-batch` (`SRSetRestorePoint`),
+`pending-reboot-maintenance` (diagnóstico), `stale-crash-dump-cleanup`,
+`optimize-startup-recovery-state` (diagnóstico).
+
+### Troubleshoot (14)
+
+`restart-windows-audio-services`, `disable-bluetooth-absolute-volume`,
+`fix-microphone-access`, `restart-desktop-compositor`, `clear-icon-thumbnail-cache`,
+`repair-windows-update`, `resync-system-clock` (`w32tm /resync`),
+`restart-print-spooler`, `restart-bluetooth-service`, `restart-dns-client`,
+`restart-windows-search`, `restart-windows-explorer`, `recover-windows-explorer`.
 
 ---
 
-## Next Step: Research & Implement #21 enable-vrr
+## Entradas LEGACY (2) — retiradas por duplicado exacto
+
+| ID | Duplica a |
+|---|---|
+| `optimize-hdd-media-aware` | `optimize-system-drive` (ambas `defrag C: /O`) |
+| `set-best-performance-ac` | `maximum-power-plan` (ambas plan Alto rendimiento) |
+
+Estas dos existen **solo** en `OptimizationCatalog.AllLegacy` y en
+`LegacyIds` para trazabilidad; `IsProductionId(id)` devuelve `false` y nunca se
+ofrecen al usuario.
+
+---
+
+## Cómo se garantiza que no haya optimizaciones falsas
+
+1. **Contrato `IOptimization`** — cada entrada implementa `Definition`,
+   `Detect`, `Capture`, `ApplyAsync`, `RevertAsync`, `PreviewAsync` y
+   `VerifyAsync` (cuando aplica). No hay implementación "solo escribe un marker".
+2. **Verificación en vivo** — `VerifyAsync` relee el estado real de Windows
+   después de aplicar. `Unknown` **nunca** es éxito → rollback automático.
+3. **Tests de catálogo** — `CA-O.Core.Tests` valida el recuento (88), los IDs
+   únicos y que cada `Definition` tiene evidencia y riesgo declarados.
+4. **Guard de codificación** — `EncodingConsistencyTests` asegura que los
+   strings orientados al usuario no contienen mojibake.
+5. **Allowlist de comandos** — todo comando externo pasa por `CommandPolicy`
+   (rutas absolutas `%SystemRoot%\System32`, argumentos cerrados, sin shell).

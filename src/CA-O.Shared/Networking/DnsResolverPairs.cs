@@ -60,9 +60,10 @@ public static class DnsResolverPairs
     }
 
     /// <summary>
-    /// ¿Pertenecen ambas IP al mismo proveedor? Dos IP desconocidas (p. ej.
-    /// 2000.21.200.10 y 2000.21.200.9 del mismo ISP) se consideran mismo
-    /// proveedor; una conocida + una distinta nunca lo son.
+    /// ¿Pertenecen ambas IP al mismo proveedor? Dos IP desconocidas solo
+    /// cuentan como mismo proveedor si son iguales o comparten /24 (hermanos
+    /// del mismo ISP/red local); dos ISP distintos nunca se mezclan, igual
+    /// que una conocida + una distinta nunca lo son.
     /// </summary>
     public static bool IsSameProvider(string a, string b)
     {
@@ -73,15 +74,15 @@ public static class DnsResolverPairs
             return companion.Equals(b, StringComparison.Ordinal);
         if (CompanionByIp.TryGetValue(b, out _))
             return false; // b es pública conocida pero a no es su pareja
-        return true; // ambas personalizadas/ISP: se asume misma red, no mezcla pública
+        return SameSlash24(a, b); // ambas personalizadas/ISP: solo mismo /24
     }
 
     /// <summary>
     /// Resuelve el par consistente para un primario dado.
     /// Conocido → su compañero canónico. Desconocido (ISP) → busca un hermano
-    /// en <paramref name="candidates"/> (otro DNS del sistema que no sea
-    /// público conocido, preferido mismo /24); si no hay, secundario null
-    /// (un solo DNS antes que mezclar).
+    /// en <paramref name="candidates"/> en el mismo /24 (otro DNS del sistema
+    /// que no sea público conocido); si no hay, secundario null (un solo DNS
+    /// antes que mezclar, ni siquiera dos ISP de distinta red).
     /// </summary>
     public static (string Primary, string? Secondary) ResolvePair(
         string primary,
@@ -91,21 +92,16 @@ public static class DnsResolverPairs
         var companion = GetCompanion(primary);
         if (companion != null) return (primary, companion);
 
-        // ISP / personalizado: buscar hermano en la misma red.
+        // ISP / personalizado: solo hermano en la misma red.
         if (candidates != null)
         {
-            string? sameSlash24 = null;
-            string? anyOtherCustom = null;
             foreach (var c in candidates)
             {
                 var t = c.Trim();
                 if (t.Equals(primary, StringComparison.Ordinal)) continue;
                 if (IsKnownPublic(t)) continue; // nunca mezclar ISP + público
-                anyOtherCustom ??= t;
-                if (SameSlash24(primary, t)) { sameSlash24 = t; break; }
+                if (SameSlash24(primary, t)) return (primary, t);
             }
-            var sibling = sameSlash24 ?? anyOtherCustom;
-            if (sibling != null) return (primary, sibling);
         }
         return (primary, null);
     }

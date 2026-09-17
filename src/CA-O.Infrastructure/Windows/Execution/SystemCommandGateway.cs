@@ -17,6 +17,24 @@ namespace CAO.Infrastructure.Windows.Execution;
 public sealed class SystemCommandGateway : IPrivilegedCommandExecutor
 {
     private static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(60);
+    private static readonly TimeSpan HeavyTimeout = TimeSpan.FromMinutes(20);
+    private const int MaxOutputChars = 256 * 1024;
+
+    // Operaciones que necesitan minutos (DISM/defrag): matarlas a los 60 s
+    // las dejaba a medias y podía corromper el almacén de componentes.
+    // Espejo del HeavyOptimizationIds del servicio a nivel de comando.
+    private static TimeSpan TimeoutFor(SystemCommandKey key) => key switch
+    {
+        SystemCommandKey.DismStartComponentCleanup => HeavyTimeout,
+        SystemCommandKey.DismResetBase => HeavyTimeout,
+        SystemCommandKey.DefragC => HeavyTimeout,
+        SystemCommandKey.DefragHdd => HeavyTimeout,
+        SystemCommandKey.DefragRetrim => HeavyTimeout,
+        SystemCommandKey.DefragAnalyze => HeavyTimeout,
+        SystemCommandKey.PnPUtilAddDriver => HeavyTimeout,
+        SystemCommandKey.ExpandCab => HeavyTimeout,
+        _ => DefaultTimeout,
+    };
 
     public async Task<PrivilegedCommandResult> ExecuteAsync(
         SystemCommandKey key,
@@ -45,7 +63,7 @@ public sealed class SystemCommandGateway : IPrivilegedCommandExecutor
         process.Start();
 
         using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        timeoutCts.CancelAfter(DefaultTimeout);
+        timeoutCts.CancelAfter(TimeoutFor(key));
 
         var stdoutTask = process.StandardOutput.ReadToEndAsync(timeoutCts.Token);
         var stderrTask = process.StandardError.ReadToEndAsync(timeoutCts.Token);
@@ -60,10 +78,15 @@ public sealed class SystemCommandGateway : IPrivilegedCommandExecutor
             return new PrivilegedCommandResult(-1, "", "Timed out", TimedOut: true);
         }
 
-        var stdout = await stdoutTask;
-        var stderr = await stderrTask;
+        var stdout = Truncate(await stdoutTask);
+        var stderr = Truncate(await stderrTask);
         return new PrivilegedCommandResult(process.ExitCode, stdout.Trim(), stderr.Trim(), TimedOut: false);
     }
+
+    // Cota de salida: schtasks /Query /V o pnputil /enum-devices pueden
+    // devolver MBs; sin techo, la respuesta IPC hereda el OOM.
+    private static string Truncate(string text) =>
+        text.Length <= MaxOutputChars ? text : text[..MaxOutputChars];
 
     private static void TryKill(Process process)
     {

@@ -19,13 +19,17 @@ namespace CAO.Infrastructure.Windows.SystemRegistry;
 [SupportedOSPlatform("windows")]
 public sealed class RegistryAccessor : IRegistryAccessor
 {
-    private static RegistryKey OpenBase(RegistryHive2 hive, bool writable) => hive switch
+    private static RegistryKey OpenBase(RegistryHive2 hive, bool writable, out bool owned)
     {
-        RegistryHive2.CurrentUser => OpenCurrentUser(writable),
-        _ => Registry.LocalMachine,
-    };
+        if (hive == RegistryHive2.CurrentUser) return OpenCurrentUser(writable, out owned);
+        // HKLM: handle estático Registry.LocalMachine — NUNCA disponerlo.
+        // El llamante solo dispone la subclave (OpenSubKey/CreateSubKey),
+        // nunca la base.
+        owned = false;
+        return Registry.LocalMachine;
+    }
 
-    private static RegistryKey OpenCurrentUser(bool writable)
+    private static RegistryKey OpenCurrentUser(bool writable, out bool owned)
     {
         if (OperatingSystem.IsWindows())
         {
@@ -41,6 +45,7 @@ public sealed class RegistryAccessor : IRegistryAccessor
                     | (writable ? (KeySetValue | KeyCreateSubKey) : 0);
                 if (RegOpenCurrentUser(access, out var hkey) == 0 && hkey != nint.Zero)
                 {
+                    owned = true;
                     return RegistryKey.FromHandle(new SafeRegistryHandle(hkey, ownsHandle: true));
                 }
             }
@@ -49,6 +54,8 @@ public sealed class RegistryAccessor : IRegistryAccessor
                 // Fallback al comportamiento anterior.
             }
         }
+        // Fallback: handle estático del proceso — tampoco se dispone.
+        owned = false;
         return Registry.CurrentUser;
     }
 
@@ -57,42 +64,56 @@ public sealed class RegistryAccessor : IRegistryAccessor
 
     public RegistryValueKind2 GetKind(RegistryHive2 hive, string keyPath, string valueName)
     {
-        using var baseKey = OpenBase(hive, writable: false);
-        using var key = baseKey.OpenSubKey(keyPath);
-        var kind = key?.GetValueKind(valueName);
-        return MapFromWin(kind);
+        ValidatePath(hive, keyPath, valueName);
+        var baseKey = OpenBase(hive, writable: false, out var ownsBase);
+        try
+        {
+            using var key = baseKey.OpenSubKey(keyPath);
+            var kind = key?.GetValueKind(valueName);
+            return MapFromWin(kind);
+        }
+        finally { if (ownsBase) baseKey.Dispose(); }
     }
 
     public object? GetValue(RegistryHive2 hive, string keyPath, string valueName)
     {
         ValidatePath(hive, keyPath, valueName);
-        using var baseKey = OpenBase(hive, writable: false);
-        using var key = baseKey.OpenSubKey(keyPath);
-        return key?.GetValue(valueName);
+        var baseKey = OpenBase(hive, writable: false, out var ownsBase);
+        try
+        {
+            using var key = baseKey.OpenSubKey(keyPath);
+            return key?.GetValue(valueName);
+        }
+        finally { if (ownsBase) baseKey.Dispose(); }
     }
 
     public object? GetValueRaw(RegistryHive2 hive, string keyPath, string valueName, out RegistryValueKind2 kind)
     {
-        using var baseKey = OpenBase(hive, writable: false);
-        using var key = baseKey.OpenSubKey(keyPath);
-        if (key is null)
-        {
-            kind = RegistryValueKind2.None;
-            return null;
-        }
-
+        ValidatePath(hive, keyPath, valueName);
+        var baseKey = OpenBase(hive, writable: false, out var ownsBase);
         try
         {
-            var winKind = key.GetValueKind(valueName);
-            kind = MapFromWin(winKind);
-            // DoNotExpand: REG_EXPAND_SZ must round-trip with %VARS% intact.
-            return key.GetValue(valueName, null, RegistryValueOptions.DoNotExpandEnvironmentNames);
+            using var key = baseKey.OpenSubKey(keyPath);
+            if (key is null)
+            {
+                kind = RegistryValueKind2.None;
+                return null;
+            }
+
+            try
+            {
+                var winKind = key.GetValueKind(valueName);
+                kind = MapFromWin(winKind);
+                // DoNotExpand: REG_EXPAND_SZ must round-trip with %VARS% intact.
+                return key.GetValue(valueName, null, RegistryValueOptions.DoNotExpandEnvironmentNames);
+            }
+            catch (System.IO.IOException)
+            {
+                kind = RegistryValueKind2.None;
+                return null;
+            }
         }
-        catch (System.IO.IOException)
-        {
-            kind = RegistryValueKind2.None;
-            return null;
-        }
+        finally { if (ownsBase) baseKey.Dispose(); }
     }
 
     public void SetValue(RegistryHive2 hive, string keyPath, string valueName, object value, RegistryValueKind2 kind) =>
@@ -101,9 +122,13 @@ public sealed class RegistryAccessor : IRegistryAccessor
     public void SetValueRaw(RegistryHive2 hive, string keyPath, string valueName, object value, RegistryValueKind2 kind)
     {
         ValidatePath(hive, keyPath, valueName);
-        using var baseKey = OpenBase(hive, writable: true);
-        using var key = baseKey.CreateSubKey(keyPath, writable: true)!;
-        key.SetValue(valueName, Coerce(value), MapToWin(kind));
+        var baseKey = OpenBase(hive, writable: true, out var ownsBase);
+        try
+        {
+            using var key = baseKey.CreateSubKey(keyPath, writable: true)!;
+            key.SetValue(valueName, Coerce(value), MapToWin(kind));
+        }
+        finally { if (ownsBase) baseKey.Dispose(); }
     }
 
     private static void ValidatePath(RegistryHive2 hive, string keyPath, string valueName)
@@ -119,25 +144,48 @@ public sealed class RegistryAccessor : IRegistryAccessor
 
     public bool DeleteValue(RegistryHive2 hive, string keyPath, string valueName)
     {
-        using var baseKey = OpenBase(hive, writable: true);
-        using var key = baseKey.OpenSubKey(keyPath, writable: true);
-        if (key is null || key.GetValue(valueName) is null) return false;
-        key.DeleteValue(valueName, throwOnMissingValue: false);
-        return true;
+        ValidatePath(hive, keyPath, valueName);
+        var baseKey = OpenBase(hive, writable: true, out var ownsBase);
+        try
+        {
+            using var key = baseKey.OpenSubKey(keyPath, writable: true);
+            if (key is null || key.GetValue(valueName) is null) return false;
+            key.DeleteValue(valueName, throwOnMissingValue: false);
+            return true;
+        }
+        finally { if (ownsBase) baseKey.Dispose(); }
     }
 
     public IReadOnlyList<string> GetValueNames(RegistryHive2 hive, string keyPath)
     {
-        using var baseKey = OpenBase(hive, writable: false);
-        using var key = baseKey.OpenSubKey(keyPath);
-        return key?.GetValueNames() ?? Array.Empty<string>();
+        ValidateKeyPath(hive, keyPath);
+        var baseKey = OpenBase(hive, writable: false, out var ownsBase);
+        try
+        {
+            using var key = baseKey.OpenSubKey(keyPath);
+            return key?.GetValueNames() ?? Array.Empty<string>();
+        }
+        finally { if (ownsBase) baseKey.Dispose(); }
     }
 
     public IReadOnlyList<string> GetSubKeyNames(RegistryHive2 hive, string keyPath)
     {
-        using var baseKey = OpenBase(hive, writable: false);
-        using var key = baseKey.OpenSubKey(keyPath);
-        return key?.GetSubKeyNames() ?? Array.Empty<string>();
+        ValidateKeyPath(hive, keyPath);
+        var baseKey = OpenBase(hive, writable: false, out var ownsBase);
+        try
+        {
+            using var key = baseKey.OpenSubKey(keyPath);
+            return key?.GetSubKeyNames() ?? Array.Empty<string>();
+        }
+        finally { if (ownsBase) baseKey.Dispose(); }
+    }
+
+    private static void ValidateKeyPath(RegistryHive2 hive, string keyPath)
+    {
+        if (string.IsNullOrWhiteSpace(keyPath) || keyPath.Contains("..") || keyPath.Length > 512)
+            throw new ArgumentException("Registry path inválido.", nameof(keyPath));
+        if (hive is not (RegistryHive2.CurrentUser or RegistryHive2.LocalMachine))
+            throw new UnauthorizedAccessException("Hive no permitido.");
     }
 
     private static RegistryValueKind2 MapFromWin(RegistryValueKind? kind) => kind switch

@@ -17,10 +17,16 @@ public sealed record TransactionEvent(
     [property: JsonPropertyName("bySid")] string? RequestedBySid = null,
     [property: JsonPropertyName("byName")] string? RequestedByName = null)
 {
-    /// <summary>Phases that close a transaction cleanly.</summary>
+    /// <summary>
+    /// Phases that close a transaction cleanly. CancelledBeforeApply es
+    /// terminal: la cancelación solo se admite ANTES de mutar (snapshot
+    /// eliminado, cero cambios) — dejarla como no-terminal la reportaría
+    /// como "incompleta" eternamente en el recovery.
+    /// </summary>
     public static bool IsTerminal(TransactionPhase phase) =>
         phase is TransactionPhase.Commit
               or TransactionPhase.RolledBack
               or TransactionPhase.Failed
+              or TransactionPhase.CancelledBeforeApply
               or TransactionPhase.RecoveryCompleted;
 }

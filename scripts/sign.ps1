@@ -12,14 +12,22 @@ $ErrorActionPreference = "Stop"
 
 if ([string]::IsNullOrWhiteSpace($Thumbprint)) {
     Write-Warning "CAO_SIGN_THUMBPRINT no definido: los artefactos quedan SIN firmar (build de desarrollo)."
-    exit 0
+    return
 }
 
+function Find-SigningCert([string]$tp) {
+    foreach ($store in @("Cert:\CurrentUser\My\$tp", "Cert:\LocalMachine\My\$tp")) {
+        try { $c = Get-Item $store -ErrorAction Stop; if ($c) { return $c } } catch {}
+    }
+    throw "Certificado no encontrado en CurrentUser\My ni LocalMachine\My: $tp"
+}
+
+$cert = Find-SigningCert $Thumbprint
 foreach ($file in $Files) {
     if (-not (Test-Path $file)) { throw "No existe: $file" }
-    Set-AuthenticodeSignature -FilePath $file -Certificate (Get-Item "Cert:\CurrentUser\My\$Thumbprint") -TimestampServer "http://timestamp.digicert.com" | Out-Null
+    Set-AuthenticodeSignature -FilePath $file -Certificate $cert -TimestampServer "https://timestamp.digicert.com" -HashAlgorithm SHA256 | Out-Null
     $sig = (Get-AuthenticodeSignature -FilePath $file)
     Write-Host "$file -> $($sig.Status)"
-    if ($sig.Status -ne "Valid") { exit 1 }
+    if ($sig.Status -ne "Valid") { throw "Firma inválida en $file ($($sig.Status))" }
 }
 Write-Host "Firma OK." -ForegroundColor Green

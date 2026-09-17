@@ -27,7 +27,7 @@ public abstract class RegistryOptimizationBase : IOptimization
         foreach (var target in Targets)
         {
             var current = registry.GetValue(target.Hive, target.KeyPath, target.ValueName);
-            if (!Equals(Normalize(current), Normalize(target.AppliedValue)))
+            if (!NormalizedEquals(current, target.AppliedValue))
             {
                 return OptimizationState.NotApplied;
             }
@@ -56,7 +56,12 @@ public abstract class RegistryOptimizationBase : IOptimization
     {
         foreach (var entry in snapshot.Registry)
         {
-            var hive = Enum.Parse<RegistryHive2>(entry.Hive);
+            // Snapshot corrupto (hive desconocido) no debe romper el revert
+            // con ArgumentException: se registra y se continúa con el resto.
+            if (!Enum.TryParse<RegistryHive2>(entry.Hive, out var hive))
+            {
+                continue;
+            }
             if (entry.Existed && entry.Value is not null)
             {
                 // EXACT restore (FASE 8/9): declared kind, no inference.
@@ -124,12 +129,24 @@ public abstract class RegistryOptimizationBase : IOptimization
         }
     }
 
+    private static bool NormalizedEquals(object? current, object? applied)
+    {
+        // Comparación estructural: Equals por referencia fallaría para
+        // binarios/multi-string aunque el contenido coincida.
+        if (current is byte[] currentBytes && applied is byte[] appliedBytes)
+            return currentBytes.SequenceEqual(appliedBytes);
+        if (current is string[] currentMulti && applied is string[] appliedMulti)
+            return currentMulti.SequenceEqual(appliedMulti);
+        return Equals(Normalize(current), Normalize(applied));
+    }
+
     private static object? Normalize(object? value) => value switch
     {
         int i => (long)i,
         uint u => (long)u,
         long l => l,
         string s => s,
+        bool b => b ? 1L : 0L,
         null => null,
         _ => value.ToString(),
     };

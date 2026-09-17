@@ -120,10 +120,11 @@ public sealed class CrashRecoveryService
     private bool LiveMatchesPreState(OptimizationSnapshot preState, OptimizationState live)
     {
         // A pre-state whose entries all read as NotApplied means nothing was
-        // applied yet: safe.
-        return live == OptimizationState.NotApplied || live == OptimizationState.Unknown
-            ? live != OptimizationState.AppliedByCao && live != OptimizationState.AppliedManually
-            : false;
+        // applied yet: safe. Unknown (lectura no concluyente: WMI/registry
+        // transitorio) NUNCA cuenta como coincidencia: ante la duda se
+        // revierte al pre-estado capturado (fail-safe, no SafeToIgnore).
+        if (live == OptimizationState.Unknown) return false;
+        return live == OptimizationState.NotApplied;
     }
 
     private OptimizationState SafeDetect(string optimizationId)

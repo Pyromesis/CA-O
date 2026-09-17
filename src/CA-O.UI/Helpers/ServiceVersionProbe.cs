@@ -10,13 +10,18 @@ namespace CAO.UI.Helpers;
 /// </summary>
 public static class ServiceVersionProbe
 {
+    /// <summary>
+    /// Sonda de 10 s como máximo (CancelAfter sobre token enlazado: manda la
+    /// cancelación del llamante y el techo propio, lo primero que llegue).
+    /// Corre fuera del hilo UI: no captura el contexto de sincronización.
+    /// </summary>
     public static async Task<string?> FetchAsync(PrivilegedPipeClient pipe, CancellationToken ct)
     {
         try
         {
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
             cts.CancelAfter(TimeSpan.FromSeconds(10));
-            var response = await pipe.GetServiceStatusAsync(cts.Token);
+            var response = await pipe.GetServiceStatusAsync(cts.Token).ConfigureAwait(false);
             if (response is not { Accepted: true } || string.IsNullOrWhiteSpace(response.DetailJson))
                 return null;
             using var document = JsonDocument.Parse(response.DetailJson);

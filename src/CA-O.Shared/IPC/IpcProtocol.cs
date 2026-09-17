@@ -17,7 +17,7 @@ public static class IpcProtocol
     public static readonly TimeSpan MaxAge = TimeSpan.FromSeconds(30);
 }
 
-/// <summary>The nine privileged operations; each carries exactly one typed payload.</summary>
+/// <summary>The privileged operations (allowlist); each carries exactly one typed payload.</summary>
 public enum PrivilegedOperationKind
 {
     ApplyOptimization,

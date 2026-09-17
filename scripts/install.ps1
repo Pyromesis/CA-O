@@ -65,6 +65,9 @@ if (Test-Path $artifactRoot) { Remove-Item $artifactRoot -Recurse -Force -ErrorA
 New-Item $uiOutput, $serviceOutput -ItemType Directory -Force | Out-Null
 
 Write-Host "== 1/5 Publishing Release ==" -ForegroundColor Cyan
+Write-Host "Restoring..." -ForegroundColor Gray
+dotnet restore $repoRoot\CA-O.sln
+if ($LASTEXITCODE -ne 0) { throw "Restore failed with exit code $LASTEXITCODE" }
 Write-Host "Publishing UI..." -ForegroundColor Gray
 dotnet publish $uiProject -c $Configuration -r $RuntimeIdentifier --self-contained true /p:PublishSingleFile=false /p:PublishTrimmed=false --output $uiOutput --no-restore
 if ($LASTEXITCODE -ne 0) { throw "Publish UI failed with exit code $LASTEXITCODE" }
@@ -104,7 +107,7 @@ if ($LASTEXITCODE -eq 0) {
     Start-Sleep -Seconds 2
 }
 
-& sc.exe create $svcName binPath= "`"$svcExePath`"" start= demand obj= LocalSystem DisplayName= $svcDisplayName
+& sc.exe create $svcName binPath= "`"$svcExePath`"" start= demand obj= LocalSystem DisplayName= "`"$svcDisplayName`"" description= "`"$svcDescription`""
 if ($LASTEXITCODE -ne 0) { throw "sc create failed (exit code $LASTEXITCODE)" }
 
 # Recovery policy
@@ -120,6 +123,7 @@ Write-Host 'Service verified: demand start + recovery policy OK' -ForegroundColo
 
 Write-Host "== 4/5 Hardening Data ACLs ==" -ForegroundColor Cyan
 & (Join-Path $scriptRoot 'harden-data-acls.ps1')
+if ($LASTEXITCODE -ne 0) { throw "harden-data-acls.ps1 failed (exit code $LASTEXITCODE)" }
 
 Write-Host "== 5/5 Creating Shortcuts ==" -ForegroundColor Cyan
 $sm = [Environment]::GetFolderPath('CommonStartMenu') + '\Programs\' + (Get-BuildConstant 'StartMenuFolderName')

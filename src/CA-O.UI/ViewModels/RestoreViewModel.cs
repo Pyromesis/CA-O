@@ -33,12 +33,12 @@ public sealed partial class RestoreViewModel : ObservableObject
             Snapshots = infos.Select(i => $"{i.TimestampUtc:yyyy-MM-dd HH:mm} — {i.OptimizationId} — TX:{i.TransactionId.ToString()[..8]} — {i.EntryCount} valores — build {i.WindowsBuild}").ToList();
             IsEmpty = infos.Count == 0;
         }
-        catch
+        catch (Exception ex)
         {
-            // Degradado: si falla, mostrar vacío pero no crashear (§19)
-            SnapshotInfos = Array.Empty<Infrastructure.Persistence.SnapshotRepository.SnapshotInfo>();
-            Snapshots = Array.Empty<string>();
-            IsEmpty = true;
+            // Degradado honesto: NO vaciar la lista previa ni fingir "sin
+            // snapshots" — se conserva lo último conocido y se informa el
+            // motivo en RecoveryHint para que el usuario reintente.
+            RecoveryHint = $"No se pudo leer snapshots ({ex.GetType().Name}): {ex.Message}";
         }
         RecoveryHint = _state.RecoveryCandidates.Count == 0 ? "Sin recuperaciones pendientes." : $"Recuperación requerida: {string.Join(", ", _state.RecoveryCandidates)}";
     }

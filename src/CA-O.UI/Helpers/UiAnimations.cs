@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Animation;
 
@@ -15,6 +16,8 @@ public static class UiAnimations
 {
     private static readonly TimeSpan EntranceStep = TimeSpan.FromMilliseconds(45);
     private static readonly TimeSpan EntranceDuration = TimeSpan.FromMilliseconds(380);
+    private const double HoverScale = 1.02;
+    private static readonly TimeSpan HoverDuration = TimeSpan.FromMilliseconds(150);
 
     /// <summary>Entrada en cascada para los hijos directos de un contenedor.</summary>
     public static void PlayEntrance(Panel? container)
@@ -93,5 +96,91 @@ public static class UiAnimations
             timer.Start();
         }
         catch { target.Text = finalText; }
+    }
+
+    /// <summary>
+    /// Propiedad adjunta que activa una micro-interacción de paso (escala
+    /// suave + realce) sobre cualquier FrameworkElement al pasar el puntero.
+    /// XAML: <code>Helpers:UiAnimations.CardHover="True"</code>.
+    /// Respeta ReducedMotion y reutiliza el CompositeTransform de la entrada
+    /// (no compite con PlayEntrance).
+    /// </summary>
+    public static readonly DependencyProperty CardHoverProperty =
+        DependencyProperty.RegisterAttached(
+            "CardHover", typeof(bool), typeof(UiAnimations),
+            new PropertyMetadata(false, OnCardHoverChanged));
+
+    public static bool GetCardHover(DependencyObject obj) =>
+        (bool)obj.GetValue(CardHoverProperty);
+
+    public static void SetCardHover(DependencyObject obj, bool value) =>
+        obj.SetValue(CardHoverProperty, value);
+
+    private static void OnCardHoverChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    {
+        if (d is not FrameworkElement el) return;
+        var enable = (bool)e.NewValue;
+        if (enable)
+        {
+            el.PointerEntered += OnCardPointerEntered;
+            el.PointerExited += OnCardPointerExited;
+            el.PointerCanceled += OnCardPointerExited;
+        }
+        else
+        {
+            el.PointerEntered -= OnCardPointerEntered;
+            el.PointerExited -= OnCardPointerExited;
+            el.PointerCanceled -= OnCardPointerExited;
+        }
+    }
+
+    private static void OnCardPointerEntered(object sender, PointerRoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement el) return;
+        if (!Accessibility.ReducedMotion.ShouldAnimate) return;
+        EnsureScaleTransform(el);
+        AnimateScale(el, HoverScale);
+    }
+
+    private static void OnCardPointerExited(object sender, PointerRoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement el) return;
+        EnsureScaleTransform(el);
+        AnimateScale(el, 1.0);
+    }
+
+    /// <summary>
+    /// Garantiza un CompositeTransform centrado reutilizable (si PlayEntrance
+    /// ya puso uno, se conserva para no cortar su animación de traslación).
+    /// </summary>
+    private static void EnsureScaleTransform(FrameworkElement el)
+    {
+        if (el.RenderTransform is not CompositeTransform)
+            el.RenderTransform = new CompositeTransform();
+        el.RenderTransformOrigin = new Windows.Foundation.Point(0.5, 0.5);
+    }
+
+    private static void AnimateScale(FrameworkElement el, double to)
+    {
+        try
+        {
+            if (el.RenderTransform is not CompositeTransform ct) return;
+            var board = new Storyboard();
+            var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
+            foreach (var path in new[] { "ScaleX", "ScaleY" })
+            {
+                var anim = new DoubleAnimation
+                {
+                    To = to,
+                    Duration = HoverDuration,
+                    EasingFunction = ease,
+                };
+                Storyboard.SetTarget(anim, ct);
+                Storyboard.SetTargetProperty(anim, path);
+                board.Children.Add(anim);
+            }
+            board.Begin();
+        }
+        catch (Exception ex) { Debug.WriteLine($"AnimateScale failed: {ex.Message}"); }
     }
 }

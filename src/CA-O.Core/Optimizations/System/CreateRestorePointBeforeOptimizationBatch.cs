@@ -37,35 +37,47 @@ public sealed class CreateRestorePointBeforeOptimizationBatch : IOptimization
         return snapshot;
     }
 
-    public Task<OperationResult> ApplyAsync(OptimizationContext context, CancellationToken ct = default)
+    public async Task<OperationResult> ApplyAsync(OptimizationContext context, CancellationToken ct = default)
     {
         try
         {
-            var result = Task.Run(() =>
+            // Async de verdad: el sync-over-async anterior (.GetResult())
+            // podía bloquear al llamante (deadlock en contexto UI) y el WMI
+            // no tenía timeout propio (solo el token externo).
+            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            timeoutCts.CancelAfter(TimeSpan.FromSeconds(60));
+            var result = await Task.Run(() =>
             {
-                var scope = new ManagementScope(@"root\default");
+                var options = new ConnectionOptions { Timeout = TimeSpan.FromSeconds(55) };
+                var scope = new ManagementScope(@"root\default", options);
                 scope.Connect();
 
                 using var sysRestoreClass = new ManagementClass(scope, new ManagementPath("SystemRestore"), null);
-                var inParams = sysRestoreClass.GetMethodParameters("CreateRestorePoint");
+                using var inParams = sysRestoreClass.GetMethodParameters("CreateRestorePoint");
                 inParams["Description"] = "CA-O antes de lote de optimización";
                 inParams["RestorePointType"] = 12;
                 inParams["EventType"] = 100;
 
-                var outParams = sysRestoreClass.InvokeMethod("CreateRestorePoint", inParams, null);
+                using var outParams = sysRestoreClass.InvokeMethod("CreateRestorePoint", inParams, null);
                 return outParams?["ReturnValue"] is null || Convert.ToUInt32(outParams["ReturnValue"]) == 0;
-            }, ct).GetAwaiter().GetResult();
+            }, timeoutCts.Token).ConfigureAwait(false);
 
             _lastCreated = result;
-            return Task.FromResult(result
+            return result
                 ? OperationResult.Ok("Punto de restauración creado.")
-                : OperationResult.Fail("El sistema devolvió un error al crear el punto.", "restore-point-failed"));
+                : OperationResult.Fail("El sistema devolvió un error al crear el punto.", "restore-point-failed");
+        }
+        catch (OperationCanceledException)
+        {
+            _lastCreated = false;
+            return OperationResult.Fail(
+                "Tiempos agotado creando el punto de restauración (60 s).", "restore-point-timeout");
         }
         catch (Exception ex)
         {
             _lastCreated = false;
-            return Task.FromResult(OperationResult.Fail(
-                "No se pudo crear el punto de restauración: " + ex.Message.Trim(), "restore-point-error"));
+            return OperationResult.Fail(
+                "No se pudo crear el punto de restauración: " + ex.Message.Trim(), "restore-point-error");
         }
     }
 

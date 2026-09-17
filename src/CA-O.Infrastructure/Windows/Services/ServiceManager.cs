@@ -13,10 +13,19 @@ public sealed class ServiceManager : IServiceManager
 {
     private const string ServicesKeyPath = @"SYSTEM\CurrentControlSet\Services";
 
+    private static void ValidateServiceName(string serviceName)
+    {
+        if (string.IsNullOrWhiteSpace(serviceName) || serviceName.Length > 128
+            || serviceName.Contains("..") || serviceName.Contains('\\') || serviceName.Contains('/')
+            || serviceName.Any(c => char.IsControl(c) || c is '"' or '\'' or ';' or '|' or '&' or '<' or '>'))
+            throw new ArgumentException("Nombre de servicio inválido.", nameof(serviceName));
+    }
+
     public bool Exists(string serviceName)
     {
         try
         {
+            ValidateServiceName(serviceName);
             using var sc = new ServiceController(serviceName);
             var _ = sc.Status;
             return true;
@@ -31,6 +40,7 @@ public sealed class ServiceManager : IServiceManager
     {
         try
         {
+            ValidateServiceName(serviceName);
             using var key = Registry.LocalMachine.OpenSubKey($@"{ServicesKeyPath}\{serviceName}");
             if (key is null) return null;
             var start = Convert.ToInt32(key.GetValue("Start") ?? -1);
@@ -50,6 +60,9 @@ public sealed class ServiceManager : IServiceManager
 
     public void SetStartType(string serviceName, string startType)
     {
+        ValidateServiceName(serviceName);
+        if (startType is "Boot" or "System")
+            throw new ArgumentException("Start type 'Boot/System' no permitido via CA-O (solo Automatic/Manual/Disabled).", nameof(startType));
         using var key = Registry.LocalMachine.OpenSubKey($@"{ServicesKeyPath}\{serviceName}", writable: true)
             ?? throw new InvalidOperationException($"Service '{serviceName}' not found in registry.");
 
@@ -68,8 +81,6 @@ public sealed class ServiceManager : IServiceManager
             var s when s.StartsWith("Automatic", StringComparison.OrdinalIgnoreCase) => 2,
             "Manual" => 3,
             "Disabled" => 4,
-            "Boot" => 0,
-            "System" => 1,
             _ => throw new ArgumentException($"Unsupported start type '{startType}'."),
         }, RegistryValueKind.DWord);
     }

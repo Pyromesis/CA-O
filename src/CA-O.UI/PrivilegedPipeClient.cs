@@ -1,8 +1,10 @@
 using System.IO.Pipes;
+using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text.Json;
 using CAO.Shared;
 using CAO.Shared.IPC;
+using Microsoft.Win32.SafeHandles;
 
 namespace CAO.UI;
 
@@ -15,6 +17,40 @@ namespace CAO.UI;
 public sealed class PrivilegedPipeClient
 {
     private static readonly TimeSpan CallTimeout = TimeSpan.FromSeconds(10);
+
+    // Techo de lectura de RESPUESTA por operación (el servicio despacha 60 s
+    // por defecto y 20 min en pesadas): sin techo, un servicio colgado a mitad
+    // deja la UI colgada hasta el timeout del llamante (45 min en drivers).
+    // La cancelación del llamante sigue respetándose (lo primero que llegue).
+    private static readonly TimeSpan ResponseTimeoutDefault = TimeSpan.FromSeconds(90);
+    private static readonly TimeSpan ResponseTimeoutHeavy = TimeSpan.FromMinutes(21);
+
+    private static readonly HashSet<PrivilegedOperationKind> HeavyOperations = new()
+    {
+        PrivilegedOperationKind.SearchDriverUpdates,
+        PrivilegedOperationKind.InstallDriverUpdates,
+        PrivilegedOperationKind.RemovePhantomDevices,
+        PrivilegedOperationKind.ExportDriver,
+        PrivilegedOperationKind.SearchCatalogDrivers,
+        PrivilegedOperationKind.DownloadCatalogDriver,
+    };
+
+    // Espejo de PrivilegedPipeService.HeavyOptimizationIds: Apply/Revert de
+    // estas optimizaciones despacha hasta 20 min en el servicio.
+    private static readonly HashSet<string> HeavyOptimizationIds = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "windows-component-store-cleanup",
+        "windows-component-store-resetbase",
+        "optimize-system-drive",
+        "retrim-system-ssd",
+        "defragment-hdd-only",
+        "disk-cleanup-system-files",
+        "reset-network-stack-repair",
+        "repair-windows-update",
+    };
+
+    private static bool IsHeavyOptimization(ITypedPayload payload) =>
+        payload is IOptimizationIdPayload p && HeavyOptimizationIds.Contains(p.OptimizationId);
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -102,7 +138,7 @@ public sealed class PrivilegedPipeClient
         connectCts.CancelAfter(CallTimeout);
         try
         {
-            await pipe.ConnectAsync(connectCts.Token);
+            await pipe.ConnectAsync(connectCts.Token).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -119,6 +155,16 @@ public sealed class PrivilegedPipeClient
         catch (TimeoutException)
         {
             return IpcResponse.Rejected(ErrorCodes.IpcTimeout, "Servicio no disponible: timeout al conectar (CAO-IPC-007).");
+        }
+
+        // Anti pipe-squatting: un malware de usuario estándar puede crear el
+        // pipe antes que el servicio al arrancar y falsificar respuestas
+        // (DoS + espionaje de nombres/IDs). Se exige dueño SYSTEM en sesión 0
+        // con binario bajo Program Files\CA-O antes de enviar nada.
+        if (!PipeServerTrust.IsTrustedServer(pipe, out var serverDetail))
+        {
+            try { pipe.Close(); } catch { }
+            return IpcResponse.Rejected(ErrorCodes.IpcPipeNotFound, $"Servidor IPC no confiable ({serverDetail}, CAO-IPC-008). Posible pipe suplantado: reinstala el servicio con scripts/install-privileged-service.ps1 elevado.");
         }
 
         var request = new IpcRequest(
@@ -138,15 +184,29 @@ public sealed class PrivilegedPipeClient
                 return IpcResponse.Rejected(ErrorCodes.IpcRequestTooLarge, "Solicitud excede 64KB.");
             using (var writer = new StreamWriter(pipe, System.Text.Encoding.UTF8, 1024, leaveOpen: true) { AutoFlush = true })
             {
-                await writer.WriteLineAsync(json.AsMemory(), ct);
+                await writer.WriteLineAsync(json.AsMemory(), ct).ConfigureAwait(false);
                 writer.Flush();
             }
-            // Leer una línea de respuesta con el timeout del llamante (no el de conexión)
+            // Leer una línea de respuesta con el timeout del llamante ACOTADO
+            // al techo de la operación (nunca más allá del despacho del
+            // servicio + margen): un servicio colgado responde CAO-IPC-007
+            // en vez de congelar la UI.
+            var responseCeiling = HeavyOperations.Contains(operation) || IsHeavyOptimization(payload)
+                ? ResponseTimeoutHeavy
+                : ResponseTimeoutDefault;
+            using var readCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            readCts.CancelAfter(responseCeiling);
             string? line;
             using (var reader = new StreamReader(pipe, System.Text.Encoding.UTF8, false, 1024, leaveOpen: true))
             {
-                line = await reader.ReadLineAsync(ct);
+                // Lectura acotada a MaxResponseBytes: sin techo, una
+                // respuesta gigante (servicio comprometido o salida sin
+                // truncar) congela la UI u OOM. Espejo del ReadBoundedLine
+                // del servicio.
+                line = await ReadBoundedLineAsync(reader, IpcProtocol.MaxResponseBytes + 1024, readCts.Token).ConfigureAwait(false);
             }
+            if (line is null)
+                return IpcResponse.Rejected(ErrorCodes.IpcMalformedRequest, "Respuesta excede 256KB.");
             if (string.IsNullOrWhiteSpace(line))
                 return IpcResponse.Rejected(ErrorCodes.IpcMalformedRequest, "Respuesta vacía del servicio.");
             var response = JsonSerializer.Deserialize<IpcResponse>(line, JsonOptions);
@@ -200,4 +260,103 @@ public sealed class PrivilegedPipeClient
 
     /// <summary>Legacy response shape used by pages; maps v2 codes through.</summary>
     private static IpcResponse? Map(IpcResponse? response) => response;
+
+    /// <summary>
+    /// Lee una línea con techo duro de caracteres. null si se supera el
+    /// máximo (el llamante rechaza en vez de alojar MBs en memoria).
+    /// </summary>
+    private static async Task<string?> ReadBoundedLineAsync(StreamReader reader, int maxChars, CancellationToken ct)
+    {
+        var sb = new System.Text.StringBuilder(4096);
+        var buf = new char[1024];
+        var gotData = false;
+        while (true)
+        {
+            ct.ThrowIfCancellationRequested();
+            var n = await reader.ReadAsync(buf.AsMemory(0, buf.Length), ct).ConfigureAwait(false);
+            if (n == 0) break;
+            gotData = true;
+            for (var i = 0; i < n; i++)
+            {
+                var c = buf[i];
+                if (c == '\n') return sb.ToString().TrimEnd('\r');
+                sb.Append(c);
+                if (sb.Length > maxChars) return null;
+            }
+            if (sb.Length > maxChars) return null;
+        }
+        return gotData ? sb.ToString() : string.Empty;
+    }
+}
+
+/// <summary>
+/// Anti pipe-squatting (lado cliente): verifica que el dueño del pipe sea el
+/// servicio real antes de enviar la solicitud. Un proceso de usuario puede
+/// pre-crear el mismo nombre de pipe al arrancar; sin esta comprobación la
+/// UI le entregaría nombres de interfaces/IDs y aceptaría sus respuestas.
+/// Criterio: proceso en sesión 0 (solo SYSTEM/servicios) cuyo binario vive
+/// bajo Program Files\CA-O. Nunca lanza: a la duda, no confiable.
+/// </summary>
+internal static class PipeServerTrust
+{
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool GetNamedPipeServerProcessId(SafePipeHandle pipe, out uint serverProcessId);
+
+    public static bool IsTrustedServer(NamedPipeClientStream pipe, out string detail)
+    {
+        detail = "desconocido";
+        try
+        {
+            if (!GetNamedPipeServerProcessId(pipe.SafePipeHandle, out var pid) || pid == 0)
+            {
+                detail = "sin PID de servidor";
+                return false;
+            }
+            using var process = System.Diagnostics.Process.GetProcessById(unchecked((int)pid));
+            if (process.SessionId != 0)
+            {
+                detail = $"sesión {process.SessionId} (esperada 0)";
+                return false;
+            }
+            string? path;
+            try
+            {
+                path = process.MainModule?.FileName;
+            }
+            catch
+            {
+                path = null;
+            }
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                detail = "binario del servidor no legible";
+                return false;
+            }
+            var full = Path.GetFullPath(path);
+            var programFiles = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
+            var expectedDir = Path.GetFullPath(Path.Combine(programFiles, "CA-O")) + Path.DirectorySeparatorChar;
+            string? expectedExe = null;
+            try
+            {
+                expectedExe = CAO.Shared.Constants.BuildConstants.GetServiceExecutablePath();
+            }
+            catch
+            {
+                expectedExe = null;
+            }
+            if (full.StartsWith(expectedDir, StringComparison.OrdinalIgnoreCase) ||
+                (expectedExe is not null && full.Equals(Path.GetFullPath(expectedExe), StringComparison.OrdinalIgnoreCase)))
+            {
+                detail = full;
+                return true;
+            }
+            detail = full;
+            return false;
+        }
+        catch (Exception ex)
+        {
+            detail = ex.GetType().Name;
+            return false;
+        }
+    }
 }

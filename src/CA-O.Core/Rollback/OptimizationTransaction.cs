@@ -153,7 +153,11 @@ public sealed class OptimizationTransaction
         var context = new OptimizationContext { Registry = _registry, Executor = _executor, Services = _services };
 
         // ---- RESOURCE LOCKS (FASE 15) ----
-        var lease = await ResourceLockManager.Shared.AcquireAsync(_optimization.ResourceKeys, CancellationToken.None);
+        // await using: el lease se libera en TODOS los caminos (éxito, fallo,
+        // cancelación, excepción). Dispose manual anterior fugaba el semáforo
+        // si ApplyAsync lanzaba OperationCanceledException u otra excepción
+        // fuera de los catch previstos (bloqueo permanente del recurso).
+        await using var lease = await ResourceLockManager.Shared.AcquireAsync(_optimization.ResourceKeys, CancellationToken.None);
 
         // ---- APPLY (atomic: runs with CancellationToken.None) ----
         OperationResult apply;
@@ -173,7 +177,6 @@ public sealed class OptimizationTransaction
         if (!apply.Success)
         {
             var matchLevelApply = await SafeRollbackExactAsync(context, snapshot);
-            await lease.DisposeAsync();
             Journal(matchLevelApply == SnapshotMatchLevel.ExactMatch
                 ? TransactionPhase.RolledBack : TransactionPhase.Failed,
                 ErrorCodes.TxnApplyFailed);
@@ -224,7 +227,6 @@ public sealed class OptimizationTransaction
             // Irreversible + verificación no concluyente tras reintentos: el
             // cambio se aplicó (Apply Ok) y no hay nada que revertir.
             // Éxito con aviso honesto, no "Rechazado" de un cambio real.
-            await lease.DisposeAsync();
             Journal(TransactionPhase.Commit);
             const string warning = "Aplicado, pero la verificación no fue concluyente (lectura no disponible).";
             Log(definition.Id, "apply", true, definition.Id,
@@ -245,7 +247,6 @@ public sealed class OptimizationTransaction
             {
                 // No automatic rollback exists for irreversible changes:
                 // report honestly and leave evidence for recovery/manual fix.
-                await lease.DisposeAsync();
                 Journal(TransactionPhase.Failed, verifyCode);
                 Log(definition.Id, "verify", false, definition.Id,
                     error: $"Verificación {verification.Status} en cambio irreversible.",
@@ -261,7 +262,6 @@ public sealed class OptimizationTransaction
             }
 
             var matchLevelVerify = await SafeRollbackExactAsync(context, snapshot);
-            await lease.DisposeAsync();
             Journal(matchLevelVerify == SnapshotMatchLevel.ExactMatch
                 ? TransactionPhase.RolledBack : TransactionPhase.Failed, verifyCode);
             Log(definition.Id, "verify", false,
@@ -293,7 +293,6 @@ public sealed class OptimizationTransaction
             verification: status == VerificationStatus.NotApplicable ? "not-applicable"
                 : pendingReboot ? "pending-reboot" : "passed",
             rollbackAvailable: !irreversible);
-        await lease.DisposeAsync();
 
         // ---- POST-COMMIT BENCHMARK (P0-7): failure NEVER flips Success ----
         BenchmarkResult? benchmark = null;
@@ -487,7 +486,7 @@ public sealed class MultiOptimizationTransaction
         ITransactionJournal? journal = null,
         CallerIdentity? caller = null)
         : this(optimizations, context, o => new OptimizationTransaction(
-            o, registry, context, services, executor, snapshots, history, journal))
+            o, registry, context, services, executor, snapshots, history, journal, caller))
     {
     }
 

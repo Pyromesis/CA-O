@@ -339,7 +339,7 @@ public static partial class CommandPolicy
                 Path.Combine(system32, "wpr.exe"),
 
             SystemCommandKey.WprStopToDefaultFile when arguments.Count == 3 &&
-                arguments[0] == "-stop" && arguments[2] == "-overwrite" =>
+                arguments[0] == "-stop" && IsWprDefaultEtlPath(arguments[1]) && arguments[2] == "-overwrite" =>
                 Path.Combine(system32, "wpr.exe"),
 
             SystemCommandKey.LogmanDeleteSession when Eq(arguments,
@@ -530,20 +530,37 @@ public static partial class CommandPolicy
     }
 
     /// <summary>
-    /// Ruta INF estricta para pnputil /add-driver: absoluta, extensión .inf,
-    /// sin '..', sin ADS (':' solo tras la unidad), sin comillas ni control.
+    /// Ruta INF estricta para pnputil /add-driver: absoluta en disco LOCAL,
+    /// extensión .inf, sin '..', sin ADS (':' solo tras la unidad), sin UNC
+    /// (\\server\share haría que SYSTEM autenticara SMB saliente con la
+    /// cuenta máquina: coerción/relay), sin comillas ni control.
     /// Se permiten espacios y paréntesis de carpetas reales de Descargas.
     /// </summary>
     public static bool IsValidInfPath(string path)
     {
         if (string.IsNullOrWhiteSpace(path) || path.Length > 260) return false;
         if (!Path.IsPathFullyQualified(path)) return false;
+        if (path.StartsWith(@"\\", StringComparison.Ordinal)) return false;
+        if (path.StartsWith(@"//", StringComparison.Ordinal)) return false;
+        if (!char.IsLetter(path[0]) || path[1] != ':' ) return false;
         if (!".inf".Equals(Path.GetExtension(path), StringComparison.OrdinalIgnoreCase)) return false;
         if (path.Contains("..")) return false;
         if (path.IndexOf(':', 2) >= 0) return false;
         if (path.Any(c => c is '"' or '\'' or '\n' or '\r' or '\t' or '\0' || char.IsControl(c))) return false;
         return true;
     }
+
+    /// <summary>Ruta ETL canónica de la traza del servicio (%ProgramData%\CA-O\etw\dpc.etl).</summary>
+    public static string WprDefaultEtlPath() =>
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "CA-O", "etw", "dpc.etl");
+
+    /// <summary>
+    /// El ETL de -stop debe ser EXACTAMENTE la ruta canónica del colector:
+    /// cualquier otra ruta permitiría escribir el ETL en ubicación arbitraria.
+    /// </summary>
+    private static bool IsWprDefaultEtlPath(string path) =>
+        !string.IsNullOrWhiteSpace(path) &&
+        path.Equals(WprDefaultEtlPath(), StringComparison.OrdinalIgnoreCase);
 
     private static bool IsValidInterfaceName(string name) =>
         !string.IsNullOrWhiteSpace(name) && name.Length <= 64 && SafeArg().IsMatch(name);

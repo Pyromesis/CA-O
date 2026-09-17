@@ -153,27 +153,31 @@ public sealed class SystemContextProvider : ISystemContextProvider
         try
         {
             using var searcher = new ManagementObjectSearcher(
-                "SELECT Name, DriverVersion, CurrentRefreshRate FROM Win32_VideoController");
-            ManagementObject? best = null;
-            foreach (var adapter in searcher.Get().Cast<ManagementObject>())
+                "SELECT Name, DriverVersion, CurrentRefreshRate, AdapterRAM FROM Win32_VideoController");
+            // AdapterRAM SÍ se selecciona: sin ella la comparación era siempre
+            // 0 > 0 y se elegía la primera GPU, no la de más VRAM.
+            using var results = searcher.Get();
+            string name = string.Empty, driver = string.Empty;
+            var refresh = 0;
+            long bestRam = -1;
+            var found = false;
+            foreach (ManagementObject adapter in results)
             {
-                if (best is null ||
-                    Convert.ToInt32(adapter["AdapterRAM"] ?? best["AdapterRAM"] ?? 0) >
-                    Convert.ToInt32(best["AdapterRAM"] ?? 0))
+                using (adapter)
                 {
-                    best = adapter;
+                    var ram = Convert.ToInt64(adapter["AdapterRAM"] ?? 0);
+                    if (!found || ram > bestRam)
+                    {
+                        name = adapter["Name"]?.ToString() ?? string.Empty;
+                        driver = adapter["DriverVersion"]?.ToString() ?? string.Empty;
+                        refresh = Convert.ToInt32(adapter["CurrentRefreshRate"] ?? 0);
+                        bestRam = ram;
+                        found = true;
+                    }
                 }
             }
 
-            if (best is null)
-            {
-                return null;
-            }
-
-            return (
-                best["Name"]?.ToString() ?? string.Empty,
-                best["DriverVersion"]?.ToString() ?? string.Empty,
-                Convert.ToInt32(best["CurrentRefreshRate"] ?? 0));
+            return found ? (name, driver, refresh) : null;
         }
         catch
         {

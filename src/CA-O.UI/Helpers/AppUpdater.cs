@@ -1,5 +1,6 @@
 using System.IO.Compression;
 using System.Net.Http;
+using System.Runtime.InteropServices;
 using System.Text.Json;
 
 namespace CAO.UI.Helpers;
@@ -109,7 +110,7 @@ public static class AppUpdater
     public static async Task DownloadAsync(string url, string destinationPath, IProgress<double>? progress, CancellationToken ct, long maxBytes)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxBytes);
-        using var http = CreateClient(TimeSpan.FromMinutes(30));
+        using var http = CreateClient(TimeSpan.FromMinutes(30), url);
         using var response = await http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
         var total = response.Content.Headers.ContentLength;
@@ -184,7 +185,13 @@ public static class AppUpdater
                 var dest = Path.GetFullPath(Path.Combine(destinationDir, entry.FullName));
                 if (!dest.StartsWith(root, StringComparison.Ordinal))
                     throw new IOException($"Entrada ZIP fuera del destino: {entry.FullName}");
-                Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
+                // Tope ANTES de extraer: una sola entrada gigante no debe
+                // llenar el disco antes del corte (el acumulado solo se sabía
+                // después de ExtractToFile). entry.Length es cota superior.
+                if (entry.Length > maxTotalBytes || written + entry.Length > maxTotalBytes)
+                    throw new InvalidOperationException($"Extracción supera el tope ({maxTotalBytes} bytes): posible bomba.");
+                var parent = Path.GetDirectoryName(dest);
+                if (parent is not null) Directory.CreateDirectory(parent);
                 entry.ExtractToFile(dest, overwrite: true);
                 written += new FileInfo(dest).Length;
                 if (written > maxTotalBytes)
@@ -315,9 +322,102 @@ public static class AppUpdater
         }
     }
 
-    private static HttpClient CreateClient(TimeSpan? timeout = null)
+    /// <summary>
+    /// Verifica la firma Authenticode del fichero con WinVerifyTrust (la
+    /// validación del propio Windows: cadena a raíz confiable + timestamp).
+    /// true solo si el sistema la da por válida. Sin firma, corrupta o con
+    /// certificado no confiable = false. Nunca lanza.
+    /// </summary>
+    public static bool HasValidAuthenticodeSignature(string path)
     {
-        var http = new HttpClient { Timeout = timeout ?? TimeSpan.FromSeconds(10) };
+        try
+        {
+            if (string.IsNullOrWhiteSpace(path) || !File.Exists(path)) return false;
+            return WinVerifyTrustFile(path) == 0;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static uint WinVerifyTrustFile(string path)
+    {
+        var actionId = new Guid("00AAC56B-CD44-11d0-8CC2-00C04FC295EE");
+        var fileInfo = new WINTRUST_FILE_INFO
+        {
+            cbStruct = (uint)Marshal.SizeOf<WINTRUST_FILE_INFO>(),
+            pcwszFilePath = path,
+            hFile = IntPtr.Zero,
+            pgKnownSubject = IntPtr.Zero,
+        };
+        var data = new WINTRUST_DATA
+        {
+            cbStruct = (uint)Marshal.SizeOf<WINTRUST_DATA>(),
+            dwUIChoice = 2, // WTD_UI_NONE: sin diálogos
+            fdwRevocationChecks = 0, // WTD_REVOKE_NONE: funciona offline
+            dwUnionChoice = 1, // WTD_CHOICE_FILE
+            pFile = Marshal.AllocHGlobal(Marshal.SizeOf<WINTRUST_FILE_INFO>()),
+            dwStateAction = 0,
+            hWVTStateData = IntPtr.Zero,
+            pwszURLReference = IntPtr.Zero,
+            dwProvFlags = 0x00000080, // WTD_CACHE_ONLY_URL_RETRIEVAL
+            dwUIContext = 0,
+        };
+        try
+        {
+            Marshal.StructureToPtr(fileInfo, data.pFile, fDeleteOld: false);
+            return NativeWinTrust.WinVerifyTrust(IntPtr.Zero, new[] { actionId }, ref data);
+        }
+        finally
+        {
+            if (data.pFile != IntPtr.Zero) Marshal.FreeHGlobal(data.pFile);
+        }
+    }
+
+    private static class NativeWinTrust
+    {
+        [DllImport("wintrust.dll", PreserveSig = true, CharSet = CharSet.Unicode)]
+        internal static extern uint WinVerifyTrust(IntPtr hwnd, Guid[] pgActionID, ref WINTRUST_DATA pWVTData);
+    }
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    private struct WINTRUST_FILE_INFO
+    {
+        public uint cbStruct;
+        public string pcwszFilePath;
+        public IntPtr hFile;
+        public IntPtr pgKnownSubject;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct WINTRUST_DATA
+    {
+        public uint cbStruct;
+        public IntPtr pPolicyCallbackData;
+        public IntPtr pSIPClientData;
+        public uint dwUIChoice;
+        public uint fdwRevocationChecks;
+        public uint dwUnionChoice;
+        public IntPtr pFile;
+        public uint dwStateAction;
+        public IntPtr hWVTStateData;
+        public IntPtr pwszURLReference;
+        public uint dwProvFlags;
+        public uint dwUIContext;
+    }
+
+    private static HttpClient CreateClient(TimeSpan? timeout = null, string? url = null)
+    {
+        // El loopback nunca debe cruzar el proxy del sistema: en máquinas con
+        // proxy local (p. ej. 127.0.0.1:12334 que no excluye loopback) la
+        // descarga iría al proxy y fallaría con 403/HttpRequestException
+        // en vez de conectar directo. Internet sí respeta el proxy.
+        var bypassProxy = url is not null &&
+            Uri.TryCreate(url, UriKind.Absolute, out var uri) &&
+            uri.IsLoopback;
+        var handler = new HttpClientHandler { UseProxy = !bypassProxy };
+        var http = new HttpClient(handler) { Timeout = timeout ?? TimeSpan.FromSeconds(10) };
         http.DefaultRequestHeaders.UserAgent.ParseAdd($"CA-O-App/{CurrentVersion}");
         http.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github.v3+json");
         return http;

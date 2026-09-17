@@ -150,16 +150,17 @@ if (Test-Path $signScript) {
         $setupExePath,
         $uninstallExePath
     )
-    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 } else {
     Write-Warning "sign.ps1 not found - skipping signing (dev build)"
 }
 
 Write-Host '== SHA-256 Manifest ==' -ForegroundColor Cyan
-Get-ChildItem $artifactRoot -File -Recurse |
+$manifestPath = Join-Path $artifactRoot $Sha256ManifestName
+if (Test-Path $manifestPath) { Remove-Item $manifestPath -Force }
+Get-ChildItem $artifactRoot -File -Recurse | Where-Object { $_.Name -ne $Sha256ManifestName } |
     Get-FileHash -Algorithm SHA256 |
     ForEach-Object { "$($_.Hash)  $($_.Path.Substring($artifactRoot.Length + 1))" } |
-    Set-Content (Join-Path $artifactRoot $Sha256ManifestName)
+    Set-Content $manifestPath -Encoding ASCII
 
 Write-Host "== SBOM (CycloneDX) ==" -ForegroundColor Cyan
 $hasTool = (dotnet tool list --global | Select-String -Quiet "cyclonedx")

@@ -20,6 +20,10 @@ public static class ErrorTranslator
         UnauthorizedAccessException => new(ErrorCodes.SecStandardUserDenied, "Acceso denegado: se requieren privilegios de administrador.", ex.Message, "Ejecute CA-O Service como administrador o use modo solo lectura.", correlationId),
         OperationCanceledException => new("CAO-CANCELLED", "Operación cancelada.", ex.Message, "Reintente si lo desea.", correlationId),
         TimeoutException => new(ErrorCodes.IpcRequestExpired, "Tiempo de espera agotado.", ex.Message, "Reintente; verifique que el servicio responda.", correlationId),
+        System.Net.Http.HttpRequestException http => new(ErrorCodes.UiServiceUnavailable, "Falló la red (descarga o comprobación de actualización).", http.Message, "Revise su conexión e inténtelo de nuevo.", correlationId),
+        System.Net.Sockets.SocketException sock => new(ErrorCodes.UiServiceUnavailable, "Falló la conexión de red.", sock.Message, "Revise su conexión e inténtelo de nuevo.", correlationId),
+        System.Text.Json.JsonException json => new(ErrorCodes.UiDiagnosticsFailed, "Respuesta con formato inesperado.", json.Message, "Reintente; si persiste, genere un bundle de soporte.", correlationId),
+        InvalidOperationException invalid => new(ErrorCodes.UiDiagnosticsFailed, "La operación no se pudo completar.", invalid.Message, "Reintente; si persiste, genere un bundle de soporte.", correlationId),
         System.IO.IOException io => new(ErrorCodes.UiServiceUnavailable, "No se pudo conectar con el servicio privilegiado.", io.Message, "Verifique que CA-O Service esté instalado e iniciado.", correlationId),
         _ => new(ErrorCodes.UiDiagnosticsFailed, "Ocurrió un error inesperado.", ex.GetType().Name + ": " + ex.Message, "Reintente; si persiste, genere un bundle de soporte.", correlationId),
     };

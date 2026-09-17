@@ -92,7 +92,7 @@ public sealed partial class SolucionarPage : Page
             {
                 var local = await Helpers.ExplorerRecovery.RecoverLocallyAsync(
                     killLeftovers: optimizationId.Equals("restart-windows-explorer", StringComparison.Ordinal),
-                    CancellationToken.None);
+                    cts.Token);
                 message += $"\nFallback local: {local}";
             }
             if (target != null) target.Text = $"{optimizationId}: {message}";
@@ -102,9 +102,12 @@ public sealed partial class SolucionarPage : Page
             var message = $"servicio no disponible ({ex.Message})";
             if (IsExplorerFix(optimizationId))
             {
+                // Sin cts aquí (está disposed tras el using): token con techo
+                // propio para que el fallback no cuelgue la UI sin límite.
+                using var fallbackCts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
                 var local = await Helpers.ExplorerRecovery.RecoverLocallyAsync(
                     killLeftovers: optimizationId.Equals("restart-windows-explorer", StringComparison.Ordinal),
-                    CancellationToken.None);
+                    fallbackCts.Token);
                 message += $"\nFallback local: {local}";
             }
             if (target != null) target.Text = $"{optimizationId}: {message}";

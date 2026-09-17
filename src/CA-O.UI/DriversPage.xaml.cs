@@ -40,6 +40,7 @@ public sealed partial class DriversPage : Page
     private async void OnScanClick(object sender, RoutedEventArgs e)
     {
         try { _cts?.Cancel(); } catch { }
+        try { _cts?.Dispose(); } catch { }
         _cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         ScanButton.IsEnabled = false;
         ScanRing.IsActive = true;
@@ -534,10 +535,15 @@ public sealed partial class DriversPage : Page
     {
         try
         {
-            var root = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "CA-O", "DriverBackup")
+            // Normalizar ANTES de comparar: comparar la ruta cruda permite
+            // escapar con "..\". GetFullPath resuelve esos segmentos.
+            var root = Path.GetFullPath(Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "CA-O", "DriverBackup"))
                 + Path.DirectorySeparatorChar;
-            if (!path.StartsWith(root, StringComparison.OrdinalIgnoreCase) || !Directory.Exists(path)) return;
-            System.Diagnostics.Process.Start("explorer.exe", $"\"{path}\"");
+            var full = Path.GetFullPath(path);
+            if (!full.StartsWith(root, StringComparison.OrdinalIgnoreCase) || !Directory.Exists(full)) return;
+            var explorer = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "explorer.exe");
+            System.Diagnostics.Process.Start(explorer, $"\"{full}\"");
         }
         catch (Exception ex) { App.WriteCrashLog(ex); }
     }
@@ -780,13 +786,23 @@ public sealed partial class DriversPage : Page
             return;
         }
 
-        string infPath;
-        var autoPick = pkg.InfPaths.Count > 1
-            ? CatalogDriverProtocol.PickBestInfMatch(pkg.InfPaths, row.HwId)
-            : null;
-        if (pkg.InfPaths.Count == 1)
+        // El .inf llega del servicio (DetailJson): validar extensión .inf,
+        // existencia y raíz esperada ANTES de mostrar/instalar. Sin esto un
+        // DetailJson manipulado colaría cualquier ruta a pnputil.
+        var candidates = pkg.InfPaths.Where(IsAcceptableInfPath).ToList();
+        if (candidates.Count == 0)
         {
-            infPath = pkg.InfPaths[0];
+            InfStatusText.Text = "Descarga sin .inf utilizables (rutas rechazadas por seguridad).";
+            return;
+        }
+
+        string infPath;
+        var autoPick = candidates.Count > 1
+            ? CatalogDriverProtocol.PickBestInfMatch(candidates, row.HwId)
+            : null;
+        if (candidates.Count == 1)
+        {
+            infPath = candidates[0];
         }
         else if (autoPick is not null)
         {
@@ -799,7 +815,7 @@ public sealed partial class DriversPage : Page
             {
                 SelectionMode = ListViewSelectionMode.Single,
                 MaxHeight = 300,
-                ItemsSource = pkg.InfPaths.Select(p => new CatalogInfRow(p, Path.GetFileName(p))).ToList(),
+                ItemsSource = candidates.Select(p => new CatalogInfRow(p, Path.GetFileName(p))).ToList(),
             };
             infList.ItemTemplate = (DataTemplate)Application.Current.Resources["CatalogInfTemplate"];
             var infDialog = new ContentDialog
@@ -820,6 +836,13 @@ public sealed partial class DriversPage : Page
 
     private async Task InstallInfAsync(string infPath, string instanceId, string? deviceTitle)
     {
+        // Defensa en profundidad: re-validar aunque el llamante ya filtró.
+        if (!IsAcceptableInfPath(infPath))
+        {
+            InfStatusText.Visibility = Visibility.Visible;
+            InfStatusText.Text = "Ruta .inf rechazada por seguridad.";
+            return;
+        }
         var target = string.IsNullOrWhiteSpace(deviceTitle) ? "el dispositivo" : deviceTitle;
         var confirm = new ContentDialog
         {
@@ -853,6 +876,31 @@ public sealed partial class DriversPage : Page
             App.WriteCrashLog(ex);
         }
         OnScanClick(ScanButton, new RoutedEventArgs());
+    }
+
+    /// <summary>
+    /// .inf aceptable: forma estricta (.inf, absoluta, sin ADS/traversal),
+    /// existe en disco y vive bajo %ProgramData%\CA-O (descargas del catálogo)
+    /// o el Temp del sistema. Todo lo demás se rechaza antes de ofrecerse.
+    /// </summary>
+    private static bool IsAcceptableInfPath(string infPath)
+    {
+        try
+        {
+            if (!CAO.Shared.Security.CommandPolicy.IsValidInfPath(infPath)) return false;
+            if (!File.Exists(infPath)) return false;
+            var full = Path.GetFullPath(infPath);
+            var dataRoot = Path.GetFullPath(Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "CA-O"))
+                + Path.DirectorySeparatorChar;
+            var tempRoot = Path.GetFullPath(Path.GetTempPath()) + Path.DirectorySeparatorChar;
+            return full.StartsWith(dataRoot, StringComparison.OrdinalIgnoreCase) ||
+                   full.StartsWith(tempRoot, StringComparison.OrdinalIgnoreCase);
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     /// <summary>Segunda línea con los IDs uno a uno (instancia, hardware, INF, proveedor).</summary>

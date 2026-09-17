@@ -4,8 +4,11 @@ param(
     [string]$Configuration = "Debug"
 )
 
+Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
-Set-Location (Join-Path $PSScriptRoot "..")
+if (-not (Get-Command dotnet -ErrorAction SilentlyContinue)) { throw "dotnet SDK no encontrado en PATH." }
+Push-Location (Join-Path $PSScriptRoot "..")
+try {
 
 Write-Host "== dotnet restore ==" -ForegroundColor Cyan
 dotnet restore CA-O.sln
@@ -16,3 +19,4 @@ dotnet build CA-O.sln -c $Configuration --no-restore
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 Write-Host "Build OK" -ForegroundColor Green
+} finally { Pop-Location }

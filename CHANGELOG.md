@@ -2,6 +2,24 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
+## [2.1.32] - 2026-09-16
+
+### Seguridad
+- Endurecimiento del canal IPC privilegiado contra denegación de servicio local: throttle por SID (30 conexiones/minuto) que bloquea el patrón slow-loris (un usuario no autorizado podía abrir muchas conexiones lentas y ocupar el despacho del servicio en bucle). El gate de despacho ahora solo protege la mutación, no la lectura lenta.
+- Anti pipe-squatting: la UI verifica que el servidor del pipe sea dueño SYSTEM en sesión 0 con binario bajo `Program Files\CA-O` antes de enviar nada. Un malware de usuario estándar podía crear el pipe antes que el servicio al arrancar y falsificar respuestas (DoS + espionaje de IDs). Si falla, se rechaza con `CAO-IPC-008` y se indica cómo reinstalar el servicio.
+- Timeouts de respuesta acotados en el cliente IPC (90 s por defecto, 21 min en operaciones pesadas de drivers/DISM/defrag): un servicio colgado a mitad de respuesta ya no deja la UI colgada hasta el timeout del llamador. La cancelación del usuario sigue respetándose.
+- `ServiceManager` valida el nombre del servicio antes de tocar `HKLM\Services`: los traversal (`..\`) y metacaracteres se rechazan, y los start types `Boot`/`System` no se permiten (solo Automatic/Manual/Disabled). Nuevos tests `ServiceManagerValidationTests`.
+- `RegistryAccessor`: el handle estático de HKLM nunca se dispone (solo la subclave); corrime fugas de handles en escrituras HKLM.
+- `RevertAsync` ahora cruza las mismas barreras que `ApplyAsync`: sin mutaciones con recuperación pendiente ni en modo solo lectura.
+- Validación IPv4 estricta antes de aplicar un par DNS; descarga de paquetes de catálogo de drivers con tope anti-bomba (1,5 GB).
+
+### Mejorado
+- UI más atractiva y con profundidad real: `ThemeShadow` en tarjetas héroe/acción/elevadas, rail de acento vertical en el Centro de Control del Panel, y micro-interacción de hover (`UiAnimations.CardHover`) en las tarjetas de módulos y de recomendaciones. Respeta ReducedMotion y no compite con la animación de entrada.
+- `OPTIMIZATION_INVENTORY.md` reescrito: las 88 optimizaciones están en producción (Registry/powercfg/netsh/schtasks/DISM reales), 0 stubs. El documento antiguo listaba 48 entradas como "STUB" de forma obsoleta.
+
+### Corregido
+- Mojibake en `SolucionarPage.xaml.cs` (acentos corruptos en comentarios): el guard de codificación `EncodingConsistencyTests` fallaba y ahora pasa. Suite completa 991/991 tests en verde.
+
 ## [2.1.31] - 2026-09-15
 
 ### Corregido

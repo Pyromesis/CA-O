@@ -45,6 +45,29 @@ internal sealed class PrivilegedPipeService(
     private const int MaxConcurrentDispatch = 4;
     private readonly SemaphoreSlim _gate = new(MaxConcurrentDispatch, MaxConcurrentDispatch);
 
+    // Throttle por SID: tope de conexiones por minuto y llamante. Sin esto,
+    // un usuario no autorizado (la ACL deja CONECTAR a Interactive) abría N
+    // conexiones lentas y ocupaba el despacho en bucle (slow-loris local).
+    private const int MaxConnectionsPerMinutePerSid = 30;
+    private readonly ConcurrentDictionary<string, (int Count, DateTime WindowStart)> _throttle = new();
+
+    private bool CheckThrottle(CallerIdentity caller)
+    {
+        var now = DateTime.UtcNow;
+        var entry = _throttle.AddOrUpdate(caller.Sid,
+            _ => (1, now),
+            (_, old) => (now - old.WindowStart) > TimeSpan.FromMinutes(1) ? (1, now) : (old.Count + 1, old.WindowStart));
+        if (_throttle.Count > 1024)
+        {
+            foreach (var kv in _throttle)
+            {
+                if (now - kv.Value.WindowStart > TimeSpan.FromMinutes(2))
+                    _throttle.TryRemove(kv.Key, out _);
+            }
+        }
+        return entry.Count <= MaxConnectionsPerMinutePerSid;
+    }
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         // Multi-instancia: por cada conexión aceptada se crea la siguiente
@@ -91,18 +114,12 @@ internal sealed class PrivilegedPipeService(
 
     private async Task HandleOneAsync(NamedPipeServerStream pipe, CancellationToken stoppingToken)
     {
+        // Sin semáforo aquí a propósito: el gate solo protege el DESPACHO
+        // (ver HandleClientAsync). Los lectores lentos (slow-loris) antes
+        // ocupaban un slot de despacho 15 s por conexión y bloqueaban la UI
+        // legítima; ahora solo cuestan una instancia de pipe.
         await using (pipe)
         {
-            var acquired = false;
-            try
-            {
-                await _gate.WaitAsync(stoppingToken);
-                acquired = true;
-            }
-            catch (OperationCanceledException)
-            {
-                return;
-            }
             try
             {
                 await HandleClientAsync(pipe, stoppingToken);
@@ -110,10 +127,6 @@ internal sealed class PrivilegedPipeService(
             catch (Exception ex)
             {
                 logger.LogError(ex, "Fallo inesperado atendiendo un cliente IPC concurrente.");
-            }
-            finally
-            {
-                if (acquired) _gate.Release();
             }
         }
     }
@@ -202,6 +215,12 @@ try { caller = GetCallerIdentity(pipe, new CAO.Infrastructure.Windows.Security.W
             }
             logger.LogInformation("Conexión IPC de {Sid} ({Name}).", caller.Sid, caller.Name);
             logger.LogDebug("Connected {Sid} {Name} Elevated={IsElevated} Admin={IsAdministrator}", caller.Sid, caller.Name, caller.IsElevated, caller.IsAdministrator);
+            if (!CheckThrottle(caller))
+            {
+                logger.LogWarning("Throttle IPC: {Sid} superó {Max}/min; conexión rechazada.", caller.Sid, MaxConnectionsPerMinutePerSid);
+                await WriteResponse(pipe, IpcResponse.Rejected(ErrorCodes.IpcTimeout, "Demasiadas solicitudes en poco tiempo (CAO-IPC-007). Reintenta en un minuto."), stoppingToken);
+                return;
+            }
 
             IpcRequest? request;
 try { request = JsonSerializer.Deserialize<IpcRequest>(line, JsonOptions); }
@@ -217,13 +236,83 @@ try { request = JsonSerializer.Deserialize<IpcRequest>(line, JsonOptions); }
             var dispatchTimeout = IsHeavy(request) ? DispatchTimeoutHeavy : DispatchTimeoutDefault;
             using var dispatchCts = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
             dispatchCts.CancelAfter(dispatchTimeout);
-            // Suplantar al llamante: HKCU y carpetas de perfil (%TEMP%, etc.)
-            // deben resolverse en SU hive, no en el de SYSTEM. Sin suplantación,
-            // lo aplicado a HKCU sería invisible para la UI (siempre "no aplicado").
-            var response = await DispatchAsCallerAsync(pipe, () => ValidateAndDispatchAsync(request, caller, dispatchCts.Token));
+            // 1) Validación + autorización + anti-replay COMO SYSTEM, sin
+            // suplantar: estas decisiones nunca deben depender del contexto
+            // del llamante ni escribir nada con su token.
+            var precheck = ValidatePreconditions(request, caller);
+            if (precheck is not null)
+            {
+                logger.LogInformation(
+                    "Auditoría IPC: requestedBy={Sid}/{Name} executedBy=SYSTEM op={Op} accepted={Accepted} code={Code}",
+                    caller.Sid, caller.Name, request?.Operation.ToString() ?? "?", precheck.Accepted, precheck.ErrorCode ?? "-");
+                await WriteResponse(pipe, precheck, stoppingToken);
+                return;
+            }
+            // 2) Ping / GetServiceStatus no tocan HKCU ni mutan nada: se
+            // responden como SYSTEM sin suplantación.
+            if (request!.Operation is PrivilegedOperationKind.Ping)
+            {
+                var ping = new PingResponse(CAO.Shared.AppVersion.Semantic, IpcProtocol.Version, Environment.ProcessId, true, "running");
+                await WriteResponse(pipe, IpcResponse.Ok(JsonSerializer.Serialize(ping, JsonOptions)), stoppingToken);
+                return;
+            }
+            if (request.Operation is PrivilegedOperationKind.GetServiceStatus)
+            {
+                var status = new ServiceStatusResponse(CAO.Shared.AppVersion.Semantic, IpcProtocol.Version, Environment.ProcessId, true, "running", new[] { "ApplyOptimization", "RevertOptimization", "Ping" });
+                await WriteResponse(pipe, IpcResponse.Ok(JsonSerializer.Serialize(status, JsonOptions)), stoppingToken);
+                return;
+            }
+            // 3) Capturar el token del llamante para el despacho. FAIL-CLOSED:
+            // antes, si la suplantación fallaba, se reintentaba como SYSTEM en
+            // silencio (las escrituras HKCU caían en el hive de SYSTEM y la UI
+            // las veía como "no aplicadas", además de romper la garantía de
+            // privilegio mínimo). Ahora se rechaza con error explícito.
+            WindowsIdentity? callerIdentity = null;
+            try
+            {
+                pipe.RunAsClient(() => { callerIdentity = WindowsIdentity.GetCurrent(); });
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "No se pudo capturar el token del llamante; se rechaza (fail-closed).");
+                await WriteResponse(pipe, IpcResponse.Rejected(ErrorCodes.IpcMalformedRequest, "No se pudo verificar la identidad del llamante."), stoppingToken);
+                return;
+            }
+            if (callerIdentity is null)
+            {
+                await WriteResponse(pipe, IpcResponse.Rejected(ErrorCodes.IpcMalformedRequest, "No se pudo verificar la identidad del llamante."), stoppingToken);
+                return;
+            }
+            // 4) Suplantar SOLO alrededor del despacho al motor: HKCU y las
+            // rutas de perfil (%TEMP%, etc.) deben resolverse en el hive del
+            // llamante, no en el de SYSTEM. La validación/autorización ya
+            // quedó atrás como SYSTEM. El gate solo cubre esta sección.
+            IpcResponse response;
+            using (callerIdentity)
+            {
+                try
+                {
+                    await _gate.WaitAsync(dispatchCts.Token);
+                }
+                catch (OperationCanceledException)
+                {
+                    await WriteResponse(pipe, IpcResponse.Rejected(ErrorCodes.IpcTimeout, "Servicio saturado (CAO-IPC-007)."), stoppingToken);
+                    return;
+                }
+                try
+                {
+                    var token = callerIdentity.AccessToken;
+                    response = await WindowsIdentity.RunImpersonated(token,
+                        () => DispatchOperationAsync(request, caller, dispatchCts.Token));
+                }
+                finally
+                {
+                    _gate.Release();
+                }
+            }
 
             logger.LogInformation(
-                "AuditorÃ­a IPC: requestedBy={Sid}/{Name} executedBy=SYSTEM op={Op} accepted={Accepted} code={Code}",
+                "Auditoría IPC: requestedBy={Sid}/{Name} executedBy=SYSTEM op={Op} accepted={Accepted} code={Code}",
                 caller.Sid, caller.Name, request?.Operation.ToString() ?? "?", response.Accepted, response.ErrorCode ?? "-");
 
             await WriteResponse(pipe, response, stoppingToken);
@@ -241,7 +330,9 @@ try { request = JsonSerializer.Deserialize<IpcRequest>(line, JsonOptions); }
 catch (Exception ex)
             {
                 logger.LogError(ex, "Fallo inesperado atendiendo la conexión IPC.");
-                await WriteResponse(pipe, IpcResponse.Rejected(ErrorCodes.IpcMalformedRequest, $"Error interno: {ex.GetType().Name} — {ex.Message}"), stoppingToken);
+                // Mensaje genérico al cliente (pre-auth o no): el detalle va
+                // solo al log del servicio para no filtrar internals.
+                await WriteResponse(pipe, IpcResponse.Rejected(ErrorCodes.IpcMalformedRequest, "Error interno del servicio."), stoppingToken);
             }
     }
 
@@ -283,44 +374,13 @@ catch (Exception ex)
     }
 
     /// <summary>
-    /// Ejecuta el despacho suplantando al llamante autorizado para que HKCU y
-    /// las rutas de perfil se resuelvan en su hive (no en el de SYSTEM).
-    /// No eleva privilegios: el llamante ya está autorizado como administrador
-    /// elevado; solo reduce el contexto de SYSTEM al del usuario. Si la
-    /// suplantación falla, se ejecuta como SYSTEM (comportamiento anterior).
+    /// Validación + autorización + anti-replay. Corre como SYSTEM, sin
+    /// suplantar y sin efectos: devuelve el rechazo o null si la solicitud
+    /// puede despacharse. Ping/Status ya se respondieron antes (no llegan
+    /// aquí); el resto se valida igual que antes, pero fuera de cualquier
+    /// contexto suplantado.
     /// </summary>
-    private async Task<IpcResponse> DispatchAsCallerAsync(
-        NamedPipeServerStream pipe,
-        Func<Task<IpcResponse>> dispatch)
-    {
-        WindowsIdentity? callerIdentity = null;
-        try
-        {
-            pipe.RunAsClient(() => { callerIdentity = WindowsIdentity.GetCurrent(); });
-        }
-        catch (Exception ex)
-        {
-            logger.LogWarning(ex, "No se pudo capturar el token del llamante; se ejecuta como SYSTEM.");
-        }
-        if (callerIdentity is null)
-        {
-            return await dispatch();
-        }
-        using (callerIdentity)
-        {
-            try
-            {
-                return await WindowsIdentity.RunImpersonated(callerIdentity.AccessToken, dispatch);
-            }
-            catch (Exception ex)
-            {
-                logger.LogWarning(ex, "Suplantación falló; reintento como SYSTEM.");
-                return await dispatch();
-            }
-        }
-    }
-
-    private async Task<IpcResponse> ValidateAndDispatchAsync(IpcRequest? request, CallerIdentity caller, CancellationToken ct)
+    private IpcResponse? ValidatePreconditions(IpcRequest? request, CallerIdentity caller)
     {
         if (!IpcRequestValidator.TryValidate(request, out var errorCode, out var error))
         {
@@ -331,7 +391,7 @@ catch (Exception ex)
         if (!authorization.Allowed)
         {
             return IpcResponse.Rejected(authorization.ReasonCode,
-                "El usuario actual no estÃ¡ autorizado para operaciones privilegiadas.");
+                "El usuario actual no está autorizado para operaciones privilegiadas.");
         }
 
         // Replay protection: request id and nonce are single-use.
@@ -340,17 +400,17 @@ catch (Exception ex)
             return IpcResponse.Rejected(ErrorCodes.IpcReplayDetected, "Solicitud repetida.");
         }
 
-        // Ping / GetServiceStatus no requieren OptimizationId (Â§10)
-        if (request.Operation is PrivilegedOperationKind.Ping)
-        {
-            var ping = new PingResponse(CAO.Shared.AppVersion.Semantic, IpcProtocol.Version, Environment.ProcessId, true, "running");
-            return IpcResponse.Ok(JsonSerializer.Serialize(ping, JsonOptions));
-        }
-        if (request.Operation is PrivilegedOperationKind.GetServiceStatus)
-        {
-            var status = new ServiceStatusResponse(CAO.Shared.AppVersion.Semantic, IpcProtocol.Version, Environment.ProcessId, true, "running", new[] { "ApplyOptimization", "RevertOptimization", "Ping" });
-            return IpcResponse.Ok(JsonSerializer.Serialize(status, JsonOptions));
-        }
+        return null;
+    }
+
+    /// <summary>
+    /// Despacho al motor. Se invoca YA suplantando al llamante (ver
+    /// HandleClientAsync): HKCU y rutas de perfil se resuelven en su hive.
+    /// Sin fallback a SYSTEM: si la suplantación falló, la solicitud ya fue
+    /// rechazada antes de llegar aquí.
+    /// </summary>
+    private async Task<IpcResponse> DispatchOperationAsync(IpcRequest request, CallerIdentity caller, CancellationToken ct)
+    {
 
             if (request.Operation == PrivilegedOperationKind.SetDns && request.Payload is SetDnsPayload dns)
             {
@@ -512,7 +572,7 @@ catch (Exception ex)
             {
                 PrivilegedOperationKind.ApplyOptimization => FromResult(await engine.ApplyAsync(optimizationId, caller, ct)),
                 PrivilegedOperationKind.RevertOptimization => FromResult(await engine.RevertAsync(optimizationId, caller, ct)),
-                PrivilegedOperationKind.CaptureSnapshot => Snapshot(engine.CaptureSnapshot(optimizationId)),
+                PrivilegedOperationKind.CaptureSnapshot => Snapshot(await engine.CaptureSnapshotAsync(optimizationId)),
                 PrivilegedOperationKind.VerifyOptimization => await VerifyAsync(engine.VerifyAsync(optimizationId, ct)),
                 PrivilegedOperationKind.DetectOptimization => IpcResponse.Ok($"\"{engine.Detect(optimizationId)}\""),
                 _ => IpcResponse.Rejected(ErrorCodes.IpcPayloadSchemaInvalid, "Operación no disponible."),
@@ -549,6 +609,15 @@ catch (Exception ex)
         try
         {
             var json = JsonSerializer.Serialize(response, JsonOptions);
+            // Cota de respuesta (IpcProtocol.MaxResponseBytes): un DetailJson
+            // gigante (p. ej. salida de pnputil sin truncar) no debe
+            // convertirse en OOM asimétrico en la UI.
+            if (System.Text.Encoding.UTF8.GetByteCount(json) > IpcProtocol.MaxResponseBytes)
+            {
+                json = JsonSerializer.Serialize(
+                    IpcResponse.Rejected(ErrorCodes.IpcMalformedRequest, "Respuesta excede 256KB."),
+                    JsonOptions);
+            }
             using var writer = new StreamWriter(pipe, System.Text.Encoding.UTF8, 1024, leaveOpen: true) { AutoFlush = true };
             await writer.WriteLineAsync(json.AsMemory(), ct);
             writer.Flush();

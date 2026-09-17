@@ -113,13 +113,14 @@ private async Task InstallAsync()
         try
         {
             // Detectar instalación existente para actualización
-            bool isUpdate = Directory.Exists(installDir) || Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\CA-O") != null;
+            using var uninstallKey = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\CA-O");
+            bool isUpdate = Directory.Exists(installDir) || uninstallKey != null;
             if (isUpdate)
             {
                 Log("Instalación existente detectada — se realizará actualización (se sobrescribirán archivos).");
                 try
                 {
-                    var existingVer = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\CA-O")?.GetValue("DisplayVersion") as string ?? "desconocida";
+                    var existingVer = uninstallKey?.GetValue("DisplayVersion") as string ?? "desconocida";
                     Log($"Versión instalada: {existingVer}");
                 }
                 catch { }

@@ -146,7 +146,9 @@ public sealed class OptimizationEngine
         OptimizationState preState;
         try
         {
-            preState = Resolve(optimizationId).Detect(_registry);
+            var precheck = Resolve(optimizationId);
+            PrepareServiceAwareOptimization(precheck);
+            preState = precheck.Detect(_registry);
         }
         catch
         {
@@ -171,6 +173,22 @@ public sealed class OptimizationEngine
         if (!IsRunningAsAdmin())
         {
             return OperationResult.Fail("Se requieren permisos de administrador para revertir cambios.", "not-admin");
+        }
+
+        // Mismas barreras que ApplyAsync: sin mutaciones durante recuperación
+        // pendiente ni en modo solo lectura (el revert también muta el sistema).
+        if (_hasPendingRecovery?.Invoke() == true)
+        {
+            return OperationResult.Fail(
+                "Se detectó una operación incompleta. El sistema está en modo recuperación.",
+                ErrorCodes.TxnRecoveryPending);
+        }
+
+        if (_settings?.Load().Ui.ReadOnlyMode == true)
+        {
+            return OperationResult.Fail(
+                "Modo de solo lectura activo: diagnóstico y benchmark disponibles, mutaciones deshabilitadas.",
+                ErrorCodes.SecReadOnlyMode);
         }
 
         TransactionSnapshotRecord? record = null;
@@ -214,12 +232,13 @@ public sealed class OptimizationEngine
     }
 
     /// <summary>Persists a fresh snapshot under a NEW transaction identity (P0-3).</summary>
-    public SnapshotDescriptor CaptureSnapshot(string optimizationId)
+    public async Task<SnapshotDescriptor> CaptureSnapshotAsync(string optimizationId)
     {
         var optimization = Resolve(optimizationId);
         PrepareServiceAwareOptimization(optimization);
         var snapshot = optimization.Capture(_registry);
         var txid = Guid.NewGuid();
+        var context = await GetContextAsync();
         _snapshots.Save(new CAO.Core.Rollback.TransactionSnapshotRecord
         {
             Manifest = new CAO.Core.Rollback.TransactionSnapshotManifest
@@ -229,7 +248,7 @@ public sealed class OptimizationEngine
                 DefinitionVersion = AppVersion.Semantic,
                 SchemaVersion = CAO.Core.Rollback.TransactionSnapshotDefaults.SchemaVersion,
                 AppVersion = AppVersion.Semantic,
-                WindowsBuild = 0,
+                WindowsBuild = context.WindowsBuild,
                 TimestampUtc = DateTime.UtcNow,
             },
             State = snapshot,
@@ -257,8 +276,8 @@ public sealed class OptimizationEngine
         if (parts.Length == 0) return OperationResult.Fail("IP DNS no especificada.", "invalid-ip");
         var primary = parts[0];
         var secondary = parts.Length > 1 ? parts[1] : null;
-        if (!System.Net.IPAddress.TryParse(primary, out _)) return OperationResult.Fail($"IP DNS inválida: {primary}", "invalid-ip");
-        if (secondary != null && !System.Net.IPAddress.TryParse(secondary, out _)) return OperationResult.Fail($"IP DNS secundaria inválida: {secondary}", "invalid-ip");
+        if (!IsIPv4(primary)) return OperationResult.Fail($"IP DNS inválida (solo IPv4): {primary}", "invalid-ip");
+        if (secondary != null && !IsIPv4(secondary)) return OperationResult.Fail($"IP DNS secundaria inválida (solo IPv4): {secondary}", "invalid-ip");
 
         // Regla mismo-proveedor: nunca mezclar (p. ej. nunca 2000.21.200.10 +
         // 1.1.1.1). Si llega un par mezclado (snapshot antiguo o llamada
@@ -748,7 +767,16 @@ public sealed class OptimizationEngine
                     return new CatalogDownloadOutcome(false, $"Paquete excesivo ({CatalogDriverProtocol.FormatSize(length.Value)}, máx. 1.5 GB).", string.Empty, Array.Empty<string>(), "too-big");
                 await using var content = await download.Content.ReadAsStreamAsync(ct);
                 await using var file = File.Create(cab);
-                await content.CopyToAsync(file, ct);
+                var buf = new byte[81920];
+                long written = 0;
+                int read;
+                while ((read = await content.ReadAsync(buf.AsMemory(0, buf.Length), ct)) > 0)
+                {
+                    written += read;
+                    if (written > CatalogDriverProtocol.MaxCabBytes)
+                        throw new IOException($"Paquete excede máximo 1.5 GB ({written} bytes).");
+                    await file.WriteAsync(buf.AsMemory(0, read), ct);
+                }
                 totalBytes = new FileInfo(cab).Length;
             }
             catch (OperationCanceledException) { throw; }
@@ -851,4 +879,8 @@ public sealed class OptimizationEngine
 
     private static OperationResult AppendWarning(OperationResult result, string? warning) =>
         warning is null ? result : new OperationResult(result.Success, result.MessageEs + " (Aviso: " + warning + ")", result.Error);
+
+    private static bool IsIPv4(string ip) =>
+        System.Net.IPAddress.TryParse(ip, out var addr) &&
+        addr.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork;
 }
