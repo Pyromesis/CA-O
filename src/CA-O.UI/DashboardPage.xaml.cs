@@ -18,6 +18,11 @@ public sealed partial class DashboardPage : Page
 {
     private readonly ViewModels.DashboardViewModel _vm;
     private bool _sampling;
+    private DispatcherTimer? _sleepTimer;
+    private DispatcherTimer? _celebrateTimer;
+    private bool _analysisRunning;
+    private DateTime? _lastSeenAnalysisUtc;
+    private static DateTime? s_lastAnalyzeClickUtc;
 
     public DashboardPage()
     {
@@ -26,6 +31,7 @@ public sealed partial class DashboardPage : Page
         _vm = AppHost.Resolve<ViewModels.DashboardViewModel>();
         DataContext = _vm;
         ApplyTexts();
+        RestoreCatMood();
         RenderHub();
         var uiState0 = AppHost.Resolve<ViewModels.UiState>();
         uiState0.LanguageChanged += (_, __) => DispatcherQueue.TryEnqueue(ApplyTexts);
@@ -40,6 +46,14 @@ public sealed partial class DashboardPage : Page
             if (e.PropertyName is null or nameof(ViewModels.UiState.Context) or nameof(ViewModels.UiState.Recommendations) or nameof(ViewModels.UiState.LastAnalysisUtc) or nameof(ViewModels.UiState.ServiceStatus) or nameof(ViewModels.UiState.UpdateAvailable) or nameof(ViewModels.UiState.LatestVersion))
                 DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Normal, RenderHub);
         };
+        uiState.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName is not null && e.PropertyName != nameof(ViewModels.UiState.LastAnalysisUtc))
+                return;
+            DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Normal, OnAnalysisCompleted);
+        };
+        PointerMoved += (_, __) => { try { ArmSleepTimer(); } catch { } };
+        Unloaded += (_, __) => { try { _sleepTimer?.Stop(); _celebrateTimer?.Stop(); } catch { } };
         Loaded += async (_, __) =>
         {
             Helpers.UiAnimations.PlayEntrance(PageContent);
@@ -103,6 +117,9 @@ public sealed partial class DashboardPage : Page
         ServiceDot.Fill = connected
             ? (Brush)Application.Current.Resources["SystemFillColorSuccessBrush"]
             : (Brush)Application.Current.Resources["SystemFillColorNeutralBrush"];
+        // Mascota: servicio caído al renderizar → Warn (sin pisar un análisis en curso).
+        if (!connected && !_analysisRunning)
+            SetCat("Warn");
 
         // Salud + índice global (solo medido)
         var report = context is null ? null : HealthEngine.Evaluate(context);
@@ -432,11 +449,116 @@ public sealed partial class DashboardPage : Page
         catch (Exception ex) { try { App.WriteCrashLog(ex); } catch { } }
     }
 
+    /// <summary>Cambia el mood del gato del héroe y lo persiste en <c>UiState</c>. Nunca lanza.</summary>
+    private void SetCat(string mood)
+    {
+        try
+        {
+            HeroCat.SetMood(mood);
+            AppHost.Resolve<ViewModels.UiState>().MascotMood = mood;
+            ArmSleepTimer();
+        }
+        catch { /* la mascota nunca rompe la página */ }
+    }
+
+    /// <summary>Rearma el temporizador de inactividad (10 min → Sleep). Nunca lanza.</summary>
+    private void ArmSleepTimer()
+    {
+        try
+        {
+            _sleepTimer?.Stop();
+            _sleepTimer ??= new DispatcherTimer { Interval = TimeSpan.FromMinutes(10) };
+            _sleepTimer.Tick -= OnSleepTick;
+            _sleepTimer.Tick += OnSleepTick;
+            _sleepTimer.Start();
+        }
+        catch { /* la mascota nunca rompe la página */ }
+    }
+
+    private void OnSleepTick(object? sender, object e)
+    {
+        try { SetCat("Sleep"); } catch { /* la mascota nunca rompe la página */ }
+    }
+
+    /// <summary>Programa la vuelta a Idle 4 s después de Celebrate. Nunca lanza.</summary>
+    private void ScheduleCelebrateReturn()
+    {
+        try
+        {
+            _celebrateTimer?.Stop();
+            _celebrateTimer ??= new DispatcherTimer { Interval = TimeSpan.FromSeconds(4) };
+            _celebrateTimer.Tick -= OnCelebrateTick;
+            _celebrateTimer.Tick += OnCelebrateTick;
+            _celebrateTimer.Start();
+        }
+        catch { /* la mascota nunca rompe la página */ }
+    }
+
+    private void OnCelebrateTick(object? sender, object e)
+    {
+        try
+        {
+            _celebrateTimer?.Stop();
+            if (_analysisRunning)
+                return;
+            SetCat("Idle");
+        }
+        catch { /* la mascota nunca rompe la página */ }
+    }
+
+    /// <summary>
+    /// Restaura el mood persistido al crear la página (p. ej. al volver desde
+    /// Analizar). Si el análisis terminó mientras esta página no existía,
+    /// celebra en lugar de quedarse en Working. Nunca lanza.
+    /// </summary>
+    private void RestoreCatMood()
+    {
+        try
+        {
+            var state = AppHost.Resolve<ViewModels.UiState>();
+            _lastSeenAnalysisUtc = state.LastAnalysisUtc;
+            var mood = state.MascotMood;
+            if (mood == "Working" && state.LastAnalysisUtc > s_lastAnalyzeClickUtc)
+            {
+                _analysisRunning = false;
+                SetCat("Celebrate");
+                ScheduleCelebrateReturn();
+                return;
+            }
+            if (mood == "Working")
+                _analysisRunning = true;
+            HeroCat.SetMood(mood);
+            ArmSleepTimer();
+        }
+        catch { /* la mascota nunca rompe la página */ }
+    }
+
+    /// <summary>Al completar un análisis: Celebrate y vuelta a Idle a los 4 s. Nunca lanza.</summary>
+    private void OnAnalysisCompleted()
+    {
+        try
+        {
+            var state = AppHost.Resolve<ViewModels.UiState>();
+            if (state.LastAnalysisUtc == _lastSeenAnalysisUtc)
+                return;
+            _lastSeenAnalysisUtc = state.LastAnalysisUtc;
+            if (!_analysisRunning && state.MascotMood != "Working")
+                return;
+            _analysisRunning = false;
+            SetCat("Celebrate");
+            ScheduleCelebrateReturn();
+        }
+        catch { /* la mascota nunca rompe la página */ }
+    }
+
     private async void OnAnalyzeClick(object sender, RoutedEventArgs e)
     {
         AnalyzeButton.IsEnabled = false;
         AnalyzingRing.IsActive = true;
         AnalyzeStatusText.Text = Localizer.Get("dashboard.analyzing");
+        s_lastAnalyzeClickUtc = DateTime.UtcNow;
+        _analysisRunning = true;
+        SetCat("Working");
         try
         {
             if (MainWindow.Current is not null)
@@ -446,6 +568,8 @@ public sealed partial class DashboardPage : Page
         }
         catch (Exception ex)
         {
+            _analysisRunning = false;
+            SetCat("Idle");
             AnalyzeStatusText.Text = "No se pudo iniciar el análisis.";
             App.WriteCrashLog(ex);
         }

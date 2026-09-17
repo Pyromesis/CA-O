@@ -2,7 +2,8 @@
     x:Class="CAO.UI.Pages.DashboardPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:helpers="using:CAO.UI.Helpers">
+    xmlns:helpers="using:CAO.UI.Helpers"
+    xmlns:controls="using:CAO.UI.Controls">
     <Grid Background="{ThemeResource SolidBackgroundFillColorBaseBrush}">
         <ScrollViewer Padding="{StaticResource CaoPagePadding}" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
         <StackPanel x:Name="PageContent" Style="{StaticResource CaoPageContainerStyle}">
@@ -55,6 +56,9 @@
                         </StackPanel>
                     </StackPanel>
                     <StackPanel Grid.Column="2" Spacing="10" MinWidth="250" VerticalAlignment="Center">
+                        <controls:CaoCat x:Name="HeroCat" Width="120" Height="140"
+                                         HorizontalAlignment="Center"
+                                         AutomationProperties.Name="Mascota de CA-O"/>
                         <Button x:Name="AnalyzeButton" Content="Analizar sistema" Click="OnAnalyzeClick" Style="{StaticResource CaoOpsPrimaryButtonStyle}" HorizontalAlignment="Stretch" AutomationProperties.Name="Analizar sistema"/>
                         <Button x:Name="OptimizeCtaButton" Content="Ver recomendadas" Click="OnGoOptimizeClick" Style="{StaticResource CaoElevatedButtonStyle}" HorizontalAlignment="Stretch" AutomationProperties.Name="Ver recomendaciones"/>
                         <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
