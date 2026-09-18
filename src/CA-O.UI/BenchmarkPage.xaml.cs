@@ -42,6 +42,7 @@ public sealed partial class BenchmarkPage : Page
     {
         base.OnNavigatedTo(e);
         ApplyTexts();
+        UiAnimations.PlayEntrance(PageContent);
     }
 
     private void RenderVm()
