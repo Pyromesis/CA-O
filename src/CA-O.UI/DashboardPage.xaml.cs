@@ -23,6 +23,11 @@ public sealed partial class DashboardPage : Page
     private bool _analysisRunning;
     private DateTime? _lastSeenAnalysisUtc;
     private static DateTime? s_lastAnalyzeClickUtc;
+    private readonly ViewModels.UiState _uiState;
+    private readonly System.ComponentModel.PropertyChangedEventHandler _onVmChanged;
+    private readonly System.ComponentModel.PropertyChangedEventHandler _onUiStateChanged;
+    private readonly System.ComponentModel.PropertyChangedEventHandler _onLastAnalysisChanged;
+    private readonly EventHandler<string> _onLanguageChanged;
 
     public DashboardPage()
     {
@@ -34,29 +39,35 @@ public sealed partial class DashboardPage : Page
         RestoreCatMood();
         RenderHub();
         var uiState0 = AppHost.Resolve<ViewModels.UiState>();
-        uiState0.LanguageChanged += (_, __) => DispatcherQueue.TryEnqueue(ApplyTexts);
-        _vm.PropertyChanged += (_, e) =>
+        _uiState = uiState0;
+        _onLanguageChanged = (_, __) => DispatcherQueue.TryEnqueue(ApplyTexts);
+        uiState0.LanguageChanged += _onLanguageChanged;
+        _onVmChanged = (_, e) =>
         {
             if (e.PropertyName is null or nameof(ViewModels.DashboardViewModel.Recommendations) or nameof(ViewModels.DashboardViewModel.StatusMessage))
                 DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Normal, RenderHub);
         };
+        _vm.PropertyChanged += _onVmChanged;
         var uiState = AppHost.Resolve<ViewModels.UiState>();
-        uiState.PropertyChanged += (_, e) =>
+        _onUiStateChanged = (_, e) =>
         {
             if (e.PropertyName is null or nameof(ViewModels.UiState.Context) or nameof(ViewModels.UiState.Recommendations) or nameof(ViewModels.UiState.LastAnalysisUtc) or nameof(ViewModels.UiState.ServiceStatus) or nameof(ViewModels.UiState.UpdateAvailable) or nameof(ViewModels.UiState.LatestVersion))
                 DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Normal, RenderHub);
         };
-        uiState.PropertyChanged += (_, e) =>
+        uiState.PropertyChanged += _onUiStateChanged;
+        _onLastAnalysisChanged = (_, e) =>
         {
             if (e.PropertyName is not null && e.PropertyName != nameof(ViewModels.UiState.LastAnalysisUtc))
                 return;
             DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Normal, OnAnalysisCompleted);
         };
+        uiState.PropertyChanged += _onLastAnalysisChanged;
         PointerMoved += (_, __) => { try { ArmSleepTimer(); } catch { } };
-        Unloaded += (_, __) => { try { _sleepTimer?.Stop(); _celebrateTimer?.Stop(); } catch { } };
+        Unloaded += OnUnloaded;
         Loaded += async (_, __) =>
         {
             Helpers.UiAnimations.PlayEntrance(PageContent);
+            try { ArmSleepTimer(); } catch { /* la mascota nunca rompe la página */ }
             RenderHub();
             if (uiState.Context is null)
             {
@@ -72,6 +83,23 @@ public sealed partial class DashboardPage : Page
             _ = SampleLiveAsync();
             App.BootMark("Panel interactivo");
         };
+    }
+
+    /// <summary>
+    /// Limpieza al descargar la página: detiene timers y desuscribe los handlers
+    /// del singleton <c>UiState</c> para no retener instancias viejas. Nunca lanza.
+    /// </summary>
+    private void OnUnloaded(object sender, RoutedEventArgs e)
+    {
+        try { _sleepTimer?.Stop(); _celebrateTimer?.Stop(); } catch { }
+        try
+        {
+            _uiState.LanguageChanged -= _onLanguageChanged;
+            _uiState.PropertyChanged -= _onUiStateChanged;
+            _uiState.PropertyChanged -= _onLastAnalysisChanged;
+            _vm.PropertyChanged -= _onVmChanged;
+        }
+        catch { /* la mascota nunca rompe la página */ }
     }
 
     private void ApplyTexts()
@@ -456,7 +484,10 @@ public sealed partial class DashboardPage : Page
         {
             HeroCat.SetMood(mood);
             AppHost.Resolve<ViewModels.UiState>().MascotMood = mood;
-            ArmSleepTimer();
+            if (mood == "Sleep")
+                try { _sleepTimer?.Stop(); } catch { }
+            else
+                ArmSleepTimer();
         }
         catch { /* la mascota nunca rompe la página */ }
     }
@@ -518,17 +549,25 @@ public sealed partial class DashboardPage : Page
             var state = AppHost.Resolve<ViewModels.UiState>();
             _lastSeenAnalysisUtc = state.LastAnalysisUtc;
             var mood = state.MascotMood;
-            if (mood == "Working" && state.LastAnalysisUtc > s_lastAnalyzeClickUtc)
+            bool completedWhileAway = state.LastAnalysisUtc > s_lastAnalyzeClickUtc
+                || (s_lastAnalyzeClickUtc is null && state.LastAnalysisUtc.HasValue);
+            if (mood == "Working" && completedWhileAway)
             {
                 _analysisRunning = false;
                 SetCat("Celebrate");
                 ScheduleCelebrateReturn();
                 return;
             }
+            if (mood == "Working" && s_lastAnalyzeClickUtc is null)
+            {
+                // Working obsoleto sin click registrado en este proceso: degradar a Idle.
+                _analysisRunning = false;
+                SetCat("Idle");
+                return;
+            }
             if (mood == "Working")
                 _analysisRunning = true;
-            HeroCat.SetMood(mood);
-            ArmSleepTimer();
+            SetCat(mood);
         }
         catch { /* la mascota nunca rompe la página */ }
     }
