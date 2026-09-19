@@ -10,7 +10,13 @@ public sealed record SystemBenchmarkResult(
     double MemoryBandwidthGbs,
     double DiskReadMbs,
     double DiskWriteMbs,
-    TimeSpan Elapsed)
+    TimeSpan Elapsed,
+    double CpuMs = 0,
+    double CpuCvPercent = 0,
+    double MemoryCvPercent = 0,
+    double DiskReadIops = 0,
+    double DiskWriteIops = 0,
+    Dictionary<string, double>? PhaseSeconds = null)
 {
     public string WorkloadId => Header.WorkloadId;
 }
@@ -47,7 +53,8 @@ public sealed class SystemBenchmarkRunner
         string workloadId = "system-baseline",
         CancellationToken ct = default)
     {
-        for (var warm = 0; warm < Core.Benchmark.BenchmarkPolicy.WarmupRuns; warm++)
+        var warmupRuns = warmup ? Core.Benchmark.BenchmarkPolicy.WarmupRuns : 0;
+        for (var warm = 0; warm < warmupRuns; warm++)
         {
             await RunAsync(workloadId + "-warmup" + (warm + 1), ct);
         }
@@ -60,11 +67,21 @@ public sealed class SystemBenchmarkRunner
         }
 
         var median = MedianOf(results);
-        return new SystemBenchmarkResult(
-            median.Header with { WorkloadId = workloadId },
-            median.CpuScore, median.MemoryBandwidthGbs,
-            median.DiskReadMbs, median.DiskWriteMbs,
-            median.Elapsed);
+        static double Cv(IEnumerable<double> values)
+        {
+            var arr = values.ToArray();
+            if (arr.Length < 2) return 0;
+            var avg = arr.Average();
+            if (avg == 0) return 0;
+            var sd = Math.Sqrt(arr.Average(v => (v - avg) * (v - avg)));
+            return Math.Round(sd / avg * 100, 2);
+        }
+        return median with
+        {
+            Header = median.Header with { WorkloadId = workloadId },
+            CpuCvPercent = Cv(results.Select(r => r.CpuScore)),
+            MemoryCvPercent = Cv(results.Select(r => r.MemoryBandwidthGbs)),
+        };
     }
 
     /// <summary>Per-metric median across trials (spec 83).</summary>
@@ -90,16 +107,25 @@ public sealed class SystemBenchmarkRunner
             MemoryBandwidthGbs = Median(result => result.MemoryBandwidthGbs),
             DiskReadMbs = Median(result => result.DiskReadMbs),
             DiskWriteMbs = Median(result => result.DiskWriteMbs),
+            CpuMs = Median(result => result.CpuMs),
         };
     }
 
     public async Task<SystemBenchmarkResult> RunAsync(string workloadId = "system-baseline", CancellationToken ct = default)
     {
-        var sw = Stopwatch.StartNew();
-        var cpu = await Task.Run(() => MeasureCpu(ct), ct);
+        var phases = new Dictionary<string, double>(StringComparer.Ordinal);
+        var swTotal = Stopwatch.StartNew();
+        var (cpuOps, cpuMs) = await Task.Run(() => MeasureCpu(ct), ct);
+        phases["cpu"] = cpuMs / 1000d;
+        var memSw = Stopwatch.StartNew();
         var memory = await Task.Run(() => MeasureMemoryBandwidth(ct), ct);
+        memSw.Stop();
+        phases["memory"] = memSw.Elapsed.TotalSeconds;
+        var diskSw = Stopwatch.StartNew();
         var (read, write) = await Task.Run(() => MeasureDisk(ct), ct);
-        sw.Stop();
+        diskSw.Stop();
+        phases["disk"] = diskSw.Elapsed.TotalSeconds;
+        swTotal.Stop();
 
         var header = new BenchmarkRunHeader(
             workloadId,
@@ -110,7 +136,8 @@ public sealed class SystemBenchmarkRunner
             0,
             PowerState());
 
-        return new SystemBenchmarkResult(header, cpu, memory, read, write, sw.Elapsed);
+        return new SystemBenchmarkResult(header, cpuOps, memory, read, write, swTotal.Elapsed,
+            CpuMs: cpuMs, PhaseSeconds: phases);
     }
 
     public static SystemBenchmarkComparison Compare(SystemBenchmarkResult baseline, SystemBenchmarkResult after)
@@ -143,47 +170,57 @@ public sealed class SystemBenchmarkRunner
     public static double PercentChange(double before, double after) =>
         before == 0 ? 0 : Math.Round((after - before) / before * 100, 2);
 
-    private static double MeasureCpu(CancellationToken ct)
+    private static (double OpsPerSecond, double Milliseconds) MeasureCpu(CancellationToken ct)
     {
-        // Fixed-size integer work: primes below a constant bound.
         const int bound = 300_000;
-        var count = 0L;
-        for (var candidate = 2; candidate < bound; candidate++)
-        {
-            ct.ThrowIfCancellationRequested();
-            var isPrime = true;
-            for (var divisor = 2; (long)divisor * divisor <= candidate; divisor++)
+        var sw = Stopwatch.StartNew();
+        var total = 0L;
+        Parallel.For(2, bound, new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount }, () => 0L,
+            (candidate, _, local) =>
             {
-                if (candidate % divisor == 0)
+                ct.ThrowIfCancellationRequested();
+                var isPrime = true;
+                for (var divisor = 2; (long)divisor * divisor <= candidate; divisor++)
                 {
-                    isPrime = false;
-                    break;
+                    if (candidate % divisor == 0) { isPrime = false; break; }
                 }
-            }
-            if (isPrime)
-            {
-                count++;
-            }
-        }
-        return count; // deterministic count => stable score across machines
+                return local + (isPrime ? 1 : 0);
+            },
+            local => Interlocked.Add(ref total, local));
+        sw.Stop();
+        return (total / sw.Elapsed.TotalSeconds, sw.Elapsed.TotalMilliseconds);
     }
+
+    private static readonly byte[] SharedSource = new byte[32 * 1024 * 1024];
+    private static readonly byte[] SharedTarget = new byte[32 * 1024 * 1024];
+    private static bool _memoryWarmedUp;
 
     private static double MeasureMemoryBandwidth(CancellationToken ct)
     {
-        const int size = 32 * 1024 * 1024; // 32 MB
-        var source = new byte[size];
-        var target = new byte[size];
-        Random.Shared.NextBytes(source);
-
-        var sw = Stopwatch.StartNew();
-        for (var round = 0; round < 4; round++)
+        const int size = 32 * 1024 * 1024;
+        if (!_memoryWarmedUp)
         {
-            ct.ThrowIfCancellationRequested();
-            Array.Copy(source, target, size);
+            Random.Shared.NextBytes(SharedSource);
+            Array.Copy(SharedSource, SharedTarget, size); // warmup fuera de crono
+            _memoryWarmedUp = true;
         }
-        sw.Stop();
-
-        var totalBytes = 4L * size * 2 / (1024d * 1024 * 1024); // read+write GBs
+        var noGc = false;
+        try { noGc = GC.TryStartNoGCRegion(128L * 1024 * 1024, disallowFullBlockingGC: true); } catch { }
+        var sw = Stopwatch.StartNew();
+        try
+        {
+            for (var round = 0; round < 4; round++)
+            {
+                ct.ThrowIfCancellationRequested();
+                Array.Copy(SharedSource, SharedTarget, size);
+            }
+        }
+        finally
+        {
+            sw.Stop();
+            if (noGc) { try { GC.EndNoGCRegion(); } catch { } }
+        }
+        var totalBytes = 4L * size * 2 / (1024d * 1024 * 1024);
         return totalBytes / sw.Elapsed.TotalSeconds;
     }
 
