@@ -38,7 +38,8 @@ public sealed class OptimizationEngine
         CAO.Core.Rollback.ITransactionJournal? journal = null,
         Func<bool>? hasPendingRecovery = null,
         ISettingsStore? settings = null,
-        Core.Interfaces.IDnsConfigurationProvider? dnsProvider = null)
+        Core.Interfaces.IDnsConfigurationProvider? dnsProvider = null,
+        Func<bool>? isRunningAsAdmin = null)
     {
         _registry = registry;
         _restorePoints = restorePoints;
@@ -51,11 +52,13 @@ public sealed class OptimizationEngine
         _hasPendingRecovery = hasPendingRecovery;
         _settings = settings;
         _dnsProvider = dnsProvider;
+        _isRunningAsAdmin = isRunningAsAdmin ?? IsRunningAsAdmin;
     }
 
     private readonly CAO.Core.Rollback.ITransactionJournal? _journal;
     private readonly Func<bool>? _hasPendingRecovery;
     private readonly ISettingsStore? _settings;
+    private readonly Func<bool> _isRunningAsAdmin;
 
     public static bool IsRunningAsAdmin()
     {
@@ -77,7 +80,7 @@ public sealed class OptimizationEngine
     /// <summary>Applies one optimization with all safety rails (transactional).</summary>
     public async Task<OperationResult> ApplyAsync(string optimizationId, Shared.Security.CallerIdentity? caller = null, CancellationToken ct = default)
     {
-        if (!IsRunningAsAdmin())
+        if (!_isRunningAsAdmin())
         {
             return OperationResult.Fail("Se requieren permisos de administrador para aplicar cambios.", "not-admin");
         }
@@ -106,10 +109,31 @@ public sealed class OptimizationEngine
         string? backupWarning = null;
         if (requiresRestorePoint && !_restorePointCreatedThisSession)
         {
-            var (ok, reason) = await _restorePoints.CreateAsync($"CA-O 2.0 — antes de {optimizationId}", ct);
-            if (ok)
+            // FASE 12: una operación irreversible sin punto de restauración es
+            // una ventana sin rollback. Si la creación falla (SR deshabilitado,
+            // disco lleno...) se aborta; solo lo reversible sigue con warning.
+            var notReversible = definition!.Definition.Flags.HasFlag(OptimizationFlags.NotReversible);
+            bool created;
+            string reason;
+            try
+            {
+                (created, reason) = await _restorePoints.CreateAsync($"CA-O 2.0 — antes de {optimizationId}", ct);
+            }
+            catch (Exception) when (notReversible)
+            {
+                return OperationResult.Fail(
+                    "Punto de restauración no disponible; operación irreversible abortada.",
+                    "no-restore-point");
+            }
+            if (created)
             {
                 _restorePointCreatedThisSession = true;
+            }
+            else if (notReversible)
+            {
+                return OperationResult.Fail(
+                    "Punto de restauración no disponible; operación irreversible abortada.",
+                    "no-restore-point");
             }
             else
             {
