@@ -29,6 +29,38 @@ public abstract class TempFileCleanupOptimization : IOptimization
             .Replace("%SystemRoot%", SystemRoot, StringComparison.OrdinalIgnoreCase)
             .Replace("%WinDir%", SystemRoot, StringComparison.OrdinalIgnoreCase);
 
+    /// <summary>Subdirectorios existentes bajo cada perfil de C:\Users. El servicio
+    /// corre como SYSTEM y %TEMP% solo le da el suyo: así se alcanza el Temp real
+    /// de cada usuario. Solo rutas absolutas existentes bajo \Users (nunca se
+    /// elevan rutas de usuario sin validar).</summary>
+    internal static IReadOnlyList<string> ProfileSubDirs(params string[] relativeParts)
+    {
+        var found = new List<string>();
+        try
+        {
+            var usersRoot = Path.Combine(Path.GetPathRoot(Environment.SystemDirectory) ?? @"C:\", "Users");
+            foreach (var profile in Directory.GetDirectories(usersRoot))
+            {
+                try
+                {
+                    var dir = profile;
+                    foreach (var part in relativeParts) dir = Path.Combine(dir, part);
+                    if (Directory.Exists(dir) && dir.Length > 3) found.Add(dir);
+                }
+                catch { }
+            }
+        }
+        catch { }
+        return found;
+    }
+
+    /// <summary>Temp de cada usuario interactivo (AppData\Local\Temp existente).</summary>
+    internal static IReadOnlyList<string> InteractiveUserTempDirs() =>
+        ProfileSubDirs("AppData", "Local", "Temp");
+
+    /// <summary>Formato de tamaño para mensajes. Base = KB (mensajes históricos intactos).</summary>
+    protected virtual string FormatSize(long bytes) => $"{bytes / 1024} KB";
+
     private IReadOnlyList<string> PendingFiles()
     {
         var found = new List<string>();
@@ -88,7 +120,7 @@ public abstract class TempFileCleanupOptimization : IOptimization
 
         _lastDeleted = deleted;
         return Task.FromResult(deleted > 0
-            ? OperationResult.Ok($"Limpieza completada: {deleted} fichero(s), {bytes / 1024} KB liberados.")
+            ? OperationResult.Ok($"Limpieza completada: {deleted} fichero(s), {FormatSize(bytes)} liberados.")
             : OperationResult.Ok("No quedaban ficheros antiguos para limpiar."));
     }
 
