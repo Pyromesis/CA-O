@@ -85,6 +85,8 @@ public sealed partial class LimpiezaPage : Page
         "enable-storage-sense" or "storage-sense-temp-cleanup"
             or "storage-sense-recycle-bin-policy" => SenseStatusText,
         "free-low-storage-space" => SpaceStatusText,
+        "cleanup-prefetch-stale" or "cleanup-cbs-logs" or "cleanup-crash-dumps-extended"
+            or "cleanup-outlook-cache" or "cleanup-browser-code-cache" => DeepStatusText,
         _ => CleanupStatusText,
     };
 
@@ -100,6 +102,8 @@ public sealed partial class LimpiezaPage : Page
                 "Ejecuta desfragmentado/TRIM en C:. Tarda varios minutos y es mejor no usar el disco mientras tanto. ¿Continuar?"),
             "disable-hibernate" => ("Desactivar hibernación",
                 "Libera varios GB (hiberfil.sys) pero desactiva hibernación e inicio rápido. Reversible. ¿Continuar?"),
+            "cleanup-crash-dumps-extended" => ("Volcados extendidos",
+                "Borra LiveKernelReports, MEMORY.DMP y CrashDumps de usuario de más de 30 días. Dificulta depurar fallos antiguos y no se puede deshacer. ¿Continuar?"),
             _ => (null, null),
         };
         if (title is null) return true;

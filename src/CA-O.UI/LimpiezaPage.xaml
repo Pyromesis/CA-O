@@ -30,6 +30,8 @@
                             <Setter Target="CardSense.(Grid.Column)" Value="0"/>
                             <Setter Target="MiniStack.(Grid.Row)" Value="5"/>
                             <Setter Target="MiniStack.(Grid.Column)" Value="0"/>
+                            <Setter Target="CardDeep.(Grid.Row)" Value="6"/>
+                            <Setter Target="CardDeep.(Grid.Column)" Value="0"/>
                         </VisualState.Setters>
                     </VisualState>
                 </VisualStateGroup>
@@ -47,7 +49,7 @@
                     <ColumnDefinition x:Name="Col2" Width="*"/>
                 </Grid.ColumnDefinitions>
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
                 <!-- Archivos temporales -->
@@ -368,6 +370,64 @@
                         </StackPanel>
                     </Border>
                 </StackPanel>
+                <!-- Limpieza profunda (nuevas rutas seguras) -->
+                <Border x:Name="CardDeep" Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="2" Style="{StaticResource CaoCardStyle}" VerticalAlignment="Stretch" helpers:UiAnimations.CardHover="True">
+                    <Grid RowSpacing="4">
+                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                        <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="10" Margin="0,0,0,6">
+                            <Border Width="36" Height="36" CornerRadius="18" Background="{StaticResource CaoAmberSoftBrush}">
+                                <FontIcon Glyph="&#xE9D9;" FontSize="16" Foreground="{StaticResource CaoAmberSolidBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Text="Limpieza profunda" FontWeight="SemiBold" FontSize="14"/>
+                                <TextBlock Text="Nuevas rutas seguras · informa archivos y MB" FontSize="11" Opacity="0.65"/>
+                            </StackPanel>
+                        </StackPanel>
+                        <StackPanel Grid.Row="1" Spacing="0">
+                            <Grid ColumnSpacing="12" Padding="0,8,0,8">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                <StackPanel Spacing="2" VerticalAlignment="Center">
+                                    <TextBlock Text="Prefetch antiguo" FontWeight="SemiBold" FontSize="13"/>
+                                    <TextBlock Text="*.pf de +30 días. Solo espacio, no acelera." FontSize="11" Opacity="0.7" TextWrapping="Wrap"/>
+                                </StackPanel>
+                                <Button Grid.Column="1" Content="Limpiar" Tag="cleanup-prefetch-stale" Click="OnCleanClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="128" VerticalAlignment="Center" AutomationProperties.Name="Limpiar prefetch antiguo" ToolTipService.ToolTip="Borra rastros prefetch (*.pf) de más de 30 días. Solo libera espacio; Windows lo reconstruye."/>
+                            </Grid>
+                            <Grid ColumnSpacing="12" Padding="0,8,0,8">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                <StackPanel Spacing="2" VerticalAlignment="Center">
+                                    <TextBlock Text="Registros CBS" FontWeight="SemiBold" FontSize="13"/>
+                                    <TextBlock Text="*.log de +30 días en Windows\Logs\CBS." FontSize="11" Opacity="0.7" TextWrapping="Wrap"/>
+                                </StackPanel>
+                                <Button Grid.Column="1" Content="Limpiar" Tag="cleanup-cbs-logs" Click="OnCleanClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="128" VerticalAlignment="Center" AutomationProperties.Name="Limpiar registros CBS" ToolTipService.ToolTip="Borra registros CBS (*.log) de más de 30 días. Solo libera espacio."/>
+                            </Grid>
+                            <Grid ColumnSpacing="12" Padding="0,8,0,8">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                <StackPanel Spacing="2" VerticalAlignment="Center">
+                                    <TextBlock Text="Volcados extendidos" FontWeight="SemiBold" FontSize="13"/>
+                                    <TextBlock Text="LiveKernelReports, MEMORY.DMP y CrashDumps +30 días. Pide confirmación." FontSize="11" Opacity="0.7" TextWrapping="Wrap"/>
+                                </StackPanel>
+                                <Button Grid.Column="1" Content="Limpiar" Tag="cleanup-crash-dumps-extended" Click="OnCleanClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="128" VerticalAlignment="Center" AutomationProperties.Name="Limpiar volcados extendidos" ToolTipService.ToolTip="Borra LiveKernelReports, MEMORY.DMP y CrashDumps de usuario de más de 30 días. Pide confirmación: dificulta depurar fallos viejos."/>
+                            </Grid>
+                            <Grid ColumnSpacing="12" Padding="0,8,0,8">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                <StackPanel Spacing="2" VerticalAlignment="Center">
+                                    <TextBlock Text="Caché de Outlook" FontWeight="SemiBold" FontSize="13"/>
+                                    <TextBlock Text="Adjuntos temporales +7 días, todos los usuarios." FontSize="11" Opacity="0.7" TextWrapping="Wrap"/>
+                                </StackPanel>
+                                <Button Grid.Column="1" Content="Limpiar" Tag="cleanup-outlook-cache" Click="OnCleanClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="128" VerticalAlignment="Center" AutomationProperties.Name="Limpiar caché de Outlook" ToolTipService.ToolTip="Borra adjuntos temporales de Outlook (Content.Outlook) de más de 7 días. Se regeneran solos."/>
+                            </Grid>
+                            <Grid ColumnSpacing="12" Padding="0,8,0,8">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                <StackPanel Spacing="2" VerticalAlignment="Center">
+                                    <TextBlock Text="Cachés de navegadores" FontWeight="SemiBold" FontSize="13"/>
+                                    <TextBlock Text="Chrome, Edge y Teams. Cierra cada app antes." FontSize="11" Opacity="0.7" TextWrapping="Wrap"/>
+                                </StackPanel>
+                                <Button Grid.Column="1" Content="Limpiar" Tag="cleanup-browser-code-cache" Click="OnCleanClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="128" VerticalAlignment="Center" AutomationProperties.Name="Limpiar cachés de navegadores" ToolTipService.ToolTip="Vacía cachés regenerables de Chrome, Edge y Teams (nunca sesiones ni contraseñas). Cierra cada app primero o se omite lo en uso."/>
+                            </Grid>
+                        </StackPanel>
+                        <TextBlock Grid.Row="2" x:Name="DeepStatusText" FontSize="11" Opacity="0.75" TextWrapping="Wrap" VerticalAlignment="Bottom" AutomationProperties.LiveSetting="Polite"/>
+                    </Grid>
+                </Border>
             </Grid>
         </StackPanel>
     </ScrollViewer>
