@@ -105,7 +105,7 @@ public sealed partial class OptimizeViewModel : ObservableObject
         var context = _state.Context ?? await _contextProvider.GetAsync(ct);
         _state.Context = context;
 
-        var catalog = CAO.Core.Catalog.OptimizationCatalog.All;
+        var catalog = CAO.Core.Catalog.CatalogProjections.BatchDefault;
         _state.Recommendations = CAO.Core.Engine.RecommendationEngine.BuildAll(catalog, _registry, context);
     }
 }
