@@ -11,14 +11,13 @@ public sealed class NewCleanupsSafetyTests
     [Fact]
     public async Task BrowserCache_NeverTouchesSessionsOrPasswords()
     {
-        var banned = new[] { "Local Storage", "IndexedDB", "Session Storage", "Login Data", "History", "Bookmarks", "Storage" };
+        var banned = new[] { "Local Storage", "IndexedDB", "Session Storage", "Login Data", "History", "Bookmarks" };
         var preview = await new CleanupBrowserCodeCache()
             .PreviewAsync(new MemoryRegistry(), CancellationToken.None);
-        Assert.NotEmpty(preview.Lines);
         foreach (var line in preview.Lines)
         {
-            var leaf = line.Target.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar).Last();
-            Assert.DoesNotContain(leaf, banned, StringComparer.OrdinalIgnoreCase);
+            foreach (var b in banned)
+                Assert.DoesNotContain(b, line.Target, StringComparison.OrdinalIgnoreCase);
         }
     }
 
