@@ -27,23 +27,28 @@ public sealed partial class CaoCat : UserControl
 
     private void ApplyMood()
     {
-        var (caption, key) = CatMoodCatalog.Resolve(Mood);
-        CaptionText.Text = caption;
-        // Vía campos x:Name generados (verificada en compilación). Cada Storyboard
-        // lleva además x:Key gemelo ("<AnimationKey>Board") por si hiciera falta
-        // la vía fallback: (Storyboard)CatBody.Resources[key + "Board"].
-        var boards = new Storyboard[] { IdleBoard, WorkingBoard, CelebrateBoard, WarnBoard, SleepBoard };
-        foreach (var board in boards)
-            board.Stop();
-        if (!Accessibility.ReducedMotion.ShouldAnimate) return;
-        Storyboard run = key switch
+        try
         {
-            "Working" => WorkingBoard,
-            "Celebrate" => CelebrateBoard,
-            "Warn" => WarnBoard,
-            "Sleep" => SleepBoard,
-            _ => IdleBoard,
-        };
-        run.Begin();
+            if (CaptionText is null) return;
+            var (caption, key) = CatMoodCatalog.Resolve(Mood);
+            CaptionText.Text = caption;
+            // Vía campos x:Name generados (verificada en compilación). Cada Storyboard
+            // lleva además x:Key gemelo ("<AnimationKey>Board") por si hiciera falta
+            // la vía fallback: (Storyboard)CatBody.Resources[key + "Board"].
+            var boards = new Storyboard[] { IdleBoard, WorkingBoard, CelebrateBoard, WarnBoard, SleepBoard };
+            foreach (var board in boards)
+                board?.Stop();
+            if (!Accessibility.ReducedMotion.ShouldAnimate) return;
+            Storyboard run = key switch
+            {
+                "Working" => WorkingBoard,
+                "Celebrate" => CelebrateBoard,
+                "Warn" => WarnBoard,
+                "Sleep" => SleepBoard,
+                _ => IdleBoard,
+            };
+            run?.Begin();
+        }
+        catch { /* la mascota nunca rompe la página */ }
     }
 }
