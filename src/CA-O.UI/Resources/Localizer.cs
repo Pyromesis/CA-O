@@ -218,6 +218,7 @@ public static class Localizer
         ["benchmark.exportCsv"] = "Exportar CSV",
         ["benchmark.unavailable"] = "No disponible en este equipo",
         ["benchmark.ctxOpt"] = "Midiendo el impacto de",
+        ["benchmark.bootFormat"] = "Último arranque: {0} · En actividad: {1}",
         // Gaming
         ["gaming.vendorTech"] = "Tecnologías del fabricante",
         ["gaming.scan"] = "Escanear sistema gaming",
@@ -443,6 +444,7 @@ public static class Localizer
         ["benchmark.exportCsv"] = "Export CSV",
         ["benchmark.unavailable"] = "Not available on this machine",
         ["benchmark.ctxOpt"] = "Measuring the impact of",
+        ["benchmark.bootFormat"] = "Last boot: {0} · Uptime: {1}",
         ["gaming.vendorTech"] = "Vendor technologies",
         ["gaming.scan"] = "Scan gaming system",
         ["restore.title"] = "Restore",

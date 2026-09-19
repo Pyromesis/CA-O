@@ -110,7 +110,7 @@ public sealed partial class BenchmarkPage : Page
             else
             {
                 var local = boot.BootTimeUtc.ToLocalTime();
-                BootText.Text = $"Último arranque: {local:g} · En actividad: {FormatUptime(boot.Uptime)}";
+                BootText.Text = Localizer.Format("benchmark.bootFormat", local.ToString("g"), FormatUptime(boot.Uptime));
             }
             _vm.BootSummary = BootText.Text;
         }
@@ -129,6 +129,7 @@ public sealed partial class BenchmarkPage : Page
     {
         _uiState.PendingBenchmarkOptimizationId = string.Empty;
         _uiState.PendingBenchmarkCategory = string.Empty;
+        _autoStartedFor = null;
         OptContextCard.Visibility = Visibility.Collapsed;
     }
 
@@ -217,7 +218,7 @@ public sealed partial class BenchmarkPage : Page
             FillDeltaRow(DiskRBeforeText, DiskRAfterText, DiskRDeltaText, session.Before.DiskReadMbs, session.After?.DiskReadMbs);
             FillDeltaRow(DiskWBeforeText, DiskWAfterText, DiskWDeltaText, session.Before.DiskWriteMbs, session.After?.DiskWriteMbs);
             DeltaTable.Visibility = Visibility.Visible;
-            ExportCsvButton.Visibility = Visibility.Visible;
+            ExportCsvButton.Visibility = hasAfter ? Visibility.Visible : Visibility.Collapsed;
             if (hasAfter)
             {
                 SetSpark(CpuSpark, session.Before.CpuScore, session.After!.CpuScore);
