@@ -8,7 +8,7 @@ namespace CAO.Core.Tests;
 
 /// <summary>Contrato anti-duplicados (spec §5.3): dos IDs distintos no pueden
 /// reclamar el mismo directorio de limpieza ni la misma clave de registro,
-/// salvoallowlist explícita con justificación. Impide futuros WU-dups en CI.</summary>
+/// salvo allowlist explícita con justificación. Impide futuros WU-dups en CI.</summary>
 public sealed class NoDuplicateTargetsTests
 {
     /// <summary>Pares declarados que comparten objetivo a propósito (vacío hoy).</summary>

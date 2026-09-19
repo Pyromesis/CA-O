@@ -404,7 +404,7 @@ Todas son `RegistryOptimizationBase` puras (reversión exacta). Ej. `disable-tel
 - `disable-pcie-link-state-power-saving-ac` → `HKLM\SYSTEM\CurrentControlSet\Services\pci\Parameters\DisableLinkStateThrottling=1`
 - Resto: políticas de `USB selective suspend`, `Wireless max performance`, limpieza de planes huérfanos
 
-#### Storage (17)
+#### Storage (21)
 
 - `disable-hibernate` → `powercfg /h off` (libera `hiberfil.sys`)
 - `ensure-trim-enabled` / `retrim-system-ssd` / `optimize-system-drive` → `fsutil` + `defrag /O` (para desfragmentación profunda con umbral: `defragment-hdd-only`)

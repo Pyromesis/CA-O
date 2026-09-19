@@ -156,7 +156,7 @@ public static class OptimizationCatalog
     public static readonly RestartWindowsExplorer RestartWindowsExplorer = new();
     public static readonly RecoverWindowsExplorer RecoverWindowsExplorer = new();
 
-    /// <summary>Production catalog: 87 verified optimizations. All optimizations are now in production.</summary>
+    /// <summary>Production catalog: 92 verified optimizations. All optimizations are now in production.</summary>
     public static IReadOnlyList<IOptimization> All { get; } = new IOptimization[]
     {
         DisableBackgroundApps,
