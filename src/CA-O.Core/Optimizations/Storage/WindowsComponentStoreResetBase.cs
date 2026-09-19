@@ -28,6 +28,7 @@ public sealed class WindowsComponentStoreResetBase : IOptimization
         Impact = ImpactLevel.Medium,
         Reversible = false,
         Flags = OptimizationFlags.NotReversible | OptimizationFlags.ExpertOnly,
+        RequiresRestorePoint = true,
     };
 
     public OptimizationState Detect(IRegistryAccessor registry) => OptimizationState.NotApplied;

@@ -26,6 +26,7 @@ public sealed class ResetNetworkStackRepair : IOptimization
         Impact = ImpactLevel.Low,
         Reversible = false,
         Flags = OptimizationFlags.NotReversible | OptimizationFlags.RequiresReboot,
+        RequiresRestorePoint = true,
     };
 
     public OptimizationState Detect(IRegistryAccessor registry) => OptimizationState.NotApplied;

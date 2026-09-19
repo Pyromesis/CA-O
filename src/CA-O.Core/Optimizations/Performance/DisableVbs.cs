@@ -32,6 +32,7 @@ public sealed class DisableVbs : IOptimization
         SecurityImpact = SecurityImpact.ReducedProtection,
         Impact = ImpactLevel.High,
         Flags = OptimizationFlags.ExpertOnly | OptimizationFlags.SecurityTradeoff | OptimizationFlags.RequiresReboot,
+        RequiresRestorePoint = true,
     };
 
     private static string Id => "disable-vbs";

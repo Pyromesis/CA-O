@@ -21,7 +21,7 @@ public sealed class DisableDynamicTick : IOptimization
         NameEn = "Steady tick (no dynamic tick)",
         DescriptionEs = "El planificador no detiene su reloj en idle (bcdedit).",
         DescriptionEn = "The scheduler never stops its clock at idle (bcdedit).",
-        TooltipEs = "Puede estabilizar latencia/DPC en algunos equipos; en otros no cambia nada y gasta algo más en idle. Requiere reinicio. Reversible al default.",
+        TooltipEs = "Puede estabilizar latencia/DPC en algunos equipos; en otros no cambia nada y gasta algo más en idle. En Windows 10/11 moderno el tick dinámico en idle apenas afecta; placebo probable. Solo Expertos. Requiere reinicio. Reversible al default.",
         Category = OptimizationCategory.Performance,
         ExpectedImpact = PerformanceImpact.Small,
         Evidence = EvidenceLevel.Empirical,
@@ -31,7 +31,7 @@ public sealed class DisableDynamicTick : IOptimization
         Compatibility = CompatibilityStatus.Conditional,
         SecurityImpact = SecurityImpact.None,
         Impact = ImpactLevel.Low,
-        Flags = OptimizationFlags.RequiresReboot,
+        Flags = OptimizationFlags.ExpertOnly | OptimizationFlags.RequiresReboot,
     };
 
     public OptimizationState Detect(IRegistryAccessor registry) => OptimizationState.Unknown;
