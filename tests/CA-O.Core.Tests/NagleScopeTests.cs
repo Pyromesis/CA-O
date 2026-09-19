@@ -109,6 +109,30 @@ public sealed class NagleScopeTests
     }
 
     [Fact]
+    public async Task NagleMatchesRegistrySubkeyWithoutBraces()
+    {
+        // En producción las subclaves del registro vienen SIN llaves, mientras
+        // que la BCL reporta los Ids CON llaves: la intersección solo cierra si
+        // NormalizeId las quita. Sin esa normalización Apply tocaría cero NICs
+        // (Fail perpetuo) mientras la suite seguiría en verde.
+        const string bareGuid = "11111111-2222-3333-4444-555555555555";
+        var nagle = new DisableNagleTcpAcks();
+        var registry = new MemoryRegistry();
+        registry.SetValue(RegistryHive2.LocalMachine, KeyFor(bareGuid), "DhcpIPAddress", "1.2.3.4", RegistryValueKind2.String);
+        var nics = new[]
+        {
+            (PhysGuid, "Ethernet", "Intel Ethernet Controller", NetworkInterfaceType.Ethernet, OperationalStatus.Up),
+        };
+        var context = new OptimizationContext { Registry = registry };
+
+        Assert.Single(DisableNagleTcpAcks.PhysicalCandidateIds(registry, nics));
+
+        var applied = await nagle.ApplyAsync(context, nics);
+        Assert.True(applied.Success);
+        Assert.True(DisableNagleTcpAcks.HasNagleOff(registry, bareGuid));
+    }
+
+    [Fact]
     public void GamingTooltipsDocumentTradeoffs()
     {
         Assert.Contains("audio", new MmcssSystemResponsiveness().Definition.TooltipEs, StringComparison.OrdinalIgnoreCase);
