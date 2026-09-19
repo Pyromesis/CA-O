@@ -151,4 +151,33 @@ public sealed class E2EFlowsTests
         Assert.False(string.IsNullOrWhiteSpace(cmp.VerdictEs));
         Assert.True(cmp.CpuDeltaPercent > 0);
     }
+
+    [Fact] // Benchmark A/B completado -> línea bench: en el historial
+    public async Task BenchmarkSession_ProducesHistoryBenchLine()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), $"cao-bench-e2e-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(dir);
+        try
+        {
+            var header = new BenchmarkRunHeader("b", DateTime.UtcNow, 26200, "", "", 0, "ac", MachineHash: "h1");
+            var baseline = new SystemBenchmarkResult(header, 50_000, 20, 400, 350, TimeSpan.Zero);
+            var after = baseline with { DiskReadMbs = 460 };
+            var comparison = SystemBenchmarkRunner.CompareFull(baseline, after, OptimizationCategory.Storage);
+
+            var logger = new JsonHistoryLogger(Path.Combine(dir, "history.jsonl"));
+            logger.Log(new HistoryEntry
+            {
+                TimestampUtc = DateTime.UtcNow,
+                OptimizationId = "cleanup-windows-temp",
+                Operation = "benchmark",
+                Success = comparison.VerdictEs == "Mejora medible",
+                BenchmarkSummary = $"disco R {comparison.DiskReadDeltaPercent:+0.0;-0.0}% — {comparison.VerdictEs}",
+            });
+
+            var lines = await File.ReadAllLinesAsync(Path.Combine(dir, "history.jsonl"));
+            Assert.Single(lines);
+            Assert.Contains("bench", lines[0], StringComparison.OrdinalIgnoreCase);
+        }
+        finally { try { Directory.Delete(dir, recursive: true); } catch { } }
+    }
 }

@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CAO.Core.Engine;
 using CAO.Infrastructure.Benchmarking;
+using CAO.Infrastructure.Logging;
 using CAO.Infrastructure.Networking;
 using CAO.Shared;
 
@@ -86,6 +87,19 @@ public sealed partial class BenchmarkViewModel : ObservableObject
                 LastSessionPath = BenchmarkStore.SessionPathFor(optimizationId, DateTime.UtcNow);
                 await BenchmarkStore.SaveJsonAsync(LastSessionPath,
                     new BenchmarkSession(baseline, result, null, null, category, optimizationId), ct);
+                try
+                {
+                    new JsonHistoryLogger().Log(new HistoryEntry
+                    {
+                        TimestampUtc = DateTime.UtcNow,
+                        AppVersion = AppVersion.Semantic,
+                        OptimizationId = optimizationId,
+                        Operation = "benchmark",
+                        Success = comparison.VerdictEs != "Regresión",
+                        BenchmarkSummary = $"CPU {comparison.CpuDeltaPercent:+0.0;-0.0}% MEM {comparison.MemoryDeltaPercent:+0.0;-0.0}% R {comparison.DiskReadDeltaPercent:+0.0;-0.0}% W {comparison.DiskWriteDeltaPercent:+0.0;-0.0}% — {comparison.VerdictEs}",
+                    });
+                }
+                catch { /* el historial nunca rompe el benchmark */ }
             }
             Status = $"Benchmark completado — {Verdict}";
         }
