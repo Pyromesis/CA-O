@@ -206,7 +206,7 @@ public sealed class SystemBenchmarkRunner
         const int bound = 300_000;
         var sw = Stopwatch.StartNew();
         var total = 0L;
-        Parallel.For(2, bound, new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount }, () => 0L,
+        Parallel.For(2, bound, new ParallelOptions { CancellationToken = ct, MaxDegreeOfParallelism = Environment.ProcessorCount }, () => 0L,
             (candidate, _, local) =>
             {
                 ct.ThrowIfCancellationRequested();
@@ -224,7 +224,7 @@ public sealed class SystemBenchmarkRunner
 
     private static readonly byte[] SharedSource = new byte[32 * 1024 * 1024];
     private static readonly byte[] SharedTarget = new byte[32 * 1024 * 1024];
-    private static bool _memoryWarmedUp;
+    private static volatile bool _memoryWarmedUp;
 
     private static double MeasureMemoryBandwidth(CancellationToken ct)
     {
@@ -272,7 +272,7 @@ public sealed class SystemBenchmarkRunner
         {
             return MeasureDiskAtPath(primary, ct);
         }
-        catch (UnauthorizedAccessException)
+        catch (Exception ex) when (ex is UnauthorizedAccessException or IOException)
         {
             var fallback = Path.Combine(Path.GetTempPath(), $"cao-bench-{Guid.NewGuid():N}.tmp");
             return MeasureDiskAtPath(fallback, ct);

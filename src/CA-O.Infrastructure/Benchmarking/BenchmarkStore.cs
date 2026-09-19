@@ -93,15 +93,35 @@ public static class BenchmarkStore
     {
         try
         {
-            using var searcher = new System.Management.ManagementObjectSearcher(
-                "SELECT MediaType FROM Win32_DiskDrive");
-            foreach (var disk in searcher.Get())
+            // Correlaciona el root con SU disco físico: LogicalDisk → Partition → DiskDrive.
+            var deviceId = (Path.GetPathRoot(root) ?? root).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            if (string.IsNullOrWhiteSpace(deviceId)) return true;
+            var safeId = deviceId.Replace("'", string.Empty);
+            using var logicalSearcher = new System.Management.ManagementObjectSearcher(
+                $"SELECT DeviceID FROM Win32_LogicalDisk WHERE DeviceID='{safeId}'");
+            foreach (System.Management.ManagementObject logical in logicalSearcher.Get())
             {
-                var media = disk["MediaType"]?.ToString() ?? string.Empty;
-                if (media.Contains("Fixed", StringComparison.OrdinalIgnoreCase)) return true; // HDD clásico informa Fixed hard disk media
+                using (logical)
+                {
+                    foreach (System.Management.ManagementObject partition in logical.GetRelated("Win32_DiskPartition"))
+                    {
+                        using (partition)
+                        {
+                            foreach (System.Management.ManagementObject drive in partition.GetRelated("Win32_DiskDrive"))
+                            {
+                                using (drive)
+                                {
+                                    var media = drive["MediaType"]?.ToString() ?? string.Empty;
+                                    if (media.Contains("Fixed", StringComparison.OrdinalIgnoreCase)) return true;
+                                }
+                            }
+                        }
+                    }
+                }
+                return false; // volumen localizado en un disco físico no-HDD
             }
         }
         catch { }
-        return false;
+        return true; // correlación imposible: fallback conservador (timeout largo)
     }
 }

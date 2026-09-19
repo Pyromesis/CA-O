@@ -48,6 +48,7 @@ public sealed partial class BenchmarkViewModel : ObservableObject
     {
         IsRunning = true;
         Status = "Midiendo…";
+        CurrentStep = isBaseline ? "Paso 1: Midiendo línea base…" : "Paso 3: Midiendo tras el cambio…";
         try
         {
             var runner = new SystemBenchmarkRunner();
@@ -63,6 +64,7 @@ public sealed partial class BenchmarkViewModel : ObservableObject
                     new BenchmarkSession(result, null, null, null, category, optimizationId), ct);
                 ComparisonSummary = "✓ Línea base guardada (mediana de 3 trials).";
                 Verdict = "Línea base lista";
+                CurrentStep = "Paso 1: Línea base guardada";
             }
             else
             {
@@ -81,9 +83,11 @@ public sealed partial class BenchmarkViewModel : ObservableObject
                     return;
                 }
                 var parsed = Enum.TryParse<OptimizationCategory>(category, out var cat) ? cat : (OptimizationCategory?)null;
+                CurrentStep = "Paso 4: Comparando resultados…";
                 var comparison = SystemBenchmarkRunner.CompareFull(baseline, result, parsed);
-                ComparisonSummary = $"CPU: {comparison.CpuDeltaPercent:+0.0;-0.0}% | Memoria: {comparison.MemoryDeltaPercent:+0.0;-0.0}% | Disco R: {comparison.DiskReadDeltaPercent:+0.0;-0.0}% W: {comparison.DiskWriteDeltaPercent:+0.0;-0.0}% — {comparison.VerdictEs} (suelo ±3%, mediana 3 trials).\n{comparison.ReasonEs}";
+                ComparisonSummary = $"CPU: {comparison.CpuDeltaPercent:+0.0;-0.0}% | Memoria: {comparison.MemoryDeltaPercent:+0.0;-0.0}% | Disco R: {comparison.DiskReadDeltaPercent:+0.0;-0.0}% W: {comparison.DiskWriteDeltaPercent:+0.0;-0.0}% — {comparison.VerdictEs} (suelo ±{SystemBenchmarkRunner.NoiseFloorPercent:0}%, mediana 3 trials).\n{comparison.ReasonEs}";
                 Verdict = comparison.VerdictEs;
+                CurrentStep = $"Paso 5: Veredicto — {comparison.VerdictEs}";
                 LastSessionPath = BenchmarkStore.SessionPathFor(optimizationId, DateTime.UtcNow);
                 await BenchmarkStore.SaveJsonAsync(LastSessionPath,
                     new BenchmarkSession(baseline, result, null, null, category, optimizationId), ct);

@@ -44,7 +44,7 @@ public sealed partial class BenchmarkPage : Page
         DnsTitleText.Text = Localizer.Get("benchmark.dnsTitle");
         BootTitleText.Text = Localizer.Get("benchmark.bootTitle");
         FluencyTitleText.Text = Localizer.Get("benchmark.fluencyTitle");
-        try { LocalizationHelper.LocalizeTree(this.Content as DependencyObject ?? this); } catch { }
+        try { LocalizationHelper.LocalizeTree(this.Content as DependencyObject ?? this); FillBoot(); } catch { }
     }
 
     protected override void OnNavigatedTo(Microsoft.UI.Xaml.Navigation.NavigationEventArgs e)
