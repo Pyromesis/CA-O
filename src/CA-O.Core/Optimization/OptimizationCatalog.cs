@@ -23,9 +23,21 @@ public static class OptimizationCatalog
         // set-best-performance-ac == maximum-power-plan (plan Alto rendimiento).
         "optimize-hdd-media-aware",
         "set-best-performance-ac",
+        // cleanup-windows-update-cache == disk-cleanup-system-files (SoftwareDistribution\Download).
+        "disk-cleanup-system-files",
     };
 
     public static bool IsProductionId(string id) => !LegacyIds.Contains(id);
+
+    /// <summary>IDs retirados que siguen resolviendo a su canónica (historial y llamadas viejas).</summary>
+    public static readonly IReadOnlyDictionary<string, string> RetiredAliases =
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["disk-cleanup-system-files"] = "cleanup-windows-update-cache",
+        };
+
+    public static string CanonicalIdFor(string id) =>
+        RetiredAliases.TryGetValue(id, out var canonical) ? canonical : id;
 
     // Performance (existing)
     public static readonly DisableVbs DisableVbs = new();
@@ -54,8 +66,8 @@ public static class OptimizationCatalog
     public static readonly MmcssSystemResponsiveness MmcssSystemResponsiveness = new();
 
     // Historical entries retained only for traceability (AllLegacy + LegacyIds);
-    // solo optimize-hdd-media-aware y set-best-performance-ac están
-    // realmente retirados (duplicados exactos). El resto sigue en All.
+    // optimize-hdd-media-aware, set-best-performance-ac y disk-cleanup-system-files
+    // están retirados de All (duplicados exactos). El resto sigue en All.
     public static readonly EnableWindowedGameOptimizations EnableWindowedGameOptimizations = new();
     public static readonly EnableVrr EnableVrr = new();
     public static readonly SetGamesHighPerformanceGpu SetGamesHighPerformanceGpu = new();
@@ -139,7 +151,7 @@ public static class OptimizationCatalog
     public static readonly RestartWindowsExplorer RestartWindowsExplorer = new();
     public static readonly RecoverWindowsExplorer RecoverWindowsExplorer = new();
 
-    /// <summary>Production catalog: 88 verified optimizations. All optimizations are now in production.</summary>
+    /// <summary>Production catalog: 87 verified optimizations. All optimizations are now in production.</summary>
     public static IReadOnlyList<IOptimization> All { get; } = new IOptimization[]
     {
         DisableBackgroundApps,
@@ -192,7 +204,6 @@ public static class OptimizationCatalog
         CleanupDeliveryOptimizationCache,
         WindowsComponentStoreCleanup,
         WindowsComponentStoreResetBase,
-        DiskCleanupSystemFiles,
         FreeLowStorageSpace,
         RestoreSystemManagedPagefile,
         DefragmentHddOnly,

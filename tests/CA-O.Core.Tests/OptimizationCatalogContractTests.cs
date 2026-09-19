@@ -28,6 +28,7 @@ public sealed class OptimizationCatalogContractTests
     [Theory]
     [InlineData("optimize-hdd-media-aware", "optimize-system-drive")]
     [InlineData("set-best-performance-ac", "maximum-power-plan")]
+    [InlineData("disk-cleanup-system-files", "cleanup-windows-update-cache")]
     public void RetiredDuplicatesStayOutOfProductionButTraceable(string retiredId, string canonicalId)
     {
         Assert.Contains(retiredId, OptimizationCatalog.LegacyIds);
@@ -43,7 +44,7 @@ public sealed class OptimizationCatalogContractTests
     public void IdsAreUnique()
     {
         var ids = OptimizationCatalog.All.Select(o => o.Definition.Id).ToList();
-        Assert.Equal(88, ids.Count); // 81 previas + 8 nuevas + 1 cachés apps - 2 duplicados retirados (hdd-media-aware, set-best-performance-ac)
+        Assert.Equal(87, ids.Count); // 88 previas - 1 duplicado WU retirado (disk-cleanup-system-files → alias)
         Assert.Equal(ids.Count, ids.Distinct(StringComparer.Ordinal).Count());
     }
 

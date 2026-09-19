@@ -83,10 +83,10 @@
                             <Grid ColumnSpacing="12" Padding="0,8,0,8">
                                 <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                                 <StackPanel Spacing="2" VerticalAlignment="Center">
-                                    <TextBlock Text="Archivos del sistema" FontWeight="SemiBold" FontSize="13"/>
+                                    <TextBlock Text="Caché Windows Update" FontWeight="SemiBold" FontSize="13"/>
                                     <TextBlock Text="SoftwareDistribution\Download. ~1 min, no reversible." FontSize="11" Opacity="0.7" TextWrapping="Wrap"/>
                                 </StackPanel>
-                                <Button Grid.Column="1" Content="Limpiar" Tag="disk-cleanup-system-files" Click="OnCleanClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="128" VerticalAlignment="Center" AutomationProperties.Name="Limpiar archivos del sistema" ToolTipService.ToolTip="Vacía SoftwareDistribution\Download (restos de Windows Update). Detiene wuauserv/bits ~1 min. Mantenimiento: no reversible."/>
+                                <Button Grid.Column="1" Content="Limpiar" Tag="cleanup-windows-update-cache" Click="OnCleanClick" Style="{StaticResource CaoActionButtonStyle}" MinWidth="128" VerticalAlignment="Center" AutomationProperties.Name="Limpiar caché Windows Update" ToolTipService.ToolTip="Vacía SoftwareDistribution\Download (restos de Windows Update). Detiene wuauserv/bits ~1 min. Mantenimiento: no reversible."/>
                             </Grid>
                             <Grid ColumnSpacing="12" Padding="0,8,0,8">
                                 <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>

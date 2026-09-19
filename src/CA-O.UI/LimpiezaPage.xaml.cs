@@ -23,7 +23,7 @@ public sealed partial class LimpiezaPage : Page
     [
         "cleanup-windows-temp",
         "cleanup-delivery-optimization-cache",
-        "disk-cleanup-system-files",
+        "cleanup-windows-update-cache",
         "stale-crash-dump-cleanup",
         "cleanup-app-caches",
     ];

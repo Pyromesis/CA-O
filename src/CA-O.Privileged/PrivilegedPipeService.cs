@@ -35,6 +35,7 @@ internal sealed class PrivilegedPipeService(
         "retrim-system-ssd",
         "defragment-hdd-only",
         "disk-cleanup-system-files",
+        "cleanup-windows-update-cache",
         "reset-network-stack-repair",
         "repair-windows-update",
     };

@@ -99,7 +99,8 @@ public sealed class OptimizationEngine
         }
 
         // Restore point policy (FASE 12): per-optimization RequiresRestorePoint
-        var definition = OptimizationCatalog.All.FirstOrDefault(o => o.Definition.Id.Equals(optimizationId, StringComparison.OrdinalIgnoreCase));
+        var canonicalId = OptimizationCatalog.CanonicalIdFor(optimizationId);
+        var definition = OptimizationCatalog.All.FirstOrDefault(o => o.Definition.Id.Equals(canonicalId, StringComparison.OrdinalIgnoreCase));
         var requiresRestorePoint = definition?.Definition.RequiresRestorePoint ?? false;
 
         string? backupWarning = null;
@@ -843,8 +844,9 @@ public sealed class OptimizationEngine
     private IOptimization Resolve(string optimizationId, IOptimization? instance = null)
     {
         if (instance is not null) return instance;
+        var canonicalId = OptimizationCatalog.CanonicalIdFor(optimizationId);
         var found = OptimizationCatalog.All.FirstOrDefault(o =>
-            o.Definition.Id.Equals(optimizationId, StringComparison.OrdinalIgnoreCase));
+            o.Definition.Id.Equals(canonicalId, StringComparison.OrdinalIgnoreCase));
         return found ?? throw new InvalidOperationException($"Unknown optimization '{optimizationId}'");
     }
 

@@ -164,7 +164,7 @@ public sealed class NewOptimizationsTests
             Assert.False(string.IsNullOrWhiteSpace(optimization.Definition.NameEs));
             Assert.False(string.IsNullOrWhiteSpace(optimization.Definition.TooltipEs));
         }
-        Assert.Equal(88, OptimizationCatalog.All.Count); // 81 + 8 nuevas + 1 cachés apps - 2 duplicados retirados
+        Assert.Equal(87, OptimizationCatalog.All.Count); // 88 previas - 1 duplicado WU retirado (disk-cleanup-system-files → alias)
     }
 
     [Theory]

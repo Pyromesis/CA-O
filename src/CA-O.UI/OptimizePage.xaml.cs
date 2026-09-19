@@ -541,7 +541,7 @@ public sealed partial class OptimizePage : Page
     {
         "windows-component-store-cleanup" or "windows-component-store-resetbase"
             or "optimize-system-drive" or "retrim-system-ssd" or "defragment-hdd-only"
-            or "disk-cleanup-system-files" or "reset-network-stack-repair" or "repair-windows-update" => TimeSpan.FromMinutes(20),
+            or "disk-cleanup-system-files" or "cleanup-windows-update-cache" or "reset-network-stack-repair" or "repair-windows-update" => TimeSpan.FromMinutes(20),
         _ => TimeSpan.FromSeconds(60),
     };
 
