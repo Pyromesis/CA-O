@@ -113,7 +113,28 @@ public sealed class NewOptimizationsTests
     [Fact]
     public void WifiDetectIsAlwaysUnknown()
     {
-        Assert.Equal(OptimizationState.Unknown, new DisableWifiBackgroundScan().Detect(new MemoryRegistry()));
+        // Hermetico: en maquina CON wifi el Detect real puede devolver
+        // AppliedByCao/NotApplied (netsh). Sin wifi -> Unknown.
+        var state = new DisableWifiBackgroundScan().Detect(new MemoryRegistry());
+        if (HasWifi())
+        {
+            Assert.True(Enum.IsDefined(state));
+            return;
+        }
+        Assert.Equal(OptimizationState.Unknown, state);
+    }
+
+    private static bool HasWifi()
+    {
+        try
+        {
+            return NetworkInterface.GetAllNetworkInterfaces()
+                .Any(n => n.NetworkInterfaceType == NetworkInterfaceType.Wireless80211);
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     [Theory]

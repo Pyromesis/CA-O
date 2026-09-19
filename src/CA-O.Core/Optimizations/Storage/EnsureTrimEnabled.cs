@@ -59,15 +59,25 @@ public sealed class EnsureTrimEnabled : IOptimization
             process.StartInfo.RedirectStandardError = true;
             process.StartInfo.CreateNoWindow = true;
             process.Start();
-            // Patrón mínimo anti-deadlock: leer stdout antes de WaitForExit
-            // (salida minúscula, stderr se drena después solo por higiene).
-            var stdout = process.StandardOutput.ReadToEnd();
+            // Anti-deadlock BCL-only: drenar stdout+stderr en concurrente con
+            // ReadToEndAsync y acotar con Task.Delay (nunca bloquear en un
+            // ReadToEnd sincrono con el otro pipe sin drenar). Detect sigue
+            // sync por firma: el timeout lo pone el Delay, no el WaitForExit.
+            var stdoutTask = process.StandardOutput.ReadToEndAsync();
+            var stderrTask = process.StandardError.ReadToEndAsync();
+            var readAll = Task.WhenAll(stdoutTask, stderrTask);
+            if (Task.WhenAny(readAll, Task.Delay(5000)).GetAwaiter().GetResult() != readAll)
+            {
+                try { process.Kill(); } catch { }
+                return OptimizationState.Unknown;
+            }
             if (!process.WaitForExit(5000))
             {
                 try { process.Kill(); } catch { }
                 return OptimizationState.Unknown;
             }
-            _ = process.StandardError.ReadToEnd();
+            var stdout = stdoutTask.GetAwaiter().GetResult();
+            _ = stderrTask.GetAwaiter().GetResult();
             return ParseDeleteNotifyOff(stdout)
                 ? OptimizationState.AppliedByCao
                 : OptimizationState.NotApplied;
