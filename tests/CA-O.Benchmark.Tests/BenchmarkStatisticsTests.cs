@@ -54,6 +54,18 @@ public sealed class BenchmarkStatisticsTests
     }
 
     [Fact]
+    public void ComparisonDefaultThreshold_IsPolicyThreePercent()
+    {
+        var baseline = new FrameTimeStatistics(600, 120.0, 90.0, 70.0, 8.3, 11.0, 12.0, 2.5);
+        var after = baseline with { AverageFps = 122.0, OnePercentLowFps = 92.0, P99FrameTimeMs = 11.6 }; // ~+1.7 % / -3.3 %
+
+        var comparison = BenchmarkAnalyzer.Compare(baseline, after);
+
+        // Con el viejo suelo 1.0 esto sería Improvement; con 3.0 no hay mejora consistente.
+        Assert.Equal(BenchmarkVerdict.NoMeasurableImprovement, comparison.Verdict);
+    }
+
+    [Fact]
     public void RepeatedRunsUseMedianNotSingleSample()
     {
         // Spec 83: never trust one measurement. Median of runs absorbs spikes.

@@ -30,7 +30,8 @@ public sealed record SystemBenchmarkFullComparison(
     double MemoryDeltaPercent,
     double DiskReadDeltaPercent,
     double DiskWriteDeltaPercent,
-    string VerdictEs);
+    string VerdictEs,
+    string ReasonEs = "");
 
 /// <summary>
 /// Reproducible system benchmark (spec 66, 69): fixed workload sizes, header
@@ -107,6 +108,8 @@ public sealed class SystemBenchmarkRunner
             MemoryBandwidthGbs = Median(result => result.MemoryBandwidthGbs),
             DiskReadMbs = Median(result => result.DiskReadMbs),
             DiskWriteMbs = Median(result => result.DiskWriteMbs),
+            DiskReadIops = Median(result => result.DiskReadIops),
+            DiskWriteIops = Median(result => result.DiskWriteIops),
             CpuMs = Median(result => result.CpuMs),
         };
     }
@@ -122,7 +125,7 @@ public sealed class SystemBenchmarkRunner
         memSw.Stop();
         phases["memory"] = memSw.Elapsed.TotalSeconds;
         var diskSw = Stopwatch.StartNew();
-        var (read, write) = await Task.Run(() => MeasureDisk(ct), ct);
+        var (read, write, readIops, writeIops) = await Task.Run(() => MeasureDisk(ct), ct);
         diskSw.Stop();
         phases["disk"] = diskSw.Elapsed.TotalSeconds;
         swTotal.Stop();
@@ -132,12 +135,18 @@ public sealed class SystemBenchmarkRunner
             DateTime.UtcNow,
             Environment.OSVersion.Version.Build,
             GpuDriverPlaceholder(),
-            $"{Environment.ProcessorCount} logical processors",
+            string.Empty, // Resolution: ya no se abusa para ProcessorCount
             0,
-            PowerState());
+            PowerState(),
+            OsUbr: Environment.OSVersion.Version.ToString(),
+            AppVersion: AppVersion.Semantic,
+            MachineHash: BenchmarkStore.ComputeMachineHash(MachineId.Current(), CpuName()),
+            CpuName: CpuName(),
+            BgCpuPercent: 0, // Task 4 la rellena durante captura; aquí 0 = no medida
+            GpuName: string.Empty);
 
         return new SystemBenchmarkResult(header, cpuOps, memory, read, write, swTotal.Elapsed,
-            CpuMs: cpuMs, PhaseSeconds: phases);
+            CpuMs: cpuMs, DiskReadIops: readIops, DiskWriteIops: writeIops, PhaseSeconds: phases);
     }
 
     public static SystemBenchmarkComparison Compare(SystemBenchmarkResult baseline, SystemBenchmarkResult after)
@@ -158,13 +167,35 @@ public sealed class SystemBenchmarkRunner
         return new(cpuDelta, memoryDelta, verdict);
     }
 
-    /// <summary>Comparación extendida incluyendo disco (no cambia el veredicto: CPU/memoria mandan).</summary>
-    public static SystemBenchmarkFullComparison CompareFull(SystemBenchmarkResult baseline, SystemBenchmarkResult after)
+    /// <summary>
+    /// Comparación extendida con veredicto por categoría opcional.
+    /// Sin categoría: compat total (CPU/MEM deciden, disco informativo).
+    /// Storage/Cleanup: el disco decide. Resto: CPU/MEM deciden.
+    /// </summary>
+    public static SystemBenchmarkFullComparison CompareFull(
+        SystemBenchmarkResult baseline, SystemBenchmarkResult after, OptimizationCategory? category = null)
     {
         var baseCmp = Compare(baseline, after);
         var diskReadDelta = PercentChange(baseline.DiskReadMbs, after.DiskReadMbs);
         var diskWriteDelta = PercentChange(baseline.DiskWriteMbs, after.DiskWriteMbs);
-        return new(baseCmp.CpuDeltaPercent, baseCmp.MemoryDeltaPercent, diskReadDelta, diskWriteDelta, baseCmp.VerdictEs);
+
+        // Sin categoría: compat total (CPU/MEM deciden, disco informativo).
+        if (category is null)
+            return new(baseCmp.CpuDeltaPercent, baseCmp.MemoryDeltaPercent, diskReadDelta, diskWriteDelta, baseCmp.VerdictEs, "Veredicto clásico CPU/memoria; disco informativo.");
+
+        // Storage/Cleanup: el disco (lectura+4K) decide.
+        if (category is OptimizationCategory.Storage or OptimizationCategory.Cleanup)
+        {
+            var diskWins = diskReadDelta > NoiseFloorPercent || diskWriteDelta > NoiseFloorPercent;
+            var diskLoses = diskReadDelta < -NoiseFloorPercent || diskWriteDelta < -NoiseFloorPercent;
+            var verdict = diskWins ? "Mejora medible" : diskLoses ? "Regresión" : "Sin mejora medible";
+            return new(baseCmp.CpuDeltaPercent, baseCmp.MemoryDeltaPercent, diskReadDelta, diskWriteDelta, verdict,
+                $"Veredicto por disco para {category}: R {diskReadDelta:+0.0;-0.0}% W {diskWriteDelta:+0.0;-0.0}% (suelo ±{NoiseFloorPercent:0}%).");
+        }
+
+        // Network/Gaming/resto: CPU/MEM deciden (Network añade DNS en Task 5; Gaming añade fluidez en Task 4).
+        return new(baseCmp.CpuDeltaPercent, baseCmp.MemoryDeltaPercent, diskReadDelta, diskWriteDelta, baseCmp.VerdictEs,
+            $"Veredicto CPU/memoria para {category}: CPU {baseCmp.CpuDeltaPercent:+0.0;-0.0}% MEM {baseCmp.MemoryDeltaPercent:+0.0;-0.0}%.");
     }
 
     public static double PercentChange(double before, double after) =>
@@ -224,42 +255,99 @@ public sealed class SystemBenchmarkRunner
         return totalBytes / sw.Elapsed.TotalSeconds;
     }
 
-    private static (double ReadMbs, double WriteMbs) MeasureDisk(CancellationToken ct)
+    /// <summary>
+    /// Disco real: 256 MB secuenciales prealocados con <c>WriteThrough</c> en el
+    /// volumen del sistema + 4K aleatorio (IOPS) sobre el mismo fichero.
+    /// La lectura secuencial inmediata puede beneficiarse de caché del SO —
+    /// el test 4K + WriteThrough es la medida dura.
+    /// Si la escritura en la raíz del volumen falla por permisos, reintenta
+    /// una vez en <c>Path.GetTempPath()</c>. El fichero se borra siempre.
+    /// </summary>
+    private static (double ReadMbs, double WriteMbs, double ReadIops, double WriteIops) MeasureDisk(CancellationToken ct)
     {
-        var path = Path.Combine(Path.GetTempPath(), $"cao-bench-{Guid.NewGuid():N}.tmp");
+        // Volumen del sistema (donde viven Windows y la mayoría de juegos/apps), no solo %TEMP% cacheado.
+        var systemRoot = Path.GetPathRoot(Environment.SystemDirectory) ?? Path.GetTempPath();
+        var primary = Path.Combine(systemRoot, $"cao-bench-{Guid.NewGuid():N}.tmp");
         try
         {
-            const int bufferSize = 1024 * 1024;
-            const int blocks = 64; // 64 MB
-            var buffer = new byte[bufferSize];
-            Random.Shared.NextBytes(buffer);
+            return MeasureDiskAtPath(primary, ct);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            var fallback = Path.Combine(Path.GetTempPath(), $"cao-bench-{Guid.NewGuid():N}.tmp");
+            return MeasureDiskAtPath(fallback, ct);
+        }
+    }
+
+    private static (double ReadMbs, double WriteMbs, double ReadIops, double WriteIops) MeasureDiskAtPath(string path, CancellationToken ct)
+    {
+        try
+        {
+            const int seqBlocks = 256; // 256 MB secuencial
+            const int payload4k = 4 * 1024;
+            const int ops4k = 2000;
+            var seqBuffer = new byte[1024 * 1024];
+            Random.Shared.NextBytes(seqBuffer);
 
             double writeMbs, readMbs;
             var sw = Stopwatch.StartNew();
-            using (var stream = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.Read, bufferSize, FileOptions.SequentialScan))
+            using (var stream = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None,
+                       1024 * 1024, FileOptions.WriteThrough))
             {
-                for (var block = 0; block < blocks; block++)
+                stream.SetLength((long)seqBlocks * seqBuffer.Length); // prealocado: mide escritura, no metadata
+                for (var block = 0; block < seqBlocks; block++)
                 {
                     ct.ThrowIfCancellationRequested();
-                    stream.Write(buffer, 0, buffer.Length);
+                    stream.Write(seqBuffer, 0, seqBuffer.Length);
                 }
                 stream.Flush(true);
-                sw.Stop();
-                writeMbs = blocks / sw.Elapsed.TotalSeconds;
-            }
-            using var verifyStream = File.OpenHandle(path, FileMode.Open, FileAccess.Read, FileShare.Read, FileOptions.SequentialScan);
-            sw.Restart();
-            long totalRead = 0;
-            while (totalRead < (long)blocks * bufferSize)
-            {
-                ct.ThrowIfCancellationRequested();
-                totalRead += RandomAccess.Read(verifyStream, buffer, totalRead);
             }
             sw.Stop();
+            writeMbs = seqBlocks / sw.Elapsed.TotalSeconds;
 
-            readMbs = (totalRead / (1024d * 1024)) / sw.Elapsed.TotalSeconds;
-            GC.KeepAlive(buffer);
-            return (readMbs, writeMbs);
+            using (var verifyStream = File.OpenHandle(path, FileMode.Open, FileAccess.Read, FileShare.Read,
+                FileOptions.SequentialScan))
+            {
+                var readBuffer = new byte[seqBuffer.Length];
+                sw.Restart();
+                long totalRead = 0;
+                while (totalRead < (long)seqBlocks * seqBuffer.Length)
+                {
+                    ct.ThrowIfCancellationRequested();
+                    totalRead += RandomAccess.Read(verifyStream, readBuffer, totalRead);
+                }
+                sw.Stop();
+                readMbs = (totalRead / (1024d * 1024)) / sw.Elapsed.TotalSeconds;
+                GC.KeepAlive(readBuffer);
+            } // verifyStream se cierra aquí: randStream abre con FileShare.None
+
+            // 4K aleatorio sobre el mismo fichero (IOPS reales).
+            using var randStream = File.OpenHandle(path, FileMode.Open, FileAccess.ReadWrite, FileShare.None,
+                FileOptions.WriteThrough);
+            var tiny = new byte[payload4k];
+            Random.Shared.NextBytes(tiny);
+            var maxOffset = (long)seqBlocks * seqBuffer.Length - payload4k;
+            sw.Restart();
+            for (var op = 0; op < ops4k; op++)
+            {
+                ct.ThrowIfCancellationRequested();
+                var offset = Random.Shared.NextInt64(0, maxOffset + 1);
+                RandomAccess.Write(randStream, tiny, offset);
+            }
+            sw.Stop();
+            var writeIops = ops4k / sw.Elapsed.TotalSeconds;
+            sw.Restart();
+            for (var op = 0; op < ops4k; op++)
+            {
+                ct.ThrowIfCancellationRequested();
+                var offset = Random.Shared.NextInt64(0, maxOffset + 1);
+                RandomAccess.Read(randStream, tiny, offset);
+            }
+            sw.Stop();
+            var readIops = ops4k / sw.Elapsed.TotalSeconds;
+
+            GC.KeepAlive(seqBuffer);
+            return (readMbs, writeMbs, readIops, writeIops);
         }
         finally
         {
@@ -269,6 +357,9 @@ public sealed class SystemBenchmarkRunner
 
     private static string PowerState() =>
         SystemPowerStatus.IsOnBattery() ? "battery" : "ac";
+
+    private static string CpuName() =>
+        Environment.GetEnvironmentVariable("PROCESSOR_IDENTIFIER") ?? string.Empty;
 
     private static string GpuDriverPlaceholder() => string.Empty;
 }

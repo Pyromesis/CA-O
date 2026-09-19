@@ -1,3 +1,4 @@
+using CAO.Core.Benchmark;
 using CAO.Shared;
 
 namespace CAO.Core.Engine;
@@ -35,7 +36,7 @@ public static class BenchmarkAnalyzer
     public static BenchmarkComparison Compare(
         FrameTimeStatistics baseline,
         FrameTimeStatistics candidate,
-        double significanceThresholdPercent = 1.0)
+        double significanceThresholdPercent = BenchmarkPolicy.MinimumEffectPercent)
     {
         if (baseline.SampleCount == 0 || candidate.SampleCount == 0)
         {

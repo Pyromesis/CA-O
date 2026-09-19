@@ -36,7 +36,13 @@ public sealed record BenchmarkRunHeader(
     string GpuDriverVersion,
     string Resolution,
     int RefreshHz,
-    string PowerState);
+    string PowerState,
+    string OsUbr = "",
+    string AppVersion = "",
+    string MachineHash = "",
+    string CpuName = "",
+    double BgCpuPercent = 0,
+    string GpuName = "");
 
 /// <summary>
 /// Measured outcome attached to an optimization lifecycle (spec 66-70).
