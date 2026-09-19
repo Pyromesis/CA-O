@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 using CAO.Core.Abstractions;
+using CAO.Core.Optimization;
 using CAO.Shared;
 using CAO.Shared.Security;
 
@@ -38,7 +39,28 @@ public sealed class RemoveUnusedCustomPowerPlans : IOptimization
         Flags = OptimizationFlags.NotReversible,
     };
 
-    public OptimizationState Detect(IRegistryAccessor registry) => OptimizationState.NotApplied;
+    public OptimizationState Detect(IRegistryAccessor registry)
+    {
+        // Honesto vía registry (sin executor en Detect): planes custom
+        // inactivos pendientes → NotApplied; si no queda nada que limpiar
+        // → AppliedByCao (fin del nagging eterno). Nunca lanza → Unknown.
+        try
+        {
+            // Mismo literal que PowerSchemes.SchemesKey (privada, PowerSchemes.cs:19).
+            const string schemesKey = @"SYSTEM\CurrentControlSet\Control\Power\User\PowerSchemes";
+            var subs = registry.GetSubKeyNames(RegistryHive2.LocalMachine, schemesKey);
+            var active = PowerSchemes.ReadActiveScheme(registry);
+            var stale = subs.Where(s =>
+                Guid.TryParse(s, out _) &&
+                !BuiltInSchemes.Contains(s) &&
+                !string.Equals(s, active, StringComparison.OrdinalIgnoreCase));
+            return stale.Any() ? OptimizationState.NotApplied : OptimizationState.AppliedByCao;
+        }
+        catch
+        {
+            return OptimizationState.Unknown;
+        }
+    }
 
     public OptimizationSnapshot Capture(IRegistryAccessor registry)
     {

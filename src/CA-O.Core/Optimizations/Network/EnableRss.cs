@@ -37,6 +37,35 @@ public sealed class EnableRss : RegistryOptimizationBase
         Impact = ImpactLevel.Low,
     };
 
+    public override OptimizationState Detect(IRegistryAccessor registry)
+    {
+        // Override honesto con degradación a Unknown (la base no captura
+        // excepciones del registry): ==1 → AppliedByCao, otro/ausente →
+        // NotApplied. Compatibility Conditional intacto (sigue Experimental).
+        try
+        {
+            var current = registry.GetValue(
+                RegistryHive2.LocalMachine,
+                @"SYSTEM\CurrentControlSet\Services\Tcpip\Parameters",
+                "EnableRss");
+            return IsOne(current) ? OptimizationState.AppliedByCao : OptimizationState.NotApplied;
+        }
+        catch
+        {
+            return OptimizationState.Unknown;
+        }
+    }
+
+    private static bool IsOne(object? value) => value switch
+    {
+        int i => i == 1,
+        uint u => u == 1,
+        long l => l == 1,
+        string s => s == "1",
+        bool b => b,
+        _ => false,
+    };
+
     public override Task<OperationResult> ApplyAsync(OptimizationContext context, CancellationToken ct = default)
     {
         WriteTargets(context);

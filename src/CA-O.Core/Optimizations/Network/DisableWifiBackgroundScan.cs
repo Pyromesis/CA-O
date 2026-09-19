@@ -1,4 +1,6 @@
+using System.Diagnostics;
 using System.Net.NetworkInformation;
+using System.Text.RegularExpressions;
 using CAO.Core.Abstractions;
 using CAO.Shared;
 using CAO.Shared.Security;
@@ -50,7 +52,74 @@ public sealed class DisableWifiBackgroundScan : IOptimization
         catch { return null; }
     }
 
-    public OptimizationState Detect(IRegistryAccessor registry) => OptimizationState.Unknown;
+    /// <summary>
+    /// Parsea `netsh wlan show autoconfig`: devuelve true si la lógica de
+    /// autoconfiguración está habilitada en `iface`, false si está
+    /// deshabilitada, null si la salida no trae esa interfaz. Verificado en
+    /// máquina real: `netsh wlan show /?` lista `show autoconfig` ("shows
+    /// whether the auto configuration logic is enabled or disabled") mientras
+    /// que `show settings` solo trae ajustes globales (sin autoconfig), por
+    /// eso no se usa. Sin interfaz en el equipo la salida viene vacía.
+    /// </summary>
+    internal static bool? ParseAutoconfigState(string output, string iface)
+    {
+        if (string.IsNullOrEmpty(output) || string.IsNullOrWhiteSpace(iface))
+            return null;
+        foreach (Match match in Regex.Matches(output,
+            "Auto\\s+configuration\\s+logic\\s+is\\s+(enabled|disabled)\\s+on\\s+interface\\s+\"?([^\"\\r\\n]+)\"?",
+            RegexOptions.IgnoreCase))
+        {
+            if (string.Equals(match.Groups[2].Value.Trim().Trim('"'), iface.Trim(),
+                StringComparison.OrdinalIgnoreCase))
+            {
+                return match.Groups[1].Value.Equals("enabled", StringComparison.OrdinalIgnoreCase);
+            }
+        }
+        return null;
+    }
+
+    public OptimizationState Detect(IRegistryAccessor registry)
+    {
+        // Best-effort read-only (`show autoconfig`, ruta fija, timeout 5s).
+        // Sin wifi o sin parse fiable → Unknown con motivo (como antes);
+        // RULING: Unknown o real, nunca NotApplied ciego. Nunca lanza.
+        try
+        {
+            var iface = FindLiveWifiInterface();
+            if (string.IsNullOrWhiteSpace(iface))
+                return OptimizationState.Unknown;
+            var netsh = Path.Combine(
+                Environment.ExpandEnvironmentVariables(@"%SystemRoot%\System32"), "netsh.exe");
+            using var process = new Process();
+            process.StartInfo.FileName = netsh;
+            process.StartInfo.ArgumentList.Add("wlan");
+            process.StartInfo.ArgumentList.Add("show");
+            process.StartInfo.ArgumentList.Add("autoconfig");
+            process.StartInfo.UseShellExecute = false;
+            process.StartInfo.RedirectStandardOutput = true;
+            process.StartInfo.RedirectStandardError = true;
+            process.StartInfo.CreateNoWindow = true;
+            process.Start();
+            var stdout = process.StandardOutput.ReadToEnd();
+            if (!process.WaitForExit(5000))
+            {
+                try { process.Kill(); } catch { }
+                return OptimizationState.Unknown;
+            }
+            _ = process.StandardError.ReadToEnd();
+            var enabled = ParseAutoconfigState(stdout, iface);
+            return enabled switch
+            {
+                false => OptimizationState.AppliedByCao,
+                true => OptimizationState.NotApplied,
+                _ => OptimizationState.Unknown,
+            };
+        }
+        catch
+        {
+            return OptimizationState.Unknown;
+        }
+    }
 
     public OptimizationSnapshot Capture(IRegistryAccessor registry)
     {

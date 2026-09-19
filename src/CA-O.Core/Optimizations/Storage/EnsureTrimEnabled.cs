@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using System.Text.RegularExpressions;
 using CAO.Core.Abstractions;
 using CAO.Shared;
 using CAO.Shared.Security;
@@ -26,7 +28,55 @@ public sealed class EnsureTrimEnabled : IOptimization
         Impact = ImpactLevel.Low,
     };
 
-    public OptimizationState Detect(IRegistryAccessor registry) => OptimizationState.NotApplied;
+    /// <summary>
+    /// true solo si alguna línea es `DisableDeleteNotify = 0` (NTFS y/o
+    /// ReFS). El nombre del valor no se localiza, así que vale en ES y EN.
+    /// </summary>
+    internal static bool ParseDeleteNotifyOff(string output)
+    {
+        if (string.IsNullOrEmpty(output))
+            return false;
+        return Regex.IsMatch(output, @"DisableDeleteNotify\s*=\s*0",
+            RegexOptions.IgnoreCase | RegexOptions.Multiline);
+    }
+
+    public OptimizationState Detect(IRegistryAccessor registry)
+    {
+        // Solo lectura: `fsutil behavior query` por ruta fija de System32
+        // (sin PATH, sin PowerShell, sin executor: Detect no tiene executor
+        // por firma). Nunca lanza → Unknown.
+        try
+        {
+            var fsutil = Path.Combine(
+                Environment.ExpandEnvironmentVariables(@"%SystemRoot%\System32"), "fsutil.exe");
+            using var process = new Process();
+            process.StartInfo.FileName = fsutil;
+            process.StartInfo.ArgumentList.Add("behavior");
+            process.StartInfo.ArgumentList.Add("query");
+            process.StartInfo.ArgumentList.Add("DisableDeleteNotify");
+            process.StartInfo.UseShellExecute = false;
+            process.StartInfo.RedirectStandardOutput = true;
+            process.StartInfo.RedirectStandardError = true;
+            process.StartInfo.CreateNoWindow = true;
+            process.Start();
+            // Patrón mínimo anti-deadlock: leer stdout antes de WaitForExit
+            // (salida minúscula, stderr se drena después solo por higiene).
+            var stdout = process.StandardOutput.ReadToEnd();
+            if (!process.WaitForExit(5000))
+            {
+                try { process.Kill(); } catch { }
+                return OptimizationState.Unknown;
+            }
+            _ = process.StandardError.ReadToEnd();
+            return ParseDeleteNotifyOff(stdout)
+                ? OptimizationState.AppliedByCao
+                : OptimizationState.NotApplied;
+        }
+        catch
+        {
+            return OptimizationState.Unknown;
+        }
+    }
 
     public OptimizationSnapshot Capture(IRegistryAccessor registry) => new OptimizationSnapshot();
 
@@ -69,7 +119,7 @@ public sealed class EnsureTrimEnabled : IOptimization
         if (!query.Success)
             return VerificationResult.Unknown(OptimizationState.Unknown, "No se pudo consultar TRIM: " + query.StdErr);
 
-        return query.StdOut.Contains('0')
+        return ParseDeleteNotifyOff(query.StdOut)
             ? VerificationResult.Passed(OptimizationState.AppliedByCao, "TRIM verificado habilitado.")
             : VerificationResult.Failed(OptimizationState.NotApplied, "TRIM no está habilitado tras aplicar.");
     }
