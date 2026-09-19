@@ -150,6 +150,26 @@ public sealed class UiState : ObservableObject
         set => SetProperty(ref _mascotMood, string.IsNullOrWhiteSpace(value) ? "Idle" : value);
     }
 
+    private string _pendingBenchmarkOptimizationId = string.Empty;
+    private string _pendingBenchmarkCategory = string.Empty;
+
+    /// <summary>
+    /// Optimización pendiente de medir en Benchmark (fijada por OptimizePage).
+    /// Vacía = medición manual sin contexto.
+    /// </summary>
+    public string PendingBenchmarkOptimizationId
+    {
+        get => _pendingBenchmarkOptimizationId;
+        set => SetProperty(ref _pendingBenchmarkOptimizationId, value ?? string.Empty);
+    }
+
+    /// <summary>Categoría (<see cref="OptimizationCategory"/>) de la optimización pendiente, como texto.</summary>
+    public string PendingBenchmarkCategory
+    {
+        get => _pendingBenchmarkCategory;
+        set => SetProperty(ref _pendingBenchmarkCategory, value ?? string.Empty);
+    }
+
     /// <summary>
     /// Ids aplicados con éxito en esta sesión. Cubre one-shots sin estado
     /// persistente (flush-dns, trim, DISM...): tras aplicarlos la tarjeta

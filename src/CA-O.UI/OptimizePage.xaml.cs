@@ -28,7 +28,8 @@ public sealed record RecommendationRow(
     bool IsApplyEnabled,
     bool IsApplied,
     string ApplyLabel,
-    string TooltipDetail)
+    string TooltipDetail,
+    string MeasureLabel)
 {
     public Microsoft.UI.Xaml.Visibility LockVisibility => IsLocked ? Microsoft.UI.Xaml.Visibility.Visible : Microsoft.UI.Xaml.Visibility.Collapsed;
     public Microsoft.UI.Xaml.Visibility AppliedVisibility => IsApplied ? Microsoft.UI.Xaml.Visibility.Visible : Microsoft.UI.Xaml.Visibility.Collapsed;
@@ -157,7 +158,8 @@ public sealed partial class OptimizePage : Page
                 canApply,
                 isApplied,
                 isApplied ? "Aplicado ✓" : "Aplicar",
-                tooltip);
+                tooltip,
+                Localizer.Get("benchmark.measureOpt"));
             })
             .ToList();
 
@@ -341,6 +343,18 @@ public sealed partial class OptimizePage : Page
         {
             StatusText.Text = $"El dry-run falló: {ex.Message}";
         }
+    }
+
+    private void OnMeasureImpactClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: string id }) return;
+        var uiState = AppHost.Resolve<ViewModels.UiState>();
+        var recommendation = uiState.Recommendations.FirstOrDefault(r =>
+            r.OptimizationId.Equals(id, StringComparison.OrdinalIgnoreCase));
+        uiState.PendingBenchmarkOptimizationId = id;
+        uiState.PendingBenchmarkCategory = recommendation?.Category.ToString() ?? string.Empty;
+        if (MainWindow.Current is not null) MainWindow.Current.SelectRoute("benchmark");
+        else AppHost.Resolve<Navigation.INavigationService>().Select("benchmark");
     }
 
     private async void OnApplyClick(object sender, RoutedEventArgs e)

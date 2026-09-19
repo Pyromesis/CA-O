@@ -1,6 +1,9 @@
+using System.Text;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using CAO.Core.Engine;
 using CAO.Infrastructure.Benchmarking;
+using CAO.Infrastructure.Networking;
 using CAO.Shared;
 
 namespace CAO.UI.ViewModels;
@@ -15,6 +18,27 @@ public sealed partial class BenchmarkViewModel : ObservableObject
     [ObservableProperty] private string _currentStep = "Paso 1: Crear línea base";
     [ObservableProperty] private string _verdict = string.Empty;
     [ObservableProperty] private string _contextNote = string.Empty;
+    [ObservableProperty] private string _dnsSummary = string.Empty;
+    [ObservableProperty] private string _fluencySummary = string.Empty;
+    [ObservableProperty] private string _bootSummary = string.Empty;
+
+    private IReadOnlyList<DnsBenchmarkResult>? _dnsLastResults;
+
+    /// <summary>Últimos resultados DNS medidos (para pintar barras en la UI).</summary>
+    public IReadOnlyList<DnsBenchmarkResult>? DnsLastResults
+    {
+        get => _dnsLastResults;
+        set => SetProperty(ref _dnsLastResults, value);
+    }
+
+    private string? _lastSessionPath;
+
+    /// <summary>Ruta de la última sesión guardada (la UI la recarga para tabla+sparkline).</summary>
+    public string? LastSessionPath
+    {
+        get => _lastSessionPath;
+        set => SetProperty(ref _lastSessionPath, value);
+    }
 
     public async Task RunAsync(bool isBaseline, CancellationToken ct) =>
         await RunForOptimizationAsync("manual", "", isBaseline, ct);
@@ -33,7 +57,8 @@ public sealed partial class BenchmarkViewModel : ObservableObject
             if (isBaseline)
             {
                 await BenchmarkStore.SaveJsonAsync(BenchmarkStore.BaselinePath, result, ct);
-                await BenchmarkStore.SaveJsonAsync(BenchmarkStore.SessionPathFor(optimizationId, DateTime.UtcNow),
+                LastSessionPath = BenchmarkStore.SessionPathFor(optimizationId, DateTime.UtcNow);
+                await BenchmarkStore.SaveJsonAsync(LastSessionPath,
                     new BenchmarkSession(result, null, null, null, category, optimizationId), ct);
                 ComparisonSummary = "✓ Línea base guardada (mediana de 3 trials).";
                 Verdict = "Línea base lista";
@@ -58,7 +83,8 @@ public sealed partial class BenchmarkViewModel : ObservableObject
                 var comparison = SystemBenchmarkRunner.CompareFull(baseline, result, parsed);
                 ComparisonSummary = $"CPU: {comparison.CpuDeltaPercent:+0.0;-0.0}% | Memoria: {comparison.MemoryDeltaPercent:+0.0;-0.0}% | Disco R: {comparison.DiskReadDeltaPercent:+0.0;-0.0}% W: {comparison.DiskWriteDeltaPercent:+0.0;-0.0}% — {comparison.VerdictEs} (suelo ±3%, mediana 3 trials).\n{comparison.ReasonEs}";
                 Verdict = comparison.VerdictEs;
-                await BenchmarkStore.SaveJsonAsync(BenchmarkStore.SessionPathFor(optimizationId, DateTime.UtcNow),
+                LastSessionPath = BenchmarkStore.SessionPathFor(optimizationId, DateTime.UtcNow);
+                await BenchmarkStore.SaveJsonAsync(LastSessionPath,
                     new BenchmarkSession(baseline, result, null, null, category, optimizationId), ct);
             }
             Status = $"Benchmark completado — {Verdict}";
@@ -72,6 +98,46 @@ public sealed partial class BenchmarkViewModel : ObservableObject
             App.WriteCrashLog(ex);
         }
         finally { IsRunning = false; if (Status == "Midiendo…") Status = string.Empty; }
+    }
+
+    public async Task MeasureDnsAsync(CancellationToken ct)
+    {
+        try
+        {
+            var provider = new DnsBenchmarkProvider();
+            var results = await provider.BenchmarkAsync(null, ct);
+            var best = DnsBenchmarkProvider.PickBest(results);
+            DnsSummary = best is null ? "Sin respuesta DNS medible." :
+                $"Mejor: {best.Resolver} {best.MedianLatencyMs:0.0} ms (jitter {best.JitterMs:0.0} ms, {best.Successes}/{best.Attempts})";
+            DnsLastResults = results; // propiedad para pintar barras + guardar DnsAfterMs si hay sesión
+        }
+        catch (OperationCanceledException) { DnsSummary = "Medición DNS cancelada."; }
+        catch (Exception ex) { DnsSummary = $"{ErrorCodes.UiBenchmarkFailed}: DNS no medido. [Técnico: {ex.GetType().Name}]"; }
+    }
+
+    public async Task MeasureFluencyAsync(IFrameCapture capture, CancellationToken ct)
+    {
+        try
+        {
+            var result = await capture.CaptureAsync(TimeSpan.FromSeconds(10), ct);
+            if (result is null) { FluencySummary = CAO.UI.Localizer.Get("benchmark.unavailable"); return; }
+            var stats = BenchmarkAnalyzer.AnalyzeFrameTimes(result.FrameTimesMs);
+            FluencySummary = $"avg {stats.AverageFps:0} FPS · 1% low {stats.OnePercentLowFps:0} · P99 {stats.P99FrameTimeMs:0.0} ms · DPC {result.DpcPercent:0.0}%";
+        }
+        catch (OperationCanceledException) { FluencySummary = "Medición cancelada."; }
+        catch (Exception ex) { FluencySummary = $"{ErrorCodes.UiBenchmarkFailed}: fluidez no medida. [Técnico: {ex.GetType().Name}]"; }
+    }
+
+    public string ExportSessionCsv(BenchmarkSession session)
+    {
+        var sb = new StringBuilder("metrica;antes;despues;delta_%\n");
+        void Row(string name, double before, double after) =>
+            sb.AppendLine($"{name};{before:0.00};{after:0.00};{SystemBenchmarkRunner.PercentChange(before, after):+0.00;-0.00}");
+        Row("cpu_ops", session.Before.CpuScore, session.After?.CpuScore ?? 0);
+        Row("mem_gbs", session.Before.MemoryBandwidthGbs, session.After?.MemoryBandwidthGbs ?? 0);
+        Row("disk_r_mbs", session.Before.DiskReadMbs, session.After?.DiskReadMbs ?? 0);
+        Row("disk_w_mbs", session.Before.DiskWriteMbs, session.After?.DiskWriteMbs ?? 0);
+        return sb.ToString();
     }
 
     [RelayCommand]
