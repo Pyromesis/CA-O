@@ -106,6 +106,11 @@ public static class OptimizationCatalog
     public static readonly DefragmentHddOnly DefragmentHddOnly = new();
     public static readonly CleanupWindowsUpdateCache CleanupWindowsUpdateCache = new();
     public static readonly CleanupAppCaches CleanupAppCaches = new();
+    public static readonly CleanupPrefetchStale CleanupPrefetchStale = new();
+    public static readonly CleanupCbsLogs CleanupCbsLogs = new();
+    public static readonly CleanupCrashDumpsExtended CleanupCrashDumpsExtended = new();
+    public static readonly CleanupOutlookCache CleanupOutlookCache = new();
+    public static readonly CleanupBrowserCodeCache CleanupBrowserCodeCache = new();
 
     // Network (existing + new)
     public static readonly NormalizeTcpAutoTuning NormalizeTcpAutoTuning = new();
@@ -209,6 +214,11 @@ public static class OptimizationCatalog
         DefragmentHddOnly,
         CleanupWindowsUpdateCache,
         CleanupAppCaches,
+        CleanupPrefetchStale,
+        CleanupCbsLogs,
+        CleanupCrashDumpsExtended,
+        CleanupOutlookCache,
+        CleanupBrowserCodeCache,
         // Network Phase 4: promoted from legacy
         EnableRss,
         RestoreTcpChecksumOffload,

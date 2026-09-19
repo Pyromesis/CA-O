@@ -44,7 +44,7 @@ public sealed class OptimizationCatalogContractTests
     public void IdsAreUnique()
     {
         var ids = OptimizationCatalog.All.Select(o => o.Definition.Id).ToList();
-        Assert.Equal(87, ids.Count); // 88 previas - 1 duplicado WU retirado (disk-cleanup-system-files → alias)
+        Assert.Equal(92, ids.Count); // 87 + 5 limpiezas nuevas (prefetch, CBS, volcados ext, Outlook, navegadores)
         Assert.Equal(ids.Count, ids.Distinct(StringComparer.Ordinal).Count());
     }
 
