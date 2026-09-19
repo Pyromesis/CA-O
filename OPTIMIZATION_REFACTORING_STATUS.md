@@ -1,3 +1,7 @@
+> HISTÓRICO (2026-09-19): documento desincronizado (hablaba de 19/21 en producción). Estado real y vinculante: `OPTIMIZATION_INVENTORY.md` + tests de catálogo (`OptimizationCatalogContractTests`, `NoDuplicateTargetsTests`). No actualizar este fichero; se conserva por trazabilidad.
+
+---
+
 # Optimization Refactoring Status
 
 ## Executive Summary

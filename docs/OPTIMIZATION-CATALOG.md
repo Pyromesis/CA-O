@@ -92,9 +92,17 @@ Nunca se deshabilita silenciosamente Secure Boot/TPM/VBS/HVCI/Defender/firewall.
 - cleanup-delivery-optimization-cache
 - windows-component-store-cleanup
 - windows-component-store-resetbase
-- disk-cleanup-system-files
+- ~~disk-cleanup-system-files~~ (RETIRADA: duplicado exacto de `cleanup-windows-update-cache`; alias en `LegacyIds`)
 - free-low-storage-space
 - restore-system-managed-pagefile
+- defragment-hdd-only
+- cleanup-windows-update-cache
+- cleanup-app-caches
+- cleanup-prefetch-stale
+- cleanup-cbs-logs
+- cleanup-crash-dumps-extended
+- cleanup-outlook-cache
+- cleanup-browser-code-cache
 - enable-rss
 - restore-tcp-checksum-offload
 - restore-udp-checksum-offload
@@ -290,14 +298,29 @@ Caché WU (para + borra + arranca)
 ### cleanup-app-caches
 Cachés Discord/Spotify/Slack (nunca sesiones)
 
+### cleanup-prefetch-stale
+Prefetch *.pf +30d (solo espacio)
+
+### cleanup-cbs-logs
+CBS *.log +30d (solo espacio)
+
+### cleanup-crash-dumps-extended
+LiveKernelReports + MEMORY.DMP + CrashDumps por usuario (+30d)
+
+### cleanup-outlook-cache
+Adjuntos temp Outlook Content.Outlook +7d
+
+### cleanup-browser-code-cache
+Cachés regenerables Chrome/Edge/Teams (nunca sesiones)
+
 ### windows-component-store-cleanup
 DISM StartComponentCleanup
 
 ### windows-component-store-resetbase
 DISM ResetBase, irreversible
 
-### disk-cleanup-system-files
-cleanmgr
+### ~~disk-cleanup-system-files~~ (RETIRADA)
+Duplicado exacto de `cleanup-windows-update-cache`. Alias en `LegacyIds`.
 
 ### free-low-storage-space
 Umbrales 10/15/20%

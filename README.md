@@ -22,7 +22,7 @@
 4. [Arquitectura profunda](#arquitectura-profunda)
 5. [Estructura del repositorio](#estructura-del-repositorio)
 6. [Modelo de seguridad](#modelo-de-seguridad)
-7. [Catálogo completo de optimizaciones (88)](#catálogo-completo-de-optimizaciones-88)
+7. [Catálogo completo de optimizaciones (92)](#catálogo-completo-de-optimizaciones-92)
 8. [Cómo funciona la app — viaje del usuario](#cómo-funciona-la-app--viaje-del-usuario)
 9. [Motores internos](#motores-internos)
 10. [Persistencia y rutas de datos](#persistencia-y-rutas-de-datos)
@@ -47,7 +47,7 @@
 La UI **siempre eleva** (`app.manifest` `requireAdministrator` → UAC en cada inicio) pero **toda mutación privilegiada cruza** al servicio Windows `CAO.Privileged` (SYSTEM) vía **Named Pipe autenticado** con ACL restrictiva, validación de esquema tipado, ventana de 30 s, nonce y protección anti-replay. Sin el servicio, la app opera en **modo solo lectura** (diagnóstico + benchmark disponibles). El servicio es `start= demand` por diseño: tras un reinicio queda detenido y la propia app lo levanta (`sc start`) al comprobar, o lo re-registra con `Ajustes → Instalar ahora` sin necesitar el repositorio.
 
 **En números:**
-- **88 optimizaciones** con efecto real verificado (transaccionales) + `AllLegacy` para trazabilidad
+- **92 optimizaciones** con efecto real verificado (transaccionales) + `AllLegacy` para trazabilidad
 - **12 páginas** WinUI 3 con Mica, `NavigationView`, animaciones de entrada, i18n `es-ES`/`en-US` instantáneo
 - **991 tests** en 6 suites (Core 571, Security 238, Integration 48, Infra 55, Benchmark 7, UI 72)
 - **0 telemetría externa**, 0 dependencias web, 0 comandos arbitrarios
@@ -116,7 +116,7 @@ La UI **siempre eleva** (`app.manifest` `requireAdministrator` → UAC en cada i
 | Proyecto | Responsabilidad | Depende de |
 |---|---|---|
 | `CA-O.Shared` | DTOs, contratos IPC v2 (`IpcProtocol` v2, `Ping`, `GetServiceStatus`), `CaOPaths`, `ErrorCodes CAO-XXX-nnn`, `AppVersion 2.1.32`, `BuildConstants`, `Constants/IpcConstants` | — |
-| `CA-O.Core` | `OptimizationCatalog` (88), `OptimizationEngine` transaccional, `RecommendationEngine` + `OptimizationScoreCalculator` (0-100), `GameCompatibilityPolicy` (matriz SAFE/CAUTION/BLOCKED `CAO-GAME-001`), `HealthEngine`, `KnownIssueMatcher`, `CrashRecoveryService`, `Rollback/*` | Shared |
+| `CA-O.Core` | `OptimizationCatalog` (92), `OptimizationEngine` transaccional, `RecommendationEngine` + `OptimizationScoreCalculator` (0-100), `GameCompatibilityPolicy` (matriz SAFE/CAUTION/BLOCKED `CAO-GAME-001`), `HealthEngine`, `KnownIssueMatcher`, `CrashRecoveryService`, `Rollback/*` | Shared |
 | `CA-O.Infrastructure` | WMI 5 s timeout + `SystemAnalysisService` + `AnalysisStateStore` (atómico, 24 h TTL) + `SnapshotRepository`/`FileSnapshotStore` (TX identity + SHA-256) + `JsonHistoryLogger` (hash-chain) + `SystemBenchmarkRunner` + `Gaming/*` + `Networking/*` + `Storage/*` + `Security/*` + `Windows/*` | Core, Shared |
 | `CA-O.Privileged` | Servicio `SYSTEM` + `PrivilegedPipeService` (Named Pipe `CA-O.Privileged.v1`, ACL + `ReplayCache` 30 s, timeout 15 s/conn) + `OptimizationEngine` hosteado + `AdministratorsOnlyAuthorizer` | Core, Infrastructure, Shared |
 | `CA-O.UI` | WinUI 3 Mica + ViewModels DI (`AppHost` + `UiState`) + `Controls` (`MetricCard`/`RiskBadge`/`ScoreRing`/`Diagnostic*`) + `PrivilegedPipeClient` + `ErrorTranslator` + `Helpers/{LocalizationHelper,UiAnimations,AppUpdater}` + 12 páginas con `VisualState` y animaciones | Core, Infrastructure, Shared |
@@ -160,8 +160,8 @@ CA-O.sln  (.NET 10 · LangVersion 13 · WinUI 3)
 │   │   ├── Enums/                   # RecommendationBucket, RiskLevel, EvidenceLevel, etc.
 │   │   └── DTO/                     # OptimizationDefinition, SystemContext, HealthScore
 │   ├── CA-O.Core/                   # Lógica de negocio, sin WMI
-│   │   ├── Optimization/            # OptimizationCatalog (88), RegistryOptimizationBase, Engine
-│   │   ├── Optimizations/           # 88 clases por carpeta (+ bases compartidas):
+│   │   ├── Optimization/            # OptimizationCatalog (92), RegistryOptimizationBase, Engine
+│   │   ├── Optimizations/           # 92 clases por carpeta (+ bases compartidas):
 │   │   │   ├── Performance/         # DisableVbs, MaximumPowerPlan, DisableVisualEffects, DisableDynamicTick…
 │   │   │   ├── Power/               # powercfg real + bases PowerAcSetting/PowerSchemeSwitch…
 │   │   │   ├── Storage/             # borrado real + base TempFileCleanup… + AppCaches/WU-cache/HDD-only…
@@ -205,7 +205,7 @@ CA-O.sln  (.NET 10 · LangVersion 13 · WinUI 3)
 │   ├── CA-O.Setup/                  # Consola fallback (sc.exe create/start)
 │   └── CA-O.Uninstaller/            # ARP uninstaller (sc stop/delete + rmdir)
 ├── tests/                           # 991 tests, Release
-│   ├── CA-O.Core.Tests/             # 568: catalog (88), AnalysisStateStore, GameCompatibility, transacciones
+│   ├── CA-O.Core.Tests/             # 568: catalog (92), AnalysisStateStore, GameCompatibility, transacciones
 │   ├── CA-O.Integration.Tests/      # 48: E2E 10 flujos + TransactionJournalRecovery + ArchitectureDependency
 │   ├── CA-O.Security.Tests/         # 236: IpcValidator (+timer/nonce), ReplayCache, CommandPolicy (incl. `@` ACPI)
 │   ├── CA-O.Infrastructure.Tests/   # 48: HistoryRobustness, SnapshotRepository, PhantomBatchValidation
@@ -269,11 +269,11 @@ Ver detalles completos en [docs/SECURITY.md](docs/SECURITY.md) y [docs/THREAT-MO
 
 ---
 
-## Catálogo completo de optimizaciones (88)
+## Catálogo completo de optimizaciones (92)
 
 > **Calidad sobre cantidad.** Cada entrada responde *qué cambia*, *por qué*, *con qué evidencia*, *qué riesgo/seguridad afecta*, *si es reversible* y *cómo se verifica*. Todas implementan `IOptimization` (`Definition` + `Detect` + `Capture` + `ApplyAsync` + `RevertAsync` + `PreviewAsync` + `VerifyAsync` cuando aplica).
 
-### Tabla maestra (88) — `OptimizationCatalog.All` (+ 2 legacy retiradas: `optimize-hdd-media-aware`, `set-best-performance-ac`)
+### Tabla maestra (92) — `OptimizationCatalog.All` (+ 3 legacy retiradas: `optimize-hdd-media-aware`, `set-best-performance-ac`, `disk-cleanup-system-files`)
 
 | # | Id | Categoría | Impacto | Evidencia | Riesgo | Compat. | Reversible | Flags | Qué hace |
 |---|---|---|---|---|---|---|---|---|---|
@@ -322,7 +322,7 @@ Ver detalles completos en [docs/SECURITY.md](docs/SECURITY.md) y [docs/THREAT-MO
 | 43 | `cleanup-delivery-optimization-cache` | Storage | Small | Official | Low | Compatible | ✅ | — | Cache Delivery Optimization |
 | 44 | `windows-component-store-cleanup` | Storage | Medium | Official | Moderate | Compatible | ✅ | — | `DISM /Online /Cleanup-Image /StartComponentCleanup` |
 | 45 | `windows-component-store-resetbase` | Storage | Large | Official | High | Compatible | ❌ | NotReversible | `DISM /ResetBase` (**irreversible**, libera WinSxS) |
-| 46 | `disk-cleanup-system-files` | Storage | Medium | Official | Low | Compatible | ✅ | — | `cleanmgr /sagerun` system files |
+| 46 | ~~disk-cleanup-system-files~~ | Storage | — | — | — | — | ✅ | — | **Retirada** (duplicada): usar `cleanup-windows-update-cache` |
 | 47 | `free-low-storage-space` | Storage | Medium | Official | Low | Compatible | ✅ | — | Umbrales 10/15/20 % espacio libre |
 | 48 | `restore-system-managed-pagefile` | Storage | None | Official | Low | Compatible | ✅ | — | Pagefile → System managed |
 | 49 | `enable-rss` | Network | Small | Official | Low | Compatible | ✅ | — | Receive Side Scaling on |
@@ -367,6 +367,11 @@ Ver detalles completos en [docs/SECURITY.md](docs/SECURITY.md) y [docs/THREAT-MO
 | 86 | `restart-windows-search` | Troubleshoot | Small | Official | Low | Compatible | ✅ | — | Reinicia Windows Search |
 | 87 | `restart-windows-explorer` | Troubleshoot | Small | Official | Moderate | Compatible | ✅ | — | Reinicia el Explorador (vuelve solo) |
 | 88 | `recover-windows-explorer` | Troubleshoot | Small | Official | Low | Compatible | ✅ | — | Restaura barra y escritorio si desaparecieron |
+| 89 | `cleanup-prefetch-stale` | Storage | None | Empirical | Low | Compatible | ❌ | NotReversible | Borra `*.pf` +30d en Prefetch (solo espacio) |
+| 90 | `cleanup-cbs-logs` | Storage | None | Empirical | Low | Compatible | ❌ | NotReversible | Borra `*.log` +30d en `Logs\CBS` (solo espacio) |
+| 91 | `cleanup-crash-dumps-extended` | Storage | Small | Official | Moderate | Compatible | ❌ | NotReversible | LiveKernelReports + MEMORY.DMP + CrashDumps por usuario (+30d) |
+| 92 | `cleanup-outlook-cache` | Storage | Small | Empirical | Low | Compatible | ❌ | NotReversible | Adjuntos temp Outlook Content.Outlook +7d (todos los usuarios) |
+| 93 | `cleanup-browser-code-cache` | Storage | Small | Empirical | Low | Compatible | ❌ | NotReversible | Cachés regenerables Chrome/Edge/Teams (nunca sesiones ni historial) |
 
 > **Nota:** `optimize-system-drive` y `windows-component-store-resetbase` son **no reversibles** (`NotReversible`) — se auditan como `VerificationStatus.NotApplicable` y no eliminan snapshot tras éxito.
 
@@ -405,7 +410,7 @@ Todas son `RegistryOptimizationBase` puras (reversión exacta). Ej. `disable-tel
 - `ensure-trim-enabled` / `retrim-system-ssd` / `optimize-system-drive` → `fsutil` + `defrag /O` (para desfragmentación profunda con umbral: `defragment-hdd-only`)
 - `Storage Sense` (enable + temp + recycle bin 7-90 d) → `HKCU\Software\Microsoft\Windows\CurrentVersion\StorageSense`
 - `windows-component-store-*` → `DISM` (`ResetBase` irreversible)
-- `cleanup-windows-temp` / `delivery-optimization-cache` / `cleanup-windows-update-cache` / `cleanup-app-caches` (Discord/Spotify/Slack) / `disk-cleanup` → file + DO cache
+- `cleanup-windows-temp` / `delivery-optimization-cache` / `cleanup-windows-update-cache` / `cleanup-app-caches` (Discord/Spotify/Slack) / `cleanup-prefetch-stale` / `cleanup-cbs-logs` / `cleanup-crash-dumps-extended` / `cleanup-outlook-cache` / `cleanup-browser-code-cache` → file + DO cache
 - `restore-system-managed-pagefile` → `HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management`
 
 #### Network (13)
@@ -732,7 +737,7 @@ powershell -ExecutionPolicy Bypass -File scripts/harden-data-acls.ps1
 
 | Suite | Cubre | Cant. |
 |---|---|---|
-| `CA-O.Core.Tests` | Contratos catálogo (88), `AnalysisStateStore` (save/load/corrupt/schema), `GameCompatibility` (VBS bloqueado), `OptimizationTransaction` (snapshot/apply/verify/rollback), `RecommendationEngine`, `KnownIssueMatcher`, `HealthEngine`, 88 definiciones `IOptimization` + `FixDriver`/`InstallDriver` motor | **568** |
+| `CA-O.Core.Tests` | Contratos catálogo (92), `AnalysisStateStore` (save/load/corrupt/schema), `GameCompatibility` (VBS bloqueado), `OptimizationTransaction` (snapshot/apply/verify/rollback), `RecommendationEngine`, `KnownIssueMatcher`, `HealthEngine`, 92 definiciones `IOptimization` + `FixDriver`/`InstallDriver` motor | **568** |
 | `CA-O.Security.Tests` | `IpcRequestValidator` (version/nonce mín. 16/freshness/size/schema, timer, SetDns 1–2 IPs, FixDriver/InstallDriver), `ReplayCache` (TTL, single-use atómico), `CommandPolicy` (allowlist, PATH-hijacking, injection, pnputil, `@` ACPI), `WindowsCallerInspector` (SID/SessionId/elevación), `PrivilegedIpcSecurityTests` (oversized/malformed/flood) | **236** |
 | `CA-O.Integration.Tests` | `E2EFlowsTests` 10 flujos (Abrir→Analizar→Persistir→Vanguard→Restore→Benchmark→History→Cancel→Recovery), `TransactionJournalRecovery` (Incomplete→RollbackRequired), `ArchitectureDependencyTests` | **48** |
 | `CA-O.Infrastructure.Tests` | `HistoryRobustness` (líneas malformadas), `SnapshotRepository` (TX identity), `SystemContextCache` dual-TTL, `DnsBenchmark`, `PhantomBatchValidation` (IDs reales + barrido vivo) | **48** |

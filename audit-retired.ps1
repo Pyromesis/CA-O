@@ -1,3 +1,4 @@
+# HISTÓRICO (2026-09-19): script desincronizado (19/21 prod). Estado real: OPTIMIZATION_INVENTORY.md + tests de catálogo. Se conserva por trazabilidad, no usar para auditar.
 $retired = @(
     'EnableWindowedGameOptimizations', 'EnableVrr', 'SetGamesHighPerformanceGpu',
     'DisableBackgroundGameCaptures', 'DisableGameBarAutoLaunch', 'ConfigureGamingPowerModeAc',

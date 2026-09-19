@@ -1,7 +1,7 @@
-# CA-O Optimization Inventory — 88 production optimizations
+# CA-O Optimization Inventory — 92 production optimizations
 
 > **Estado verificado (revisado contra `OptimizationCatalog.All`):**
-> las **88** optimizaciones del catálogo están en **PRODUCTION**.
+> las **92** optimizaciones del catálogo están en **PRODUCTION**.
 > No queda ningún STUB. Cada una muta Windows de verdad (Registry API,
 > `powercfg`, `netsh`, `schtasks`, `defrag`, `fsutil`, `DISM`, SCM) bajo el
 > flujo transaccional `PRECHECK → SNAPSHOT → APPLY → VERIFY → COMMIT`.
@@ -23,8 +23,8 @@
 
 | Status | Count |
 |--------|-------|
-| PRODUCTION | 88 |
-| LEGACY (retirada por duplicada) | 2 |
+| PRODUCTION | 92 |
+| LEGACY (retirada por duplicada) | 3 |
 | **STUB / falsa** | **0** |
 
 > **Nota histórica:** una versión anterior de este archivo listaba 48 entradas
@@ -37,7 +37,7 @@
 
 ---
 
-## Catálogo por categoría (88 producción)
+## Catálogo por categoría (92 producción)
 
 ### Performance (8)
 
@@ -80,7 +80,7 @@
 `set-wireless-adapter-max-performance-ac`, `restore-power-plan-after-gaming`,
 `remove-unused-custom-power-plans`.
 
-### Storage (17)
+### Storage (21)
 
 `disable-hibernate` (`powercfg /h off`), `optimize-system-drive` (`defrag /O`,
 no reversible), `ensure-trim-enabled` (`fsutil`), `retrim-system-ssd`,
@@ -88,9 +88,19 @@ no reversible), `ensure-trim-enabled` (`fsutil`), `retrim-system-ssd`,
 `storage-sense-recycle-bin-policy`, `cleanup-windows-temp`,
 `cleanup-delivery-optimization-cache`, `windows-component-store-cleanup` (DISM),
 `windows-component-store-resetbase` (DISM `/ResetBase`, **irreversible**),
-`disk-cleanup-system-files`, `free-low-storage-space`,
+`free-low-storage-space`,
 `restore-system-managed-pagefile`, `defragment-hdd-only`,
-`cleanup-windows-update-cache`, `cleanup-app-caches`.
+`cleanup-windows-update-cache`, `cleanup-app-caches`,
+`cleanup-prefetch-stale` (`%SystemRoot%\Prefetch\*.pf` +30d),
+`cleanup-cbs-logs` (`%SystemRoot%\Logs\CBS\*.log` +30d),
+`cleanup-crash-dumps-extended` (LiveKernelReports + MEMORY.DMP + CrashDumps por usuario, +30d),
+`cleanup-outlook-cache` (Content.Outlook por usuario, +7d),
+`cleanup-browser-code-cache` (Chrome/Edge/Teams solo cachés regenerables, +1d).
+
+> **Nota:** `disk-cleanup-system-files` (`cleanmgr /sagerun`) está **RETIRADA**:
+> duplicado exacto de `cleanup-windows-update-cache`
+> (mismo `SoftwareDistribution\Download`). Solo existe en
+> `OptimizationCatalog.AllLegacy` + `LegacyIds` como alias de compatibilidad.
 
 ### Network (13)
 
@@ -126,14 +136,15 @@ no reversible), `ensure-trim-enabled` (`fsutil`), `retrim-system-ssd`,
 
 ---
 
-## Entradas LEGACY (2) — retiradas por duplicado exacto
+## Entradas LEGACY (3) — retiradas por duplicado exacto
 
 | ID | Duplica a |
 |---|---|
 | `optimize-hdd-media-aware` | `optimize-system-drive` (ambas `defrag C: /O`) |
 | `set-best-performance-ac` | `maximum-power-plan` (ambas plan Alto rendimiento) |
+| `disk-cleanup-system-files` | `cleanup-windows-update-cache` (ambas `SoftwareDistribution\Download`) |
 
-Estas dos existen **solo** en `OptimizationCatalog.AllLegacy` y en
+Estas tres existen **solo** en `OptimizationCatalog.AllLegacy` y en
 `LegacyIds` para trazabilidad; `IsProductionId(id)` devuelve `false` y nunca se
 ofrecen al usuario.
 
@@ -146,7 +157,7 @@ ofrecen al usuario.
    `VerifyAsync` (cuando aplica). No hay implementación "solo escribe un marker".
 2. **Verificación en vivo** — `VerifyAsync` relee el estado real de Windows
    después de aplicar. `Unknown` **nunca** es éxito → rollback automático.
-3. **Tests de catálogo** — `CA-O.Core.Tests` valida el recuento (88), los IDs
+3. **Tests de catálogo** — `CA-O.Core.Tests` valida el recuento (92), los IDs
    únicos y que cada `Definition` tiene evidencia y riesgo declarados.
 4. **Guard de codificación** — `EncodingConsistencyTests` asegura que los
    strings orientados al usuario no contienen mojibake.
