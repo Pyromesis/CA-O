@@ -1,7 +1,18 @@
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
+using CAO.Shared;
 
 namespace CAO.Infrastructure.Benchmarking;
+
+/// <summary>Sesión A/B ligada a una optimización (o "manual").</summary>
+public sealed record BenchmarkSession(
+    SystemBenchmarkResult Before,
+    SystemBenchmarkResult? After,
+    IReadOnlyList<double>? DnsBeforeMs,
+    IReadOnlyList<double>? DnsAfterMs,
+    string Category,
+    string OptimizationId);
 
 /// <summary>Identidad máquina no reversible (solo comparación).</summary>
 public static class MachineId
@@ -17,16 +28,80 @@ public static class MachineId
     }
 }
 
-/// <summary>
-/// Persistencia y validez de líneas base / sesiones A/B (base mínima Task 2:
-/// identidad + hash; Task 3 añade TTL, paths y sesiones).
-/// </summary>
 public static class BenchmarkStore
 {
+    public static readonly TimeSpan BaselineTtl = TimeSpan.FromDays(7);
+
     /// <summary>SHA256 truncado a 16 hex de MachineGuid+CPU: estable, no reversible.</summary>
     public static string ComputeMachineHash(string machineGuid, string cpuName)
     {
         var bytes = SHA256.HashData(Encoding.UTF8.GetBytes($"CA-O|{machineGuid}|{cpuName}"));
         return Convert.ToHexString(bytes)[..16].ToLowerInvariant();
+    }
+
+    public static string BaselinePath => Path.Combine(CaOPaths.BenchmarksDirectory, "baseline.json");
+
+    public static string SessionPathFor(string optimizationId, DateTime utc)
+    {
+        var safe = string.Concat(optimizationId.Select(ch => char.IsLetterOrDigit(ch) ? ch : '-'));
+        return Path.Combine(CaOPaths.BenchmarksDirectory, $"{safe}-{utc:yyyyMMddHHmmss}.json");
+    }
+
+    public static bool IsBaselineValid(SystemBenchmarkResult baseline, SystemBenchmarkResult current, DateTime utcNow)
+    {
+        if ((utcNow - baseline.Header.TimestampUtc) > BaselineTtl) return false;
+        return string.Equals(baseline.Header.MachineHash, current.Header.MachineHash, StringComparison.Ordinal)
+            && baseline.Header.WindowsBuild == current.Header.WindowsBuild
+            && string.Equals(baseline.Header.OsUbr, current.Header.OsUbr, StringComparison.Ordinal)
+            && string.Equals(baseline.Header.AppVersion, current.Header.AppVersion, StringComparison.Ordinal)
+            && string.Equals(baseline.Header.PowerState, current.Header.PowerState, StringComparison.OrdinalIgnoreCase);
+    }
+
+    public static async Task SaveJsonAsync<T>(string path, T value, CancellationToken ct)
+    {
+        Directory.CreateDirectory(CaOPaths.BenchmarksDirectory);
+        await File.WriteAllTextAsync(path, JsonSerializer.Serialize(value), ct);
+    }
+
+    public static async Task<T?> LoadJsonAsync<T>(string path, CancellationToken ct)
+    {
+        try
+        {
+            var json = await File.ReadAllTextAsync(path, ct);
+            return JsonSerializer.Deserialize<T>(json);
+        }
+        catch { return default; } // fichero ausente o corrupto: sin datos, sin crash
+    }
+
+    /// <summary>Timeout adaptativo: 120 s base SSD, 300 s si el volumen sistema es HDD.</summary>
+    public static TimeSpan TimeoutForSystemDrive()
+    {
+        try
+        {
+            var root = Path.GetPathRoot(Environment.SystemDirectory) ?? "C:\\";
+            foreach (var drive in DriveInfo.GetDrives())
+            {
+                if (string.Equals(drive.Name, root, StringComparison.OrdinalIgnoreCase))
+                    return drive.DriveType == DriveType.Fixed && IsHdd(root) ? TimeSpan.FromSeconds(300) : TimeSpan.FromSeconds(120);
+            }
+        }
+        catch { }
+        return TimeSpan.FromSeconds(120);
+    }
+
+    private static bool IsHdd(string root)
+    {
+        try
+        {
+            using var searcher = new System.Management.ManagementObjectSearcher(
+                "SELECT MediaType FROM Win32_DiskDrive");
+            foreach (var disk in searcher.Get())
+            {
+                var media = disk["MediaType"]?.ToString() ?? string.Empty;
+                if (media.Contains("Fixed", StringComparison.OrdinalIgnoreCase)) return true; // HDD clásico informa Fixed hard disk media
+            }
+        }
+        catch { }
+        return false;
     }
 }

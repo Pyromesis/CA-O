@@ -1,4 +1,3 @@
-using System.Text.Json;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CAO.Infrastructure.Benchmarking;
@@ -9,8 +8,6 @@ namespace CAO.UI.ViewModels;
 /// <summary>ViewModel para BenchmarkPage — benchmark A/B con trials y suelo de ruido explícito (§46-48).</summary>
 public sealed partial class BenchmarkViewModel : ObservableObject
 {
-    private static string BaselinePath => Path.Combine(CaOPaths.BenchmarksDirectory, "baseline.json");
-
     [ObservableProperty] private bool _isRunning;
     [ObservableProperty] private string _baselineSummary = string.Empty;
     [ObservableProperty] private string _comparisonSummary = string.Empty;
@@ -19,56 +16,52 @@ public sealed partial class BenchmarkViewModel : ObservableObject
     [ObservableProperty] private string _verdict = string.Empty;
     [ObservableProperty] private string _contextNote = string.Empty;
 
-    public async Task RunAsync(bool isBaseline, CancellationToken ct)
+    public async Task RunAsync(bool isBaseline, CancellationToken ct) =>
+        await RunForOptimizationAsync("manual", "", isBaseline, ct);
+
+    public async Task RunForOptimizationAsync(string optimizationId, string category, bool isBaseline, CancellationToken ct)
     {
         IsRunning = true;
         Status = "Midiendo…";
-        CurrentStep = isBaseline ? "Paso 1: Creando línea base (3 trials + warmup)..." : "Paso 3: Midiendo después del cambio (3 trials + warmup)...";
         try
         {
-            Directory.CreateDirectory(CaOPaths.BenchmarksDirectory);
             var runner = new SystemBenchmarkRunner();
-            // Mediana de 3 trials con warmup: un pico aislado no fabrica mejoras (§46-48).
-            var result = await runner.RunTrialsAsync(trials: 3, warmup: true, workloadId: isBaseline ? "baseline" : "after-change", ct);
-
+            var result = await runner.RunTrialsAsync(trials: 3, warmup: true,
+                workloadId: $"{optimizationId}-{(isBaseline ? "baseline" : "after")}", ct);
             BaselineSummary = Describe(result);
             ContextNote = DescribeContext(result);
-
             if (isBaseline)
             {
-                await File.WriteAllTextAsync(BaselinePath, JsonSerializer.Serialize(result), ct);
-                ComparisonSummary = "✓ Línea base guardada (Paso 1 completado, mediana de 3 trials). Ahora aplique UN cambio en Optimizar (p. ej. plan Alto rendimiento) y vuelva para Paso 3 con las mismas condiciones (misma batería/AC, sin otras apps pesadas).";
+                await BenchmarkStore.SaveJsonAsync(BenchmarkStore.BaselinePath, result, ct);
+                await BenchmarkStore.SaveJsonAsync(BenchmarkStore.SessionPathFor(optimizationId, DateTime.UtcNow),
+                    new BenchmarkSession(result, null, null, null, category, optimizationId), ct);
+                ComparisonSummary = "✓ Línea base guardada (mediana de 3 trials).";
                 Verdict = "Línea base lista";
-                CurrentStep = "Paso 2: Aplique UNA optimización en Optimizar";
-                Status = "Línea base completada";
             }
             else
             {
-                CurrentStep = "Paso 4: Comparando...";
-                if (!File.Exists(BaselinePath))
+                var baseline = await BenchmarkStore.LoadJsonAsync<SystemBenchmarkResult>(BenchmarkStore.BaselinePath, ct);
+                if (baseline is null) { ComparisonSummary = "No hay línea base legible; mida primero la línea base."; Verdict = "Sin datos"; return; }
+                if (!BenchmarkStore.IsBaselineValid(baseline, result, DateTime.UtcNow))
                 {
-                    ComparisonSummary = "No hay línea base guardada; mida primero la línea base (Paso 1).";
-                    Verdict = "Sin datos";
+                    ComparisonSummary = "La línea base caducó o cambiaron las condiciones (TTL 7 días, misma máquina/SO/versión/alimentación). Mida de nuevo la línea base.";
+                    Verdict = "InsuficienteData";
                     return;
                 }
-                var baseline = JsonSerializer.Deserialize<SystemBenchmarkResult>(await File.ReadAllTextAsync(BaselinePath, ct));
-                if (baseline is null) { ComparisonSummary = "La línea base guardada no es legible."; Verdict = "Error"; return; }
-                if (!string.Equals(baseline.Header.PowerState, result.Header.PowerState, StringComparison.OrdinalIgnoreCase))
+                if (result.CpuCvPercent > 5 || result.MemoryCvPercent > 5)
                 {
-                    ContextNote += $"\n⚠ Condiciones distintas: base en '{baseline.Header.PowerState}', ahora en '{result.Header.PowerState}'. Para comparar, repita con la misma alimentación (idealmente AC).";
+                    ComparisonSummary = $"Varianza alta entre trials (CV CPU {result.CpuCvPercent:0.0}% MEM {result.MemoryCvPercent:0.0}% > 5%): repita con el equipo en reposo.";
+                    Verdict = "InsuficienteData";
+                    return;
                 }
-                var comparison = SystemBenchmarkRunner.CompareFull(baseline, result);
-                // Veredicto honesto con suelo de ruido §33 (CPU/memoria deciden; disco es informativo)
-                var noise = SystemBenchmarkRunner.NoiseFloorPercent;
-                ComparisonSummary =
-                    $"CPU: {comparison.CpuDeltaPercent:+0.0;-0.0}% | Memoria: {comparison.MemoryDeltaPercent:+0.0;-0.0}% | Disco R: {comparison.DiskReadDeltaPercent:+0.0;-0.0}% W: {comparison.DiskWriteDeltaPercent:+0.0;-0.0}% — {comparison.VerdictEs} " +
-                    $"(suelo ±{noise:0}%, mediana 3 trials).\n" +
-                    $"Paso 5 — Veredicto: {comparison.VerdictEs}\n" +
-                    (comparison.VerdictEs == "Regresión" ? "Regresión — Recomendación: revertir el cambio en Restaurar y repetir la medición." : comparison.VerdictEs == "Sin mejora medible" ? $"Sin mejora medible (dentro de ±{noise}%) — sin evidencia para mantener el cambio." : "Mejora medida — puede mantenerse si es estable tras reiniciar y repetir.");
+                var parsed = Enum.TryParse<OptimizationCategory>(category, out var cat) ? cat : (OptimizationCategory?)null;
+                var comparison = SystemBenchmarkRunner.CompareFull(baseline, result, parsed);
+                ComparisonSummary = $"CPU: {comparison.CpuDeltaPercent:+0.0;-0.0}% | Memoria: {comparison.MemoryDeltaPercent:+0.0;-0.0}% | Disco R: {comparison.DiskReadDeltaPercent:+0.0;-0.0}% W: {comparison.DiskWriteDeltaPercent:+0.0;-0.0}% — {comparison.VerdictEs} (suelo ±3%, mediana 3 trials).\n{comparison.ReasonEs}";
                 Verdict = comparison.VerdictEs;
-                CurrentStep = $"Paso 5: {comparison.VerdictEs}";
-                Status = $"Benchmark completado — {comparison.VerdictEs}";
+                await BenchmarkStore.SaveJsonAsync(BenchmarkStore.SessionPathFor(optimizationId, DateTime.UtcNow),
+                    new BenchmarkSession(baseline, result, null, null, category, optimizationId), ct);
             }
+            Status = $"Benchmark completado — {Verdict}";
         }
         catch (OperationCanceledException) { Status = "Benchmark cancelado."; Verdict = "Cancelado"; }
         catch (Exception ex)
