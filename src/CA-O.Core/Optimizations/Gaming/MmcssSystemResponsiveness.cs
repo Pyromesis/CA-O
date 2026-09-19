@@ -22,7 +22,7 @@ public sealed class MmcssSystemResponsiveness : RegistryOptimizationBase
         NameEn = "MMCSS priority to game (10)",
         DescriptionEs = "Reserva menos CPU a tareas de fondo (10 en vez de 20).",
         DescriptionEn = "Reserves less CPU for background tasks (10 instead of 20).",
-        TooltipEs = "El juego en foco recibe más CPU. Si el audio en segundo plano se entrecorta, revierte.",
+        TooltipEs = "El juego en foco recibe más CPU, pero puede recortar audio en segundo plano durante el juego: si se entrecorta, revierte.",
         Category = OptimizationCategory.Gaming,
         ExpectedImpact = PerformanceImpact.Small,
         Evidence = EvidenceLevel.Empirical,

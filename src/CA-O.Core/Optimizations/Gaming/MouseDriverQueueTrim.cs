@@ -23,7 +23,7 @@ public sealed class MouseDriverQueueTrim : RegistryOptimizationBase
         NameEn = "Trimmed mouse queue (32)",
         DescriptionEs = "Baja el buffer del driver de ratón de 100 a 32 paquetes.",
         DescriptionEn = "Lowers the mouse driver queue from 100 to 32 packets.",
-        TooltipEs = "Medido por la comunidad: menos input lag con sensores modernos. Requiere reinicio. Reversible.",
+        TooltipEs = "Medido por la comunidad: menos input lag con sensores modernos. En hardware antiguo puede perder eventos de ratón. Requiere reinicio. Reversible.",
         Category = OptimizationCategory.Gaming,
         ExpectedImpact = PerformanceImpact.Tiny,
         Evidence = EvidenceLevel.Empirical,

@@ -16,28 +16,37 @@ namespace CAO.Core.Tests;
 /// </summary>
 public sealed class NewOptimizationsTests
 {
-    private const string Iface1 = @"SYSTEM\CurrentControlSet\Services\Tcpip\Parameters\Interfaces\{11111111-2222-3333-4444-555555555555}";
-    private const string Iface2 = @"SYSTEM\CurrentControlSet\Services\Tcpip\Parameters\Interfaces\{AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE}";
+    private const string PhysGuid1 = "{11111111-2222-3333-4444-555555555555}";
+    private const string PhysGuid2 = "{AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE}";
+
+    private static IReadOnlyList<(string Id, string Name, string Description, NetworkInterfaceType Type, OperationalStatus Status)> SeededNagleNics() =>
+    [
+        (PhysGuid1, "Ethernet", "Intel Ethernet Controller", NetworkInterfaceType.Ethernet, OperationalStatus.Up),
+        (PhysGuid2, "Ethernet 2", "Realtek GbE Family", NetworkInterfaceType.Ethernet, OperationalStatus.Up),
+    ];
+
+    private static string NagleKeyFor(string guid) =>
+        DisableNagleTcpAcks.InterfacesBase + "\\" + guid;
 
     private static MemoryRegistry SeededNagle(bool iface1On, bool iface2On)
     {
         var registry = new MemoryRegistry();
         // Dummy para que la enumeración vea ambas interfaces (como el registro real).
-        registry.SetValue(RegistryHive2.LocalMachine, Iface1, "DhcpIPAddress", "1.2.3.4", RegistryValueKind2.String);
-        registry.SetValue(RegistryHive2.LocalMachine, Iface2, "DhcpIPAddress", "5.6.7.8", RegistryValueKind2.String);
+        registry.SetValue(RegistryHive2.LocalMachine, NagleKeyFor(PhysGuid1), "DhcpIPAddress", "1.2.3.4", RegistryValueKind2.String);
+        registry.SetValue(RegistryHive2.LocalMachine, NagleKeyFor(PhysGuid2), "DhcpIPAddress", "5.6.7.8", RegistryValueKind2.String);
         if (iface1On)
         {
-            registry.SetValue(RegistryHive2.LocalMachine, Iface1, "TcpAckFrequency", 1, RegistryValueKind2.DWord);
-            registry.SetValue(RegistryHive2.LocalMachine, Iface1, "TCPNoDelay", 1, RegistryValueKind2.DWord);
+            registry.SetValue(RegistryHive2.LocalMachine, NagleKeyFor(PhysGuid1), "TcpAckFrequency", 1, RegistryValueKind2.DWord);
+            registry.SetValue(RegistryHive2.LocalMachine, NagleKeyFor(PhysGuid1), "TCPNoDelay", 1, RegistryValueKind2.DWord);
         }
         if (iface2On)
         {
-            registry.SetValue(RegistryHive2.LocalMachine, Iface2, "TcpAckFrequency", 1, RegistryValueKind2.DWord);
-            registry.SetValue(RegistryHive2.LocalMachine, Iface2, "TCPNoDelay", 1, RegistryValueKind2.DWord);
+            registry.SetValue(RegistryHive2.LocalMachine, NagleKeyFor(PhysGuid2), "TcpAckFrequency", 1, RegistryValueKind2.DWord);
+            registry.SetValue(RegistryHive2.LocalMachine, NagleKeyFor(PhysGuid2), "TCPNoDelay", 1, RegistryValueKind2.DWord);
         }
         else
         {
-            registry.SetValue(RegistryHive2.LocalMachine, Iface2, "TcpAckFrequency", 2, RegistryValueKind2.DWord);
+            registry.SetValue(RegistryHive2.LocalMachine, NagleKeyFor(PhysGuid2), "TcpAckFrequency", 2, RegistryValueKind2.DWord);
         }
         return registry;
     }
@@ -45,11 +54,14 @@ public sealed class NewOptimizationsTests
     [Fact]
     public void NagleDetect_AllOnMixedAndEmpty()
     {
+        // Task 5: Detect itera solo físicas; NICs sintéticas para no depender
+        // de la BCL viva (hermético en cualquier máquina).
         var nagle = new DisableNagleTcpAcks();
-        Assert.Equal(OptimizationState.AppliedByCao, nagle.Detect(SeededNagle(true, true)));
-        Assert.Equal(OptimizationState.NotApplied, nagle.Detect(SeededNagle(true, false)));
-        Assert.Equal(OptimizationState.NotApplied, nagle.Detect(SeededNagle(false, false)));
-        Assert.Equal(OptimizationState.Unknown, nagle.Detect(new MemoryRegistry()));
+        var nics = SeededNagleNics();
+        Assert.Equal(OptimizationState.AppliedByCao, nagle.Detect(SeededNagle(true, true), nics));
+        Assert.Equal(OptimizationState.NotApplied, nagle.Detect(SeededNagle(true, false), nics));
+        Assert.Equal(OptimizationState.NotApplied, nagle.Detect(SeededNagle(false, false), nics));
+        Assert.Equal(OptimizationState.Unknown, nagle.Detect(new MemoryRegistry(), nics));
     }
 
     [Fact]
@@ -57,18 +69,19 @@ public sealed class NewOptimizationsTests
     {
         var nagle = new DisableNagleTcpAcks();
         var registry = SeededNagle(false, false);
-        var snapshot = nagle.Capture(registry);
+        var nics = SeededNagleNics();
+        var snapshot = nagle.Capture(registry, nics);
         var context = new OptimizationContext { Registry = registry };
 
-        var applied = await nagle.ApplyAsync(context);
+        var applied = await nagle.ApplyAsync(context, nics);
         Assert.True(applied.Success);
-        Assert.Equal(OptimizationState.AppliedByCao, nagle.Detect(registry));
+        Assert.Equal(OptimizationState.AppliedByCao, nagle.Detect(registry, nics));
 
         var reverted = await nagle.RevertAsync(context, snapshot);
         Assert.True(reverted.Success);
-        Assert.Equal(OptimizationState.NotApplied, nagle.Detect(registry));
+        Assert.Equal(OptimizationState.NotApplied, nagle.Detect(registry, nics));
         // La iface1 no tenía valores: el revert los borra, no deja 1.
-        Assert.Null(registry.GetValue(RegistryHive2.LocalMachine, Iface1, "TcpAckFrequency"));
+        Assert.Null(registry.GetValue(RegistryHive2.LocalMachine, NagleKeyFor(PhysGuid1), "TcpAckFrequency"));
     }
 
     [Fact]
@@ -84,7 +97,7 @@ public sealed class NewOptimizationsTests
     public async Task NaglePreviewListsEveryInterface()
     {
         var nagle = new DisableNagleTcpAcks();
-        var preview = await nagle.PreviewAsync(SeededNagle(true, false));
+        var preview = await nagle.PreviewAsync(SeededNagle(true, false), SeededNagleNics());
         Assert.Equal(2, preview.Lines.Count);
         Assert.All(preview.Lines, line => Assert.Equal("Registry", line.Kind));
     }
