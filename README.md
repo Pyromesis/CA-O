@@ -273,6 +273,8 @@ Ver detalles completos en [docs/SECURITY.md](docs/SECURITY.md) y [docs/THREAT-MO
 
 > **Calidad sobre cantidad.** Cada entrada responde *qué cambia*, *por qué*, *con qué evidencia*, *qué riesgo/seguridad afecta*, *si es reversible* y *cómo se verifica*. Todas implementan `IOptimization` (`Definition` + `Detect` + `Capture` + `ApplyAsync` + `RevertAsync` + `PreviewAsync` + `VerifyAsync` cuando aplica).
 
+> **Proyecciones honestas (spec §5.3):** `CatalogProjections` parte las 92 en `BatchDefault` (68, rendimiento real — es lo único que aplica el batch), `RepairActions` (14), `Diagnostics` (4, read-only) y `Restores` (6). Proyección, no borrado: `All` sigue con 92 y todo ID resuelve.
+
 ### Tabla maestra (92) — `OptimizationCatalog.All` (+ 3 legacy retiradas: `optimize-hdd-media-aware`, `set-best-performance-ac`, `disk-cleanup-system-files`)
 
 | # | Id | Categoría | Impacto | Evidencia | Riesgo | Compat. | Reversible | Flags | Qué hace |

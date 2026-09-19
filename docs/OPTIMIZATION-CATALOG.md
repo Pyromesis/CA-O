@@ -50,7 +50,7 @@ Nunca se deshabilita silenciosamente Secure Boot/TPM/VBS/HVCI/Defender/firewall.
 | disable-search-indexing | Performance | WorkloadDependent | Empirical | Moderate | Conditional | Si | RecommendedOnSsd |
 | maximum-power-plan | Performance | Small | Official | Low | Compatible | Si | — |
 | disable-hibernate | Storage | None | Official | Moderate | Compatible | Si | — |
-| disable-vbs | Performance | WorkloadDependent | Vendor | Critical | PotentialConflict | Si | ExpertOnly, SecurityTradeoff, RequiresReboot |
+| disable-vbs | Performance | WorkloadDependent | Vendor | Critical | PotentialConflict | Si | ExpertOnly, SecurityTradeoff, RequiresReboot **[Gated: ExpertOnly+RestorePoint]** |
 | normalize-tcp-autotuning | Network | WorkloadDependent | Official | Low | Conditional | Si | — |
 | optimize-system-drive | Storage | None | Official | Low | Compatible | No | NotReversible |
 | disable-nagle-tcp-acks | Network | Small | Official | Moderate | Conditional | Si | RequiresReboot |
@@ -74,7 +74,7 @@ Nunca se deshabilita silenciosamente Secure Boot/TPM/VBS/HVCI/Defender/firewall.
 - configure-gaming-power-mode-ac
 - restore-default-gpu-preference
 - enable-auto-hdr
-- gaming-display-refresh-rate-audit
+- gaming-display-refresh-rate-audit **[Diagnostic]**
 - set-best-performance-ac
 - restore-balanced-power-dc
 - disable-usb-selective-suspend-ac
@@ -91,10 +91,10 @@ Nunca se deshabilita silenciosamente Secure Boot/TPM/VBS/HVCI/Defender/firewall.
 - cleanup-windows-temp
 - cleanup-delivery-optimization-cache
 - windows-component-store-cleanup
-- windows-component-store-resetbase
+- windows-component-store-resetbase **[Gated: ExpertOnly+RestorePoint]**
 - ~~disk-cleanup-system-files~~ (RETIRADA: duplicado exacto de `cleanup-windows-update-cache`; alias en `LegacyIds`)
-- free-low-storage-space
-- restore-system-managed-pagefile
+- free-low-storage-space **[Diagnostic]**
+- restore-system-managed-pagefile **[Restore]**
 - defragment-hdd-only
 - cleanup-windows-update-cache
 - cleanup-app-caches
@@ -104,25 +104,25 @@ Nunca se deshabilita silenciosamente Secure Boot/TPM/VBS/HVCI/Defender/firewall.
 - cleanup-outlook-cache
 - cleanup-browser-code-cache
 - enable-rss
-- restore-tcp-checksum-offload
-- restore-udp-checksum-offload
-- restore-large-send-offload
+- restore-tcp-checksum-offload **[Restore]**
+- restore-udp-checksum-offload **[Restore]**
+- restore-large-send-offload **[Restore]**
 - configure-interrupt-moderation-for-low-latency
 - disable-nic-power-saving-ac
-- restore-windows-tcp-congestion-default
-- flush-dns-cache
-- reset-network-stack-repair
+- restore-windows-tcp-congestion-default **[Restore]**
+- flush-dns-cache **[Repair]**
+- reset-network-stack-repair **[Repair]**
 - delivery-optimization-bandwidth-profile
 - disable-unnecessary-startup-apps
 - disable-heavy-startup-apps
 - delay-safe-third-party-service-start
 - disable-selected-third-party-background-task
-- restore-sysmain-default
+- restore-sysmain-default **[Restore]**
 - restore-windows-search-default
 - create-restore-point-before-optimization-batch
-- pending-reboot-maintenance
+- pending-reboot-maintenance **[Diagnostic]**
 - stale-crash-dump-cleanup
-- optimize-startup-recovery-state
+- optimize-startup-recovery-state **[Diagnostic]**
 
 ## Detailed definitions
 
@@ -241,7 +241,7 @@ Restaura preferencia
 ### enable-auto-hdr
 Visual, no FPS
 
-### gaming-display-refresh-rate-audit
+### gaming-display-refresh-rate-audit **[Diagnostic]**
 Audita Hz
 
 ### set-best-performance-ac
@@ -316,28 +316,28 @@ Cachés regenerables Chrome/Edge/Teams (nunca sesiones)
 ### windows-component-store-cleanup
 DISM StartComponentCleanup
 
-### windows-component-store-resetbase
+### windows-component-store-resetbase **[Gated: ExpertOnly+RestorePoint]**
 DISM ResetBase, irreversible
 
 ### ~~disk-cleanup-system-files~~ (RETIRADA)
 Duplicado exacto de `cleanup-windows-update-cache`. Alias en `LegacyIds`.
 
-### free-low-storage-space
+### free-low-storage-space **[Diagnostic]**
 Umbrales 10/15/20%
 
-### restore-system-managed-pagefile
+### restore-system-managed-pagefile **[Restore]**
 System Managed
 
 ### enable-rss
 RSS
 
-### restore-tcp-checksum-offload
+### restore-tcp-checksum-offload **[Restore]**
 TCP offload
 
-### restore-udp-checksum-offload
+### restore-udp-checksum-offload **[Restore]**
 UDP offload
 
-### restore-large-send-offload
+### restore-large-send-offload **[Restore]**
 LSO
 
 ### configure-interrupt-moderation-for-low-latency
@@ -346,13 +346,13 @@ Solo Competitive
 ### disable-nic-power-saving-ac
 NIC AC
 
-### restore-windows-tcp-congestion-default
+### restore-windows-tcp-congestion-default **[Restore]**
 Congestion TCP
 
-### flush-dns-cache
+### flush-dns-cache **[Repair]**
 Maintenance tiny
 
-### reset-network-stack-repair
+### reset-network-stack-repair **[Repair]**
 Winsock/TCP
 
 ### delivery-optimization-bandwidth-profile
@@ -376,7 +376,7 @@ Delayed auto
 ### disable-selected-third-party-background-task
 Disable tareas
 
-### restore-sysmain-default
+### restore-sysmain-default **[Restore]**
 Restaura SysMain
 
 ### restore-windows-search-default
@@ -385,12 +385,12 @@ Restaura Search
 ### create-restore-point-before-optimization-batch
 SRSetRestorePoint
 
-### pending-reboot-maintenance
+### pending-reboot-maintenance **[Diagnostic]**
 Detecta reboot
 
 ### stale-crash-dump-cleanup
 Dumps antiguos
 
-### optimize-startup-recovery-state
+### optimize-startup-recovery-state **[Diagnostic]**
 Audita boot
 

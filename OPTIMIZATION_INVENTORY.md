@@ -6,6 +6,11 @@
 > `powercfg`, `netsh`, `schtasks`, `defrag`, `fsutil`, `DISM`, SCM) bajo el
 > flujo transaccional `PRECHECK → SNAPSHOT → APPLY → VERIFY → COMMIT`.
 >
+> Además, las 92 entradas se proyectan en grupos honestos
+> (`CatalogProjections`, spec §5.3): **68** de rendimiento real (batch default),
+> **14** repairs, **4** diagnósticos de solo lectura y **6** restores.
+> Proyección, no borrado: `All` sigue intacto y todo ID sigue resolviendo.
+>
 > El recuento se valida automáticamente en los tests de catálogo
 > (`CA-O.Core.Tests`), por lo que este documento no puede volverse a desincronizar
 > del código sin que la CI lo detecte.
@@ -71,7 +76,7 @@
 `enable-vrr` (`VRROptimizeEnable=1`), `set-games-high-performance-gpu`,
 `disable-background-game-captures`, `disable-game-bar-auto-launch`,
 `configure-gaming-power-mode-ac`, `restore-default-gpu-preference`,
-`enable-auto-hdr`, `gaming-display-refresh-rate-audit` (diagnóstico).
+`enable-auto-hdr`, `gaming-display-refresh-rate-audit` **[Diagnostic]** (diagnóstico).
 
 ### Power (6)
 
@@ -88,8 +93,8 @@ no reversible), `ensure-trim-enabled` (`fsutil`), `retrim-system-ssd`,
 `storage-sense-recycle-bin-policy`, `cleanup-windows-temp`,
 `cleanup-delivery-optimization-cache`, `windows-component-store-cleanup` (DISM),
 `windows-component-store-resetbase` (DISM `/ResetBase`, **irreversible**),
-`free-low-storage-space`,
-`restore-system-managed-pagefile`, `defragment-hdd-only`,
+`free-low-storage-space` **[Diagnostic]**,
+`restore-system-managed-pagefile` **[Restore]**, `defragment-hdd-only`,
 `cleanup-windows-update-cache`, `cleanup-app-caches`,
 `cleanup-prefetch-stale` (`%SystemRoot%\Prefetch\*.pf` +30d),
 `cleanup-cbs-logs` (`%SystemRoot%\Logs\CBS\*.log` +30d),
@@ -105,11 +110,11 @@ no reversible), `ensure-trim-enabled` (`fsutil`), `retrim-system-ssd`,
 ### Network (13)
 
 `normalize-tcp-autotuning` (`netsh`), `enable-rss`,
-`restore-tcp-checksum-offload`, `restore-udp-checksum-offload`,
-`restore-large-send-offload`, `configure-interrupt-moderation-for-low-latency`,
-`disable-nic-power-saving-ac`, `restore-windows-tcp-congestion-default`,
-`flush-dns-cache` (`ipconfig /flushdns`), `reset-network-stack-repair`
-(`netsh winsock/tcp reset`, RequiresReboot),
+`restore-tcp-checksum-offload` **[Restore]**, `restore-udp-checksum-offload` **[Restore]**,
+`restore-large-send-offload` **[Restore]**, `configure-interrupt-moderation-for-low-latency`,
+`disable-nic-power-saving-ac`, `restore-windows-tcp-congestion-default` **[Restore]**,
+`flush-dns-cache` **[Repair]** (`ipconfig /flushdns`), `reset-network-stack-repair`
+**[Repair]** (`netsh winsock/tcp reset`, RequiresReboot),
 `delivery-optimization-bandwidth-profile`, `disable-nagle-tcp-acks`,
 `disable-wifi-background-scan`.
 
@@ -117,22 +122,43 @@ no reversible), `ensure-trim-enabled` (`fsutil`), `retrim-system-ssd`,
 
 `disable-unnecessary-startup-apps`, `disable-heavy-startup-apps`,
 `delay-safe-third-party-service-start`, `disable-selected-third-party-background-task`
-(`schtasks /Change /DISABLE` real), `restore-sysmain-default`,
+(`schtasks /Change /DISABLE` real), `restore-sysmain-default` **[Restore]**,
 `restore-windows-search-default`.
 
 ### System / Maintenance (4)
 
 `create-restore-point-before-optimization-batch` (`SRSetRestorePoint`),
-`pending-reboot-maintenance` (diagnóstico), `stale-crash-dump-cleanup`,
-`optimize-startup-recovery-state` (diagnóstico).
+`pending-reboot-maintenance` **[Diagnostic]** (diagnóstico), `stale-crash-dump-cleanup`,
+`optimize-startup-recovery-state` **[Diagnostic]** (diagnóstico).
 
 ### Troubleshoot (14)
 
-`restart-windows-audio-services`, `disable-bluetooth-absolute-volume`,
-`fix-microphone-access`, `restart-desktop-compositor`, `clear-icon-thumbnail-cache`,
-`repair-windows-update`, `resync-system-clock` (`w32tm /resync`),
-`restart-print-spooler`, `restart-bluetooth-service`, `restart-dns-client`,
-`restart-windows-search`, `restart-windows-explorer`, `recover-windows-explorer`.
+`restart-windows-audio-services` **[Repair]**, `disable-bluetooth-absolute-volume` **[Repair]**,
+`fix-microphone-access` **[Repair]**, `restart-desktop-compositor` **[Repair]**, `clear-icon-thumbnail-cache`,
+`repair-windows-update` **[Repair]**, `resync-system-clock` **[Repair]** (`w32tm /resync`),
+`restart-print-spooler` **[Repair]**, `restart-bluetooth-service` **[Repair]**, `restart-dns-client` **[Repair]**,
+`restart-windows-search` **[Repair]**, `restart-windows-explorer` **[Repair]**, `recover-windows-explorer` **[Repair]**.
+
+---
+
+## Proyecciones (spec §5.3) — `CatalogProjections`
+
+El catálogo **no se borra**: `OptimizationCatalog.All` sigue con las 92 entradas y
+todo ID sigue resolviendo (motor, Preview, Resolve). Las proyecciones solo filtran
+*qué entra en el batch* y *qué es diagnóstico/repair/restore*:
+
+| Proyección | Count | Qué es |
+|---|---|---|
+| `BatchDefault` | **68** | Rendimiento real: el batch (Optimize/Analyze) aplica solo estas. Excluye repairs, diagnósticos y restores |
+| `RepairActions` (`RepairIds`) | **14** | Reparos de troubleshooting (restarts de servicios, flush/reset de red, WU, reloj, micro/explorer/compositor) — fuera del batch |
+| `Diagnostics` (`DiagnosticIds`) | **4** | `gaming-display-refresh-rate-audit`, `free-low-storage-space`, `pending-reboot-maintenance`, `optimize-startup-recovery-state` — read-only, `Detect` real |
+| `Restores` (`RestoreIds`) | **6** | Devuelven defaults (offloads TCP, congestión, SysMain, pagefile) — fuera del batch |
+| **Total `All`** | **92** | Partición exacta y validada por `CatalogProjectionTests` |
+
+Entradas **gated** (no se ofertan nunca en Recommended; requieren modo Expert y, si
+mutan, restore point obligatorio): `disable-vbs` y `windows-component-store-resetbase`
+(ExpertOnly + RequiresRestorePoint); `reset-network-stack-repair` lleva
+RequiresRestorePoint.
 
 ---
 
