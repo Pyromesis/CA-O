@@ -10,28 +10,14 @@ namespace CAO.Core.Gaming;
 /// </summary>
 public static class AntiCheatGuard
 {
-    /// <summary>Optimization ids that must never be auto-recommended (spec 95).</summary>
+    /// <summary>
+    /// Optimization ids that must never be auto-recommended (spec 95).
+    /// N5: solo ids presentes en OptimizationCatalog.All; los retirados se
+    /// eliminaron (el guard no protege contra ids inexistentes).
+    /// </summary>
     public static readonly IReadOnlySet<string> NeverAutoRecommend = new HashSet<string>(StringComparer.Ordinal)
     {
         "disable-vbs",
-        "disable-hvci",
-        "disable-memory-integrity",
-        "disable-memory-compression",
-        "disable-core-parking",
-        "cpu-min-state-100",
-        "disable-cpu-idle",
-        "disable-power-throttling",
-        "disable-search-service",
-        "disable-bits",
-        "disable-delivery-optimization",
-        "disable-automatic-maintenance",
-        "disable-mpo",
-        "disable-fullscreen-optimizations-global",
-        "static-pagefile",
-        "network-throttling-index-hack",
-        "svchost-split-threshold-hack",
-        "delete-prefetch",
-        "hypervisor-launchtype-off",
     };
 
     /// <summary>

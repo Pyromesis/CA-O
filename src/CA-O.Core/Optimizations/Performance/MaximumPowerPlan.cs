@@ -2,6 +2,7 @@ using System.Text.RegularExpressions;
 using CAO.Core.Abstractions;
 using CAO.Shared;
 using CAO.Shared.Security;
+using CAO.Core.Rollback;
 
 namespace CAO.Core.Optimizations.Performance;
 
@@ -32,29 +33,21 @@ public sealed class MaximumPowerPlan : IOptimization
 
     private static string Id => "maximum-power-plan";
 
-    /// <summary>Active scheme GUID parsed by the engine from powercfg (legado).</summary>
+    /// <summary>Active scheme GUID parsed by the engine from powercfg (legado, sin uso).</summary>
     public string? ActiveSchemeGuid { get; set; }
 
-    public OptimizationState Detect(IRegistryAccessor registry)
-    {
-        // El plan activo se lee del registro (sincronizado por powercfg):
-        // High o Ultimate cuentan como aplicados (igual que Verify).
-        var live = Optimization.PowerSchemes.DetectScheme(registry, HighPerformanceGuid, UltimatePerformanceGuid);
-        if (live != OptimizationState.Unknown)
-        {
-            return live;
-        }
-        // Fallback legado: inyección del motor.
-        return string.Equals(ActiveSchemeGuid, HighPerformanceGuid, StringComparison.OrdinalIgnoreCase)
-            || string.Equals(ActiveSchemeGuid, UltimatePerformanceGuid, StringComparison.OrdinalIgnoreCase)
-            ? OptimizationState.AppliedByCao
-            : OptimizationState.NotApplied;
-    }
+    /// <summary>Cambios de plan activo serializados entre sí.</summary>
+    public IReadOnlyList<ResourceKey> ResourceKeys => [Rollback.ResourceKey.PowerPlan()];
+
+    public OptimizationState Detect(IRegistryAccessor registry) =>
+        // Lectura honesta del registro (sincronizado por powercfg): High o
+        // Ultimate cuentan como aplicados. Sin lectura no hay éxito falso.
+        Optimization.PowerSchemes.DetectScheme(registry, HighPerformanceGuid, UltimatePerformanceGuid);
 
     public OptimizationSnapshot Capture(IRegistryAccessor registry)
     {
         var snapshot = new OptimizationSnapshot();
-        snapshot.RawNotes.Add($"scheme={Optimization.PowerSchemes.ReadActiveScheme(registry) ?? ActiveSchemeGuid ?? "381b4222-f694-41f0-9685-ff5bb260df2e"}");
+        snapshot.RawNotes.Add($"scheme={Optimization.PowerSchemes.ReadActiveScheme(registry) ?? "unknown"}");
         return snapshot;
     }
 
@@ -71,11 +64,12 @@ public sealed class MaximumPowerPlan : IOptimization
         var output = activate.StdOut;
         if (code != 0)
         {
-            // Hidden plan may not exist yet: duplicate it, then activate.
+            // Hidden plan may not exist yet: duplicate Ultimate, then
+            // activate Ultimate (antes reintentaba High, que seguía sin existir).
             var duplicate = await context.Executor.ExecuteAsync(
                 SystemCommandKey.PowerCfgDuplicateScheme, ["/duplicatescheme", UltimatePerformanceGuid], ct);
             var retry = await context.Executor.ExecuteAsync(
-                SystemCommandKey.PowerCfgSetActiveScheme, ["/setactive", HighPerformanceGuid], ct);
+                SystemCommandKey.PowerCfgSetActiveScheme, ["/setactive", UltimatePerformanceGuid], ct);
             code = retry.ExitCode;
             output = retry.StdOut + duplicate.StdErr;
             if (code != 0)
@@ -118,7 +112,8 @@ public sealed class MaximumPowerPlan : IOptimization
         }
         var note = snapshot.RawNotes.FirstOrDefault(n => n.StartsWith("scheme=", StringComparison.Ordinal));
         var guid = note?["scheme=".Length..];
-        if (string.IsNullOrWhiteSpace(guid)) return OperationResult.Ok("Sin plan previo registrado; nada que restaurar.");
+        if (string.IsNullOrWhiteSpace(guid) || !Guid.TryParse(guid, out _))
+            return OperationResult.Fail("Sin plan previo registrado; nada que restaurar.", "no-previous-scheme");
 
         var restore = await context.Executor.ExecuteAsync(
             SystemCommandKey.PowerCfgSetActiveScheme, ["/setactive", guid], ct);

@@ -138,10 +138,15 @@ public sealed class RealDetectTests
     {
         // Esta máquina/CI no tiene adaptador Wi-Fi: sin interfaz no hay
         // estado que leer; Unknown (nunca NotApplied ciego: RULING Plan 04).
+        // Con Wi-Fi el Detect real observa netsh: cualquier valor definido vale.
+        var state = new DisableWifiBackgroundScan().Detect(new MemoryRegistry());
         if (!HasWifi())
         {
-            Assert.Equal(OptimizationState.Unknown,
-                new DisableWifiBackgroundScan().Detect(new MemoryRegistry()));
+            Assert.Equal(OptimizationState.Unknown, state);
+        }
+        else
+        {
+            Assert.True(Enum.IsDefined(state));
         }
     }
 

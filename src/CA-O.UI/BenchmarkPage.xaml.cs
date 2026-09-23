@@ -92,10 +92,17 @@ public sealed partial class BenchmarkPage : Page
         if (!string.IsNullOrWhiteSpace(_vm.BootSummary)) BootText.Text = _vm.BootSummary;
     }
 
-    /// <summary>Cambia el mood de BenchCat. Nunca lanza (constraint Plan 01).</summary>
+    /// <summary>Cambia el mood de BenchCat y lo publica al estado global para que
+    /// todas las pestañas muestren el mismo ciclo. Nunca lanza (constraint Plan 01).</summary>
     private void SetCat(string mood)
     {
-        try { BenchCat.SetMood(mood); } catch { }
+        try
+        {
+            var normalized = CAO.UI.Controls.MascotFlipbook.Normalize(mood);
+            BenchCat.SetMood(normalized);
+            _uiState.MascotMood = normalized;
+        }
+        catch { }
     }
 
     private void FillBoot()

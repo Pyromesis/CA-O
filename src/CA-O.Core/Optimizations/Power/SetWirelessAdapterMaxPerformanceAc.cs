@@ -26,5 +26,6 @@ public sealed class SetWirelessAdapterMaxPerformanceAc : PowerAcSettingOptimizat
         Compatibility = CompatibilityStatus.Conditional,
         SecurityImpact = SecurityImpact.None,
         Impact = ImpactLevel.Low,
+        Flags = OptimizationFlags.OneShot,
     };
 }

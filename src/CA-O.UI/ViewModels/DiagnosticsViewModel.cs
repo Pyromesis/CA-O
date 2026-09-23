@@ -6,7 +6,7 @@ using CAO.Shared;
 
 namespace CAO.UI.ViewModels;
 
-/// <summary>ViewModel para DiagnosticsPage — métricas de entrada, térmicas y rendimiento.</summary>
+/// <summary>ViewModel de diagnósticos — métricas de entrada, térmicas y rendimiento (lo consume AnalyzePage).</summary>
 public sealed partial class DiagnosticsViewModel : ObservableObject
 {
     [ObservableProperty] private bool _isRunning;

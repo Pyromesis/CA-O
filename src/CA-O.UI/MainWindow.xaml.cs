@@ -107,26 +107,40 @@ public sealed partial class MainWindow : Window
     /// Diálogo no descartable: la única salida es ejecutar el análisis.
     /// Cualquier ejecución completa (aunque sea con advertencias) desbloquea.
     /// </summary>
+    private int _initialAnalysisPrompts;
+    private bool _initialAnalysisPromptOpen;
+
     private async Task PromptInitialAnalysisAsync()
     {
-        while (NeedsInitialAnalysis())
+        // Guard reentrante + tope de intentos: si el análisis cancela o
+        // falla de forma persistente, no se bloquea la UI en un bucle
+        // infinito — se informa y se deja usar la app.
+        if (_initialAnalysisPromptOpen) return;
+        _initialAnalysisPromptOpen = true;
+        try
         {
-            var dialog = new ContentDialog
+            while (NeedsInitialAnalysis() && _initialAnalysisPrompts < 3)
             {
-                Title = "Análisis inicial obligatorio",
-                Content = "Antes de usar CA-O necesitas un análisis completo: mide tu CPU, GPU, red y seguridad para generar recomendaciones con evidencia. No modifica nada del sistema.",
-                PrimaryButtonText = "Ejecutar análisis ahora",
-                DefaultButton = ContentDialogButton.Primary,
-                XamlRoot = Content.XamlRoot,
-            };
-            await dialog.ShowAsync();
-            try
-            {
-                if (ContentFrame.Content is Pages.AnalyzePage page)
-                    await page.RunFullAnalysisAsync();
+                _initialAnalysisPrompts++;
+                var dialog = new ContentDialog
+                {
+                    Title = "Análisis inicial obligatorio",
+                    Content = "Antes de usar CA-O necesitas un análisis completo: mide tu CPU, GPU, red y seguridad para generar recomendaciones con evidencia. No modifica nada del sistema.",
+                    PrimaryButtonText = "Ejecutar análisis ahora",
+                    CloseButtonText = "Ahora no",
+                    DefaultButton = ContentDialogButton.Primary,
+                    XamlRoot = Content.XamlRoot,
+                };
+                await dialog.ShowAsync();
+                try
+                {
+                    if (ContentFrame.Content is Pages.AnalyzePage page)
+                        await page.RunFullAnalysisAsync();
+                }
+                catch (Exception ex) { App.WriteCrashLog(ex); }
             }
-            catch (Exception ex) { App.WriteCrashLog(ex); }
         }
+        finally { _initialAnalysisPromptOpen = false; }
     }
 
     private void ApplyLocalization()

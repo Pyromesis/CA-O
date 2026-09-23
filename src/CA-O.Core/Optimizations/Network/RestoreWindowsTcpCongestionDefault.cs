@@ -25,6 +25,7 @@ public sealed class RestoreWindowsTcpCongestionDefault : IOptimization
         Compatibility = CompatibilityStatus.Compatible,
         SecurityImpact = SecurityImpact.None,
         Impact = ImpactLevel.Low,
+        Flags = OptimizationFlags.OneShot,
     };
 
     public OptimizationState Detect(IRegistryAccessor registry) => OptimizationState.NotApplied;

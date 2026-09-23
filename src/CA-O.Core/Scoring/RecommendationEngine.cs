@@ -16,12 +16,13 @@ public static class RecommendationEngine
     public static IReadOnlyList<Recommendation> BuildAll(
         IEnumerable<IOptimization> catalog,
         IRegistryAccessor registry,
-        SystemContext context)
+        SystemContext context,
+        IReadOnlySet<string>? appliedOneShots = null)
     {
         var recommendations = new List<Recommendation>();
         foreach (var optimization in catalog)
         {
-            recommendations.Add(Build(optimization, registry, context));
+            recommendations.Add(Build(optimization, registry, context, appliedOneShots));
         }
 
         return recommendations;
@@ -30,7 +31,8 @@ public static class RecommendationEngine
     public static Recommendation Build(
         IOptimization optimization,
         IRegistryAccessor registry,
-        SystemContext context)
+        SystemContext context,
+        IReadOnlySet<string>? appliedOneShots = null)
     {
         var definition = optimization.Definition;
         // Un Detect que lanza (p. ej. HKLM denegado sin elevación) no puede
@@ -47,7 +49,7 @@ public static class RecommendationEngine
         }
         var guardReason = AntiCheatGuard.Evaluate(definition, context);
 
-        var (bucket, reason) = Classify(definition, context, currentState, guardReason);
+        var (bucket, reason) = Classify(definition, context, currentState, guardReason, appliedOneShots);
         var score = OptimizationScoreCalculator.Compute(definition);
 
         return new Recommendation
@@ -80,7 +82,8 @@ public static class RecommendationEngine
         OptimizationDefinition definition,
         SystemContext context,
         OptimizationState currentState,
-        RecommendationReason guardReason)
+        RecommendationReason guardReason,
+        IReadOnlySet<string>? appliedOneShots = null)
     {
         // 0) Fail-closed for retired historical tweaks: they are explicitly unsupported in production recommendations.
         if (StubIds.Contains(definition.Id))
@@ -147,6 +150,24 @@ public static class RecommendationEngine
             return (RecommendationBucket.Optional,
                 new RecommendationReason("pending-reboot",
                     "Aplicado; pendiente de reinicio para surtir efecto."));
+        }
+
+        // 6b) One-shot actions run once: after success they are recorded in the
+        // persistent ledger and never recommended again, even though Detect
+        // cannot observe their effect (flush-dns, powercfg AC settings...).
+        if (definition.Flags.HasFlag(OptimizationFlags.OneShot))
+        {
+            if (appliedOneShots is not null &&
+                appliedOneShots.Contains(definition.Id))
+            {
+                return (RecommendationBucket.Optional,
+                    new RecommendationReason("one-shot-applied",
+                        "Acción única ya ejecutada; no es necesario repetirla."));
+            }
+
+            return (RecommendationBucket.Optional,
+                new RecommendationReason("one-shot",
+                    "Acción de un solo uso; se ofrece una vez y no se recomienda automáticamente."));
         }
 
         // 7) Maintenance actions are offered as optional work, never auto-applied.

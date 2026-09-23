@@ -54,12 +54,12 @@ public sealed class PendingRebootMaintenance : IOptimization
 
     public Task<VerificationResult> VerifyAsync(OptimizationContext context, CancellationToken ct = default)
     {
+        // M3: auditoría no-op (Apply no muta). Exigir la desaparición de las
+        // señales haría imposible el commit: solo un reinicio manual —fuera de
+        // esta transacción— las elimina. NotApplicable honesto en ambos casos.
         var observed = Detect(context.Registry);
-        return Task.FromResult(observed switch
-        {
-            OptimizationState.AppliedByCao =>
-                VerificationResult.Passed(observed, "Sin señales de reinicio pendiente."),
-            _ => VerificationResult.Failed(observed, "Hay señales de reinicio pendiente."),
-        });
+        return Task.FromResult(observed == OptimizationState.AppliedByCao
+            ? VerificationResult.Passed(observed, "Sin señales de reinicio pendiente.")
+            : VerificationResult.NotApplicable());
     }
 }

@@ -24,21 +24,12 @@ internal sealed class PrivilegedPipeService(
     OptimizationEngine engine,
     IPrivilegedCallerAuthorizer authorizer) : BackgroundService
 {
-    private static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(15);
-    private static readonly TimeSpan DispatchTimeoutDefault = TimeSpan.FromSeconds(60);
-    private static readonly TimeSpan DispatchTimeoutHeavy = TimeSpan.FromMinutes(20);
-    private static readonly HashSet<string> HeavyOptimizationIds = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "windows-component-store-cleanup",
-        "windows-component-store-resetbase",
-        "optimize-system-drive",
-        "retrim-system-ssd",
-        "defragment-hdd-only",
-        "disk-cleanup-system-files",
-        "cleanup-windows-update-cache",
-        "reset-network-stack-repair",
-        "repair-windows-update",
-    };
+    // Techos centralizados en CAO.Shared.TimeoutProfile (fuente única):
+    // antes triplicados como literales en servicio/gateway/cliente UI.
+    private static readonly TimeSpan RequestTimeout = TimeoutProfile.RequestRead;
+    private static readonly TimeSpan DispatchTimeoutDefault = TimeoutProfile.DispatchDefault;
+    private static readonly TimeSpan DispatchTimeoutHeavy = TimeoutProfile.DispatchHeavy;
+    private static readonly HashSet<string> HeavyOptimizationIds = TimeoutProfile.HeavyOptimizationIds;
     private readonly Core.Security.IIpcReplayGuard _replayGuard = new Core.Security.ReplayCache();
 
 
@@ -227,7 +218,9 @@ try { caller = GetCallerIdentity(pipe, new CAO.Infrastructure.Windows.Security.W
 try { request = JsonSerializer.Deserialize<IpcRequest>(line, JsonOptions); }
             catch (JsonException ex)
             {
-                logger.LogWarning(ex, "JSON inválido recibido: {Line}", line.Length > 200 ? line[..200] : line);
+                // No se registra el contenido: la línea la controla el llamante
+                // y podría forjar entradas en el log del servicio (SYSTEM).
+                logger.LogWarning(ex, "JSON inválido recibido ({Length} caracteres).", line?.Length ?? 0);
                 await WriteResponse(pipe, IpcResponse.Rejected(ErrorCodes.IpcMalformedRequest, $"JSON inválido: {ex.Message}"), stoppingToken);
                 return;
             }
@@ -565,7 +558,12 @@ catch (Exception ex)
                 }, JsonOptions));
             }
 
-            var optimizationId = ((IOptimizationIdPayload)request.Payload).OptimizationId;
+            if (request.Payload is not IOptimizationIdPayload idPayload)
+            {
+                return IpcResponse.Rejected(ErrorCodes.IpcPayloadSchemaInvalid, "Operación no disponible.");
+            }
+
+            var optimizationId = idPayload.OptimizationId;
 
         try
         {
@@ -624,9 +622,10 @@ catch (Exception ex)
             writer.Flush();
             pipe.Flush();
         }
-        catch (IOException)
+        catch (Exception ex) when (ex is IOException or ObjectDisposedException or InvalidOperationException)
         {
-            // Client gone before reading the answer.
+            // Cliente ido (pipe roto/dispuesto) antes de leer la respuesta.
+            // Se cubren las tres formas de 'pipe muerto' para no ensuciar el log.
         }
     }
 

@@ -26,5 +26,6 @@ public sealed class DisablePcieLinkStatePowerSavingAc : PowerAcSettingOptimizati
         Compatibility = CompatibilityStatus.Compatible,
         SecurityImpact = SecurityImpact.None,
         Impact = ImpactLevel.Medium,
+        Flags = OptimizationFlags.OneShot,
     };
 }

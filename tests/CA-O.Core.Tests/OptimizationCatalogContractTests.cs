@@ -5,7 +5,7 @@ using Xunit;
 namespace CAO.Core.Tests;
 
 /// <summary>
-/// Optimization contract tests (spec 92): every catalog entry must be fully
+/// Optimization contract tests (spec 91): every catalog entry must be fully
 /// documented, classified, reversible (or explicitly maintenance) and
 /// security-annotated. A catalog entry that cannot answer these questions
 /// must not ship.
@@ -29,6 +29,7 @@ public sealed class OptimizationCatalogContractTests
     [InlineData("optimize-hdd-media-aware", "optimize-system-drive")]
     [InlineData("set-best-performance-ac", "maximum-power-plan")]
     [InlineData("disk-cleanup-system-files", "cleanup-windows-update-cache")]
+    [InlineData("restore-power-plan-after-gaming", "restore-balanced-power-dc")]
     public void RetiredDuplicatesStayOutOfProductionButTraceable(string retiredId, string canonicalId)
     {
         Assert.Contains(retiredId, OptimizationCatalog.LegacyIds);
@@ -44,7 +45,7 @@ public sealed class OptimizationCatalogContractTests
     public void IdsAreUnique()
     {
         var ids = OptimizationCatalog.All.Select(o => o.Definition.Id).ToList();
-        Assert.Equal(92, ids.Count); // 87 + 5 limpiezas nuevas (prefetch, CBS, volcados ext, Outlook, navegadores)
+        Assert.Equal(91, ids.Count); // 87 + 5 limpiezas nuevas (prefetch, CBS, volcados ext, Outlook, navegadores) - 1 duplicado retirado (restore-power-plan-after-gaming)
         Assert.Equal(ids.Count, ids.Distinct(StringComparer.Ordinal).Count());
     }
 
@@ -130,4 +131,30 @@ public sealed class OptimizationCatalogContractTests
 
     private static OptimizationDefinition Resolve(string id) =>
         OptimizationCatalog.All.First(o => o.Definition.Id == id).Definition;
+
+    /// <summary>
+    /// Integridad referencial del blocklist anticheat (N5): cada id en
+    /// NeverAutoRecommend debe existir en el catálogo (producción, legacy
+    /// o alias retirado). Un id muerto envejece en silencio.
+    /// </summary>
+    [Fact]
+    public void AntiCheatBlocklistOnlyReferencesKnownOptimizationIds()
+    {
+        var known = OptimizationCatalog.All
+            .Select(o => o.Definition.Id)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var legacyId in OptimizationCatalog.LegacyIds)
+        {
+            known.Add(legacyId);
+        }
+        foreach (var alias in OptimizationCatalog.RetiredAliases.Keys)
+        {
+            known.Add(alias);
+        }
+
+        var unknown = CAO.Core.Gaming.AntiCheatGuard.NeverAutoRecommend
+            .Where(id => !known.Contains(id))
+            .ToList();
+        Assert.Empty(unknown);
+    }
 }

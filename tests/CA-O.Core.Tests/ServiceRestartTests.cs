@@ -39,11 +39,12 @@ public sealed class ServiceRestartTests
     public async Task PrintSpooler_Restarts_StopThenStart()
     {
         var services = new FakeServices();
-        var result = await new RestartPrintSpooler().ApplyAsync(Context(services));
+        var optimization = new RestartPrintSpooler();
+        var result = await optimization.ApplyAsync(Context(services));
 
         Assert.True(result.Success);
         Assert.Equal(["stop:Spooler", "start:Spooler"], services.Calls);
-        var verify = await new RestartPrintSpooler().VerifyAsync(Context(services));
+        var verify = await optimization.VerifyAsync(Context(services));
         Assert.Equal(VerificationStatus.Passed, verify.Status);
     }
 

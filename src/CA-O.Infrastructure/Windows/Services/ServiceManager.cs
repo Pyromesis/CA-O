@@ -66,14 +66,19 @@ public sealed class ServiceManager : IServiceManager
         using var key = Registry.LocalMachine.OpenSubKey($@"{ServicesKeyPath}\{serviceName}", writable: true)
             ?? throw new InvalidOperationException($"Service '{serviceName}' not found in registry.");
 
-        // Preserve delayed-auto flag unless explicitly changing away from Automatic.
-        if (!startType.StartsWith("Automatic", StringComparison.OrdinalIgnoreCase))
+        // DelayedAutostart solo se toca cuando el tipo lo especifica:
+        // - "Automatic (Delayed)" => 1 (diferido explícito).
+        // - "Automatic" a secas => 0 (automático no diferido explícito; no
+        //   se deja un flag obsoleto que causaría arranque diferido inesperado).
+        // - No-Automatic => se deja intacto para no perder la intención del
+        //   usuario si más tarde vuelve a Automatic (el flag solo afecta al
+        //   arranque automático).
+
+        if (startType.StartsWith("Automatic", StringComparison.OrdinalIgnoreCase))
         {
-            key.SetValue("DelayedAutostart", 0, RegistryValueKind.DWord);
-        }
-        else if (startType.Contains("Delayed", StringComparison.OrdinalIgnoreCase))
-        {
-            key.SetValue("DelayedAutostart", 1, RegistryValueKind.DWord);
+            key.SetValue("DelayedAutostart",
+                startType.Contains("Delayed", StringComparison.OrdinalIgnoreCase) ? 1 : 0,
+                RegistryValueKind.DWord);
         }
 
         key.SetValue("Start", startType switch

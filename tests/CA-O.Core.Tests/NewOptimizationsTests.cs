@@ -124,7 +124,7 @@ public sealed class NewOptimizationsTests
     }
 
     [Fact]
-    public void WifiDetectIsAlwaysUnknown()
+    public void WifiDetect_ObservesLiveStateOrReportsUnknown()
     {
         // Hermetico: en maquina CON wifi el Detect real puede devolver
         // AppliedByCao/NotApplied (netsh). Sin wifi -> Unknown.
@@ -198,7 +198,7 @@ public sealed class NewOptimizationsTests
             Assert.False(string.IsNullOrWhiteSpace(optimization.Definition.NameEs));
             Assert.False(string.IsNullOrWhiteSpace(optimization.Definition.TooltipEs));
         }
-        Assert.Equal(92, OptimizationCatalog.All.Count); // 87 + 5 limpiezas nuevas (prefetch, CBS, volcados ext, Outlook, navegadores)
+        Assert.Equal(91, OptimizationCatalog.All.Count); // 87 + 5 limpiezas nuevas - 1 duplicado retirado (restore-power-plan-after-gaming)
     }
 
     [Theory]

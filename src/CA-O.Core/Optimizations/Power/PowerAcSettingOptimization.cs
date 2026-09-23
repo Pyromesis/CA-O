@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 using CAO.Core.Abstractions;
+using CAO.Core.Rollback;
 using CAO.Shared;
 using CAO.Shared.Security;
 
@@ -17,9 +18,24 @@ public abstract class PowerAcSettingOptimization : IOptimization
     protected abstract string SettingGuid { get; }
     protected abstract string TargetIndex { get; }
 
-    public OptimizationState Detect(IRegistryAccessor registry) => OptimizationState.NotApplied;
+    /// <summary>
+    /// El índice AC solo es observable vía powercfg (requiere ejecutor, no
+    /// registro): Detect honesto es Unknown. La regla OneShot del motor de
+    /// recomendaciones evita el nagging tras aplicar (ver OneShotLedger).
+    /// </summary>
+    public OptimizationState Detect(IRegistryAccessor registry) => OptimizationState.Unknown;
 
-    public OptimizationSnapshot Capture(IRegistryAccessor registry) => new OptimizationSnapshot();
+    /// <summary>Las escrituras powercfg se serializan por el plan activo.</summary>
+    public virtual IReadOnlyList<ResourceKey> ResourceKeys => [ResourceKey.PowerPlan()];
+
+    public OptimizationSnapshot Capture(IRegistryAccessor registry)
+    {
+        var snapshot = new OptimizationSnapshot { TimestampUtc = DateTime.UtcNow };
+        snapshot.RawNotes.Add($"power-target={TargetIndex}");
+        snapshot.RawNotes.Add($"power-sub={SubGuid}");
+        snapshot.RawNotes.Add($"power-setting={SettingGuid}");
+        return snapshot;
+    }
 
     private async Task<string?> QueryCurrentAsync(Core.Interfaces.IPrivilegedCommandExecutor executor, CancellationToken ct)
     {
@@ -29,7 +45,11 @@ public abstract class PowerAcSettingOptimization : IOptimization
         if (!query.Success) return null;
         var match = Regex.Match(query.StdOut,
             @"Current AC Power Setting Index:\s*0x([0-9a-fA-F]+)", RegexOptions.IgnoreCase);
-        return match.Success ? match.Groups[1].Value.TrimStart('0') is var hex && hex.Length == 0 ? "0" : hex : null;
+        if (!match.Success) return null;
+        // Normaliza a minúsculas sin ceros a la izquierda: powercfg emite
+        // hex (p. ej. 0x0000000a) y TargetIndex puede ser decimal.
+        var hex = match.Groups[1].Value.TrimStart('0').ToLowerInvariant();
+        return hex.Length == 0 ? "0" : hex;
     }
 
     public async Task<OperationResult> ApplyAsync(OptimizationContext context, CancellationToken ct = default)
@@ -69,8 +89,16 @@ public abstract class PowerAcSettingOptimization : IOptimization
 
         var previous = snapshot.RawNotes
             .FirstOrDefault(n => n.StartsWith("power-index=", StringComparison.Ordinal))?["power-index=".Length..]
-            ?? _lastPrevious ?? "1";
-        if (previous is not ("0" or "1" or "2")) previous = "1";
+            ?? _lastPrevious;
+        if (previous is null)
+        {
+            // Sin índice previo registrado (snapshot antiguo o Apply en otro
+            // proceso): fallar ANTES de mutar en vez de inventar un índice.
+            return OperationResult.Fail(
+                "No hay índice previo registrado para este ajuste; no se puede revertir sin adivinar.",
+                "no-previous-index");
+        }
+        if (previous is not ("0" or "1" or "2")) previous = NormalizeIndex(previous);
 
         var set = await context.Executor.ExecuteAsync(
             SystemCommandKey.PowerCfgSetAcValueIndex,
@@ -92,7 +120,7 @@ public abstract class PowerAcSettingOptimization : IOptimization
         if (current is null)
             return VerificationResult.Unknown(OptimizationState.Unknown, "No se pudo releer el ajuste.");
 
-        return current == TargetIndex
+        return NormalizeIndex(current) == NormalizeIndex(TargetIndex)
             ? VerificationResult.Passed(OptimizationState.AppliedByCao, $"Índice verificado: {current}.")
             : VerificationResult.Failed(OptimizationState.NotApplied, $"Índice actual {current}, esperado {TargetIndex}.");
     }
@@ -112,7 +140,7 @@ public abstract class PowerAcSettingOptimization : IOptimization
                 {
                     Kind = "PowerCfg",
                     Target = $"powercfg /setacvalueindex SCHEME_CURRENT {SubGuid} {SettingGuid}",
-                    Before = "índice actual",
+                    Before = "índice actual (se lee con powercfg al aplicar)",
                     After = $"índice {TargetIndex}",
                 },
             ],
@@ -120,6 +148,12 @@ public abstract class PowerAcSettingOptimization : IOptimization
             SecurityImpact = Definition.SecurityImpact,
             Flags = Definition.Flags,
         });
+
+    private static string NormalizeIndex(string index)
+    {
+        var n = index.Trim().TrimStart('0').ToLowerInvariant();
+        return n.Length == 0 ? "0" : n;
+    }
 
     private string? _lastPrevious;
 }

@@ -58,7 +58,11 @@ public static class PowerSchemes
             : OptimizationState.NotApplied;
     }
 
-    /// <summary>Nota scheme= para snapshot (revertir el plan previo exacto).</summary>
+    /// <summary>
+    /// Nota scheme= para snapshot. Si el plan previo no se puede leer se
+    /// registra scheme=unknown y el Revert falla honesto en vez de mover al
+    /// usuario a Equilibrado inventado.
+    /// </summary>
     public static string CaptureSchemeNote(IRegistryAccessor registry) =>
-        $"scheme={ReadActiveScheme(registry) ?? BalancedGuid}";
+        $"scheme={ReadActiveScheme(registry) ?? "unknown"}";
 }

@@ -734,7 +734,7 @@ public sealed partial class DriversPage : Page
                 o.UpdateId, o.Title,
                 string.IsNullOrWhiteSpace(o.Version) ? "versión desconocida" : $"Versión {o.Version}")).ToList(),
         };
-        offersList.ItemTemplate = (DataTemplate)Application.Current.Resources["CatalogOfferTemplate"];
+        offersList.ItemTemplate = (DataTemplate)(this.Resources.TryGetValue("CatalogOfferTemplate", out var offerT) ? offerT : Application.Current.Resources["CatalogOfferTemplate"]);
         var offerDialog = new ContentDialog
         {
             Title = $"{search.Offers.Count} oficiales encontrados",
@@ -817,7 +817,7 @@ public sealed partial class DriversPage : Page
                 MaxHeight = 300,
                 ItemsSource = candidates.Select(p => new CatalogInfRow(p, Path.GetFileName(p))).ToList(),
             };
-            infList.ItemTemplate = (DataTemplate)Application.Current.Resources["CatalogInfTemplate"];
+            infList.ItemTemplate = (DataTemplate)(this.Resources.TryGetValue("CatalogInfTemplate", out var infT) ? infT : Application.Current.Resources["CatalogInfTemplate"]);
             var infDialog = new ContentDialog
             {
                 Title = "Elige el .inf a instalar",

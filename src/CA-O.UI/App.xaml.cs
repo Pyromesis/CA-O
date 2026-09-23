@@ -84,6 +84,8 @@ public partial class App : Application
     private void OnUnhandledException(object sender, Microsoft.UI.Xaml.UnhandledExceptionEventArgs e)
     {
         WriteCrashLog(e.Exception);
+        // §19 nunca cerrar por un fallo no fatal: se registra y la app sigue viva.
+        e.Handled = true;
     }
 
     /// <summary>

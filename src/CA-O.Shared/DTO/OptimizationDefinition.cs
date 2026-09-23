@@ -57,8 +57,12 @@ public sealed record OptimizationDefinition
     /// <summary>Alias consumed by cards/report tables (spec 8 "RequiresRestart").</summary>
     public bool RequiresRestart => Flags.HasFlag(OptimizationFlags.RequiresReboot);
 
-    /// <summary>True when apply only succeeds elevated (service-mediated).</summary>
-    public bool RequiresAdmin => !Flags.HasFlag(OptimizationFlags.NotReversible) || true;
+    /// <summary>
+    /// True when apply only succeeds elevated (service-mediated).
+    /// M6: todas las operaciones pasan por el servicio privilegiado; la
+    /// expresión anterior (!NotReversible || true) era siempre true.
+    /// </summary>
+    public bool RequiresAdmin => true;
 
     /// <summary>Ids of optimizations that must be evaluated/handled first.</summary>
     public IReadOnlyList<string> Prerequisites { get; init; } = Array.Empty<string>();

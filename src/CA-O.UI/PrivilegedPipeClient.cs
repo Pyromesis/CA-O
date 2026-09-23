@@ -22,8 +22,11 @@ public sealed class PrivilegedPipeClient
     // por defecto y 20 min en pesadas): sin techo, un servicio colgado a mitad
     // deja la UI colgada hasta el timeout del llamante (45 min en drivers).
     // La cancelación del llamante sigue respetándose (lo primero que llegue).
-    private static readonly TimeSpan ResponseTimeoutDefault = TimeSpan.FromSeconds(90);
-    private static readonly TimeSpan ResponseTimeoutHeavy = TimeSpan.FromMinutes(21);
+    // Techos centralizados en CAO.Shared.TimeoutProfile (fuente única junto
+    // al servicio y al gateway): divergir aquí colgaba la UI o mataba
+    // operaciones pesadas a mitad de ejecución.
+    private static readonly TimeSpan ResponseTimeoutDefault = TimeoutProfile.ClientResponseDefault;
+    private static readonly TimeSpan ResponseTimeoutHeavy = TimeoutProfile.ClientResponseHeavy;
 
     private static readonly HashSet<PrivilegedOperationKind> HeavyOperations = new()
     {
@@ -35,20 +38,9 @@ public sealed class PrivilegedPipeClient
         PrivilegedOperationKind.DownloadCatalogDriver,
     };
 
-    // Espejo de PrivilegedPipeService.HeavyOptimizationIds: Apply/Revert de
-    // estas optimizaciones despacha hasta 20 min en el servicio.
-    private static readonly HashSet<string> HeavyOptimizationIds = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "windows-component-store-cleanup",
-        "windows-component-store-resetbase",
-        "optimize-system-drive",
-        "retrim-system-ssd",
-        "defragment-hdd-only",
-        "disk-cleanup-system-files",
-        "cleanup-windows-update-cache",
-        "reset-network-stack-repair",
-        "repair-windows-update",
-    };
+    // Espejo de TimeoutProfile.HeavyOptimizationIds (fuente única): Apply/Revert
+    // de estas optimizaciones despacha hasta 20 min en el servicio.
+    private static readonly HashSet<string> HeavyOptimizationIds = TimeoutProfile.HeavyOptimizationIds;
 
     private static bool IsHeavyOptimization(ITypedPayload payload) =>
         payload is IOptimizationIdPayload p && HeavyOptimizationIds.Contains(p.OptimizationId);

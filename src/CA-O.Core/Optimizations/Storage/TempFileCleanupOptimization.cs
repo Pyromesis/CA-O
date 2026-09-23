@@ -76,11 +76,34 @@ public abstract class TempFileCleanupOptimization : IOptimization
             catch { continue; }
             if (!info.Exists) continue;
             var cutoff = DateTime.UtcNow.AddDays(-olderThanDays);
-            FileInfo[] files;
-            try { files = info.GetFiles(pattern, SearchOption.TopDirectoryOnly); }
-            catch { continue; }
-            foreach (var file in files)
+            // Recursivo: %TEMP% acumula el grueso en subcarpetas (VS, Edge,
+            // instaladores). TopDirectoryOnly dejaba casi todo sin tocar.
+            List<string> candidates = new();
+            try
             {
+                foreach (var p in Directory.EnumerateFiles(dir, pattern, SearchOption.AllDirectories))
+                    candidates.Add(p);
+            }
+            catch
+            {
+                // Sin acceso a alguna subcarpeta: se limpia con lo listado
+                // hasta el fallo. Si no se listó nada, se intenta el nivel
+                // superior para no dejar el directorio sin cubrir.
+                if (candidates.Count == 0)
+                {
+                    try
+                    {
+                        foreach (var p in Directory.EnumerateFiles(dir, pattern, SearchOption.TopDirectoryOnly))
+                            candidates.Add(p);
+                    }
+                    catch { continue; }
+                }
+            }
+            foreach (var fullName in candidates)
+            {
+                FileInfo file;
+                try { file = new FileInfo(fullName); }
+                catch { continue; }
                 DateTime stamp;
                 try { stamp = file.LastWriteTimeUtc; }
                 catch { continue; }

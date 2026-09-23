@@ -2,6 +2,24 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
+## [2.1.33] - 2026-09-23
+
+### Corregido
+- Las optimizaciones de un solo uso ya no reaparecen como pendientes tras reabrir la app: nuevo flag `OneShot` + ledger persistente (`one-shot-ledger.json` en `%ProgramData%\CA-O`) que el motor marca al aplicar y consulta al recomendar. Cubiertos los 6 casos con `Detect` no observable (resetbase DISM, 3 ajustes PowerAc, congestión TCP, flush DNS).
+- `PowerAcSettingOptimization` ahora detecta y captura estado real en vez de `NotApplied`/vacío; el revert ya no inventa el índice previo (`"1"`) sino que falla honesto si no hay evidencia, y normaliza hex correctamente.
+- `SnapshotComparison` compara también las notas estables del snapshot (antes el rollback de power siempre daba "verificado" sin observar nada) y trata valor-ausente-en-ambos-lados como coincidencia exacta (el revert perfecto ya no se reporta como fallo).
+- `MaximumPowerPlan` ya no fabrica `Balanced` como plan previo ni duplica el plan equivocado al fallar; `StartupRunKey` captura solo lo pendiente y su revert ya no lanza con snapshots corruptos.
+- Endurecida la persistencia: escrituras atómicas (tmp+move) en settings/benchmarks/snapshots, cuarentena `.corrupt-*` en vez de borrar historial, caché de cola + rotación del `history.jsonl`, y ledger one-shot con lock.
+- La UI ya no se bloquea sin salida (límite de reintentos en el análisis inicial + botón "Ahora no"), los diálogos de drivers resuelven sus plantillas sin `KeyNotFoundException`, y el análisis ya no re-mide en el hilo UI.
+
+### Mejorado
+- Mascota del Panel/Benchmark rehecha: ahora es la silueta de un gato **animada fotograma a fotograma** (flipbook de 8 PNG por mood) en lugar del gato vectorial aproximado. Misma API (`CaoCat`, `Mood`/`SetMood`, `CatMoodCatalog`) y 5 moods con arte propio: Idle (respira, la cola se mece), Working (golpecitos con la pata), Celebrate (salto), Warn (orejas atrás, cola erizada) y Sleep (dormido, cola enrollada). Dos conjuntos de arte (silueta oscura/clara) que siguen el tema de la ventana, lienzo 256² con alineación de suelo para que la animación no tiemble, y `ReducedMotion` congela el fotograma 0.
+- Arte generado con el motor local de Open Generative AI (`stable-diffusion.cpp` + DreamShaper 8) encadenando img2img frame a frame, y limpiado a silueta plana con GDI+ (mayor componente conexa, relleno de huecos, alfa suavizado). Nuevo `scripts/generate-mascot-frames.ps1` reproducible y reanudable, con reintento automático en CPU si la VRAM está ocupada. Detalles en `docs/mascot.md`.
+- `MascotFlipbookTests` comprueba el catálogo puro y que los 80 PNG existen, son 256×256 y están en el tema y mood correctos.
+
+### Corregido
+- La mascota se quedaba en el fotograma 0 sin animar: `CaoCat` cargaba los frames por ruta absoluta de archivo (frágil fuera de dev) y tragaba todos los errores en silencio. Ahora carga con URI `ms-appx:///` primero con fallback a archivo, `ApplyMood` es idempotente (reaplicar el mismo tema/mood no reinicia el ciclo) y los fallos van al log `Debug` sin romper el contrato de nunca fallar.
+
 ## [2.1.32] - 2026-09-16
 
 ### Seguridad

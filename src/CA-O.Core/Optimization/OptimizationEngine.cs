@@ -184,9 +184,18 @@ public sealed class OptimizationEngine
             return OperationResult.Ok("Ya aplicado y verificado — no se puede volver a aplicar. Use Revertir si desea restaurarlo.");
         }
 
+        var optimization = Resolve(optimizationId);
         var transaction = new OptimizationTransaction(
-            Resolve(optimizationId), _registry, context, _services, _executor, _snapshots, _history, _journal, caller);
+            optimization, _registry, context, _services, _executor, _snapshots, _history, _journal, caller);
         var report = await transaction.RunAsync(ct);
+
+        if (report.Success && optimization.Definition.Flags.HasFlag(OptimizationFlags.OneShot))
+        {
+            // One-shot actions have no observable post-apply state: record
+            // the success persistently so re-analysis never re-recommends them.
+            try { OneShotLedger.Mark(optimization.Definition.Id); }
+            catch { }
+        }
 
         return report.Success
             ? AppendWarning(new OperationResult(true, report.MessageEs), backupWarning)
@@ -195,7 +204,7 @@ public sealed class OptimizationEngine
 
     public async Task<OperationResult> RevertAsync(string optimizationId, Shared.Security.CallerIdentity? caller = null, CancellationToken ct = default)
     {
-        if (!IsRunningAsAdmin())
+        if (!_isRunningAsAdmin())
         {
             return OperationResult.Fail("Se requieren permisos de administrador para revertir cambios.", "not-admin");
         }
@@ -236,6 +245,21 @@ public sealed class OptimizationEngine
         var optimization = Resolve(resolvedId);
         PrepareServiceAwareOptimization(optimization);
 
+        // Serializa contra Apply concurrentes del mismo recurso (singletons
+        // con estado de sesión como _lastPrevious): sin esto un Revert
+        // intercalado restaura el índice/plan de otra ejecución (S4).
+        IAsyncDisposable lease;
+        try
+        {
+            lease = await Rollback.ResourceLockManager.Shared.AcquireAsync(
+                optimization.ResourceKeys, CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            return OperationResult.Fail($"Recurso ocupado, reintente: {ex.Message}", "resource-busy");
+        }
+        await using var _ = lease;
+
         var context = new OptimizationContext { Registry = _registry, Executor = _executor, Services = _services };
         OperationResult result;
         try
@@ -250,6 +274,12 @@ public sealed class OptimizationEngine
         if (result.Success)
         {
             _snapshots.Delete(record.Manifest.TransactionId);
+            if (optimization.Definition.Flags.HasFlag(OptimizationFlags.OneShot))
+            {
+                // The change is gone: the one-shot may be offered again.
+                try { OneShotLedger.Remove(optimization.Definition.Id); }
+                catch { }
+            }
         }
 
         LogLegacy(optimizationId, "revert", result.Success, record.State, error: result.Error, caller: caller);
@@ -856,7 +886,9 @@ public sealed class OptimizationEngine
                         ["interface", "ip", "add", "dns", interfaceName, beforeDnsV4[i]], ct);
                 }
             }
-            // Note: IPv6 rollback would need additional netsh commands if supported
+            // M10 (nota honesta): SetDns solo gestiona IPv4 ("interface ip set
+            // dns"); IPv6 nunca se toca, así que no hay nada que restaurar.
+            // beforeDnsV6 se conserva en la firma por compatibilidad.
         }
     }
 

@@ -65,7 +65,8 @@ public static class OptimizationScoreCalculator
     {
         SecurityImpact.None => 0,
         SecurityImpact.PrivacyOnly => 1,
-        SecurityImpact.IncreasedProtection => 6,
+        // M8: aumentar protección suma, no resta.
+        SecurityImpact.IncreasedProtection => -6,
         SecurityImpact.ReducedProtection => 22,
         SecurityImpact.Unknown => 8,
         _ => 8,

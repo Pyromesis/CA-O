@@ -18,7 +18,7 @@
             <Border x:Name="OptContextCard" Style="{StaticResource CaoCardStyle}" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" Visibility="Collapsed" helpers:UiAnimations.CardHover="True">
                 <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
                     <FontIcon Glyph="&#xE9D2;" FontSize="14" Foreground="{ThemeResource AccentFillColorDefaultBrush}" VerticalAlignment="Center"/>
-                    <TextBlock x:Name="CtxOptText" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" TextWrapping="Wrap"/>
+                    <TextBlock x:Name="CtxOptText" Style="{StaticResource CaoListItemTitleStyle}" VerticalAlignment="Center" TextWrapping="Wrap"/>
                     <Button x:Name="ClearContextButton" Content="Limpiar contexto" Click="OnClearContextClick" Style="{StaticResource CaoElevatedButtonStyle}" FontSize="11" AutomationProperties.Name="Limpiar contexto de benchmark"/>
                 </StackPanel>
             </Border>
@@ -26,7 +26,7 @@
             <Border Style="{StaticResource CaoCardStyle}">
                 <StackPanel Spacing="12">
                     <StackPanel Orientation="Horizontal" Spacing="10">
-                        <Border Width="36" Height="36" CornerRadius="18" Background="{StaticResource CaoBlueSoftBrush}">
+                        <Border Style="{StaticResource CaoCardIconStyle}" Background="{StaticResource CaoBlueSoftBrush}">
                             <FontIcon Glyph="&#xE9D9;" FontSize="16" Foreground="{StaticResource CaoBlueSolidBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
                         <StackPanel Spacing="2" VerticalAlignment="Center">
@@ -37,43 +37,43 @@
                     <Border Style="{StaticResource CaoDividerStyle}"/>
                     <Grid ColumnSpacing="10">
                         <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                        <Border Background="{StaticResource CaoBlueSoftBrush}" CornerRadius="8" Padding="10" helpers:UiAnimations.CardHover="True">
+                        <Border Style="{StaticResource CaoStatTileStyle}" Background="{StaticResource CaoBlueSoftBrush}" helpers:UiAnimations.CardHover="True">
                             <StackPanel Spacing="4" HorizontalAlignment="Center">
                                 <FontIcon Glyph="&#xE950;" FontSize="18" Foreground="{StaticResource CaoBlueSolidBrush}" HorizontalAlignment="Center"/>
-                                <TextBlock Text="CPU" FontWeight="Bold" FontSize="12" TextAlignment="Center"/>
+                                <TextBlock Text="CPU" Style="{StaticResource CaoListItemTitleStyle}" TextAlignment="Center"/>
                                 <TextBlock Text="Primos fijos" FontSize="10" Opacity="0.7" TextAlignment="Center"/>
                             </StackPanel>
                         </Border>
-                        <Border Grid.Column="1" Background="{StaticResource CaoGreenSoftBrush}" CornerRadius="8" Padding="10" helpers:UiAnimations.CardHover="True">
+                        <Border Grid.Column="1" Style="{StaticResource CaoStatTileStyle}" Background="{StaticResource CaoGreenSoftBrush}" helpers:UiAnimations.CardHover="True">
                             <StackPanel Spacing="4" HorizontalAlignment="Center">
                                 <FontIcon Glyph="&#xEB4B;" FontSize="18" Foreground="{StaticResource CaoGreenSolidBrush}" HorizontalAlignment="Center"/>
-                                <TextBlock Text="Memoria" FontWeight="Bold" FontSize="12" TextAlignment="Center"/>
+                                <TextBlock Text="Memoria" Style="{StaticResource CaoListItemTitleStyle}" TextAlignment="Center"/>
                                 <TextBlock Text="GB/s copia" FontSize="10" Opacity="0.7" TextAlignment="Center"/>
                             </StackPanel>
                         </Border>
-                        <Border Grid.Column="2" Background="{StaticResource CaoCyanSoftBrush}" CornerRadius="8" Padding="10" helpers:UiAnimations.CardHover="True">
+                        <Border Grid.Column="2" Style="{StaticResource CaoStatTileStyle}" Background="{StaticResource CaoCyanSoftBrush}" helpers:UiAnimations.CardHover="True">
                             <StackPanel Spacing="4" HorizontalAlignment="Center">
                                 <FontIcon Glyph="&#xEDA2;" FontSize="18" Foreground="{StaticResource CaoCyanSolidBrush}" HorizontalAlignment="Center"/>
-                                <TextBlock Text="Disco" FontWeight="Bold" FontSize="12" TextAlignment="Center"/>
+                                <TextBlock Text="Disco" Style="{StaticResource CaoListItemTitleStyle}" TextAlignment="Center"/>
                                 <TextBlock Text="R/W MB/s" FontSize="10" Opacity="0.7" TextAlignment="Center"/>
                             </StackPanel>
                         </Border>
-                        <Border Grid.Column="3" Background="{StaticResource CaoPurpleSoftBrush}" CornerRadius="8" Padding="10" helpers:UiAnimations.CardHover="True">
+                        <Border Grid.Column="3" Style="{StaticResource CaoStatTileStyle}" Background="{StaticResource CaoPurpleSoftBrush}" helpers:UiAnimations.CardHover="True">
                             <StackPanel Spacing="4" HorizontalAlignment="Center">
                                 <FontIcon Glyph="&#xE930;" FontSize="18" Foreground="{StaticResource CaoPurpleSolidBrush}" HorizontalAlignment="Center"/>
-                                <TextBlock Text="Regla 3%" FontWeight="Bold" FontSize="12" TextAlignment="Center"/>
+                                <TextBlock Text="Regla 3%" Style="{StaticResource CaoListItemTitleStyle}" TextAlignment="Center"/>
                                 <TextBlock Text="Sin humo" FontSize="10" Opacity="0.7" TextAlignment="Center"/>
                             </StackPanel>
                         </Border>
                     </Grid>
-                    <TextBlock x:Name="ContextText" FontSize="11" Opacity="0.8" TextWrapping="Wrap" Text="Conecte el cargador y cierre apps pesadas antes de medir."/>
+                    <TextBlock x:Name="ContextText" Style="{StaticResource CaoSectionSubtitleStyle}" Text="Conecte el cargador y cierre apps pesadas antes de medir."/>
                 </StackPanel>
             </Border>
             
             <Border Style="{StaticResource CaoCardStyle}">
                 <StackPanel Spacing="12">
                     <StackPanel Orientation="Horizontal" Spacing="10">
-                        <Border Width="36" Height="36" CornerRadius="18" Background="{StaticResource CaoPurpleSoftBrush}">
+                        <Border Style="{StaticResource CaoCardIconStyle}" Background="{StaticResource CaoPurpleSoftBrush}">
                             <FontIcon Glyph="&#xE9D2;" FontSize="16" Foreground="{StaticResource CaoPurpleSolidBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
                         <StackPanel Spacing="2" VerticalAlignment="Center">
@@ -86,19 +86,19 @@
                         <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                         <StackPanel Spacing="6" HorizontalAlignment="Center">
                             <Border Style="{StaticResource CaoStepCircleStyle}" HorizontalAlignment="Center"><TextBlock Text="1" Foreground="{StaticResource CaoOpsCyanBrush}" FontWeight="SemiBold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
-                            <TextBlock Text="Línea base" FontSize="11" FontWeight="SemiBold" TextAlignment="Center"/>
+                            <TextBlock Text="Línea base" Style="{StaticResource CaoListItemDetailStyle}" TextAlignment="Center"/>
                         </StackPanel>
                         <StackPanel Grid.Column="1" Spacing="6" HorizontalAlignment="Center">
                             <Border Style="{StaticResource CaoStepCircleStyle}" HorizontalAlignment="Center"><TextBlock Text="2" Foreground="{StaticResource CaoOpsCyanBrush}" FontWeight="SemiBold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
-                            <TextBlock Text="Aplicar cambio" FontSize="11" FontWeight="SemiBold" TextAlignment="Center"/>
+                            <TextBlock Text="Aplicar cambio" Style="{StaticResource CaoListItemDetailStyle}" TextAlignment="Center"/>
                         </StackPanel>
                         <StackPanel Grid.Column="2" Spacing="6" HorizontalAlignment="Center">
                             <Border Style="{StaticResource CaoStepCircleStyle}" HorizontalAlignment="Center"><TextBlock Text="3" Foreground="{StaticResource CaoOpsCyanBrush}" FontWeight="SemiBold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
-                            <TextBlock Text="Medir después" FontSize="11" FontWeight="SemiBold" TextAlignment="Center"/>
+                            <TextBlock Text="Medir después" Style="{StaticResource CaoListItemDetailStyle}" TextAlignment="Center"/>
                         </StackPanel>
                         <StackPanel Grid.Column="3" Spacing="6" HorizontalAlignment="Center">
                             <Border Style="{StaticResource CaoStepCircleStyle}" HorizontalAlignment="Center"><TextBlock Text="4" Foreground="{StaticResource CaoOpsCyanBrush}" FontWeight="SemiBold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
-                            <TextBlock Text="Comparar" FontSize="11" FontWeight="SemiBold" TextAlignment="Center"/>
+                            <TextBlock Text="Comparar" Style="{StaticResource CaoListItemDetailStyle}" TextAlignment="Center"/>
                         </StackPanel>
                     </Grid>
                 </StackPanel>
@@ -112,17 +112,17 @@
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
-                    <controls:CaoCat x:Name="BenchCat" Width="64" Height="76" VerticalAlignment="Center"
+                    <controls:CaoCat x:Name="BenchCat" Width="64" ShowCaption="False" VerticalAlignment="Center"
                                      AutomationProperties.Name="Mascota de CA-O"/>
                     <Border Grid.Column="1" Style="{StaticResource CaoIconCircleStyle}" Background="{StaticResource CaoBlueSoftBrush}" Width="44" Height="44">
                         <FontIcon Glyph="&#xE7F8;" FontSize="19" Foreground="{StaticResource CaoBlueSolidBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Border>
                     <StackPanel Grid.Column="2" Spacing="2" VerticalAlignment="Center">
-                        <TextBlock Text="Medición A/B" FontWeight="Bold" FontSize="14"/>
-                        <TextBlock x:Name="BenchStatusText" FontSize="12" Opacity="0.75" VerticalAlignment="Center" FontWeight="Medium" AutomationProperties.LiveSetting="Polite" Text="Cargas idénticas antes y después"/>
+                        <TextBlock Text="Medición A/B" Style="{StaticResource CaoCardTitleStyle}"/>
+                        <TextBlock x:Name="BenchStatusText" Style="{StaticResource CaoSectionSubtitleStyle}" VerticalAlignment="Center" AutomationProperties.LiveSetting="Polite" Text="Cargas idénticas antes y después"/>
                     </StackPanel>
                     <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
-                        <Button x:Name="BaselineButton" Content="Medir línea base" Click="OnBaselineClick" Style="{StaticResource CaoGradientButtonStyle}" AutomationProperties.Name="Medir línea base"/>
+                        <Button x:Name="BaselineButton" Content="Medir línea base" Click="OnBaselineClick" Style="{StaticResource CaoPrimaryButtonStyle}" AutomationProperties.Name="Medir línea base"/>
                         <Button x:Name="AfterButton" Content="Medir tras cambio" Click="OnAfterClick" Style="{StaticResource CaoElevatedButtonStyle}" AutomationProperties.Name="Medir tras cambio"/>
                         <ProgressRing x:Name="Ring" IsActive="False" Width="22" Height="22" Style="{StaticResource CaoProgressRingStyle}"/>
                     </StackPanel>
@@ -138,12 +138,11 @@
             
             <Grid ColumnSpacing="12" RowSpacing="12">
                 <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-            <Grid ColumnSpacing="12" RowSpacing="12">
-                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
                 <Border x:Name="DnsCard" Style="{StaticResource CaoCardStyle}" helpers:UiAnimations.CardHover="True">
                     <StackPanel Spacing="8">
                         <StackPanel Orientation="Horizontal" Spacing="10">
-                            <Border Width="36" Height="36" CornerRadius="18" Background="{StaticResource CaoCyanSoftBrush}">
+                            <Border Style="{StaticResource CaoCardIconStyle}" Background="{StaticResource CaoCyanSoftBrush}">
                                 <FontIcon Glyph="&#xE774;" FontSize="16" Foreground="{StaticResource CaoCyanSolidBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Border>
                             <StackPanel Spacing="2" VerticalAlignment="Center">
@@ -153,14 +152,14 @@
                         </StackPanel>
                         <Border Style="{StaticResource CaoDividerStyle}"/>
                         <Button x:Name="DnsButton" Content="Medir DNS" Click="OnDnsClick" Style="{StaticResource CaoElevatedButtonStyle}" FontSize="12" AutomationProperties.Name="Medir DNS"/>
-                        <TextBlock x:Name="DnsResultText" TextWrapping="Wrap" Opacity="0.85" IsTextSelectionEnabled="True" FontSize="12"/>
+                        <TextBlock x:Name="DnsResultText" Style="{StaticResource CaoResultTextStyle}"/>
                         <StackPanel x:Name="DnsBarsPanel" Spacing="6"/>
                     </StackPanel>
                 </Border>
                 <Border Grid.Column="1" x:Name="BootCard" Style="{StaticResource CaoCardStyle}" helpers:UiAnimations.CardHover="True">
                     <StackPanel Spacing="8">
                         <StackPanel Orientation="Horizontal" Spacing="10">
-                            <Border Width="36" Height="36" CornerRadius="18" Background="{StaticResource CaoAmberSoftBrush}">
+                            <Border Style="{StaticResource CaoCardIconStyle}" Background="{StaticResource CaoAmberSoftBrush}">
                                 <FontIcon Glyph="&#xE7E8;" FontSize="16" Foreground="{StaticResource CaoAmberSolidBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Border>
                             <StackPanel Spacing="2" VerticalAlignment="Center">
@@ -169,12 +168,11 @@
                             </StackPanel>
                         </StackPanel>
                         <Border Style="{StaticResource CaoDividerStyle}"/>
-                        <TextBlock x:Name="BootText" TextWrapping="Wrap" Opacity="0.85" IsTextSelectionEnabled="True" FontSize="12"/>
+                        <TextBlock x:Name="BootText" Style="{StaticResource CaoResultTextStyle}"/>
                     </StackPanel>
                 </Border>
-            </Grid>
 
-            <Border x:Name="FluencyCard" Style="{StaticResource CaoCardStyle}" helpers:UiAnimations.CardHover="True">
+            <Border Grid.Row="1" x:Name="FluencyCard" Style="{StaticResource CaoCardStyle}" helpers:UiAnimations.CardHover="True">
                 <StackPanel Spacing="8">
                     <StackPanel Orientation="Horizontal" Spacing="10">
                         <Border Width="36" Height="36" CornerRadius="18" Background="{StaticResource CaoPurpleSoftBrush}">
@@ -190,15 +188,15 @@
                         <Button x:Name="FluencyButton" Content="Medir fluidez 10 s" Click="OnFluencyClick" Style="{StaticResource CaoElevatedButtonStyle}" FontSize="12" AutomationProperties.Name="Medir fluidez 10 segundos"/>
                         <ProgressRing x:Name="FluencyRing" IsActive="False" Width="18" Height="18" Style="{StaticResource CaoProgressRingStyle}"/>
                     </StackPanel>
-                    <TextBlock x:Name="FluencyText" TextWrapping="Wrap" Opacity="0.85" IsTextSelectionEnabled="True" FontSize="12"/>
+                    <TextBlock x:Name="FluencyText" Style="{StaticResource CaoResultTextStyle}"/>
                 </StackPanel>
             </Border>
 
-            <Border Style="{StaticResource CaoCardStyle}">
-                    <StackPanel Spacing="8">
-                        <StackPanel Orientation="Horizontal" Spacing="10">
-                            <Border Width="36" Height="36" CornerRadius="18" Background="{StaticResource CaoBlueSoftBrush}">
-                                <FontIcon Glyph="&#xE7F8;" FontSize="16" Foreground="{StaticResource CaoBlueSolidBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            <Border Grid.Row="1" Grid.Column="1" Style="{StaticResource CaoCardStyle}">
+                <StackPanel Spacing="8">
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <Border Style="{StaticResource CaoCardIconStyle}" Background="{StaticResource CaoBlueSoftBrush}">
+                            <FontIcon Glyph="&#xE7F8;" FontSize="16" Foreground="{StaticResource CaoBlueSolidBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Border>
                             <StackPanel Spacing="2" VerticalAlignment="Center">
                                 <TextBlock Text="Línea base" Style="{StaticResource CaoSectionTitleStyle}"/>
@@ -206,13 +204,13 @@
                             </StackPanel>
                         </StackPanel>
                         <Border Style="{StaticResource CaoDividerStyle}"/>
-                        <TextBlock x:Name="BaselineText" TextWrapping="Wrap" Opacity="0.85" IsTextSelectionEnabled="True" FontSize="12"/>
+                        <TextBlock x:Name="BaselineText" Style="{StaticResource CaoResultTextStyle}"/>
                     </StackPanel>
                 </Border>
-                <Border Grid.Column="1" Style="{StaticResource CaoCardStyle}">
+                <Border Grid.Row="2" Grid.ColumnSpan="2" Style="{StaticResource CaoCardStyle}">
                     <StackPanel Spacing="8">
                         <StackPanel Orientation="Horizontal" Spacing="10">
-                            <Border Width="36" Height="36" CornerRadius="18" Background="{StaticResource CaoGreenSoftBrush}">
+                            <Border Style="{StaticResource CaoCardIconStyle}" Background="{StaticResource CaoGreenSoftBrush}">
                                 <FontIcon Glyph="&#xE9D1;" FontSize="16" Foreground="{StaticResource CaoGreenSolidBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Border>
                             <StackPanel Spacing="2" VerticalAlignment="Center">
@@ -221,7 +219,7 @@
                             </StackPanel>
                         </StackPanel>
                         <Border Style="{StaticResource CaoDividerStyle}"/>
-                        <TextBlock x:Name="ComparisonText" TextWrapping="Wrap" Opacity="0.85" IsTextSelectionEnabled="True" FontSize="12"/>
+                        <TextBlock x:Name="ComparisonText" Style="{StaticResource CaoResultTextStyle}"/>
                         <Button x:Name="ExportCsvButton" Content="Exportar CSV" Click="OnExportCsvClick" Style="{StaticResource CaoElevatedButtonStyle}" FontSize="11" Visibility="Collapsed" AutomationProperties.Name="Exportar CSV"/>
                         <TextBlock x:Name="ExportPathText" FontSize="10" Opacity="0.6" TextWrapping="Wrap" Visibility="Collapsed" IsTextSelectionEnabled="True"/>
                         <Grid x:Name="DeltaTable" ColumnSpacing="8" RowSpacing="4" Visibility="Collapsed">
@@ -301,13 +299,13 @@
                         <HyperlinkButton Content="AMD Adrenalin" NavigateUri="https://www.amd.com/en/products/software/adrenalin.html" ToolTipService.ToolTip="Tuning oficial AMD"/>
                         <HyperlinkButton Content="Intel XTU" NavigateUri="https://www.intel.com/content/www/us/en/download/17881/intel-extreme-tuning-utility-intel-xtu.html" ToolTipService.ToolTip="Overclock oficial Intel"/>
                     </StackPanel>
-                    <TextBlock Text="Usa esta página para validar: mide base → aplica OC vendor → mide después. Si el veredicto es Regresión o el sistema se cuelga, revierte el OC." FontSize="11" Opacity="0.7" TextWrapping="Wrap" FontStyle="Italic"/>
+                    <TextBlock Text="Usa esta página para validar: mide base → aplica OC vendor → mide después. Si el veredicto es Regresión o el sistema se cuelga, revierte el OC." Style="{StaticResource CaoSectionSubtitleStyle}" Opacity="0.7" FontStyle="Italic"/>
                 </StackPanel>
             </Border>
             
             <Border Style="{StaticResource CaoCardStyle}" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" Opacity="0.9">
                 <StackPanel Spacing="4">
-                    <TextBlock Text="Nota: El benchmark no modifica snapshots ni historial; solo mide rendimiento sin efectos secundarios." FontSize="11" Opacity="0.75" TextWrapping="Wrap" FontStyle="Italic"/>
+                    <TextBlock Text="Nota: El benchmark no modifica snapshots ni historial; solo mide rendimiento sin efectos secundarios." Style="{StaticResource CaoSectionSubtitleStyle}" Opacity="0.75" FontStyle="Italic"/>
                 </StackPanel>
             </Border>
         </StackPanel>

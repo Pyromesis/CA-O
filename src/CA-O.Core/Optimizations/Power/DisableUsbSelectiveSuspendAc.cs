@@ -26,5 +26,6 @@ public sealed class DisableUsbSelectiveSuspendAc : PowerAcSettingOptimization
         Compatibility = CompatibilityStatus.Conditional,
         SecurityImpact = SecurityImpact.None,
         Impact = ImpactLevel.Medium,
+        Flags = OptimizationFlags.OneShot,
     };
 }

@@ -18,7 +18,6 @@ public static class OptimizationConflicts
             ["maximum-power-plan"] = PowerSchemes.HighPerformanceGuid,
             ["configure-gaming-power-mode-ac"] = PowerSchemes.UltimatePerformanceGuid,
             ["restore-balanced-power-dc"] = PowerSchemes.BalancedGuid,
-            ["restore-power-plan-after-gaming"] = PowerSchemes.BalancedGuid,
         };
 
     public static bool IsPowerScheme(string optimizationId) =>

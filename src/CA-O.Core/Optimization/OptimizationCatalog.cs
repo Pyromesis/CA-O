@@ -25,6 +25,8 @@ public static class OptimizationCatalog
         "set-best-performance-ac",
         // cleanup-windows-update-cache == disk-cleanup-system-files (SoftwareDistribution\Download).
         "disk-cleanup-system-files",
+        // restore-balanced-power-dc == restore-power-plan-after-gaming (powercfg /setactive SCHEME_BALANCED).
+        "restore-power-plan-after-gaming",
     };
 
     public static bool IsProductionId(string id) => !LegacyIds.Contains(id);
@@ -34,6 +36,10 @@ public static class OptimizationCatalog
         new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
             ["disk-cleanup-system-files"] = "cleanup-windows-update-cache",
+            ["restore-power-plan-after-gaming"] = "restore-balanced-power-dc",
+            // M7: los 4 LegacyIds resuelven; antes 2 quedaban huérfanos.
+            ["optimize-hdd-media-aware"] = "optimize-system-drive",
+            ["set-best-performance-ac"] = "maximum-power-plan",
         };
 
     public static string CanonicalIdFor(string id) =>
@@ -156,7 +162,7 @@ public static class OptimizationCatalog
     public static readonly RestartWindowsExplorer RestartWindowsExplorer = new();
     public static readonly RecoverWindowsExplorer RecoverWindowsExplorer = new();
 
-    /// <summary>Production catalog: 92 verified optimizations. All optimizations are now in production.</summary>
+    /// <summary>Production catalog: 91 verified optimizations. All optimizations are now in production.</summary>
     public static IReadOnlyList<IOptimization> All { get; } = new IOptimization[]
     {
         DisableBackgroundApps,
@@ -197,7 +203,6 @@ public static class OptimizationCatalog
         DisableUsbSelectiveSuspendAc,
         DisablePcieLinkStatePowerSavingAc,
         SetWirelessAdapterMaxPerformanceAc,
-        RestorePowerPlanAfterGaming,
         RemoveUnusedCustomPowerPlans,
         // Storage Phase 3: promoted from legacy
         EnsureTrimEnabled,

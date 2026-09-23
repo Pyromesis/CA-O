@@ -518,6 +518,8 @@ public sealed class MultiOptimizationTransaction
                 continue;
             }
 
+            // M12: los fallos de rollback se registraban en ningún sitio.
+            var rollbackFailures = new List<string>();
             foreach (var done in Enumerable.Reverse(committed))
             {
                 if (done.Definition.Risk is not (RiskLevel.Safe or RiskLevel.Low))
@@ -525,7 +527,22 @@ public sealed class MultiOptimizationTransaction
                     continue; // manual rollback for high-risk changes
                 }
 
-                await _factory(done).RollbackCommittedAsync(ct);
+                if (!await _factory(done).RollbackCommittedAsync(ct))
+                {
+                    rollbackFailures.Add(done.Definition.Id);
+                }
+            }
+
+            if (rollbackFailures.Count > 0)
+            {
+                var last = reports[^1];
+                reports[^1] = last with
+                {
+                    MessageEs = last.MessageEs + " Rollback automático fallido para: " +
+                        string.Join(", ", rollbackFailures) + ". Reversión manual requerida.",
+                    Error = (last.Error ?? last.MessageEs) + " | rollback-failed:" +
+                        string.Join(",", rollbackFailures),
+                };
             }
 
             break;

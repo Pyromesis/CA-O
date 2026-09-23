@@ -2,6 +2,7 @@ using System.Text.RegularExpressions;
 using CAO.Core.Abstractions;
 using CAO.Shared;
 using CAO.Shared.Security;
+using CAO.Core.Rollback;
 
 namespace CAO.Core.Optimizations.Gaming;
 
@@ -34,6 +35,9 @@ public sealed class ConfigureGamingPowerModeAc : IOptimization
 
     public OptimizationState Detect(IRegistryAccessor registry) =>
         Optimization.PowerSchemes.DetectScheme(registry, UltimatePerformanceGuid);
+
+    /// <summary>Cambios de plan activo serializados entre sí.</summary>
+    public IReadOnlyList<ResourceKey> ResourceKeys => [Rollback.ResourceKey.PowerPlan()];
 
     public OptimizationSnapshot Capture(IRegistryAccessor registry)
     {
@@ -69,7 +73,7 @@ public sealed class ConfigureGamingPowerModeAc : IOptimization
 
         var note = snapshot.RawNotes.FirstOrDefault(n => n.StartsWith("scheme=", StringComparison.Ordinal));
         var previous = note?["scheme=".Length..] ?? _lastPrevious;
-        if (string.IsNullOrWhiteSpace(previous))
+        if (string.IsNullOrWhiteSpace(previous) || !Guid.TryParse(previous, out _))
             return OperationResult.Fail("Sin plan previo registrado; nada que restaurar.", "no-previous-scheme");
 
         var restore = await context.Executor.ExecuteAsync(
@@ -109,7 +113,8 @@ public sealed class ConfigureGamingPowerModeAc : IOptimization
                 {
                     Kind = "PowerCfg",
                     Target = $"powercfg /setactive {UltimatePerformanceGuid}",
-                    Before = "plan actual",
+                    // N1: Before real leído del registro, no literal.
+                    Before = Optimization.PowerSchemes.ReadActiveScheme(registry) ?? "desconocido (registro ilegible)",
                     After = "Rendimiento máximo",
                 },
             ],

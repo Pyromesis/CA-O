@@ -47,14 +47,12 @@ public sealed class ConflictAuditTests
         var high = new CAO.Core.Optimizations.Performance.MaximumPowerPlan().Detect(registry);
         var best = new CAO.Core.Optimizations.Power.SetBestPerformanceAc().Detect(registry);
         var balanced1 = new CAO.Core.Optimizations.Power.RestoreBalancedPowerDc().Detect(registry);
-        var balanced2 = new CAO.Core.Optimizations.Power.RestorePowerPlanAfterGaming().Detect(registry);
         var ultimate = new CAO.Core.Optimizations.Gaming.ConfigureGamingPowerModeAc().Detect(registry);
 
         Assert.Equal(OptimizationState.NotApplied, high);
         Assert.Equal(OptimizationState.NotApplied, best);
         Assert.Equal(OptimizationState.NotApplied, ultimate);
         Assert.Equal(OptimizationState.AppliedByCao, balanced1);
-        Assert.Equal(OptimizationState.AppliedByCao, balanced2);
     }
 
     [Fact]

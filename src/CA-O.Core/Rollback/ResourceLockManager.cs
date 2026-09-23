@@ -64,9 +64,9 @@ public sealed class ResourceLockManager
         return new Lease(acquired);
     }
 
-    /// <summary>Number of currently held leases for tests/diagnostics.</summary>
+    /// <summary>Number of currently held leases for tests/diagnostics (sin efecto lateral).</summary>
     internal int HeldCountForTesting(ResourceKey key) =>
-        (int)_locks.GetOrAdd(key.ToString(), _ => new SemaphoreSlim(1, 1)).CurrentCount;
+        _locks.TryGetValue(key.ToString(), out var semaphore) ? (int)semaphore.CurrentCount : 1;
 
     private static void Release(List<SemaphoreSlim> acquired)
     {

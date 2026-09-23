@@ -320,6 +320,19 @@ public sealed partial class AnalyzePage : Page
         await RunFullAnalysisAsync();
     }
 
+    /// <summary>Publica el mood en AnalyzeCat y en el estado global para que todas
+    /// las pestañas muestren el mismo ciclo. Nunca lanza.</summary>
+    private void SetGlobalCat(string mood)
+    {
+        try
+        {
+            var normalized = CAO.UI.Controls.MascotFlipbook.Normalize(mood);
+            AnalyzeCat.SetMood(normalized);
+            AppHost.Resolve<ViewModels.UiState>().MascotMood = normalized;
+        }
+        catch { }
+    }
+
     /// <summary>Ejecuta el análisis completo (llamable desde el Panel).</summary>
     public async Task RunFullAnalysisAsync()
     {
@@ -331,6 +344,7 @@ public sealed partial class AnalyzePage : Page
         CancelButton.Visibility = Visibility.Visible;
         Ring.IsActive = true;
         StatusText.Text = "Midiendo…";
+        SetGlobalCat("Working");
         UpdateResultsVisibility(running: true);
         try
         {
@@ -340,12 +354,22 @@ public sealed partial class AnalyzePage : Page
             // Render parcial tolerante a fallos individuales ( §10 )
             RenderFromViewModel();
             LoadPersisted();
-            // Auto-ejecutar diagnósticos integrados + DNS benchmark y DPC como parte del análisis completo
-            try { await _diagnosticsVm.RunCommand.ExecuteAsync(null); RenderDiagnostics(); } catch { }
-            try { await RunDnsBenchmarkAuto(_cts.Token); } catch { }
-            try { await RunDpcAuto(_cts.Token); } catch { }
+            // Auto-ejecutar diagnósticos integrados + DNS benchmark y DPC como parte del análisis completo.
+            // Techo propio: si el análisis principal consumió casi todo el
+            // presupuesto, estos usan un vínculo con 60 s en vez de heredar
+            // un token casi expirado que los cancelaría de inmediato.
+            var postWarnings = new List<string>();
+            using var postCts = CancellationTokenSource.CreateLinkedTokenSource(_cts.Token);
+            postCts.CancelAfter(TimeSpan.FromSeconds(60));
+            try { await _diagnosticsVm.RunCommand.ExecuteAsync(null); RenderDiagnostics(); }
+            catch (Exception ex) { postWarnings.Add("diagnósticos"); CAO.UI.App.WriteCrashLog(ex); }
+            try { await RunDnsBenchmarkAuto(postCts.Token); }
+            catch (Exception ex) { postWarnings.Add("DNS benchmark"); CAO.UI.App.WriteCrashLog(ex); }
+            try { await RunDpcAuto(postCts.Token); }
+            catch (Exception ex) { postWarnings.Add("DPC"); CAO.UI.App.WriteCrashLog(ex); }
             // Escaneo gaming integrado (la pestaña Gaming vive aquí ahora)
-            try { await _gamingVm.ScanCommand.ExecuteAsync(null); RenderGamingScan(); } catch { }
+            try { await _gamingVm.ScanCommand.ExecuteAsync(null); RenderGamingScan(); }
+            catch (Exception ex) { postWarnings.Add("gaming"); CAO.UI.App.WriteCrashLog(ex); }
             // Foto de todo lo renderizado (textos, DNS, DPC, gaming) a sesión + disco.
             PersistDisplaySnapshot();
 
@@ -354,8 +378,13 @@ public sealed partial class AnalyzePage : Page
             StatusText.Text = cancelled > 0 ? _viewModel.OverallStatus
                 : failed == 0 ? "Análisis completo — ningún cambio aplicado."
                 : $"Análisis completado con advertencias ({failed} módulos con fallo)";
+            SetGlobalCat(cancelled > 0 ? "Idle" : failed == 0 ? "Celebrate" : "Warn");
 
-            // Compatibilidad: mantener lectura directa si ViewModel no pobló algo (lazy)
+            // Compatibilidad: mantener lectura directa si ViewModel no pobló algo (lazy).
+            // Aislado del flujo principal: si este reintento cancela o falla,
+            // se conserva el análisis ya logrado en vez de marcarlo 'cancelado'.
+            try
+            {
             if (string.IsNullOrWhiteSpace(NetworkText.Text))
             {
                 var network = await new NetworkDiagnosticsProvider().MeasureAsync(_cts.Token);
@@ -370,16 +399,21 @@ public sealed partial class AnalyzePage : Page
                     network.Measurements.Any(m => m.MedianLatencyMs is not null) ? "CaoGreenSoftBrush" : "CaoSlateSoftBrush",
                     network.Measurements.Any(m => m.MedianLatencyMs is not null) ? "CaoGreenSolidBrush" : "CaoNeutralBrush");
             }
+            }
+            catch (OperationCanceledException) { }
+            catch (Exception ex) { CAO.UI.App.WriteCrashLog(ex); }
         }
         catch (OperationCanceledException)
         {
             StatusText.Text = "Análisis cancelado.";
+            SetGlobalCat("Idle");
         }
         catch (Exception ex)
         {
             var err = ErrorTranslator.Translate(ex, CAO.Shared.Correlation.New());
             NetworkText.Text = $"{err.Code}: {err.UserMessageEs} {err.RecoveryActionEs} [Técnico: {err.TechnicalMessage}]";
             StatusText.Text = $"{err.Code}: medición de red fallida";
+            SetGlobalCat("Warn");
             CAO.UI.App.WriteCrashLog(ex);
             try { AppHost.Resolve<Infrastructure.Logging.StructuredLogger>().Error("Analyze", err.UserMessageEs, ex, err.CorrelationId, err.Code); } catch { }
         }
@@ -402,6 +436,12 @@ public sealed partial class AnalyzePage : Page
 
     private async void RenderFromViewModel()
     {
+        // Las mediciones síncronas se descargan a fondo para no congelar la
+        // UI en equipos lentos; todo el método está protegido porque un
+        // async void no debe dejar escapar excepciones.
+        var renderToken = _cts?.Token ?? CancellationToken.None;
+        try
+        {
         // Network
         if (_viewModel.NetworkResult is { } net)
         {
@@ -428,7 +468,7 @@ public sealed partial class AnalyzePage : Page
         {
             if (sec.Status == ViewModels.AnalysisModuleStatus.Completed)
             {
-                var security = new SecurityDiagnosticsProvider().Measure();
+                var security = await Task.Run(() => new SecurityDiagnosticsProvider().Measure(), renderToken);
                 SecurityText.Text = string.Join("\n", security.Features.Select(feature =>
                         $"• {feature.Name}: {(feature.Enabled is null ? "desconocido" : feature.Enabled.Value ? "activado" : "desactivado")}")) +
                     $"\nVanguard: {(security.VanguardDetected ? "detectado" : "no detectado")}";
@@ -449,7 +489,7 @@ public sealed partial class AnalyzePage : Page
             if (stor.Status == ViewModels.AnalysisModuleStatus.Completed)
             {
                 const double gib = 1024d * 1024 * 1024;
-                var storage = new StorageDiagnosticsProvider().Measure();
+                var storage = await Task.Run(() => new StorageDiagnosticsProvider().Measure(), renderToken);
                 StorageText.Text = string.Join("\n", storage.Volumes.Select(volume =>
                     $"• {volume.Name} {volume.FileSystem}: libre {volume.FreeBytes / gib:0.0} de {volume.TotalBytes / gib:0.0} GB{(volume.IsSystemVolume ? " [sistema]" : "")}{(string.IsNullOrEmpty(volume.Media) ? "" : $" · {volume.Media}")}"));
                 RenderStorageBars(storage.Volumes);
@@ -462,7 +502,7 @@ public sealed partial class AnalyzePage : Page
             {
                 try
                 {
-                    var report = await new DriverDiagnosticsProvider().MeasureAsync(CancellationToken.None);
+                    var report = await new DriverDiagnosticsProvider().MeasureAsync(renderToken);
                     var problem = report.Drivers.Where(d => d.ProblemCode != 0 || d.IsSigned == false || (d.Status != null && !d.Status.Equals("OK", StringComparison.OrdinalIgnoreCase))).Take(8).ToList();
                     if (report.Drivers.Count == 0)
                     {
@@ -487,6 +527,9 @@ public sealed partial class AnalyzePage : Page
                 DriversText.Text = $"{ErrorCodes.UiDiagnosticsFailed}: {drv.Message}\nQué hace: lista drivers con problema (código ConfigManager, sin firma, detenidos) para descartar causa de stutter/crashes.";
             }
         }
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception ex) { CAO.UI.App.WriteCrashLog(ex); }
     }
 
     private static void SetSubtleBadge(Border badge, TextBlock label, string bgKey, string fgKey)

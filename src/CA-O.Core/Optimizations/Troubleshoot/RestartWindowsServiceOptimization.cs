@@ -13,6 +13,11 @@ public abstract class RestartWindowsServiceOptimization : IOptimization
     protected abstract string ServiceLabel { get; }
     public abstract OptimizationDefinition Definition { get; }
 
+    // Evidencia de sesión: el reinicio se ejecutó sin error en este proceso.
+    // IServiceManager no expone estado running/stopped, así que sin esta
+    // evidencia el Verify es Unknown honesto (nunca Passed por mera existencia).
+    private bool _restartedOk;
+
     public OptimizationState Detect(IRegistryAccessor registry) => OptimizationState.NotApplied;
 
     public OptimizationSnapshot Capture(IRegistryAccessor registry) => new OptimizationSnapshot();
@@ -36,6 +41,7 @@ public abstract class RestartWindowsServiceOptimization : IOptimization
         {
             return OperationResult.Fail($"No se pudo iniciar {ServiceLabel}.", ex.Message);
         }
+        _restartedOk = true;
         return OperationResult.Ok($"{ServiceLabel} reiniciado.");
     }
 
@@ -44,10 +50,15 @@ public abstract class RestartWindowsServiceOptimization : IOptimization
 
     public Task<VerificationResult> VerifyAsync(OptimizationContext context, CancellationToken ct = default)
     {
+        // M2: IServiceManager no expone estado running/stopped, así que no se
+        // puede afirmar Passed por mera existencia. Passed solo con evidencia
+        // de sesión (el reinicio se ejecutó sin error en este proceso);
+        // sin ella, Unknown honesto en vez de Passed ficticio.
         if (context.Services is null)
             return Task.FromResult(VerificationResult.Unknown(OptimizationState.Unknown, "Gestor de servicios no disponible."));
-        return Task.FromResult(context.Services.Exists(ServiceName)
-            ? VerificationResult.Passed(OptimizationState.AppliedByCao, $"{ServiceLabel} presente tras el reinicio.")
-            : VerificationResult.Unknown(OptimizationState.Unknown, $"Servicio {ServiceName} no encontrado."));
+        if (_restartedOk && context.Services.Exists(ServiceName))
+            return Task.FromResult(VerificationResult.Passed(OptimizationState.AppliedByCao, $"{ServiceLabel} reiniciado sin error en esta sesión."));
+        return Task.FromResult(VerificationResult.Unknown(OptimizationState.Unknown,
+            $"Servicio {ServiceName}: reinicio no observado en esta sesión."));
     }
 }

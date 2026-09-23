@@ -1,6 +1,7 @@
 using System.Security.AccessControl;
 using System.Security.Principal;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace CAO.Integration.Tests;
 
@@ -12,6 +13,13 @@ namespace CAO.Integration.Tests;
 /// </summary>
 public sealed class DataAclTests
 {
+    private readonly ITestOutputHelper _output;
+
+    public DataAclTests(ITestOutputHelper output)
+    {
+        _output = output;
+    }
+
     private static bool IsElevated()
     {
         using var identity = WindowsIdentity.GetCurrent();
@@ -24,17 +32,20 @@ public sealed class DataAclTests
         var root = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "CA-O");
         if (!Directory.Exists(root))
         {
-            return; // app never ran here; nothing to assert yet.
+            _output.WriteLine("SKIP: app never ran here; nothing to assert yet.");
+            return;
         }
 
         if (IsElevated())
         {
-            return; // elevated processes bypass deny-on-Users; covered by E2E.
+            _output.WriteLine("SKIP: elevated processes bypass deny-on-Users; covered by E2E.");
+            return;
         }
 
         if (!File.Exists(Path.Combine(root, "acls-hardened.flag")))
         {
-            return; // policy not applied yet on this machine; script is the gate.
+            _output.WriteLine("SKIP: policy not applied yet on this machine; script is the gate.");
+            return;
         }
 
         var acl = new DirectoryInfo(root).GetAccessControl();

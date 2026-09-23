@@ -24,32 +24,30 @@ public static class TestUtils
         var asm = Assembly.GetExecutingAssembly();
         var codeBase = new Uri(asm.Location).LocalPath;
         var dir = new FileInfo(codeBase).Directory;
-        
-        // Walk up from test output directory (tests/CA-O.Integration.Tests/bin/Release/net10.0/)
-        // to find repo root (6 levels up: net10.0 -> Release -> bin -> CA-O.Integration.Tests -> tests -> repo root)
-        for (int i = 0; i < 6 && dir != null; i++)
+
+        // Subir buscando CA-O.sln sin número fijo de niveles (robusto ante
+        // cambios de layout bin/, testhost o single-file), con tope de 12.
+        for (int i = 0; i < 12 && dir != null; i++)
         {
-            dir = dir.Parent;
-        }
-        
-        if (dir == null || dir.GetFiles("CA-O.sln").Length == 0)
-        {
-            // Fallback: try walking up from current directory
-            var cwd = new DirectoryInfo(Directory.GetCurrentDirectory());
-            while (cwd != null && cwd.GetFiles("CA-O.sln").Length == 0)
+            if (dir.GetFiles("CA-O.sln").Length > 0)
             {
-                cwd = cwd.Parent;
-            }
-            if (cwd != null && cwd.GetFiles("CA-O.sln").Length > 0)
-            {
-                _cachedRepoRoot = cwd.FullName;
+                _cachedRepoRoot = dir.FullName;
                 return _cachedRepoRoot;
             }
-            throw new DirectoryNotFoundException("Cannot find repo root (CA-O.sln not found)");
+            dir = dir.Parent;
         }
-        
-        _cachedRepoRoot = dir.FullName;
-        return _cachedRepoRoot;
+        // Fallback: subir desde el directorio actual.
+        var cwd = new DirectoryInfo(Directory.GetCurrentDirectory());
+        while (cwd != null && cwd.GetFiles("CA-O.sln").Length == 0)
+        {
+            cwd = cwd.Parent;
+        }
+        if (cwd != null && cwd.GetFiles("CA-O.sln").Length > 0)
+        {
+            _cachedRepoRoot = cwd.FullName;
+            return _cachedRepoRoot;
+        }
+        throw new DirectoryNotFoundException("Cannot find repo root (CA-O.sln not found)");
     }
     
     /// <summary>
@@ -67,6 +65,12 @@ public static class TestUtils
             {
                 foreach (var file in Directory.EnumerateFiles(dir, "*.cs", SearchOption.AllDirectories))
                 {
+                    // Igual que GetProjectSourceFiles: fuera generados obj/bin.
+                    if (file.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}") ||
+                        file.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}"))
+                    {
+                        continue;
+                    }
                     yield return file;
                 }
             }

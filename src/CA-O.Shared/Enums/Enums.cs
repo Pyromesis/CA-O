@@ -88,6 +88,9 @@ public enum OptimizationFlags
 
     /// <summary>Maintenance action; not reversible by design (e.g. temp cleanup).</summary>
     NotReversible = 1 << 4,
+
+    /// <summary>One-shot action: runs once, then never recommended again. For effects Detect cannot observe (flush-dns, powercfg AC settings); completion is tracked in the persistent one-shot ledger.</summary>
+    OneShot = 1 << 5,
 }
 
 /// <summary>Current machine-detected/user-chosen state of one optimization.</summary>

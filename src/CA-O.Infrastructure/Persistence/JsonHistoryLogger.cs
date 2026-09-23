@@ -24,6 +24,15 @@ public sealed class JsonHistoryLogger : IHistoryLogger
     private readonly string _filePath;
     private readonly object _lock = new();
 
+    /// <summary>Tope de líneas por fichero; al superarlo se rota a .1.</summary>
+    private const int MaxLinesPerFile = 5000;
+
+    // Caché del estado de cola: evita releer el fichero entero (O(n)) en
+    // cada append. Solo vive en memoria; la verdad sigue estando en disco.
+    private int _tailSeq;
+    private string _tailHash = GenesisHash;
+    private bool _tailLoaded;
+
     internal sealed record ChainedEntry(
         [property: JsonPropertyName("seq")] int Seq,
         [property: JsonPropertyName("prev")] string PrevHash,
@@ -40,7 +49,9 @@ public sealed class JsonHistoryLogger : IHistoryLogger
     {
         lock (_lock)
         {
-            var (seq, prevHash) = ReadTailState();
+            EnsureTailLoaded();
+            RotateIfNeeded();
+            var (seq, prevHash) = (_tailSeq, _tailHash);
             var hash = ComputeHash(seq + 1, prevHash, entry);
             var line = JsonSerializer.Serialize(
                 new ChainedEntry(seq + 1, prevHash, hash, entry), ChainOptions);
@@ -51,7 +62,36 @@ public sealed class JsonHistoryLogger : IHistoryLogger
             writer.WriteLine(line);
             writer.Flush();
             stream.Flush(flushToDisk: true);
+
+            _tailSeq = seq + 1;
+            _tailHash = hash;
         }
+    }
+
+    private void EnsureTailLoaded()
+    {
+        if (_tailLoaded) return;
+        var (seq, prevHash) = ReadTailState();
+        _tailSeq = seq;
+        _tailHash = prevHash;
+        _tailLoaded = true;
+    }
+
+    /// <summary>
+    /// Rotación simple: el fichero actual pasa a .1 (se descarta el .1
+    /// anterior) y la cadena se reinicia. Evita crecimiento ilimitado.
+    /// </summary>
+    private void RotateIfNeeded()
+    {
+        if (_tailSeq < MaxLinesPerFile || !File.Exists(_filePath)) return;
+        try
+        {
+            var backup = _filePath + ".1";
+            File.Move(_filePath, backup, overwrite: true);
+        }
+        catch { return; }
+        _tailSeq = 0;
+        _tailHash = GenesisHash;
     }
 
     public IReadOnlyList<HistoryEntry> ReadLast(int maxEntries)

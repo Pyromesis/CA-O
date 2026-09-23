@@ -3,6 +3,7 @@ using System.Threading;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using CAO.Shared.IPC;
+using CAO.UI.Controls;
 
 namespace CAO.UI.Pages;
 
@@ -151,29 +152,66 @@ public sealed partial class LimpiezaPage : Page
         };
         if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
 
+        Mascot.Set("Working");
+        ShowCleanupProgress("Limpieza rápida en curso…", 0);
         var parts = new List<string>();
-        foreach (var id in QuickCleanIds)
+        var okCount = 0;
+        try
         {
-            var message = await RunCleanupAsync(id, null, null);
-            if (!string.IsNullOrEmpty(message)) parts.Add($"{id}: {message}");
+            for (var i = 0; i < QuickCleanIds.Length; i++)
+            {
+                var id = QuickCleanIds[i];
+                var pct = (double)i / QuickCleanIds.Length * 100;
+                ShowCleanupProgress($"Limpiando {id} ({i + 1}/{QuickCleanIds.Length})…", pct);
+                var message = await RunCleanupAsync(id, null, null);
+                if (!string.IsNullOrEmpty(message)) parts.Add($"{id}: {message}");
+                if (message?.StartsWith('✓') == true) okCount++;
+            }
+            CleanupStatusText.Text = parts.Count == 0 ? "Sin nada que limpiar." : string.Join("\n", parts);
+            ShowCleanupProgress(okCount == QuickCleanIds.Length ? "✓ Limpieza rápida completada." : $"Limpieza rápida: {okCount}/{QuickCleanIds.Length} completadas.", 100);
+            Mascot.CelebrateThenIdle(DispatcherQueue);
         }
-        CleanupStatusText.Text = parts.Count == 0 ? "Sin nada que limpiar." : string.Join("\n", parts);
+        catch (Exception ex)
+        {
+            // Nunca se relanza desde un handler async void: se informa en la
+            // propia página en vez de dejarlo caer a UnhandledException.
+            Mascot.Set("Warn");
+            CleanupStatusText.Text = $"No se pudo completar la limpieza: {ex.Message}";
+            try { App.WriteCrashLog(ex); } catch { }
+        }
+        finally
+        {
+            try { await Task.Delay(1500); } catch { }
+            HideCleanupProgress();
+        }
     }
 
-    /// <summary>Ejecuta una limpieza y devuelve el mensaje corto para resúmenes.</summary>
     private async Task<string?> RunCleanupAsync(string optimizationId, TextBlock? primary, TextBlock? secondary)
     {
         var target = optimizationId == "flush-dns-cache" ? secondary ?? primary : primary ?? secondary;
+        Mascot.Set("Working");
+        var batchRunning = CleanupProgressCard.Visibility == Visibility.Visible && CleanupRing.IsActive;
+        if (!batchRunning)
+            ShowCleanupProgress($"Limpiando {optimizationId}…", null);
         try
         {
             using var cts = new CancellationTokenSource(TimeoutFor(optimizationId));
             var pipe = AppHost.Resolve<PrivilegedPipeClient>();
             if (target != null && HeavyIds.Contains(optimizationId)) target.Text = $"{optimizationId}: en curso (puede tardar minutos)...";
             var response = await pipe.ApplyAsync(optimizationId, cts.Token);
-            var message = response is { Accepted: true }
+            var ok = response is { Accepted: true };
+            var message = ok
                 ? "✓ Completado."
                 : $"Rechazado [{response?.ErrorCode}]: {response?.SafeMessage ?? "sin respuesta"}";
             if (target != null) target.Text = $"{optimizationId}: {message}";
+            if (!batchRunning)
+            {
+                ShowCleanupProgress(ok ? $"✓ {optimizationId} completado." : $"{optimizationId}: {message}", 100);
+                if (ok) Mascot.CelebrateThenIdle(DispatcherQueue);
+                else Mascot.Set("Warn");
+                try { await Task.Delay(1500); } catch { }
+                HideCleanupProgress();
+            }
             return message;
         }
         catch (Exception ex)
@@ -181,8 +219,43 @@ public sealed partial class LimpiezaPage : Page
             var message = $"Servicio no disponible: {ex.Message}";
             if (target != null) target.Text = $"{optimizationId}: {message}";
             App.WriteCrashLog(ex);
+            if (!batchRunning)
+            {
+                Mascot.Set("Warn");
+                ShowCleanupProgress(message, 100);
+                try { await Task.Delay(1500); } catch { }
+                HideCleanupProgress();
+            }
             return message;
         }
+    }
+
+    /// <summary>Muestra la tarjeta global de progreso. pct null = indeterminado. Nunca lanza.</summary>
+    private void ShowCleanupProgress(string text, double? pct)
+    {
+        try
+        {
+            CleanupProgressCard.Visibility = Visibility.Visible;
+            CleanupRing.IsActive = true;
+            CleanupProgressText.Text = text;
+            if (pct.HasValue)
+            {
+                CleanupProgressBar.IsIndeterminate = false;
+                CleanupProgressBar.Value = Math.Clamp(pct.Value, 0, 100);
+                CleanupPercentText.Text = $"{CleanupProgressBar.Value:0}%";
+            }
+            else
+            {
+                CleanupProgressBar.IsIndeterminate = true;
+                CleanupPercentText.Text = string.Empty;
+            }
+        }
+        catch { }
+    }
+
+    private void HideCleanupProgress()
+    {
+        try { CleanupProgressCard.Visibility = Visibility.Collapsed; CleanupRing.IsActive = false; } catch { }
     }
 
     private async void OnEmptyRecycleBinClick(object sender, RoutedEventArgs e)
@@ -198,6 +271,8 @@ public sealed partial class LimpiezaPage : Page
         };
         if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
 
+        Mascot.Set("Working");
+        ShowCleanupProgress("Vaciando papelera…", null);
         try
         {
             // SHEmptyRecycleBin exige hilo STA: en MTA (Task.Run) devuelve
@@ -216,14 +291,24 @@ public sealed partial class LimpiezaPage : Page
             thread.IsBackground = true;
             thread.Start();
             var result = await tcs.Task;
-            RecycleStatusText.Text = result == 0
+            var ok = result == 0;
+            RecycleStatusText.Text = ok
                 ? "✓ Papelera vaciada."
                 : $"No se pudo vaciar (código 0x{result:X8}). Si persiste, abra la Papelera y vacíela a mano: puede estar dañada.";
+            ShowCleanupProgress(ok ? "✓ Papelera vaciada." : "No se pudo vaciar la papelera.", 100);
+            if (ok) Mascot.CelebrateThenIdle(DispatcherQueue);
+            else Mascot.Set("Warn");
         }
         catch (Exception ex)
         {
             RecycleStatusText.Text = $"Error: {ex.Message}";
+            Mascot.Set("Warn");
             App.WriteCrashLog(ex);
+        }
+        finally
+        {
+            try { await Task.Delay(1500); } catch { }
+            HideCleanupProgress();
         }
     }
 
@@ -243,19 +328,31 @@ public sealed partial class LimpiezaPage : Page
         };
         if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
 
+        Mascot.Set("Working");
+        ShowCleanupProgress($"Aplicando timer {label}…", null);
         try
         {
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
             var pipe = AppHost.Resolve<PrivilegedPipeClient>();
             var response = await pipe.SetTimerResolutionAsync(resolution, cts.Token);
-            TimerStatusText.Text = response is { Accepted: true }
+            var ok = response is { Accepted: true };
+            TimerStatusText.Text = ok
                 ? $"✓ Aplicado: {label}."
                 : $"Rechazado [{response?.ErrorCode}]: {response?.SafeMessage ?? "sin respuesta"}";
+            ShowCleanupProgress(ok ? $"✓ Timer aplicado: {label}." : TimerStatusText.Text, 100);
+            if (ok) Mascot.CelebrateThenIdle(DispatcherQueue);
+            else Mascot.Set("Warn");
         }
         catch (Exception ex)
         {
             TimerStatusText.Text = $"Servicio no disponible: {ex.Message}";
+            Mascot.Set("Warn");
             App.WriteCrashLog(ex);
+        }
+        finally
+        {
+            try { await Task.Delay(1500); } catch { }
+            HideCleanupProgress();
         }
         RefreshTimerDisplay();
     }

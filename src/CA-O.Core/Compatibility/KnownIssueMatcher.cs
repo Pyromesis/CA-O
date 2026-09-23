@@ -21,7 +21,8 @@ public static class KnownIssueMatcher
 
         foreach (var issue in database)
         {
-            if (issue.Status == KnownIssueStatus.Sample)
+            // M9: Resolved no se surfacea; Sample tampoco.
+            if (issue.Status is KnownIssueStatus.Sample or KnownIssueStatus.Resolved)
             {
                 continue;
             }
@@ -32,13 +33,16 @@ public static class KnownIssueMatcher
                 continue;
             }
 
-            if (issue.GpuVendorOrDriverContains is not null &&
+            // M9: needle vacío haría match-all (Contains("") == true).
+            if (!string.IsNullOrWhiteSpace(issue.GpuVendorOrDriverContains) &&
+                issue.GpuVendorOrDriverContains is not null &&
                 !ContainsAny(context.GpuName + " " + context.GpuDriverVersion, issue.GpuVendorOrDriverContains))
             {
                 continue;
             }
 
-            if (issue.GameNameContains is not null &&
+            if (!string.IsNullOrWhiteSpace(issue.GameNameContains) &&
+                issue.GameNameContains is not null &&
                 !context.GamesDetected.Any(game => Contains(game, issue.GameNameContains)))
             {
                 continue;

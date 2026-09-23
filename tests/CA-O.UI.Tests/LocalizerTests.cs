@@ -46,14 +46,22 @@ public sealed class LocalizerTests
         Assert.NotEmpty(keys);
 
         Localizer.SetLanguage("es-ES");
-        var spanish = keys.Select(Localizer.Get).ToList();
-        Localizer.SetLanguage("en-US");
-        var english = keys.Select(Localizer.Get).ToList();
-
-        for (var index = 0; index < keys.Length; index++)
+        try
         {
-            Assert.NotEqual(keys[index], spanish[index]);
-            Assert.NotEqual(keys[index], english[index]);
+            var spanish = keys.Select(Localizer.Get).ToList();
+            Localizer.SetLanguage("en-US");
+            var english = keys.Select(Localizer.Get).ToList();
+
+            for (var index = 0; index < keys.Length; index++)
+            {
+                Assert.NotEqual(keys[index], spanish[index]);
+                Assert.NotEqual(keys[index], english[index]);
+            }
+        }
+        finally
+        {
+            // Restaurar el global: sin esto el test es orden-dependiente.
+            Localizer.SetLanguage("es-ES");
         }
     }
 

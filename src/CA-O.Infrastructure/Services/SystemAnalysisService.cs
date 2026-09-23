@@ -58,7 +58,7 @@ public sealed class SystemAnalysisService : IAnalysisCoordinator
             {
                 health = HealthEngine.Evaluate(context);
                 var catalog = Core.Catalog.CatalogProjections.BatchDefault;
-                recommendations = Core.Engine.RecommendationEngine.BuildAll(catalog, _registry, context!);
+                recommendations = Core.Engine.RecommendationEngine.BuildAll(catalog, _registry, context!, Core.Engine.OneShotLedger.LoadAll());
                 analysisState = warnings.Count == 0 ? "Completed" : "CompletedWithWarnings";
             }
             catch (Exception ex) { warnings.Add($"Health/Recommendations: {ex.Message}"); analysisState = "CompletedWithWarnings"; }

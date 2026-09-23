@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using CAO.Core.Interfaces;
+using CAO.Shared;
 using CAO.Shared.Security;
 
 namespace CAO.Infrastructure.Windows.Execution;
@@ -16,8 +17,10 @@ namespace CAO.Infrastructure.Windows.Execution;
 /// </summary>
 public sealed class SystemCommandGateway : IPrivilegedCommandExecutor
 {
-    private static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(60);
-    private static readonly TimeSpan HeavyTimeout = TimeSpan.FromMinutes(20);
+    // Techos centralizados en CAO.Shared.TimeoutProfile (fuente única junto
+    // al servicio y al cliente UI): divergir aquí mataba DISM/defrag a medias.
+    private static readonly TimeSpan DefaultTimeout = TimeoutProfile.DispatchDefault;
+    private static readonly TimeSpan HeavyTimeout = TimeoutProfile.DispatchHeavy;
     private const int MaxOutputChars = 256 * 1024;
 
     // Operaciones que necesitan minutos (DISM/defrag): matarlas a los 60 s

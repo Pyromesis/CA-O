@@ -50,7 +50,21 @@ public sealed class FileTransactionJournal : ITransactionJournal
 
         lock (_lock)
         {
-            foreach (var file in Directory.GetFiles(_directory, "*.jsonl"))
+            string[] files;
+            try
+            {
+                files = Directory.GetFiles(_directory, "*.jsonl");
+            }
+            catch (IOException)
+            {
+                return result; // directorio ilegible: recuperación parcial vacía, sin crash
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return result;
+            }
+
+            foreach (var file in files)
             {
                 if (!Guid.TryParse(Path.GetFileNameWithoutExtension(file), out var txid))
                 {
@@ -58,7 +72,24 @@ public sealed class FileTransactionJournal : ITransactionJournal
                 }
 
                 var events = new List<TransactionEvent>();
-                foreach (var line in File.ReadLines(file, Encoding.UTF8))
+                IEnumerable<string> lines;
+                try
+                {
+                    lines = File.ReadLines(file, Encoding.UTF8);
+                    // Materializar dentro del try: la enumeración diferida
+                    // lanzaría fuera si el fichero se bloquea a mitad.
+                    lines = lines.ToList();
+                }
+                catch (IOException)
+                {
+                    continue; // journal bloqueado o borrado a mitad: se salta, no tumba la recuperación
+                }
+                catch (UnauthorizedAccessException)
+                {
+                    continue;
+                }
+
+                foreach (var line in lines)
                 {
                     if (string.IsNullOrWhiteSpace(line)) continue;
                     try

@@ -34,8 +34,9 @@ public sealed class ViewModelTests
         var svc = new SystemAnalysisService(new StubProvider(), store, new StubRegistry());
         var state = new UiState();
         var provider = new CAO.Infrastructure.SystemInterop.SystemContextProvider();
-        var snapshotStore = new CAO.Infrastructure.Persistence.FileSnapshotStore();
-        var journal = new CAO.Infrastructure.Persistence.FileTransactionJournal();
+        var testRoot = Path.Combine(Path.GetTempPath(), $"cao-test-{Guid.NewGuid():N}");
+        var snapshotStore = new CAO.Infrastructure.Persistence.FileSnapshotStore(Path.Combine(testRoot, "snapshots"));
+        var journal = new CAO.Infrastructure.Persistence.FileTransactionJournal(Path.Combine(testRoot, "transactions"));
         var recoveryService = new CAO.Core.Rollback.CrashRecoveryService(journal, snapshotStore, _ => CAO.Shared.OptimizationState.Unknown);
         return (new AnalyzeViewModel(svc, state, logger), new DashboardViewModel(state, svc, store, logger, provider, recoveryService));
     }
@@ -70,6 +71,10 @@ public sealed class ViewModelTests
         var results = await vm.RunAsync(cts.Token);
         // Con token ya cancelado, al menos algún módulo en Cancelled o todo en Cancelled
         Assert.True(results.Count > 0);
+        // Invariante real: ningún módulo puede quedar colgado en Running/Pending.
+        Assert.All(results, r => Assert.True(
+            r.Status is AnalysisModuleStatus.Completed or AnalysisModuleStatus.Failed or AnalysisModuleStatus.Cancelled or AnalysisModuleStatus.Skipped,
+            $"Módulo {r.Module} quedó en {r.Status}"));
     }
 
     [Fact]

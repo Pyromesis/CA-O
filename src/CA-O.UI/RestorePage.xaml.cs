@@ -1,6 +1,7 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using CAO.Shared;
+using CAO.UI.Controls;
 using CAO.UI.Helpers;
 
 namespace CAO.UI.Pages;
@@ -56,7 +57,12 @@ public sealed partial class RestorePage : Page
     private void OnRefreshClick(object sender, RoutedEventArgs e) => _vm.RefreshCommand.Execute(null);
     private void OnGoHistoryClick(object sender, RoutedEventArgs e)
     {
-        RecoveryHintText.Text = "Historial contiene el timeline auditable con TransactionId por operación.";
+        // Botón funcional: navega al historial auditable en vez de solo
+        // escribir una nota. Si la ruta no existe, se conserva el mensaje.
+        if (MainWindow.Current is not null)
+            MainWindow.Current.SelectRoute("history");
+        else
+            RecoveryHintText.Text = "Historial contiene el timeline auditable con TransactionId por operación.";
     }
 
     private void OnInspectClick(object sender, RoutedEventArgs e)
@@ -102,6 +108,8 @@ public sealed partial class RestorePage : Page
         };
         if (await confirm.ShowAsync() != ContentDialogResult.Primary) return;
 
+        Mascot.Set("Working");
+        ShowRestoreProgress($"Restaurando snapshot {snapshotId}…");
         try
         {
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
@@ -109,6 +117,9 @@ public sealed partial class RestorePage : Page
             // Feedback explícito de éxito/fracaso
             var hint = _vm.RecoveryHint;
             var isSuccess = hint.Contains('✓') || hint.Contains("aceptada", StringComparison.OrdinalIgnoreCase);
+            ShowRestoreProgress(isSuccess ? $"✓ Snapshot {snapshotId} restaurado." : hint, done: true);
+            if (isSuccess) Mascot.CelebrateThenIdle(DispatcherQueue);
+            else Mascot.Set("Warn");
             var resultDialog = new ContentDialog
             {
                 Title = isSuccess ? "Restauración completada" : "Restauración no completada",
@@ -120,10 +131,14 @@ public sealed partial class RestorePage : Page
             await resultDialog.ShowAsync();
             _vm.RefreshCommand.Execute(null);
             RenderVm();
+            try { await Task.Delay(1500); } catch { }
+            HideRestoreProgress();
         }
         catch (Exception ex)
         {
             RecoveryHintText.Text = $"Restauración falló (servicio no disponible): {ex.Message}";
+            Mascot.Set("Warn");
+            ShowRestoreProgress($"Restauración falló: {ex.Message}", done: true);
             var errDialog = new ContentDialog
             {
                 Title = "Error en restauración",
@@ -132,6 +147,27 @@ public sealed partial class RestorePage : Page
                 XamlRoot = Content.XamlRoot
             };
             await errDialog.ShowAsync();
+            try { await Task.Delay(1500); } catch { }
+            HideRestoreProgress();
         }
+    }
+
+    /// <summary>Muestra la tarjeta global de progreso. Nunca lanza.</summary>
+    private void ShowRestoreProgress(string text, bool done = false)
+    {
+        try
+        {
+            RestoreProgressCard.Visibility = Visibility.Visible;
+            RestoreRing.IsActive = !done;
+            RestoreProgressText.Text = text;
+            RestoreProgressBar.IsIndeterminate = !done;
+            if (done) RestoreProgressBar.Value = 100;
+        }
+        catch { }
+    }
+
+    private void HideRestoreProgress()
+    {
+        try { RestoreProgressCard.Visibility = Visibility.Collapsed; RestoreRing.IsActive = false; } catch { }
     }
 }

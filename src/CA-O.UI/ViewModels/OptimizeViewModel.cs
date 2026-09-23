@@ -102,10 +102,21 @@ public sealed partial class OptimizeViewModel : ObservableObject
 
     public async Task RefreshRecommendationsAsync(CancellationToken ct = default)
     {
-        var context = _state.Context ?? await _contextProvider.GetAsync(ct);
-        _state.Context = context;
+        try
+        {
+            var context = _state.Context ?? await _contextProvider.GetAsync(ct);
+            _state.Context = context;
 
-        var catalog = CAO.Core.Catalog.CatalogProjections.BatchDefault;
-        _state.Recommendations = CAO.Core.Engine.RecommendationEngine.BuildAll(catalog, _registry, context);
+            var catalog = CAO.Core.Catalog.CatalogProjections.BatchDefault;
+            _state.Recommendations = CAO.Core.Engine.RecommendationEngine.BuildAll(catalog, _registry, context, CAO.Core.Engine.OneShotLedger.LoadAll());
+        }
+        catch (Exception ex)
+        {
+            // No se deja la lista en estado falso: se conserva lo último
+            // conocido y se registra el fallo con código.
+            LastErrorCode ??= CAO.Shared.ErrorCodes.UiOptimizeFailed;
+            LastMessage = ex.Message;
+            App.WriteCrashLog(ex);
+        }
     }
 }

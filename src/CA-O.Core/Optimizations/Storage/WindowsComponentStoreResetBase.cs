@@ -27,7 +27,7 @@ public sealed class WindowsComponentStoreResetBase : IOptimization
         SecurityImpact = SecurityImpact.None,
         Impact = ImpactLevel.Medium,
         Reversible = false,
-        Flags = OptimizationFlags.NotReversible | OptimizationFlags.ExpertOnly,
+        Flags = OptimizationFlags.NotReversible | OptimizationFlags.ExpertOnly | OptimizationFlags.OneShot,
         RequiresRestorePoint = true,
     };
 

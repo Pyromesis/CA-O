@@ -89,6 +89,7 @@ public sealed partial class AnalyzeViewModel : ObservableObject
                     case "Drivers": DriversResult = r; break;
                     case "System": SystemResult = r; break;
                     case "Thermal": ThermalResult = r; break;
+                    case "Input": InputResult = r; break;
                 }
             }
         }
@@ -213,5 +214,6 @@ public sealed partial class AnalyzeViewModel : ObservableObject
         DriversResult = new AnalysisModuleResult("Drivers", AnalysisModuleStatus.Running, TimeSpan.Zero, null, null, null, Array.Empty<string>());
         SystemResult = new AnalysisModuleResult("System", AnalysisModuleStatus.Running, TimeSpan.Zero, null, null, null, Array.Empty<string>());
         ThermalResult = new AnalysisModuleResult("Thermal", AnalysisModuleStatus.Running, TimeSpan.Zero, null, null, null, Array.Empty<string>());
+        InputResult = new AnalysisModuleResult("Input", AnalysisModuleStatus.Running, TimeSpan.Zero, null, null, null, Array.Empty<string>());
     }
 }

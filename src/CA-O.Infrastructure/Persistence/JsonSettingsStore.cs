@@ -31,9 +31,24 @@ public sealed class JsonSettingsStore : ISettingsStore
                 var settings = JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(_filePath), Options);
                 return settings ?? new AppSettings();
             }
-            catch
+            catch (JsonException)
             {
-                // Corrupt settings must never brick the app.
+                // Fichero corrupto: cuarentena antes de devolver defaults para
+                // no sobrescribirlo con valores de fábrica en el próximo Save.
+                try
+                {
+                    var quarantine = _filePath + ".corrupt-" + DateTime.UtcNow.ToString("yyyyMMddHHmmss", System.Globalization.CultureInfo.InvariantCulture);
+                    File.Move(_filePath, quarantine);
+                }
+                catch { }
+                return new AppSettings();
+            }
+            catch (IOException)
+            {
+                return new AppSettings();
+            }
+            catch (UnauthorizedAccessException)
+            {
                 return new AppSettings();
             }
         }
@@ -44,7 +59,17 @@ public sealed class JsonSettingsStore : ISettingsStore
         lock (_gate)
         {
             Directory.CreateDirectory(Path.GetDirectoryName(_filePath)!);
-            File.WriteAllText(_filePath, JsonSerializer.Serialize(settings, Options));
+            // Escritura atómica: tmp + flush a disco + move. Un corte a mitad
+            // de escritura nunca deja settings.json truncado.
+            var tmp = _filePath + ".tmp-" + Guid.NewGuid().ToString("N");
+            File.WriteAllText(tmp, JsonSerializer.Serialize(settings, Options));
+            try
+            {
+                using var fs = new FileStream(tmp, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+                fs.Flush(true);
+            }
+            catch { }
+            File.Move(tmp, _filePath, overwrite: true);
         }
     }
 }

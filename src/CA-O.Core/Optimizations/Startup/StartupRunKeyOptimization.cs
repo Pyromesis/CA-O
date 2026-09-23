@@ -109,17 +109,14 @@ public abstract class StartupRunKeyOptimization : IOptimization
 
     public OptimizationSnapshot Capture(IRegistryAccessor registry)
     {
+        // Solo lo que Apply va a borrar (Pending): ni protegidos, ni ajenos,
+        // ni entradas creadas después. Revert restaura exactamente esto.
         var snapshot = new OptimizationSnapshot();
-        foreach (var (hive, key) in RunKeys)
+        foreach (var (hive, key, name, raw, kind) in Pending(registry))
         {
-            foreach (var name in registry.GetValueNames(hive, key))
-            {
-                var raw = registry.GetValueRaw(hive, key, name, out var kind);
-                if (raw is null) continue;
-                snapshot.Registry.Add(new RegistrySnapshotEntry(
-                    hive.ToString(), key, name, raw, Existed: true)
-                { Kind = kind });
-            }
+            snapshot.Registry.Add(new RegistrySnapshotEntry(
+                hive.ToString(), key, name, raw, Existed: true)
+            { Kind = kind });
         }
         return snapshot;
     }
@@ -138,19 +135,25 @@ public abstract class StartupRunKeyOptimization : IOptimization
 
     public Task<OperationResult> RevertAsync(OptimizationContext context, OptimizationSnapshot snapshot, CancellationToken ct = default)
     {
+        var restored = 0;
         foreach (var entry in snapshot.Registry)
         {
-            var hive = Enum.Parse<RegistryHive2>(entry.Hive);
+            // Snapshot corrupto o de otra clase: se omite la entrada en vez
+            // de lanzar y romper todo el revert (contrato: nunca lanzar).
+            if (!Enum.TryParse<RegistryHive2>(entry.Hive, out var hive)) continue;
             if (entry.Existed && entry.Value is not null)
             {
                 context.Registry.SetValueRaw(hive, entry.KeyPath, entry.ValueName, entry.Value, entry.Kind);
+                restored++;
             }
             else
             {
                 context.Registry.DeleteValue(hive, entry.KeyPath, entry.ValueName);
             }
         }
-        return Task.FromResult(OperationResult.Ok("Entradas de inicio restauradas desde el snapshot."));
+        return Task.FromResult(restored == 0 && snapshot.Registry.Count > 0
+            ? OperationResult.Fail("El snapshot no contenía entradas válidas; no se restauró nada.", "snapshot-corrupt")
+            : OperationResult.Ok("Entradas de inicio restauradas desde el snapshot."));
     }
 
     public Task<VerificationResult> VerifyAsync(OptimizationContext context, CancellationToken ct = default)

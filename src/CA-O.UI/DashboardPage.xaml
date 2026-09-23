@@ -25,7 +25,7 @@
                          Title="Actualización disponible"
                          Message="Hay una versión nueva de CA-O.">
                     <InfoBar.ActionButton>
-                        <Button Content="Ver en Ajustes" FontSize="12" Click="OnGoUpdateClick"/>
+                        <Button Content="Ver en Ajustes" Click="OnGoUpdateClick"/>
                     </InfoBar.ActionButton>
                 </InfoBar>
             </StackPanel>
@@ -44,26 +44,26 @@
                             <Border Style="{StaticResource CaoOpsPillStyle}">
                                 <TextBlock Text="● DIAGNÓSTICO VIGENTE" Style="{StaticResource CaoOpsPillTextStyle}"/>
                             </Border>
-                            <TextBlock x:Name="LastAnalysisText" VerticalAlignment="Center" FontSize="11" Opacity="0.7"/>
+                            <TextBlock x:Name="LastAnalysisText" VerticalAlignment="Center" Style="{StaticResource CaoSectionSubtitleStyle}"/>
                         </StackPanel>
-                        <TextBlock Text="Centro de Control y Rendimiento" FontSize="28" FontWeight="SemiBold" TextWrapping="Wrap"/>
-                        <TextBlock x:Name="ProgramInfoText" FontSize="12" Opacity="0.7" TextWrapping="Wrap" IsTextSelectionEnabled="True"/>
+                        <TextBlock Text="Centro de Control y Rendimiento" Style="{StaticResource CaoHeroTitleStyle}" TextWrapping="Wrap"/>
+                        <TextBlock x:Name="ProgramInfoText" Style="{StaticResource CaoSectionSubtitleStyle}" TextWrapping="Wrap" IsTextSelectionEnabled="True"/>
                         <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4,0,0">
                             <Ellipse x:Name="ServiceDot" Width="9" Height="9" Fill="{ThemeResource SystemFillColorSuccessBrush}" VerticalAlignment="Center"/>
-                            <TextBlock x:Name="ServiceBadgeText" Text="Servicio: —" FontSize="12" FontWeight="SemiBold"/>
+                            <TextBlock x:Name="ServiceBadgeText" Text="Servicio: —" Style="{StaticResource CaoListItemTitleStyle}"/>
                             <TextBlock Text="·" Opacity="0.5" VerticalAlignment="Center"/>
-                            <TextBlock x:Name="FindingsLineText" Text="" FontSize="12" Opacity="0.75" VerticalAlignment="Center"/>
+                            <TextBlock x:Name="FindingsLineText" Text="" Style="{StaticResource CaoSectionSubtitleStyle}" VerticalAlignment="Center"/>
                         </StackPanel>
                     </StackPanel>
                     <StackPanel Grid.Column="2" Spacing="10" MinWidth="250" VerticalAlignment="Center">
-                        <controls:CaoCat x:Name="HeroCat" Width="120" Height="140"
+                        <controls:CaoCat x:Name="HeroCat" Width="132"
                                          HorizontalAlignment="Center"
                                          AutomationProperties.Name="Mascota de CA-O"/>
                         <Button x:Name="AnalyzeButton" Content="Analizar sistema" Click="OnAnalyzeClick" Style="{StaticResource CaoOpsPrimaryButtonStyle}" HorizontalAlignment="Stretch" AutomationProperties.Name="Analizar sistema"/>
                         <Button x:Name="OptimizeCtaButton" Content="Ver recomendadas" Click="OnGoOptimizeClick" Style="{StaticResource CaoElevatedButtonStyle}" HorizontalAlignment="Stretch" AutomationProperties.Name="Ver recomendaciones"/>
                         <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
                             <ProgressRing x:Name="AnalyzingRing" IsActive="False" Width="16" Height="16" Style="{StaticResource CaoProgressRingStyle}"/>
-                            <TextBlock x:Name="AnalyzeStatusText" FontSize="11" Opacity="0.7" VerticalAlignment="Center"/>
+                            <TextBlock x:Name="AnalyzeStatusText" Style="{StaticResource CaoSectionSubtitleStyle}" VerticalAlignment="Center"/>
                         </StackPanel>
                     </StackPanel>
                 </Grid>
@@ -103,11 +103,11 @@
                                 </StackPanel>
                             </Grid>
                             <StackPanel Grid.Column="1" Spacing="6" VerticalAlignment="Center">
-                                <TextBlock x:Name="ScoreLabelText" Text="Sin datos" FontWeight="SemiBold" FontSize="15" TextWrapping="Wrap"/>
-                                <TextBlock x:Name="ScoreDetailText" Text="Ejecute Analizar para medir." FontSize="11" Opacity="0.7" TextWrapping="Wrap"/>
+                                <TextBlock x:Name="ScoreLabelText" Text="Sin datos" Style="{StaticResource CaoCardTitleStyle}" TextWrapping="Wrap"/>
+                                <TextBlock x:Name="ScoreDetailText" Text="Ejecute Analizar para medir." Style="{StaticResource CaoSectionSubtitleStyle}" TextWrapping="Wrap"/>
                             </StackPanel>
                         </Grid>
-                        <TextBlock x:Name="MeasuredNoteText" FontSize="11" Opacity="0.65" TextWrapping="Wrap"/>
+                        <TextBlock x:Name="MeasuredNoteText" Style="{StaticResource CaoSectionSubtitleStyle}" TextWrapping="Wrap"/>
                     </StackPanel>
                 </Border>
                 <!-- CPU -->
@@ -115,14 +115,14 @@
                     <StackPanel Spacing="8">
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <FontIcon Glyph="&#xE950;" FontSize="16" Foreground="{StaticResource CaoOpsCyanBrush}" VerticalAlignment="Center"/>
-                            <TextBlock Text="Procesador" FontWeight="SemiBold" FontSize="14" VerticalAlignment="Center"/>
+                            <TextBlock Text="Procesador" Style="{StaticResource CaoCardTitleStyle}" VerticalAlignment="Center"/>
                         </StackPanel>
                         <TextBlock x:Name="CpuNameText" FontWeight="SemiBold" FontSize="16" TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis"/>
-                        <TextBlock x:Name="CpuSpecText" FontSize="11" Opacity="0.7"/>
+                        <TextBlock x:Name="CpuSpecText" Style="{StaticResource CaoSectionSubtitleStyle}"/>
                         <ProgressBar x:Name="CpuLoadBar" Minimum="0" Maximum="100" Value="0" Margin="0,6,0,0"/>
                         <Grid>
                             <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                            <TextBlock Text="Carga actual" FontSize="11" Opacity="0.7"/>
+                            <TextBlock Text="Carga actual" Style="{StaticResource CaoSectionSubtitleStyle}"/>
                             <TextBlock Grid.Column="1" x:Name="CpuLoadText" Text="—" FontWeight="SemiBold" FontSize="13" Style="{StaticResource CaoOpsMonoStyle}"/>
                         </Grid>
                     </StackPanel>
@@ -132,11 +132,11 @@
                     <StackPanel Spacing="8">
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <FontIcon Glyph="&#xE7F4;" FontSize="16" Foreground="{StaticResource CaoOpsCyanBrush}" VerticalAlignment="Center"/>
-                            <TextBlock Text="Gráficos" FontWeight="SemiBold" FontSize="14" VerticalAlignment="Center"/>
+                            <TextBlock Text="Gráficos" Style="{StaticResource CaoCardTitleStyle}" VerticalAlignment="Center"/>
                         </StackPanel>
                         <TextBlock x:Name="GpuNameText" FontWeight="SemiBold" FontSize="16" TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis"/>
-                        <TextBlock x:Name="GpuSpecText" FontSize="11" Opacity="0.7" TextWrapping="Wrap"/>
-                        <TextBlock x:Name="GpuExtraText" FontSize="11" Opacity="0.7" TextWrapping="Wrap"/>
+                        <TextBlock x:Name="GpuSpecText" Style="{StaticResource CaoSectionSubtitleStyle}" TextWrapping="Wrap"/>
+                        <TextBlock x:Name="GpuExtraText" Style="{StaticResource CaoSectionSubtitleStyle}" TextWrapping="Wrap"/>
                     </StackPanel>
                 </Border>
             </Grid>
@@ -149,17 +149,17 @@
                     <StackPanel Spacing="8">
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <FontIcon Glyph="&#xEB4B;" FontSize="16" Foreground="{StaticResource CaoOpsCyanBrush}" VerticalAlignment="Center"/>
-                            <TextBlock x:Name="RamTitleText" Text="Memoria" FontWeight="SemiBold" FontSize="14" VerticalAlignment="Center"/>
+                            <TextBlock x:Name="RamTitleText" Text="Memoria" Style="{StaticResource CaoCardTitleStyle}" VerticalAlignment="Center"/>
                         </StackPanel>
                         <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                             <TextBlock x:Name="RamUsedText" FontWeight="SemiBold" FontSize="22" Style="{StaticResource CaoOpsMonoStyle}"/>
-                            <TextBlock x:Name="RamTotalText" FontSize="12" Opacity="0.7" VerticalAlignment="Bottom" Margin="0,0,0,3"/>
+                            <TextBlock x:Name="RamTotalText" Style="{StaticResource CaoSectionSubtitleStyle}" VerticalAlignment="Bottom" Margin="0,0,0,3"/>
                         </StackPanel>
-                        <TextBlock x:Name="RamSpecText" FontSize="11" Opacity="0.7"/>
+                        <TextBlock x:Name="RamSpecText" Style="{StaticResource CaoSectionSubtitleStyle}"/>
                         <ProgressBar x:Name="RamUseBar" Minimum="0" Maximum="100" Value="0" Margin="0,6,0,0"/>
                         <Grid>
                             <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                            <TextBlock Text="Ocupación de RAM" FontSize="11" Opacity="0.7"/>
+                            <TextBlock Text="Ocupación de RAM" Style="{StaticResource CaoSectionSubtitleStyle}"/>
                             <TextBlock Grid.Column="1" x:Name="RamUsePctText" Text="—" FontWeight="SemiBold" FontSize="13" Style="{StaticResource CaoOpsMonoStyle}"/>
                         </Grid>
                     </StackPanel>
@@ -169,17 +169,17 @@
                     <StackPanel Spacing="8">
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <FontIcon Glyph="&#xEDA2;" FontSize="16" Foreground="{StaticResource CaoOpsCyanBrush}" VerticalAlignment="Center"/>
-                            <TextBlock x:Name="DiskTitleText" Text="Disco del sistema" FontWeight="SemiBold" FontSize="14" VerticalAlignment="Center"/>
+                            <TextBlock x:Name="DiskTitleText" Text="Disco del sistema" Style="{StaticResource CaoCardTitleStyle}" VerticalAlignment="Center"/>
                         </StackPanel>
                         <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                             <TextBlock x:Name="DiskFreeText" FontWeight="SemiBold" FontSize="22" Style="{StaticResource CaoOpsMonoStyle}"/>
-                            <TextBlock x:Name="DiskTotalText" FontSize="12" Opacity="0.7" VerticalAlignment="Bottom" Margin="0,0,0,3"/>
+                            <TextBlock x:Name="DiskTotalText" Style="{StaticResource CaoSectionSubtitleStyle}" VerticalAlignment="Bottom" Margin="0,0,0,3"/>
                         </StackPanel>
-                        <TextBlock x:Name="DiskSpecText" FontSize="11" Opacity="0.7"/>
+                        <TextBlock x:Name="DiskSpecText" Style="{StaticResource CaoSectionSubtitleStyle}"/>
                         <ProgressBar x:Name="DiskUseBar" Minimum="0" Maximum="100" Value="0" Margin="0,6,0,0"/>
                         <Grid>
                             <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                            <TextBlock Text="Espacio ocupado" FontSize="11" Opacity="0.7"/>
+                            <TextBlock Text="Espacio ocupado" Style="{StaticResource CaoSectionSubtitleStyle}"/>
                             <TextBlock Grid.Column="1" x:Name="DiskUsePctText" Text="—" FontWeight="SemiBold" FontSize="13" Style="{StaticResource CaoOpsMonoStyle}"/>
                         </Grid>
                     </StackPanel>
@@ -193,7 +193,7 @@
                         <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <FontIcon Glyph="&#xE72E;" FontSize="15" Foreground="{StaticResource CaoOpsCyanBrush}" VerticalAlignment="Center"/>
-                            <TextBlock Text="Postura de Seguridad" FontWeight="SemiBold" FontSize="14" VerticalAlignment="Center"/>
+                            <TextBlock Text="Postura de Seguridad" Style="{StaticResource CaoCardTitleStyle}" VerticalAlignment="Center"/>
                         </StackPanel>
                         <TextBlock Grid.Column="1" x:Name="SecCountText" Style="{StaticResource CaoOpsEyebrowStyle}" VerticalAlignment="Center"/>
                     </Grid>
@@ -206,8 +206,8 @@
                                 <FontIcon Glyph="&#xE930;" FontSize="17" Foreground="{StaticResource CaoGreenSolidBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Border>
                             <StackPanel Spacing="1" VerticalAlignment="Center">
-                                <TextBlock Text="Secure Boot" FontWeight="SemiBold" FontSize="13"/>
-                                <TextBlock x:Name="SecBootText" Text="—" FontSize="11"/>
+                                <TextBlock Text="Secure Boot" Style="{StaticResource CaoListItemTitleStyle}"/>
+                                <TextBlock x:Name="SecBootText" Text="—" Style="{StaticResource CaoListItemDetailStyle}"/>
                             </StackPanel>
                         </StackPanel>
                         <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10">
@@ -215,8 +215,8 @@
                                 <FontIcon Glyph="&#xE72E;" FontSize="17" Foreground="{StaticResource CaoBlueSolidBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Border>
                             <StackPanel Spacing="1" VerticalAlignment="Center">
-                                <TextBlock Text="VBS" FontWeight="SemiBold" FontSize="13"/>
-                                <TextBlock x:Name="SecVbsText" Text="—" FontSize="11"/>
+                                <TextBlock Text="VBS" Style="{StaticResource CaoListItemTitleStyle}"/>
+                                <TextBlock x:Name="SecVbsText" Text="—" Style="{StaticResource CaoListItemDetailStyle}"/>
                             </StackPanel>
                         </StackPanel>
                         <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="10">
@@ -224,8 +224,8 @@
                                 <FontIcon Glyph="&#xE7F4;" FontSize="17" Foreground="{StaticResource CaoPurpleSolidBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Border>
                             <StackPanel Spacing="1" VerticalAlignment="Center">
-                                <TextBlock Text="HVCI" FontWeight="SemiBold" FontSize="13"/>
-                                <TextBlock x:Name="SecHvciText" Text="—" FontSize="11"/>
+                                <TextBlock Text="HVCI" Style="{StaticResource CaoListItemTitleStyle}"/>
+                                <TextBlock x:Name="SecHvciText" Text="—" Style="{StaticResource CaoListItemDetailStyle}"/>
                             </StackPanel>
                         </StackPanel>
                         <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="10">
@@ -233,8 +233,8 @@
                                 <FontIcon Glyph="&#xE8B7;" FontSize="17" Foreground="{StaticResource CaoCyanSolidBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Border>
                             <StackPanel Spacing="1" VerticalAlignment="Center">
-                                <TextBlock Text="Servicio" FontWeight="SemiBold" FontSize="13"/>
-                                <TextBlock x:Name="SecSvcText" Text="—" FontSize="11"/>
+                                <TextBlock Text="Servicio" Style="{StaticResource CaoListItemTitleStyle}"/>
+                                <TextBlock x:Name="SecSvcText" Text="—" Style="{StaticResource CaoListItemDetailStyle}"/>
                             </StackPanel>
                         </StackPanel>
                     </Grid>
@@ -256,14 +256,14 @@
                         <Border Style="{StaticResource CaoOpsModuleIconStyle}" Background="{StaticResource CaoOpsCyanSoftBrush}">
                             <FontIcon Glyph="&#xE90F;" FontSize="18" Foreground="{StaticResource CaoOpsCyanBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
-                        <TextBlock Text="Optimización" FontWeight="SemiBold" FontSize="14" TextWrapping="Wrap"/>
-                        <TextBlock Text="Cambios transaccionales con snapshot y verificación en vivo." FontSize="11" Opacity="0.7" TextWrapping="Wrap"/>
+                        <TextBlock Text="Optimización" Style="{StaticResource CaoCardTitleStyle}" TextWrapping="Wrap"/>
+                        <TextBlock Text="Cambios transaccionales con snapshot y verificación en vivo." Style="{StaticResource CaoSectionSubtitleStyle}" TextWrapping="Wrap"/>
                         <Grid Margin="0,6,0,0">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                             <Border Style="{StaticResource CaoOpsPillStyle}" HorizontalAlignment="Left" VerticalAlignment="Center">
                                 <TextBlock x:Name="ModOptPillText" Text="—" Style="{StaticResource CaoOpsPillTextStyle}"/>
                             </Border>
-                            <Button Grid.Column="1" Content="Explorar →" Tag="optimize" Click="OnTileClick" Style="{StaticResource CaoTextButtonStyle}" FontSize="12" VerticalAlignment="Center" AutomationProperties.Name="Ir a Optimizar"/>
+                            <Button Grid.Column="1" Content="Explorar →" Tag="optimize" Click="OnTileClick" Style="{StaticResource CaoTextButtonStyle}" VerticalAlignment="Center" AutomationProperties.Name="Ir a Optimizar"/>
                         </Grid>
                     </StackPanel>
                 </Border>
@@ -272,14 +272,14 @@
                         <Border Style="{StaticResource CaoOpsModuleIconStyle}" Background="{StaticResource CaoPurpleSoftBrush}">
                             <FontIcon Glyph="&#xE7FC;" FontSize="18" Foreground="{StaticResource CaoPurpleSolidBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
-                        <TextBlock Text="Gaming" FontWeight="SemiBold" FontSize="14" TextWrapping="Wrap"/>
-                        <TextBlock x:Name="ModGamingDescText" Text="Anti-cheat y juegos detectados." FontSize="11" Opacity="0.7" TextWrapping="Wrap"/>
+                        <TextBlock Text="Gaming" Style="{StaticResource CaoCardTitleStyle}" TextWrapping="Wrap"/>
+                        <TextBlock x:Name="ModGamingDescText" Text="Anti-cheat y juegos detectados." Style="{StaticResource CaoSectionSubtitleStyle}" TextWrapping="Wrap"/>
                         <Grid Margin="0,6,0,0">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                             <Border Style="{StaticResource CaoOpsPillStyle}" HorizontalAlignment="Left" VerticalAlignment="Center">
                                 <TextBlock x:Name="ModGamingPillText" Text="—" Style="{StaticResource CaoOpsPillTextStyle}"/>
                             </Border>
-                            <Button Grid.Column="1" Content="Ver →" Tag="analyze" Click="OnTileClick" Style="{StaticResource CaoTextButtonStyle}" FontSize="12" VerticalAlignment="Center" AutomationProperties.Name="Ir a Analizar"/>
+                            <Button Grid.Column="1" Content="Ver →" Tag="analyze" Click="OnTileClick" Style="{StaticResource CaoTextButtonStyle}" VerticalAlignment="Center" AutomationProperties.Name="Ir a Analizar"/>
                         </Grid>
                     </StackPanel>
                 </Border>
@@ -288,11 +288,11 @@
                         <Border Style="{StaticResource CaoOpsModuleIconStyle}" Background="{StaticResource CaoGreenSoftBrush}">
                             <FontIcon Glyph="&#xE74D;" FontSize="18" Foreground="{StaticResource CaoGreenSolidBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
-                        <TextBlock Text="Limpieza" FontWeight="SemiBold" FontSize="14" TextWrapping="Wrap"/>
-                        <TextBlock Text="Temporales, WinSxS, TRIM y papelera con confirmación." FontSize="11" Opacity="0.7" TextWrapping="Wrap"/>
+                        <TextBlock Text="Limpieza" Style="{StaticResource CaoCardTitleStyle}" TextWrapping="Wrap"/>
+                        <TextBlock Text="Temporales, WinSxS, TRIM y papelera con confirmación." Style="{StaticResource CaoSectionSubtitleStyle}" TextWrapping="Wrap"/>
                         <Grid Margin="0,6,0,0">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                            <Button Grid.Column="1" Content="Limpiar →" Tag="cleanup" Click="OnTileClick" Style="{StaticResource CaoTextButtonStyle}" FontSize="12" VerticalAlignment="Center" AutomationProperties.Name="Ir a Limpieza"/>
+                            <Button Grid.Column="1" Content="Limpiar →" Tag="cleanup" Click="OnTileClick" Style="{StaticResource CaoTextButtonStyle}" VerticalAlignment="Center" AutomationProperties.Name="Ir a Limpieza"/>
                         </Grid>
                     </StackPanel>
                 </Border>
@@ -301,11 +301,11 @@
                         <Border Style="{StaticResource CaoOpsModuleIconStyle}" Background="{StaticResource CaoAmberSoftBrush}">
                             <FontIcon Glyph="&#xE897;" FontSize="18" Foreground="{StaticResource CaoAmberSolidBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
-                        <TextBlock Text="Solucionar" FontWeight="SemiBold" FontSize="14" TextWrapping="Wrap"/>
-                        <TextBlock Text="Audio, video, red y sistema con reversión." FontSize="11" Opacity="0.7" TextWrapping="Wrap"/>
+                        <TextBlock Text="Solucionar" Style="{StaticResource CaoCardTitleStyle}" TextWrapping="Wrap"/>
+                        <TextBlock Text="Audio, video, red y sistema con reversión." Style="{StaticResource CaoSectionSubtitleStyle}" TextWrapping="Wrap"/>
                         <Grid Margin="0,6,0,0">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                            <Button Grid.Column="1" Content="Solucionar →" Tag="solucionar" Click="OnTileClick" Style="{StaticResource CaoTextButtonStyle}" FontSize="12" VerticalAlignment="Center" AutomationProperties.Name="Ir a Solucionar"/>
+                            <Button Grid.Column="1" Content="Solucionar →" Tag="solucionar" Click="OnTileClick" Style="{StaticResource CaoTextButtonStyle}" VerticalAlignment="Center" AutomationProperties.Name="Ir a Solucionar"/>
                         </Grid>
                     </StackPanel>
                 </Border>
@@ -323,7 +323,7 @@
             <Border Style="{StaticResource CaoCardStyle}">
                 <StackPanel Spacing="0">
                     <StackPanel x:Name="AuditRows" Spacing="12"/>
-                    <TextBlock x:Name="AuditEmptyText" Text="Sin movimientos aún — aplica un cambio para estrenar la auditoría." FontSize="12" Opacity="0.7" Visibility="Collapsed"/>
+                    <TextBlock x:Name="AuditEmptyText" Text="Sin movimientos aún — aplica un cambio para estrenar la auditoría." Style="{StaticResource CaoSectionSubtitleStyle}" Visibility="Collapsed"/>
                 </StackPanel>
             </Border>
 

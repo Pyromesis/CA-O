@@ -1,6 +1,7 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using CAO.Shared.IPC;
+using CAO.UI.Controls;
 
 namespace CAO.UI.Pages;
 
@@ -74,6 +75,8 @@ public sealed partial class SolucionarPage : Page
             if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
         }
 
+        Mascot.Set("Working");
+        ShowFixProgress($"Aplicando {optimizationId}…");
         try
         {
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(120));
@@ -82,6 +85,10 @@ public sealed partial class SolucionarPage : Page
             if (response is { Accepted: true })
             {
                 if (target != null) target.Text = $"{optimizationId}: ✓ Solucionado.";
+                ShowFixProgress($"✓ {optimizationId} solucionado.");
+                Mascot.CelebrateThenIdle(DispatcherQueue);
+                try { await Task.Delay(1500); } catch { }
+                HideFixProgress();
                 return;
             }
             var message = $"Rechazado [{response?.ErrorCode}]: {response?.SafeMessage ?? "sin respuesta"}";
@@ -96,6 +103,10 @@ public sealed partial class SolucionarPage : Page
                 message += $"\nFallback local: {local}";
             }
             if (target != null) target.Text = $"{optimizationId}: {message}";
+            ShowFixProgress($"{optimizationId}: {message}");
+            Mascot.Set("Warn");
+            try { await Task.Delay(1500); } catch { }
+            HideFixProgress();
         }
         catch (Exception ex)
         {
@@ -112,6 +123,21 @@ public sealed partial class SolucionarPage : Page
             }
             if (target != null) target.Text = $"{optimizationId}: {message}";
             App.WriteCrashLog(ex);
+            ShowFixProgress($"{optimizationId}: {message}");
+            Mascot.Set("Warn");
+            try { await Task.Delay(1500); } catch { }
+            HideFixProgress();
         }
+    }
+
+    /// <summary>Muestra la tarjeta global de progreso. Nunca lanza.</summary>
+    private void ShowFixProgress(string text)
+    {
+        try { FixProgressCard.Visibility = Visibility.Visible; FixRing.IsActive = true; FixProgressText.Text = text; FixProgressBar.IsIndeterminate = true; } catch { }
+    }
+
+    private void HideFixProgress()
+    {
+        try { FixProgressCard.Visibility = Visibility.Collapsed; FixRing.IsActive = false; } catch { }
     }
 }

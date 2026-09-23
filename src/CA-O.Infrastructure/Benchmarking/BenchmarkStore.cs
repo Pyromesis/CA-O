@@ -59,8 +59,12 @@ public static class BenchmarkStore
 
     public static async Task SaveJsonAsync<T>(string path, T value, CancellationToken ct)
     {
+        // Escritura atómica (tmp + flush + move): un crash a mitad de
+        // escritura nunca deja baseline.json truncado.
         Directory.CreateDirectory(CaOPaths.BenchmarksDirectory);
-        await File.WriteAllTextAsync(path, JsonSerializer.Serialize(value), ct);
+        var tmp = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
+        await File.WriteAllTextAsync(tmp, JsonSerializer.Serialize(value), ct);
+        File.Move(tmp, path, overwrite: true);
     }
 
     public static async Task<T?> LoadJsonAsync<T>(string path, CancellationToken ct)

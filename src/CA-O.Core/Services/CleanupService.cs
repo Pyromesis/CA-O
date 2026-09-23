@@ -18,8 +18,12 @@ public sealed class CleanupService
     public CleanupService(IReadOnlyList<string>? roots = null)
     {
         var resolved = roots ?? DefaultRoots;
+        // Nunca elevar rutas relativas ni borrar la raíz del disco (C:\):
+        // el filtro es sobre la longitud de la ruta completa, no sobre la
+        // raíz (GetPathRoot("C:\\...") siempre mide 3 y el filtro antiguo
+        // `> 3` vaciaba Roots y no limpiaba nada).
         Roots = resolved
-            .Where(r => !string.IsNullOrWhiteSpace(r) && Path.IsPathRooted(r) && Path.GetPathRoot(r)!.Length > 3)
+            .Where(r => !string.IsNullOrWhiteSpace(r) && Path.IsPathRooted(r) && r.Length > 3)
             .ToList();
     }
 

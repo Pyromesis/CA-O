@@ -33,7 +33,7 @@ public sealed class WindowsCallerInspectorTests
 
         var caller = new WindowsCallerInspector().Inspect(identity);
 
-        Assert.Equal(expectedElevated, caller.IsAdministrator && caller.IsElevated == caller.IsElevated);
+        Assert.Equal(expectedElevated, caller.IsElevated);
         Assert.Equal(principal.IsInRole(WindowsBuiltInRole.Administrator), caller.IsAdministrator);
     }
 }

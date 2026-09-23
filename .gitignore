@@ -43,6 +43,9 @@ benchmarks/
 
 # Tools temp
 /opencode/
+.opencode/
+.superpowers/
+docs/superpowers/
 .claude/
 .z-ai-config
 /skills/

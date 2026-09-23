@@ -171,6 +171,8 @@ public sealed class FileSnapshotStore : ISnapshotStore
             return true;
         }
         catch (JsonException) { return false; }
+        catch (UnauthorizedAccessException) { return false; }
+        catch (IOException) { return false; } // incluye DirectoryNotFoundException
     }
 
     public bool TryLoad(Guid transactionId, out TransactionSnapshotRecord? record)
@@ -188,7 +190,11 @@ public sealed class FileSnapshotStore : ISnapshotStore
             record = null;
             if (!Directory.Exists(_root)) return false;
             TransactionSnapshotRecord? best = null;
-            foreach (var dir in Directory.GetDirectories(_root))
+            string[] dirs;
+            try { dirs = Directory.GetDirectories(_root); }
+            catch (IOException) { return false; }
+            catch (UnauthorizedAccessException) { return false; }
+            foreach (var dir in dirs)
             {
                 if (Guid.TryParse(Path.GetFileName(dir), out var txid) && TryLoadCore(txid, out var cand) && cand is not null
                     && cand.Manifest.OptimizationId.Equals(optimizationId, StringComparison.OrdinalIgnoreCase))
@@ -218,7 +224,11 @@ public sealed class FileSnapshotStore : ISnapshotStore
         {
             var result = new List<TransactionSnapshotRecord>();
             if (!Directory.Exists(_root)) return result;
-            foreach (var dir in Directory.GetDirectories(_root))
+            string[] dirs;
+            try { dirs = Directory.GetDirectories(_root); }
+            catch (IOException) { return result; }
+            catch (UnauthorizedAccessException) { return result; }
+            foreach (var dir in dirs)
             {
                 if (Guid.TryParse(Path.GetFileName(dir), out var txid) && TryLoadCore(txid, out var record) && record is not null)
                     result.Add(record);

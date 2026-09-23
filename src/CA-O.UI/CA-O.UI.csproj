@@ -23,6 +23,11 @@
   <ItemGroup>
     <Content Include="..\..\assets\app-icon-minimal.ico" Link="Assets\app-icon.ico" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\..\assets\app-icon-minimal.png" Link="Assets\app-icon.png" CopyToOutputDirectory="PreserveNewest" />
+    <!-- Mascota: silueta de gato frame a frame (assets generados con el motor
+         local; ver scripts/generate-mascot-frames.ps1). -->
+    <Content Include="..\..\assets\mascot\frames\**\*.png"
+             Link="Assets\mascot\frames\%(RecursiveDir)%(Filename)%(Extension)"
+             CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>
@@ -30,7 +35,6 @@
     <Page Include="DashboardPage.xaml" />
     <Page Include="AnalyzePage.xaml" />
     <Page Include="OptimizePage.xaml" />
-    <Page Include="DiagnosticsPage.xaml" />
     <Page Include="BenchmarkPage.xaml" />
     <Page Include="RestorePage.xaml" />
     <Page Include="HistoryPage.xaml" />

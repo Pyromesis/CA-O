@@ -115,13 +115,16 @@ public sealed class SystemContextProvider : ISystemContextProvider
 
     private static SystemInfoReport FallbackSystemInfo()
     {
+        // Fallback pesimista honesto: WMI no respondió, así que NO sabemos
+        // si hay SSD. Inventar HasSsd=true alimentaba decisiones de
+        // desfragmentación/retrim equivocadas; false desactiva esas rutas.
         var ramGb = FallbackRamGb();
         return new SystemInfoReport(
             WindowsVersion: Environment.OSVersion.VersionString,
             WindowsEdition: Environment.OSVersion.VersionString,
             RamGb: ramGb,
             CpuName: FallbackCpuName(),
-            HasSsd: true,
+            HasSsd: false,
             IsElevated: WmiSystemInfoProvider.IsElevated(),
             IsLaptop: false)
         {

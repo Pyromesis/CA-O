@@ -2,6 +2,7 @@ using System.Text.RegularExpressions;
 using CAO.Core.Abstractions;
 using CAO.Shared;
 using CAO.Shared.Security;
+using CAO.Core.Rollback;
 
 namespace CAO.Core.Optimizations.Power;
 
@@ -15,6 +16,9 @@ public abstract class PowerSchemeSwitchOptimization : IOptimization
 
     protected abstract string TargetScheme { get; }
     protected abstract string TargetLabel { get; }
+
+    /// <summary>Cambios de plan activo serializados entre sí.</summary>
+    public virtual IReadOnlyList<ResourceKey> ResourceKeys => [Rollback.ResourceKey.PowerPlan()];
 
     private static string? ParseActiveScheme(string output)
     {
@@ -58,7 +62,7 @@ public abstract class PowerSchemeSwitchOptimization : IOptimization
 
         var note = snapshot.RawNotes.FirstOrDefault(n => n.StartsWith("scheme=", StringComparison.Ordinal));
         var previous = note?["scheme=".Length..] ?? _lastPrevious;
-        if (string.IsNullOrWhiteSpace(previous))
+        if (string.IsNullOrWhiteSpace(previous) || !Guid.TryParse(previous, out _))
             return OperationResult.Fail("Sin plan previo registrado; nada que restaurar.", "no-previous-scheme");
 
         var restore = await context.Executor.ExecuteAsync(
@@ -96,7 +100,8 @@ public abstract class PowerSchemeSwitchOptimization : IOptimization
                 {
                     Kind = "PowerCfg",
                     Target = $"powercfg /setactive {TargetScheme}",
-                    Before = "plan actual",
+                    // N1: Before real leído del registro, no literal.
+                    Before = Optimization.PowerSchemes.ReadActiveScheme(registry) ?? "desconocido (registro ilegible)",
                     After = TargetLabel,
                 },
             ],

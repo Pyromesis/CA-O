@@ -40,7 +40,9 @@ public sealed partial class RestoreViewModel : ObservableObject
             // motivo en RecoveryHint para que el usuario reintente.
             RecoveryHint = $"No se pudo leer snapshots ({ex.GetType().Name}): {ex.Message}";
         }
-        RecoveryHint = _state.RecoveryCandidates.Count == 0 ? "Sin recuperaciones pendientes." : $"Recuperación requerida: {string.Join(", ", _state.RecoveryCandidates)}";
+        // No se pisa un error de lectura con el mensaje por defecto.
+        if (string.IsNullOrEmpty(RecoveryHint))
+            RecoveryHint = _state.RecoveryCandidates.Count == 0 ? "Sin recuperaciones pendientes." : $"Recuperación requerida: {string.Join(", ", _state.RecoveryCandidates)}";
     }
 
     [RelayCommand]

@@ -5,6 +5,9 @@
     <!-- CA-O Design System — Fluent nativo de Windows 11 -->
     <!-- Reglas: acento del sistema con moderación · geometría 4/8 · capas del sistema -->
     <!-- Semibold en títulos (no Bold) · color solo con significado · sin degradados -->
+    <!-- Acento: cian marca #00C9B6 SOLO en superficies firma ops (botón primario,
+         píldoras, pasos). Todo lo demás usa el acento del sistema (rampa App.xaml). -->
+    <!-- Escala única de títulos: Display 32 (héroes) / H1 24 / H2 18 / H3 14. -->
     <!-- Spacing System: 4/8/12/16/20/24/28/32/40/48/64 (perfect octal scale) -->
     <x:Double x:Key="CaoSpace2">2</x:Double>
     <x:Double x:Key="CaoSpace4">4</x:Double>
@@ -16,6 +19,7 @@
     <x:Double x:Key="CaoSpace28">28</x:Double>
     <x:Double x:Key="CaoSpace32">32</x:Double>
 
+    <!-- Deprecados: usar escala Display/H1/H2/H3 (§57). Se conservan por compatibilidad. -->
     <x:Double x:Key="CaoFontSizeTitleLarge">28</x:Double>
     <x:Double x:Key="CaoFontSizeTitle">20</x:Double>
     <x:Double x:Key="CaoFontSizeSection">16</x:Double>
@@ -57,8 +61,10 @@
     </Style>
 
     <!-- Marca: acento sólido del sistema (nativo Win11, sin degradados) -->
+    <SolidColorBrush x:Key="CaoBrandBrush" Color="{ThemeResource SystemAccentColor}"/>
+    <!-- Alias histórico (nombre honesto: no es degradado). Usar CaoBrandBrush en páginas nuevas. -->
     <SolidColorBrush x:Key="CaoBrandGradientBrush" Color="{ThemeResource SystemAccentColor}"/>
-    <SolidColorBrush x:Key="CaoHeroGlowBrush" Color="{ThemeResource SystemAccentColor}"/>
+    <!-- Alias histórico (nombre honesto: no es degradado). Canónico: CaoSuccessBrush (sección semánticos). -->
     <SolidColorBrush x:Key="CaoSuccessGradientBrush" Color="{ThemeResource SystemFillColorSuccess}"/>
 
     <!-- Medallones de icono: tintes Fluent apagados sobre fondo al 12%.
@@ -88,6 +94,15 @@
         <Setter Property="VerticalAlignment" Value="Top"/>
     </Style>
 
+    <!-- Medallón de icono 36px para cabeceras de tarjeta -->
+    <Style x:Key="CaoCardIconStyle" TargetType="Border">
+        <Setter Property="Width" Value="36"/>
+        <Setter Property="Height" Value="36"/>
+        <Setter Property="CornerRadius" Value="18"/>
+        <Setter Property="HorizontalAlignment" Value="Left"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+    </Style>
+
     <Style x:Key="CaoEyebrowStyle" TargetType="TextBlock">
         <Setter Property="FontSize" Value="11"/>
         <Setter Property="FontWeight" Value="SemiBold"/>
@@ -96,7 +111,7 @@
     </Style>
 
     <Style x:Key="CaoHeroTitleStyle" TargetType="TextBlock">
-        <Setter Property="FontSize" Value="28"/>
+        <Setter Property="FontSize" Value="{StaticResource CaoFontSizeDisplay}"/>
         <Setter Property="FontWeight" Value="SemiBold"/>
         <Setter Property="Foreground" Value="{ThemeResource TextFillColorPrimaryBrush}"/>
         <Setter Property="TextWrapping" Value="Wrap"/>
@@ -121,8 +136,10 @@
         <Setter Property="MinHeight" Value="40"/>
     </Style>
 
-    <!-- Botón principal (alias histórico del botón de acento) -->
-    <Style x:Key="CaoGradientButtonStyle" TargetType="Button" BasedOn="{StaticResource CaoAccentButtonStyle}"/>
+    <!-- Botón principal de marca (sólido del sistema, sin degradado) -->
+    <Style x:Key="CaoPrimaryButtonStyle" TargetType="Button" BasedOn="{StaticResource CaoAccentButtonStyle}"/>
+    <!-- Alias histórico. Usar CaoPrimaryButtonStyle en páginas nuevas. -->
+    <Style x:Key="CaoGradientButtonStyle" TargetType="Button" BasedOn="{StaticResource CaoPrimaryButtonStyle}"/>
 
     <!-- Botón secundario: hereda del sistema, solo métrica -->
     <Style x:Key="CaoElevatedButtonStyle" TargetType="Button" BasedOn="{StaticResource DefaultButtonStyle}">
@@ -134,7 +151,7 @@
     </Style>
 
     <Style x:Key="CaoSectionHeaderStyle" TargetType="TextBlock">
-        <Setter Property="FontSize" Value="{StaticResource CaoFontSizeSection}"/>
+        <Setter Property="FontSize" Value="{StaticResource CaoFontSizeH2}"/>
         <Setter Property="FontWeight" Value="SemiBold"/>
         <Setter Property="Margin" Value="{StaticResource CaoSectionMargin}"/>
         <Setter Property="HorizontalAlignment" Value="Center"/>
@@ -148,7 +165,7 @@
     </Style>
 
     <Style x:Key="CaoPageTitleStyle" TargetType="TextBlock">
-        <Setter Property="FontSize" Value="{StaticResource CaoFontSizeTitleLarge}"/>
+        <Setter Property="FontSize" Value="{StaticResource CaoFontSizeH1}"/>
         <Setter Property="FontWeight" Value="SemiBold"/>
         <Setter Property="Foreground" Value="{ThemeResource TextFillColorPrimaryBrush}"/>
         <Setter Property="Margin" Value="0,0,0,4"/>
@@ -187,7 +204,14 @@
 
     <!-- Título de sección con jerarquía (izquierda, no centrado) -->
     <Style x:Key="CaoSectionTitleStyle" TargetType="TextBlock">
-        <Setter Property="FontSize" Value="15"/>
+        <Setter Property="FontSize" Value="{StaticResource CaoFontSizeH2}"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Foreground" Value="{ThemeResource TextFillColorPrimaryBrush}"/>
+    </Style>
+
+    <!-- Título de tarjeta (H3): nombre de cada card en páginas de acciones -->
+    <Style x:Key="CaoCardTitleStyle" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="{StaticResource CaoFontSizeH3}"/>
         <Setter Property="FontWeight" Value="SemiBold"/>
         <Setter Property="Foreground" Value="{ThemeResource TextFillColorPrimaryBrush}"/>
     </Style>
@@ -224,8 +248,45 @@
         <Setter Property="HorizontalAlignment" Value="Left"/>
     </Style>
 
+    <!-- Mini-tiles de estadística (Drivers): geometría sin color, el tinte va local -->
+    <Style x:Key="CaoStatTileStyle" TargetType="Border">
+        <Setter Property="CornerRadius" Value="8"/>
+        <Setter Property="Padding" Value="10"/>
+    </Style>
+    <Style x:Key="CaoStatValueStyle" TargetType="TextBlock">
+        <Setter Property="FontWeight" Value="Bold"/>
+        <Setter Property="FontSize" Value="20"/>
+        <Setter Property="TextAlignment" Value="Center"/>
+    </Style>
+    <Style x:Key="CaoStatLabelStyle" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="10"/>
+        <Setter Property="Opacity" Value="0.7"/>
+        <Setter Property="TextAlignment" Value="Center"/>
+    </Style>
+
+    <!-- Filas de lista (DataTemplates): título + detalle -->
+    <Style x:Key="CaoListItemTitleStyle" TargetType="TextBlock">
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="TextWrapping" Value="Wrap"/>
+    </Style>
+    <Style x:Key="CaoListItemDetailStyle" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="11"/>
+        <Setter Property="Opacity" Value="0.7"/>
+        <Setter Property="TextWrapping" Value="Wrap"/>
+    </Style>
+
+    <!-- Textos de resultado/medición (Benchmark): lectura monoespaciada no requerida,
+         12px seleccionable con wrap. El FontFamily Consolas va local donde aplique. -->
+    <Style x:Key="CaoResultTextStyle" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="Opacity" Value="0.85"/>
+        <Setter Property="TextWrapping" Value="Wrap"/>
+        <Setter Property="IsTextSelectionEnabled" Value="True"/>
+    </Style>
+
     <Style x:Key="CaoEmptyStateTitleStyle" TargetType="TextBlock">
-        <Setter Property="FontSize" Value="16"/>
+        <Setter Property="FontSize" Value="{StaticResource CaoFontSizeH2}"/>
         <Setter Property="FontWeight" Value="SemiBold"/>
         <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}"/>
         <Setter Property="HorizontalAlignment" Value="Center"/>
@@ -291,6 +352,15 @@
         <Setter Property="HorizontalAlignment" Value="Left"/>
         <Setter Property="VerticalAlignment" Value="Stretch"/>
         <Setter Property="Background" Value="{StaticResource CaoAccentBarBrush}"/>
+    </Style>
+
+    <!-- Rail lateral de fila (timeline/snapshots): espina de estado a la izquierda.
+         El color lo pone cada fila (Background local); este estilo solo fija la geometría. -->
+    <Style x:Key="CaoTimelineRailStyle" TargetType="Border">
+        <Setter Property="Width" Value="5"/>
+        <Setter Property="CornerRadius" Value="3,0,0,3"/>
+        <Setter Property="HorizontalAlignment" Value="Left"/>
+        <Setter Property="VerticalAlignment" Value="Stretch"/>
     </Style>
 
     <!-- Status Indicator Style -->
@@ -523,7 +593,7 @@
 
     <!-- Título de sección ops: título + micro a la derecha -->
     <Style x:Key="CaoOpsSectionTitleStyle" TargetType="TextBlock">
-        <Setter Property="FontSize" Value="18"/>
+        <Setter Property="FontSize" Value="{StaticResource CaoFontSizeH2}"/>
         <Setter Property="FontWeight" Value="SemiBold"/>
         <Setter Property="Foreground" Value="{ThemeResource TextFillColorPrimaryBrush}"/>
     </Style>

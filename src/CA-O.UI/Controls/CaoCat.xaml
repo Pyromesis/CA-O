@@ -1,186 +1,35 @@
 <UserControl
     x:Class="CAO.UI.Controls.CaoCat"
+    x:Name="Root"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
-    <StackPanel Spacing="8" HorizontalAlignment="Center" VerticalAlignment="Top">
-        <Grid x:Name="CatBody" Width="120" Height="120" RenderTransformOrigin="0.5,1">
-            <Grid.RenderTransform>
-                <CompositeTransform />
-            </Grid.RenderTransform>
-            <Grid.Resources>
-                <!-- Respiración + parpadeo -->
-                <Storyboard x:Key="IdleBoard" x:Name="IdleBoard" RepeatBehavior="Forever">
-                    <DoubleAnimation Storyboard.TargetName="CatBody" Storyboard.TargetProperty="(UIElement.RenderTransform).(CompositeTransform.ScaleY)"
-                        From="1" To="1.03" Duration="0:0:1.6" AutoReverse="True" RepeatBehavior="Forever">
-                        <DoubleAnimation.EasingFunction>
-                            <CubicEase EasingMode="EaseOut" />
-                        </DoubleAnimation.EasingFunction>
-                    </DoubleAnimation>
-                    <DoubleAnimationUsingKeyFrames Storyboard.TargetName="EyeL" Storyboard.TargetProperty="(UIElement.RenderTransform).(CompositeTransform.ScaleY)" RepeatBehavior="Forever">
-                        <LinearDoubleKeyFrame KeyTime="0:0:0" Value="1" />
-                        <LinearDoubleKeyFrame KeyTime="0:0:3.9" Value="1" />
-                        <LinearDoubleKeyFrame KeyTime="0:0:4" Value="0.08" />
-                        <LinearDoubleKeyFrame KeyTime="0:0:4.2" Value="1" />
-                    </DoubleAnimationUsingKeyFrames>
-                    <DoubleAnimationUsingKeyFrames Storyboard.TargetName="EyeR" Storyboard.TargetProperty="(UIElement.RenderTransform).(CompositeTransform.ScaleY)" RepeatBehavior="Forever">
-                        <LinearDoubleKeyFrame KeyTime="0:0:0" Value="1" />
-                        <LinearDoubleKeyFrame KeyTime="0:0:3.9" Value="1" />
-                        <LinearDoubleKeyFrame KeyTime="0:0:4" Value="0.08" />
-                        <LinearDoubleKeyFrame KeyTime="0:0:4.2" Value="1" />
-                    </DoubleAnimationUsingKeyFrames>
-                </Storyboard>
-                <!-- Meneo trabajando + parpadeo -->
-                <Storyboard x:Key="WorkingBoard" x:Name="WorkingBoard" RepeatBehavior="Forever">
-                    <DoubleAnimation Storyboard.TargetName="CatBody" Storyboard.TargetProperty="(UIElement.RenderTransform).(CompositeTransform.Rotation)"
-                        From="-4" To="4" Duration="0:0:0.7" AutoReverse="True" RepeatBehavior="Forever">
-                        <DoubleAnimation.EasingFunction>
-                            <CubicEase EasingMode="EaseOut" />
-                        </DoubleAnimation.EasingFunction>
-                    </DoubleAnimation>
-                    <DoubleAnimationUsingKeyFrames Storyboard.TargetName="EyeL" Storyboard.TargetProperty="(UIElement.RenderTransform).(CompositeTransform.ScaleY)" RepeatBehavior="Forever">
-                        <LinearDoubleKeyFrame KeyTime="0:0:0" Value="1" />
-                        <LinearDoubleKeyFrame KeyTime="0:0:3.9" Value="1" />
-                        <LinearDoubleKeyFrame KeyTime="0:0:4" Value="0.08" />
-                        <LinearDoubleKeyFrame KeyTime="0:0:4.2" Value="1" />
-                    </DoubleAnimationUsingKeyFrames>
-                    <DoubleAnimationUsingKeyFrames Storyboard.TargetName="EyeR" Storyboard.TargetProperty="(UIElement.RenderTransform).(CompositeTransform.ScaleY)" RepeatBehavior="Forever">
-                        <LinearDoubleKeyFrame KeyTime="0:0:0" Value="1" />
-                        <LinearDoubleKeyFrame KeyTime="0:0:3.9" Value="1" />
-                        <LinearDoubleKeyFrame KeyTime="0:0:4" Value="0.08" />
-                        <LinearDoubleKeyFrame KeyTime="0:0:4.2" Value="1" />
-                    </DoubleAnimationUsingKeyFrames>
-                </Storyboard>
-                <!-- Salto doble + cola alta (una vez) -->
-                <Storyboard x:Key="CelebrateBoard" x:Name="CelebrateBoard">
-                    <DoubleAnimationUsingKeyFrames Storyboard.TargetName="CatBody" Storyboard.TargetProperty="(UIElement.RenderTransform).(CompositeTransform.TranslateY)">
-                        <EasingDoubleKeyFrame KeyTime="0:0:0" Value="0" />
-                        <EasingDoubleKeyFrame KeyTime="0:0:0.22" Value="-18">
-                            <EasingDoubleKeyFrame.EasingFunction>
-                                <CubicEase EasingMode="EaseOut" />
-                            </EasingDoubleKeyFrame.EasingFunction>
-                        </EasingDoubleKeyFrame>
-                        <EasingDoubleKeyFrame KeyTime="0:0:0.36" Value="0" />
-                        <EasingDoubleKeyFrame KeyTime="0:0:0.55" Value="-18" />
-                        <EasingDoubleKeyFrame KeyTime="0:0:0.7" Value="0" />
-                    </DoubleAnimationUsingKeyFrames>
-                    <DoubleAnimation Storyboard.TargetName="Tail" Storyboard.TargetProperty="(UIElement.RenderTransform).(CompositeTransform.Rotation)"
-                        From="0" To="-14" Duration="0:0:0.25" AutoReverse="True" RepeatBehavior="3x">
-                        <DoubleAnimation.EasingFunction>
-                            <CubicEase EasingMode="EaseOut" />
-                        </DoubleAnimation.EasingFunction>
-                    </DoubleAnimation>
-                </Storyboard>
-                <!-- Temblor leve, ojos abiertos -->
-                <Storyboard x:Key="WarnBoard" x:Name="WarnBoard" RepeatBehavior="Forever">
-                    <DoubleAnimation Storyboard.TargetName="CatBody" Storyboard.TargetProperty="(UIElement.RenderTransform).(CompositeTransform.TranslateX)"
-                        From="-1.5" To="1.5" Duration="0:0:0.3" AutoReverse="True" RepeatBehavior="Forever">
-                        <DoubleAnimation.EasingFunction>
-                            <CubicEase EasingMode="EaseOut" />
-                        </DoubleAnimation.EasingFunction>
-                    </DoubleAnimation>
-                    <DoubleAnimationUsingKeyFrames Storyboard.TargetName="EyeL" Storyboard.TargetProperty="(UIElement.RenderTransform).(CompositeTransform.ScaleY)" RepeatBehavior="Forever">
-                        <DiscreteDoubleKeyFrame KeyTime="0:0:0" Value="1" />
-                    </DoubleAnimationUsingKeyFrames>
-                    <DoubleAnimationUsingKeyFrames Storyboard.TargetName="EyeR" Storyboard.TargetProperty="(UIElement.RenderTransform).(CompositeTransform.ScaleY)" RepeatBehavior="Forever">
-                        <DiscreteDoubleKeyFrame KeyTime="0:0:0" Value="1" />
-                    </DoubleAnimationUsingKeyFrames>
-                </Storyboard>
-                <!-- Ojos casi cerrados + "z" flotante -->
-                <Storyboard x:Key="SleepBoard" x:Name="SleepBoard" RepeatBehavior="Forever">
-                    <DoubleAnimation Storyboard.TargetName="EyeL" Storyboard.TargetProperty="(UIElement.RenderTransform).(CompositeTransform.ScaleY)"
-                        To="0.1" Duration="0:0:0.5">
-                        <DoubleAnimation.EasingFunction>
-                            <CubicEase EasingMode="EaseOut" />
-                        </DoubleAnimation.EasingFunction>
-                    </DoubleAnimation>
-                    <DoubleAnimation Storyboard.TargetName="EyeR" Storyboard.TargetProperty="(UIElement.RenderTransform).(CompositeTransform.ScaleY)"
-                        To="0.1" Duration="0:0:0.5">
-                        <DoubleAnimation.EasingFunction>
-                            <CubicEase EasingMode="EaseOut" />
-                        </DoubleAnimation.EasingFunction>
-                    </DoubleAnimation>
-                    <DoubleAnimationUsingKeyFrames Storyboard.TargetName="SleepZ" Storyboard.TargetProperty="(UIElement.RenderTransform).(CompositeTransform.TranslateY)" RepeatBehavior="Forever">
-                        <LinearDoubleKeyFrame KeyTime="0:0:0" Value="0" />
-                        <LinearDoubleKeyFrame KeyTime="0:0:2.4" Value="-24" />
-                    </DoubleAnimationUsingKeyFrames>
-                    <DoubleAnimationUsingKeyFrames Storyboard.TargetName="SleepZ" Storyboard.TargetProperty="(UIElement.Opacity)" RepeatBehavior="Forever">
-                        <LinearDoubleKeyFrame KeyTime="0:0:0" Value="0" />
-                        <LinearDoubleKeyFrame KeyTime="0:0:0.6" Value="1" />
-                        <LinearDoubleKeyFrame KeyTime="0:0:2.4" Value="0" />
-                    </DoubleAnimationUsingKeyFrames>
-                </Storyboard>
-            </Grid.Resources>
-            <Canvas Width="120" Height="120">
-                <!-- Cola -->
-                <Path x:Name="Tail" Data="M 92,108 C 112,104 116,74 102,58"
-                      Stroke="{ThemeResource SystemFillColorNeutralBrush}" StrokeThickness="9"
-                      StrokeStartLineCap="Round" StrokeEndLineCap="Round"
-                      RenderTransformOrigin="0.1,0.9">
-                    <Path.RenderTransform>
-                        <CompositeTransform />
-                    </Path.RenderTransform>
-                </Path>
-                <!-- Cuerpo -->
-                <Ellipse Canvas.Left="18" Canvas.Top="24" Width="84" Height="96"
-                         Fill="{ThemeResource SystemFillColorNeutralBrush}"
-                         Stroke="{ThemeResource CardStrokeColorDefaultBrush}" StrokeThickness="1" />
-                <!-- Barriga -->
-                <Ellipse Canvas.Left="37" Canvas.Top="52" Width="46" Height="62"
-                         Fill="{ThemeResource CardBackgroundFillColorDefaultBrush}" Opacity="0.85" />
-                <!-- Orejas -->
-                <Path Data="M 30,30 L 34,4 L 58,24 Z"
-                      Fill="{ThemeResource SystemFillColorNeutralBrush}"
-                      Stroke="{ThemeResource CardStrokeColorDefaultBrush}" StrokeThickness="1" StrokeLineJoin="Round" />
-                <Path Data="M 90,30 L 86,4 L 62,24 Z"
-                      Fill="{ThemeResource SystemFillColorNeutralBrush}"
-                      Stroke="{ThemeResource CardStrokeColorDefaultBrush}" StrokeThickness="1" StrokeLineJoin="Round" />
-                <Path Data="M 36,24 L 38,11 L 50,21 Z"
-                      Fill="{ThemeResource CardBackgroundFillColorDefaultBrush}" Opacity="0.85" />
-                <Path Data="M 84,24 L 82,11 L 70,21 Z"
-                      Fill="{ThemeResource CardBackgroundFillColorDefaultBrush}" Opacity="0.85" />
-                <!-- Cabeza -->
-                <Ellipse Canvas.Left="24" Canvas.Top="0" Width="72" Height="64"
-                         Fill="{ThemeResource SystemFillColorNeutralBrush}"
-                         Stroke="{ThemeResource CardStrokeColorDefaultBrush}" StrokeThickness="1" />
-                <!-- Ojos -->
-                <Ellipse x:Name="EyeL" Canvas.Left="43" Canvas.Top="26" Width="10" Height="14"
-                         Fill="{ThemeResource AccentFillColorDefaultBrush}" RenderTransformOrigin="0.5,0.5">
-                    <Ellipse.RenderTransform>
-                        <CompositeTransform />
-                    </Ellipse.RenderTransform>
-                </Ellipse>
-                <Ellipse x:Name="EyeR" Canvas.Left="67" Canvas.Top="26" Width="10" Height="14"
-                         Fill="{ThemeResource AccentFillColorDefaultBrush}" RenderTransformOrigin="0.5,0.5">
-                    <Ellipse.RenderTransform>
-                        <CompositeTransform />
-                    </Ellipse.RenderTransform>
-                </Ellipse>
-                <!-- Hocico -->
-                <Path Data="M 56,42 L 64,42 L 60,47 Z"
-                      Fill="{ThemeResource SystemFillColorCriticalBrush}" />
-                <Path Data="M 60,47 L 60,50 M 60,50 C 57,53 53,53 52,51 M 60,50 C 63,53 67,53 68,51"
-                      Stroke="{ThemeResource TextFillColorSecondaryBrush}" StrokeThickness="1.2"
-                      StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
-                <!-- Bigotes -->
-                <Line X1="30" Y1="44" X2="14" Y2="40" Stroke="{ThemeResource TextFillColorSecondaryBrush}" StrokeThickness="1" />
-                <Line X1="30" Y1="48" X2="14" Y2="48" Stroke="{ThemeResource TextFillColorSecondaryBrush}" StrokeThickness="1" />
-                <Line X1="30" Y1="52" X2="14" Y2="56" Stroke="{ThemeResource TextFillColorSecondaryBrush}" StrokeThickness="1" />
-                <Line X1="90" Y1="44" X2="106" Y2="40" Stroke="{ThemeResource TextFillColorSecondaryBrush}" StrokeThickness="1" />
-                <Line X1="90" Y1="48" X2="106" Y2="48" Stroke="{ThemeResource TextFillColorSecondaryBrush}" StrokeThickness="1" />
-                <Line X1="90" Y1="52" X2="106" Y2="56" Stroke="{ThemeResource TextFillColorSecondaryBrush}" StrokeThickness="1" />
-                <!-- "Z" de dormir -->
-                <TextBlock x:Name="SleepZ" Canvas.Left="90" Canvas.Top="8" Text="z" FontSize="16"
-                           FontWeight="SemiBold" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Opacity="0">
-                    <TextBlock.RenderTransform>
-                        <CompositeTransform />
-                    </TextBlock.RenderTransform>
-                </TextBlock>
-            </Canvas>
-        </Grid>
-        <TextBlock x:Name="CaptionText" Text="¿Qué optimizamos hoy?" FontSize="12"
+    <!-- Mascota CA-O: silueta de gato frame a frame (8 fotogramas por mood).
+         Los PNG viven en Assets/mascot/frames/<tema>/<mood>/fNN.png y cambian
+         según el tema claro/oscuro de la ventana.
+         La imagen es siempre cuadrada del ancho del control (Width): así el
+         tamaño no depende del caption ni del Height que fije la página.
+         En tarjetas compactas usar ShowCaption="False" y solo Width. -->
+    <StackPanel Spacing="0" HorizontalAlignment="Center" VerticalAlignment="Center">
+        <Image x:Name="FrameImage"
+               Width="{Binding Width, ElementName=Root, FallbackValue=64}"
+               Height="{Binding Width, ElementName=Root, FallbackValue=64}"
+               Stretch="Uniform"
+               HorizontalAlignment="Center"
+               VerticalAlignment="Center"
+               RenderTransformOrigin="0.5,0.9">
+            <Image.RenderTransform>
+                <CompositeTransform x:Name="BreathTransform" />
+            </Image.RenderTransform>
+        </Image>
+
+        <TextBlock x:Name="CaptionText"
+                   Margin="0,8,0,0"
+                   Text="¿Qué optimizamos hoy?"
+                   FontSize="12"
                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                   HorizontalAlignment="Center" TextAlignment="Center"
-                   TextWrapping="Wrap" MaxWidth="160" />
+                   HorizontalAlignment="Center"
+                   TextAlignment="Center"
+                   TextWrapping="Wrap" />
     </StackPanel>
 </UserControl>

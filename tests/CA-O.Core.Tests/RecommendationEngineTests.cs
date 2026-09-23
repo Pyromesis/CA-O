@@ -121,7 +121,7 @@ public sealed class RecommendationEngineTests
     [Fact]
     public void DefaultBlockListLandsInExperimentalWithReason()
     {
-        var recommendation = Build(Definition(id: "svchost-split-threshold-hack",
+        var recommendation = Build(Definition(id: "disable-vbs",
             evidence: EvidenceLevel.Empirical));
 
         Assert.Equal(RecommendationBucket.Experimental, recommendation.Bucket);
@@ -187,6 +187,67 @@ public sealed class RecommendationEngineTests
         var score = OptimizationScoreCalculator.Compute(Definition(impact: PerformanceImpact.DiagnosticOnly));
 
         Assert.Null(score);
+    }
+
+    [Fact]
+    public void OneShotActionIsOptionalAndNeverRecommended()
+    {
+        var recommendation = RecommendationEngine.Build(
+            new SimpleOptimization(Definition(flags: OptimizationFlags.OneShot)),
+            _registry, SystemContextFactory.Default());
+
+        Assert.Equal(RecommendationBucket.Optional, recommendation.Bucket);
+        Assert.Equal("one-shot", recommendation.Reason.Code);
+    }
+
+    [Fact]
+    public void OneShotActionInLedgerIsReportedAsAlreadyApplied()
+    {
+        var applied = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "flush-dns-cache" };
+
+        var recommendation = RecommendationEngine.Build(
+            new SimpleOptimization(Definition(id: "flush-dns-cache", flags: OptimizationFlags.OneShot)),
+            _registry, SystemContextFactory.Default(), applied);
+
+        Assert.Equal(RecommendationBucket.Optional, recommendation.Bucket);
+        Assert.Equal("one-shot-applied", recommendation.Reason.Code);
+    }
+
+    [Fact]
+    public void BuildAllForwardsAppliedOneShots()
+    {
+        var catalog = new IOptimization[]
+        {
+            new SimpleOptimization(Definition(id: "flush-dns-cache", flags: OptimizationFlags.OneShot)),
+        };
+        var applied = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "FLUSH-DNS-CACHE" };
+
+        var recommendations = RecommendationEngine.BuildAll(catalog, _registry, SystemContextFactory.Default(), applied);
+
+        var single = Assert.Single(recommendations);
+        Assert.Equal(RecommendationBucket.Optional, single.Bucket);
+        Assert.Equal("one-shot-applied", single.Reason.Code);
+    }
+
+    [Fact]
+    public void OneShotLedgerRoundtripsThroughTemporaryFile()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"oneshot-{Guid.NewGuid():N}.json");
+        try
+        {
+            OneShotLedger.Mark("flush-dns-cache", path);
+
+            Assert.True(OneShotLedger.Contains("FLUSH-DNS-CACHE", path));
+            Assert.Contains("flush-dns-cache", OneShotLedger.LoadAll(path));
+
+            OneShotLedger.Remove("flush-dns-cache", path);
+
+            Assert.False(OneShotLedger.Contains("flush-dns-cache", path));
+        }
+        finally
+        {
+            try { File.Delete(path); } catch { }
+        }
     }
 
     private Recommendation Build(OptimizationDefinition definition, SystemContext? context = null) =>
