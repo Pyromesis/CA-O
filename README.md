@@ -34,9 +34,10 @@
 16. [Pruebas](#pruebas)
 17. [Release y verificación](#release-y-verificación)
 18. [Solución de problemas](#solución-de-problemas)
-19. [Documentación](#documentación)
-20. [Contribuir](#contribuir)
-21. [Licencia](#licencia)
+19. [Reportar un error](#reportar-un-error)
+20. [Documentación](#documentación)
+21. [Contribuir](#contribuir)
+22. [Licencia](#licencia)
 
 ---
 
@@ -795,6 +796,17 @@ cat artifacts/sbom/bom.json | ConvertFrom-Json | select -ExpandProperty componen
 | **Snapshot no revierte** | `NotReversible` (defrag/DISM ResetBase) | Audidado como `NotApplicable` — no se elimina snapshot, pero no hay reversión exacta |
 | **History con `corruptedCount`** | `history.jsonl` con líneas corruptas | `ReadLast` las salta, `VerifyIntegrity` muestra `InfoBar` warning sin crash. Borra `%ProgramData%\CA-O\history.jsonl` si persiste |
 | **Logs** | — | `%TEMP%\CA-O-Setup-Gui.log` (instalador), `%LOCALAPPDATA%\CA-O\logs\cao-ui-structured.log` (JSON), `cao-ui-crash.log` |
+
+---
+
+## Reportar un error
+
+¿Encontraste un bug o algo no funciona como esperabas? Escríbenos a **ca.next.project@gmail.com** con:
+
+- Versión de CA-O (`Ajustes → Sobre CA-O`) y build de Windows (`winver`)
+- Qué hacías cuando ocurrió + pasos para reproducirlo
+- Captura de pantalla si aplica
+- Logs: `%LOCALAPPDATA%\CA-O\logs\cao-ui-structured.log` (y `cao-ui-crash.log` si la app no abre)
 
 ---
 
