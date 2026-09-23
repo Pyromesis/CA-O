@@ -31,14 +31,14 @@ CA-O manipula Registry, Services, Power, Network y Boot (vía optimizaciones tip
 | **Command injection / PATH hijacking** | `IPrivilegedCommandExecutor` | `ElevatedCommandCatalog` allowlist (powercfg/netsh exact tokens), `CommandPolicy.Resolve` rutas absolutas `%SystemRoot%\System32\*`, sin shell, sin `PATH` lookup; `bcdedit` no pasa por runner genérico; `SystemCommandGateway` valida timeout/auditoría. | `ElevatedCommandCatalogTests` |
 | **DoS: oversized/malformed/flood** | Pipe | Límites `MaxRequestBytes 64KB` / `MaxResponseBytes 256KB` (`IpcProtocol:11`), timeout por conexión 15s (`PrivilegedPipeService:27`), `JsonSerializer` con `PropertyNamingPolicy camelCase` y `CAO-IPC-002` malformed; `Task` aislado por conexión. | `PrivilegedIpcSecurityTests` (oversized, malformed, flood) |
 | **Rollback manipulation** | Snapshot colisión | Identidad primaria `TransactionId` GUID, nunca `OptimizationId`; `TX-A` y `TX-B` para misma optimization generan dirs distintos; `RollbackVerified` solo si `SnapshotComparison.ExactMatch`. | `RegistryExactRoundTripTests`, `OptimizationTransactionTests` |
-| **Downgrade / Protocol confusion** | Version | `ProtocolVersion` 2 exacto, `AppVersion.Semantic 2.1.33` en manifest, UI y Service rechazan mismatch `CAO-IPC-001`; `ApplicationVersion`/`SchemaVersion`/`CatalogVersion` futuros a extender. | `IpcRequestValidator` + `CAO.Integration.Tests/DocumentationCodeConsistencyTests` |
+| **Downgrade / Protocol confusion** | Version | `ProtocolVersion` 2 exacto, `AppVersion.Semantic 2.1.34` en manifest, UI y Service rechazan mismatch `CAO-IPC-001`; `ApplicationVersion`/`SchemaVersion`/`CatalogVersion` futuros a extender. | `IpcRequestValidator` + `CAO.Integration.Tests/DocumentationCodeConsistencyTests` |
 | **Audit tampering** | `history.jsonl` | Hash chain + `RequestId`/`CallerSid`/`TimestampUtc` por entrada; corrupción → warning explícito, no `PASS`. | `HistoryHashChainTests` |
 | **Cancellation leaving half-state** | Apply atomicity | `CancellationToken.None` durante `APPLY`/`VERIFY`, checkpoints solo antes de snapshot; `CancellationDeferred` reportado. | `CancellationSafetyTests` |
 
 ## Residual Risks & Acceptance
 - **ETW attribution por driver**: muestreo %DPC/`%Interrupt` por contadores, no por traza kernel — documentado como limitación, no se presenta como `Confirmed root cause` sino `Observed contributor` (Fase 40).
 - **WPR ETW collector**: requiere trazas kernel futuras; no se finge precisión.
-- **Instalador sin certificado**: sin `CAO_SIGN_THUMBPRINT` artefactos quedan sin Authenticode (warning explícito en `sign.ps1`).
+- **Instalador sin certificado**: sin `CAO_SIGN_THUMBPRINT` artefactos quedan sin Authenticode (warning explícito en `sign.ps1`). El auto-updater acepta paquetes sin firma verificando el SHA-256 del ZIP contra el sidecar del release (riesgo aceptado y documentado: un atacante con escritura en el release podría sustituir ambos; mitigado por firma de commits y control de acceso al repo).
 - **DLL search order / Binary replacement**: mitigado por ruta absoluta y servicio ` Demand start`, pero sin firma obligatoria en dev; aceptado hasta firma en release.
 
 ## Verification

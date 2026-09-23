@@ -58,7 +58,7 @@ La cancelación solo se atiende antes de SNAPSHOT/APPLY; durante APPLY es atómi
 
 ### Cadena de suministro
 - CodeQL + NuGet audit en CI (`.github/workflows/ci.yml`), Dependabot semanal.
-- Release `v2.1.33` firma Authenticode con timestamp cuando existe certificado (`CAO_SIGN_THUMBPRINT`) y genera `SHA256SUMS.txt` + **SBOM CycloneDX 1.7 `bom.json` 67 packages** (`artifacts/sbom/bom.json`).
+- Release `v2.1.34` firma Authenticode con timestamp cuando existe certificado (`CAO_SIGN_THUMBPRINT`) y genera `SHA256SUMS.txt` + **SBOM CycloneDX 1.7 `bom.json` 67 packages** (`artifacts/sbom/bom.json`). El auto-updater no exige firma (sin certificado disponible): verifica el SHA-256 del ZIP contra el sidecar `.sha256` del release; la firma solo se comprueba de forma informativa.
 
 ## Reporte de vulnerabilidades
 
