@@ -2,6 +2,11 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
+## [Sin publicar]
+
+### Añadido
+- Pack legal completo: `LICENSE` ampliada a EULA privada (© 2026 CA-NEXT-PROJECT, uso bajo responsabilidad, garantía "tal cual", ley española), `PRIVACY.md` (sin telemetría; únicas conexiones: releases de GitHub, catálogo de Microsoft, speedtest bajo demanda y correo de soporte) y `THIRD-PARTY-NOTICES.md` (inventario de dependencias con licencias). Tarjeta "Sobre CA-O" en Ajustes con enlaces a Licencia/Privacidad/Terceros y sección `## Licencia` del README con los tres documentos.
+
 ## [2.1.34] - 2026-09-23
 
 ### Corregido

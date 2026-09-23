@@ -210,6 +210,16 @@
                     <TextBlock Text="¿Encontraste un error?" FontWeight="SemiBold" FontSize="12" Opacity="0.9"/>
                     <TextBlock Text="Cuéntanos qué pasó a nuestro correo de soporte. Incluye la versión de la app, tu build de Windows y los pasos para reproducirlo." FontSize="11" Opacity="0.75" TextWrapping="Wrap"/>
                     <HyperlinkButton Content="ca.next.project@gmail.com" NavigateUri="mailto:ca.next.project@gmail.com?subject=CA-O%20-%20Reporte%20de%20error" FontSize="12" ToolTipService.ToolTip="Abrir tu correo para reportar un error"/>
+                    <Border Style="{StaticResource CaoDividerStyle}" Margin="0,8,0,0"/>
+                    <TextBlock Text="Legal" FontWeight="SemiBold" FontSize="12" Opacity="0.9"/>
+                    <TextBlock Text="© 2026 CA-NEXT-PROJECT. Todos los derechos reservados. Sin telemetría: tus datos se quedan en tu equipo." FontSize="11" Opacity="0.75" TextWrapping="Wrap"/>
+                    <StackPanel Orientation="Horizontal" Spacing="4">
+                        <HyperlinkButton Content="Licencia" NavigateUri="https://github.com/Pyromesis/CA-O/blob/main/LICENSE" FontSize="12" ToolTipService.ToolTip="Abrir el contrato de licencia"/>
+                        <TextBlock Text="·" FontSize="12" Opacity="0.5" VerticalAlignment="Center"/>
+                        <HyperlinkButton Content="Privacidad" NavigateUri="https://github.com/Pyromesis/CA-O/blob/main/PRIVACY.md" FontSize="12" ToolTipService.ToolTip="Abrir la política de privacidad"/>
+                        <TextBlock Text="·" FontSize="12" Opacity="0.5" VerticalAlignment="Center"/>
+                        <HyperlinkButton Content="Terceros" NavigateUri="https://github.com/Pyromesis/CA-O/blob/main/THIRD-PARTY-NOTICES.md" FontSize="12" ToolTipService.ToolTip="Abrir los avisos de software de terceros"/>
+                    </StackPanel>
                 </StackPanel>
             </Border>
         </StackPanel>

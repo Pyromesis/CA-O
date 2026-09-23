@@ -1,8 +1,90 @@
-CA-O — Licencia Privada
+CA-O — Contrato de Licencia de Usuario Final (EULA) / Licencia Privada
 
-Copyright (c) CA-O Team. Todos los derechos reservados.
+Copyright (c) 2026 CA-NEXT-PROJECT. Todos los derechos reservados.
 
-Este repositorio es de código visible pero NO se concede licencia de uso, copia, modificación o distribución
-sin autorización expresa y escrita del titular.
+IMPORTANTE: LEA ESTE CONTRATO ANTES DE INSTALAR O USAR CA-O ("EL SOFTWARE").
+LA INSTALACIÓN O EL USO DEL SOFTWARE IMPLICA LA ACEPTACIÓN DE ESTAS CONDICIONES.
+EL INSTALADOR MUESTRA ESTE TEXTO Y CONTINUAR CON LA INSTALACIÓN SUPONE SU ACEPTACIÓN.
 
-Visibilidad en GitHub != licencia de uso. Para solicitar permiso, contacte al titular via GitHub Issues.
+1. TITULARIDAD Y OBJETO
+   1.1. El Software es titularidad exclusiva de CA-NEXT-PROJECT ("el Titular").
+   1.2. Este contrato le concede una licencia de uso, no una venta. El Titular
+       conserva todos los derechos, títulos e intereses sobre el Software,
+       incluyendo el código, los recursos gráficos, la documentación y la marca CA-O.
+   1.3. Que el código fuente sea visible en un repositorio (p. ej. GitHub) NO
+       equivale a una licencia de uso, copia, modificación o distribución.
+       Sin autorización expresa y escrita del Titular, dichos actos están prohibidos.
+
+2. LICENCIA DE USO LIMITADA
+   2.1. Se le concede una licencia personal, intransferible, no exclusiva y
+       revocable para instalar y usar el Software en equipos de su propiedad
+       o bajo su administración legítima.
+   2.2. Puede realizar una copia de seguridad del instalador descargado desde
+       los canales oficiales del proyecto (releases de GitHub del Titular).
+
+3. PROHIBICIONES
+   Sin autorización escrita del Titular, queda prohibido:
+   a) copiar, redistribuir, publicar, revender, alquilar o ceder el Software;
+   b) modificar, adaptar, traducir o crear obras derivadas;
+   c) aplicar ingeniería inversa, descompilar o desensamblar, salvo en la medida
+      en que la ley aplicable reconozca expresamente ese derecho;
+   d) eludir o desactivar mecanismos de licencia, firma o verificación de integridad;
+   e) eliminar o alterar avisos de copyright, marcas o textos legales;
+   f) usar el Software para actividades ilícitas o para dañar equipos de terceros.
+
+4. ACTUALIZACIONES
+   4.1. El Software puede comprobar si existen versiones nuevas y descargarlas
+       desde los releases oficiales (ver PRIVACY.md). Instalar una actualización
+       puede requerir aceptar la versión vigente de este contrato.
+   4.2. Las copias descargadas fuera de los canales oficiales pueden estar
+       manipuladas: el Titular no responde por ellas. Verifique siempre el hash
+       SHA-256 publicado junto a cada release.
+
+5. REQUISITOS Y USO BAJO SU RESPONSABILIDAD
+   5.1. CA-O es una herramienta de administración del sistema: aplica cambios
+       reales en Windows (registro, servicios, energía, red, drivers). Requiere
+       privilegios de administrador para la mayoría de funciones.
+   5.2. Antes de aplicar optimizaciones: cierre su trabajo, haga copia de
+       seguridad de sus datos y cree un punto de restauración. El Software crea
+       snapshots y ofrece reversión, pero ningún mecanismo es infalible.
+   5.3. Usted decide qué aplicar tras revisar la vista previa. El Titular no
+       responde por decisiones de configuración tomadas por el usuario.
+
+6. GARANTÍA — "TAL CUAL"
+   EL SOFTWARE SE ENTREGA "TAL CUAL" Y "SEGÚN DISPONIBILIDAD", SIN GARANTÍAS
+   DE NINGÚN TIPO, EXPRESAS O IMPLÍCITAS, INCLUIDAS LAS DE COMERCIABILIDAD,
+   IDONEIDAD PARA UN FIN DETERMINADO Y AUSENCIA DE INFRACCIÓN, EN LA MÁXIMA
+   MEDIDA PERMITIDA POR LA LEY.
+
+7. LIMITACIÓN DE RESPONSABILIDAD
+   EN LA MÁXIMA MEDIDA PERMITIDA POR LA LEY, EL TITULAR NO SERÁ RESPONSABLE DE
+   DAÑOS INDIRECTOS, INCIDENTALES, ESPECIALES, PUNITIVOS O CONSECUENTES
+   (INCLUIDA PÉRDIDA DE DATOS, DE BENEFICIOS O INTERRUPCIÓN DE ACTIVIDAD),
+   AUNQUE SE LE HAYA ADVERTIDO DE SU POSIBILIDAD.
+
+8. SOPORTE
+   Soporte por correo: ca.next.project@gmail.com. El soporte se presta
+   según disponibilidad y sin compromiso de tiempo de respuesta ni de resolución.
+
+9. PRIVACIDAD
+   El tratamiento de datos se describe en PRIVACY.md (incluido en el repositorio
+   y enlazado desde la aplicación). CA-O no incluye telemetría ni analítica:
+   no envía datos de uso al Titular. Las únicas conexiones de red son las
+   descritas en dicha política (comprobación/descarga de actualizaciones,
+   descargas de drivers de Microsoft, prueba de velocidad bajo demanda y
+   páginas de soporte de fabricantes abiertas por el usuario).
+
+10. SOFTWARE DE TERCEROS
+    El Software incorpora o requiere componentes de terceros (p. ej. .NET,
+    Windows App SDK) sujetos a sus propias licencias. Ver THIRD-PARTY-NOTICES.md.
+
+11. TERMINACIÓN
+    Esta licencia termina automáticamente si usted incumple sus términos, en
+    cuyo caso deberá desinstalar y destruir todas las copias del Software.
+
+12. LEY APLICABLE
+    Este contrato se rige por la legislación española. Para cualquier
+    controversia serán competentes los juzgados y tribunales que correspondan
+    conforme a la ley.
+
+Contacto del Titular: ca.next.project@gmail.com

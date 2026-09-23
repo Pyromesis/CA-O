@@ -841,7 +841,13 @@ Consulta [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Licencia
 
-Proyecto privado. Todos los derechos reservados. No se concede licencia de uso, copia o distribución sin autorización expresa del titular.
+Copyright (c) 2026 CA-NEXT-PROJECT. Todos los derechos reservados.
+
+Proyecto privado: no se concede licencia de uso, copia, modificación ni distribución sin autorización expresa y escrita del titular. El instalador muestra el contrato (EULA) y continuar con la instalación supone su aceptación.
+
+- [LICENSE](LICENSE) — contrato completo (EULA)
+- [PRIVACY.md](PRIVACY.md) — política de privacidad (sin telemetría)
+- [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) — licencias de terceros
 
 ---
 
