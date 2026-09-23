@@ -2,9 +2,10 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
-## [Sin publicar]
+## [2.1.35] - 2026-09-23
 
 ### Añadido
+- Contacto de soporte: nueva sección "Reportar un error" en el README y bloque "¿Encontraste un error?" en la tarjeta "Sobre CA-O" de Ajustes, con botón directo al correo ca.next.project@gmail.com (asunto pre-rellenado "CA-O - Reporte de error"). El README indica qué incluir: versión de la app, build de Windows, pasos, captura y rutas de logs.
 - Pack legal completo: `LICENSE` ampliada a EULA privada (© 2026 CA-NEXT-PROJECT, uso bajo responsabilidad, garantía "tal cual", ley española), `PRIVACY.md` (sin telemetría; únicas conexiones: releases de GitHub, catálogo de Microsoft, speedtest bajo demanda y correo de soporte) y `THIRD-PARTY-NOTICES.md` (inventario de dependencias con licencias). Tarjeta "Sobre CA-O" en Ajustes con enlaces a Licencia/Privacidad/Terceros y sección `## Licencia` del README con los tres documentos.
 
 ## [2.1.34] - 2026-09-23
