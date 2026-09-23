@@ -6,7 +6,7 @@
 2. **Sin claims numéricos**: prohibido prometer FPS/latencia en descripciones; el contrato de tests lo rechaza.
 3. **Transaccional obligatorio**: toda optimización nueva debe soportar Detect/Capture/Apply/Revert y clasificación completa (Evidence/Risk/SecurityImpact/Compatibility).
 4. **Seguridad no es moneda de cambio**: si reduces seguridad, eres SecurityTradeoff + ExpertOnly, y con anti-cheat presente quedas bloqueado por defecto.
-5. **Privilegio mínimo**: la UI no eleva; las operaciones nuevas del servicio requieren tipo fuerte en `OperationParameters` + validador + test adversarial.
+5. **Privilegio mínimo**: la UI eleva por manifiesto (`app.manifest` `requireAdministrator`); aun así, toda escritura cruza el pipe al servicio `SYSTEM` manteniendo el modelo auditado. Las operaciones nuevas del servicio requieren tipo fuerte en `OperationParameters` + validador + test adversarial.
 
 ## Flujo
 

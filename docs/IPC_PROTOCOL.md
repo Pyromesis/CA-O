@@ -11,7 +11,7 @@ Named Pipe `CAO.Privileged` → `CA-O.Privileged.v1` (constante `IpcConstants.Pi
   "requestId": "guid",          // único; anti-replay
   "nonce": "hex-128",           // único; anti-replay
   "createdAtUtc": "...",        // expira en 30 s (MaxAge)
-  "operation": 0..4,            // Apply|Revert|Verify|Detect|CaptureSnapshot
+  "operation": 0..16,           // índice en PrivilegedOperationKind (17 miembros)
   "payload": { "$payload": "apply", "optimizationId": "disable-vbs" }
 }
 ```

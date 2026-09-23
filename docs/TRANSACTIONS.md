@@ -29,11 +29,11 @@ Tras revertir se recaptura el estado y se compara con el original mediante `Snap
 | Equivalent | valores iguales, kind heredado sin info | ⚠️ false |
 | Mismatch / Unknown | difiere o indeterminado | ❌ false |
 
-El snapshot persistido solo se elimina cuando la reversión fue ExactMatch.
+El snapshot persistido solo se elimina cuando la reversión fue ExactMatch. La comparación incluye las notas estables de `RawNotes` (se ignoran las volátiles: marcas temporales y contadores); un valor ausente en ambos lados (`Kind=None`/`None`) cuenta como coincidencia exacta.
 
 ## Irreversibles (P0-5)
 
-Irreversible ≠ inverificable: se ejecuta VERIFY igualmente. Si falla o es Unknown → transacción Failed con CAO-VERIFY-nnn, sin rollback automático y con el snapshot conservado como evidencia.
+Irreversible ≠ inverificable: se ejecuta VERIFY igualmente. Si falla → transacción Failed con CAO-VERIFY-nnn, sin rollback automático y con el snapshot conservado como evidencia. Si es Unknown tras reintentos → éxito con aviso honesto («verificación no concluyente»): el cambio se aplicó y no hay nada que revertir.
 
 ## Recuperación (FASE 12)
 

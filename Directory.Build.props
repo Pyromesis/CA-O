@@ -2,7 +2,7 @@
   <Import Project="Version.props" Condition="Exists('Version.props')" />
 
   <PropertyGroup>
-    <Version>2.1.32</Version>
+    <!-- Version.props es el single source of truth de la versión: no fijar <Version> aquí. -->
     <LangVersion>13.0</LangVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -11,8 +11,7 @@
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
     <AnalysisLevel>latest-recommended</AnalysisLevel>
     <EnforceCodeStyleInBuild>false</EnforceCodeStyleInBuild>
-    <!-- Single source of truth for build constants -->
-    <ProductVersion>2.1.32</ProductVersion>
+    <!-- Single source of truth for build constants (ProductVersion viene de Version.props) -->
     <ProductName>CA-O</ProductName>
     <ProductTitle>CA-O Windows Optimizer</ProductTitle>
     <ServiceName>CAO.Privileged</ServiceName>

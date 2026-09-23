@@ -9,10 +9,10 @@ CA-O manipula configuración crítica de Windows. Las superficies relevantes son
 ### Canal privilegiado (v2 + Ping health)
 - Named Pipe `CA-O.Privileged.v1` con ACL restrictiva `NamedPipeServerStreamAcl` (SYSTEM Full, Administrators R/W, Interactive R/W — conectar ≠ autorizar).
 - `GetCallerIdentity()` vía `RunAsClient()` + `WindowsCallerInspector` (SID real, nombre, `SessionId` del token, elevación) — `P1-8`.
-- Validación `IpcRequestValidator` (§10): `ProtocolVersion==2`, `RequestId!=Empty`, `Nonce` 1..128 sin control chars, `CreatedAtUtc` ±30s/ +1m futuro, `Operation` enum, `Payload` polimórfico exacto, `OptimizationId` regex `[a-z0-9-]{1,80}`.
+- Validación `IpcRequestValidator` (§10): `ProtocolVersion==2`, `RequestId!=Empty`, `Nonce` 16..128 sin control chars, `CreatedAtUtc` ±30s/ +1m futuro, `Operation` enum, `Payload` polimórfico exacto, `OptimizationId` regex `[a-z0-9-]{1,80}`.
 - **Ping / GetServiceStatus** (§10): operaciones sin `OptimizationId` para health check (`ServiceVersion, ProtocolVersion, ProcessId, IsSystem, Status, Capabilities`) — no usan optimización real como ping.
 - Protección replay `ReplayCache` con reloj inyectable + `MaxAge 30s` + tamaño 64KB/256KB; timeout 15s por conexión.
-- **Allowlist 9 operaciones**: `Apply/Revert/Detect/Verify/CaptureSnapshot/Ping/GetServiceStatus/SetDns/SetTimerResolution` — no hay “ejecutar comando”. `SetTimerResolution` valida rango 1000..156250 y fija el valor con `NtSetTimerResolution` en el proceso del servicio.
+- **Allowlist 17 operaciones**: `Apply/Revert/Detect/Verify/CaptureSnapshot/Ping/GetServiceStatus/SetDns/SetTimerResolution/FixDriver/InstallDriver/RemovePhantomDevices/SearchDriverUpdates/InstallDriverUpdates/ExportDriver/SearchCatalogDrivers/DownloadCatalogDriver` — no hay “ejecutar comando”. `SetTimerResolution` valida rango 5000..156250 y fija el valor con `NtSetTimerResolution` en el proceso del servicio.
 - Auditoría: `requestedBy SID/Name → executedBy SYSTEM, op, accepted, code`.
 
 ### Ejecución externa
@@ -54,11 +54,11 @@ La cancelación solo se atiende antes de SNAPSHOT/APPLY; durante APPLY es atómi
 
 ### Instalador
 
-`app.manifest` + `CA-O.InstallerGui` + `CA-O.Setup` ambos `requireAdministrator` — UAC siempre. `CA-O-Setup-GUI-x64.exe` 135 MB self-contained single-file instala en `C:\Program Files\CA-O`, registra `CAO.Privileged` (failure 86400) y crea atajos Escritorio/Inicio. Log `%TEMP%\CA-O-Setup*.log`.
+`app.manifest` + `CA-O.InstallerGui` + `CA-O.Setup` ambos `requireAdministrator` — UAC siempre. `CA-O.Setup.exe` 135 MB self-contained single-file instala en `C:\Program Files\CA-O`, registra `CAO.Privileged` (failure 86400) y crea atajos Escritorio/Inicio. `CA-O-Setup-GUI-x64.zip` 88 MB con el instalador GUI. Log `%TEMP%\CA-O-Setup*.log`.
 
 ### Cadena de suministro
 - CodeQL + NuGet audit en CI (`.github/workflows/ci.yml`), Dependabot semanal.
-- Release `v2.0.1` firma Authenticode con timestamp cuando existe certificado (`CAO_SIGN_THUMBPRINT`) y genera `SHA256SUMS.txt` + **SBOM CycloneDX 1.7 `bom.json` 71 packages** (`artifacts/sbom/bom.json`).
+- Release `v2.1.33` firma Authenticode con timestamp cuando existe certificado (`CAO_SIGN_THUMBPRINT`) y genera `SHA256SUMS.txt` + **SBOM CycloneDX 1.7 `bom.json` 67 packages** (`artifacts/sbom/bom.json`).
 
 ## Reporte de vulnerabilidades
 

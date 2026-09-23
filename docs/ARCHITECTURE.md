@@ -1,4 +1,4 @@
-# Arquitectura CA-O 2.0
+# Arquitectura CA-O 2.1
 
 ## Principio rector
 
@@ -30,7 +30,7 @@ No "¿qué tweaks tiene Internet?". Cada decisión de diseño sirve a los cuatro
 | `CA-O.Core` | Catálogo y motor transaccional (`PRECHECK→SNAPSHOT→APPLY→VERIFY→COMMIT` + `GameCompatibilityPolicy` matriz SAFE/CAUTION/BLOCKED `CAO-GAME-001`), scoring, perfiles, `AntiCheatGuard`, `HealthEngine`, `CaoHealthCheck`, `CrashRecovery` | Shared |
 | `CA-O.Infrastructure` | WMI 5s timeout + `SystemAnalysisService` (WhenAll, cancelación) + `AnalysisStateStore` (atomico, 24h TTL) + `SnapshotRepository` (TX identity) + `StructuredLogger` (correlation) + `FileSnapshotStore` (SHA-256) + `JsonHistoryLogger` (hash-chain) + benchmark | Core, Shared |
 | `CA-O.Privileged` | Servicio `SYSTEM` + Named Pipe `CA-O.Privileged.v1` (ACL + `Ping` health + `ReplayCache` 30s) + `OptimizationEngine` con hard block gaming | Core, Infrastructure, Shared |
-| `CA-O.UI` | WinUI 3 Mica + 8 ViewModels DI (`AppHost`) + `Controls` (`MetricCard/RiskBadge/ScoreRing`) + `ErrorTranslator` + `ReducedMotion` + páginas con `VisualState` responsive | Core, Infrastructure, Shared |
+| `CA-O.UI` | WinUI 3 Mica + 9 ViewModels DI (`AppHost`) + `Controls` (`RiskBadge/ScoreRing/Mascot/MascotFlipbook/CaoCat`) + `ErrorTranslator` + `ReducedMotion` + páginas con `VisualState` responsive | Core, Infrastructure, Shared |
 | `CA-O.InstallerGui` / `CA-O.Setup` | Instalador GUI 680×620 + consola fallback, ambos `requireAdministrator`, auto-registro servicio + atajos | — |
 
 Las versiones de paquetes se centralizan en `Directory.Packages.props`.
@@ -74,7 +74,7 @@ El health score **nunca depende** de la cantidad de tweaks aplicados: cada dimen
 
 ## Perfiles (spec 104)
 
-Safe · Balanced · Gaming · Competitive · Privacy · Security · Maintenance · Expert · Custom. Cada perfil consulta el `SystemContext`; ninguno es una lista fija. Expert es el único que ve experimental/security-sensitive y aun así exige confirmación + snapshot.
+Safe · Balanced · Gaming · Competitive · Privacy · Security · Productivity · PowerSaver · Maintenance · Expert · Custom (11 perfiles en `AppVersion.ProfileId`). Cada perfil consulta el `SystemContext`; ninguno es una lista fija. Expert es el único que ve experimental/security-sensitive y aun así exige confirmación + snapshot.
 
 ## Persistencia (atomica + versionada + tolerante a corrupción)
 
@@ -96,14 +96,14 @@ Nunca se registran secretos, credenciales ni contenido de entrada del usuario (s
 - **i18n**: diccionario tipado es-ES/en-US (`Localizer`); migración a `.resw` planificada sin cambiar llamadas (`Localizer.Get(key)`).
 - **HAGS/VBS/MPO/etc.**: nunca tratados como ganancias universales; HAGS es WorkloadDependent+Conditional+RequiresReboot, VBS es Critical+SecurityTradeoff+ExpertOnly.
 
-## Pruebas (308 passed, 0 failed — Release)
+## Pruebas (1103 passed, 0 failed — Release)
 
 | Suite | Cubre | Count |
 |---|---|---|
-| `CA-O.Core.Tests` | Contratos catálogo, `AnalysisStateStore` (save/load/corrupt), `GameCompatibility` (VBS bloqueado), transacciones, scoring, health | 134 |
-| `CA-O.Security.Tests` | IPC validator (`Ping`/`Apply` cross-check), `IpcPingTests`, inyección | 63 |
-| `CA-O.Integration.Tests` | `E2EFlowsTests` 10 flujos (Abrir→Analizar→Persistir→Vanguard→Restore→Benchmark) + `TransactionJournalRecovery` | 48 |
-| `CA-O.Infrastructure.Tests` | `HistoryRobustness` (malformed), `SnapshotRepository` (TX identity), `SystemContextCache` dual-TTL | 17 |
-| `CA-O.Benchmark.Tests` | `SystemBenchmarkRunner` (suelo 3%, mediana) | 7 |
-| `CA-O.UI.Tests` | `ViewModelTests` (Analyze/Dashboard con `SystemAnalysisService` + `Correlation`) | 8 |
-| **Total** | **Gates 1-5 `verify.ps1` + `build-release` con `gui-installer`** | **308** |
+| `CA-O.Core.Tests` | Contratos catálogo 91, `AnalysisStateStore` (save/load/corrupt), `GameCompatibility` (VBS bloqueado), transacciones, scoring, health, ledger one-shot | 643 |
+| `CA-O.Security.Tests` | IPC validator (`Ping`/`Apply` cross-check), `IpcPingTests`, inyección | 238 |
+| `CA-O.Integration.Tests` | `E2EFlowsTests` 9 pruebas (8 casos numerados + benchmark: Abrir→Analizar→Persistir→Vanguard→Restore→Benchmark) + `TransactionJournalRecovery` + contrato docs | 49 |
+| `CA-O.Infrastructure.Tests` | `HistoryRobustness` (malformed), `SnapshotRepository` (TX identity), `SystemContextCache` dual-TTL | 55 |
+| `CA-O.Benchmark.Tests` | `SystemBenchmarkRunner` (suelo 3%, mediana) | 17 |
+| `CA-O.UI.Tests` | `ViewModelTests` (Analyze/Dashboard con `SystemAnalysisService` + `Correlation`) | 101 |
+| **Total** | **Gates 1-5 `verify.ps1` + `build-release` con `gui-installer`** | **1103** |

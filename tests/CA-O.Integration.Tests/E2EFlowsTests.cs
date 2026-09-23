@@ -23,7 +23,7 @@ using System.Linq;
 
 namespace CAO.Integration.Tests;
 
-/// <summary>E2E §80: 10 flujos reales sin UI automation (servicios directos) — cada uno debe pasar aislado.</summary>
+    /// <summary>E2E §80: 9 pruebas reales sin UI automation (servicios directos) — cada una debe pasar aislada.</summary>
 [Collection("E2E")]
 public sealed class E2EFlowsTests
 {

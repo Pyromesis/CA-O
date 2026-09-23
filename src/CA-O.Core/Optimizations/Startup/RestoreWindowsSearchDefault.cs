@@ -69,7 +69,8 @@ public sealed class RestoreWindowsSearchDefault : IOptimization
     {
         foreach (var entry in snapshot.Registry)
         {
-            var hive = Enum.Parse<RegistryHive2>(entry.Hive);
+            if (!Enum.TryParse<RegistryHive2>(entry.Hive, out var hive))
+                continue;
             if (entry.Existed && entry.Value is not null)
             {
                 context.Registry.SetValueRaw(hive, entry.KeyPath, entry.ValueName, entry.Value, entry.Kind);
