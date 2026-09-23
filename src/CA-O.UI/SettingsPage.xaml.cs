@@ -595,16 +595,16 @@ public sealed partial class SettingsPage : Page
                     UpdateDetailText.Text = "Ruta del instalador no válida. Abortado por seguridad.";
                     return;
                 }
-                // El instalador se lanza elevado: exigir firma Authenticode
-                // válida ANTES del UAC. Sin firma (release comprometido o
-                // binario sustituido en %TEMP%) no se ejecuta nada.
-                UpdateDetailText.Text = "Verificando firma del instalador...";
+                // El instalador se lanza elevado. El proyecto no firma Authenticode
+                // (sin certificado: sign.ps1 omite la firma): la confianza viene
+                // del hash SHA-256 del ZIP ya verificado contra el sidecar del
+                // release. Si el binario trae firma válida se informa; su
+                // ausencia ya no bloquea la instalación.
+                UpdateDetailText.Text = "Verificando instalador...";
                 var signatureOk = await Task.Run(() => Helpers.AppUpdater.HasValidAuthenticodeSignature(canonicalInstaller), cts.Token);
-                if (!signatureOk)
-                {
-                    UpdateDetailText.Text = $"El instalador no tiene firma Authenticode válida y no se ejecutará. Descarga el instalador a mano desde GitHub y verifica su hash: {canonicalInstaller}";
-                    return;
-                }
+                UpdateDetailText.Text = signatureOk
+                    ? "Instalador verificado (firma Authenticode válida + hash SHA-256 del paquete)."
+                    : "Instalador verificado por hash SHA-256 del paquete (proyecto sin certificado Authenticode).";
 
                 // Handoff con confirmación: antes la app se cerraba sola y si
                 // el instalador no aparecía (UAC cancelado, crash) el usuario

@@ -2,6 +2,11 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
+## [2.1.34] - 2026-09-23
+
+### Corregido
+- Auto-updater: la falta de firma Authenticode ya no bloquea la instalación. El proyecto no dispone de certificado de firma; la confianza se apoya en la verificación SHA-256 del ZIP contra el sidecar `.sha256` del release. La firma se sigue comprobando de forma informativa (se informa si existe y es válida) pero ya no impide descargar ni instalar. (`SettingsPage`: el aviso "no tiene firma Authenticode válida y no se ejecutará" pasa a informativo y el flujo continúa.)
+
 ## [2.1.33] - 2026-09-23
 
 ### Corregido

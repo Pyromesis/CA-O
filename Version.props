@@ -1,12 +1,12 @@
 <Project>
   <!-- Single source of truth for versioning (FASE 28). All other files derive from here. -->
   <PropertyGroup>
-    <Version>2.1.33</Version>
-    <AssemblyVersion>2.1.33.0</AssemblyVersion>
-    <FileVersion>2.1.33.0</FileVersion>
-    <PackageVersion>2.1.33</PackageVersion>
-    <ProductVersion>2.1.33</ProductVersion>
-    <InformationalVersion>2.1.33+$(GHTag)</InformationalVersion>
+    <Version>2.1.34</Version>
+    <AssemblyVersion>2.1.34.0</AssemblyVersion>
+    <FileVersion>2.1.34.0</FileVersion>
+    <PackageVersion>2.1.34</PackageVersion>
+    <ProductVersion>2.1.34</ProductVersion>
+    <InformationalVersion>2.1.34+$(GHTag)</InformationalVersion>
   </PropertyGroup>
 </Project>
 
