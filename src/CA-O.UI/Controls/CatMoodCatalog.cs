@@ -4,7 +4,7 @@ namespace CAO.UI.Controls;
 public static class CatMoodCatalog
 {
     public static IReadOnlyList<string> ValidMoods { get; } =
-        new[] { "Idle", "Working", "Celebrate", "Warn", "Sleep" };
+        new[] { "Idle", "Working", "Celebrate", "Warn", "Sleep", "Groom" };
 
     public static (string Caption, string AnimationKey) Resolve(string? mood) =>
         mood switch
@@ -13,6 +13,7 @@ public static class CatMoodCatalog
             "Celebrate" => ("¡Listo! Buen trabajo.", "Celebrate"),
             "Warn" => ("Ojo, algo necesita atención.", "Warn"),
             "Sleep" => ("Zzz… aquí estaré.", "Sleep"),
+            "Groom" => ("Un momento, me acicalo…", "Groom"),
             _ => ("¿Qué optimizamos hoy?", "Idle"),
         };
 }

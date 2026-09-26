@@ -44,7 +44,7 @@ public static class Mascot
 
     private static string Normalize(string mood) => mood switch
     {
-        "Idle" or "Working" or "Celebrate" or "Warn" or "Sleep" => mood,
+        "Idle" or "Working" or "Celebrate" or "Warn" or "Sleep" or "Groom" => mood,
         _ => "Idle",
     };
 }

@@ -26,6 +26,7 @@ public sealed class MascotMoodTests
     [InlineData("Celebrate", "¡Listo! Buen trabajo.")]
     [InlineData("Warn", "Ojo, algo necesita atención.")]
     [InlineData("Sleep", "Zzz… aquí estaré.")]
+    [InlineData("Groom", "Un momento, me acicalo…")]
     public void Catalog_Resolve_KnownMoods(string mood, string caption)
     {
         var (actualCaption, key) = CatMoodCatalog.Resolve(mood);
@@ -45,8 +46,8 @@ public sealed class MascotMoodTests
     }
 
     [Fact]
-    public void Catalog_ValidMoods_HasExactlyFive()
+    public void Catalog_ValidMoods_HasExactlySix()
     {
-        Assert.Equal(new[] { "Idle", "Working", "Celebrate", "Warn", "Sleep" }, CatMoodCatalog.ValidMoods);
+        Assert.Equal(new[] { "Idle", "Working", "Celebrate", "Warn", "Sleep", "Groom" }, CatMoodCatalog.ValidMoods);
     }
 }

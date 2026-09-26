@@ -3,9 +3,15 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
+using System.Threading.Tasks;
+using Windows.Foundation;
+using Windows.Graphics.Imaging;
+using Windows.Storage;
+using Windows.Storage.Streams;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Imaging;
 using Microsoft.UI.Xaml.Media.Animation;
 
@@ -15,8 +21,9 @@ namespace CAO.UI.Controls;
 /// Mascota CA-O: silueta de gato animada frame a frame (flipbook de PNG generados
 /// con el motor local). El mood decide el ciclo y su velocidad; el tema de la
 /// ventana decide el conjunto de arte (silueta oscura u clara).
-/// Respeta <see cref="Accessibility.ReducedMotion" /> (frame final estático) y
-/// nunca lanza: la mascota no puede romper la página.
+/// El flipbook siempre anima: es el contenido de la mascota, no una
+/// transición decorativa (ReducedMotion solo gobierna el resto de la UI).
+/// Nunca lanza: la mascota no puede romper la página.
 /// </summary>
 public sealed partial class CaoCat : UserControl
 {
@@ -28,16 +35,33 @@ public sealed partial class CaoCat : UserControl
         DependencyProperty.Register(nameof(ShowCaption), typeof(bool), typeof(CaoCat),
             new PropertyMetadata(true, (d, _) => ((CaoCat)d).ApplyCaptionVisibility()));
 
-    // Los frames son inmutables y compartidos (Panel y Benchmark usan el mismo mood).
-    private static readonly Dictionary<string, IReadOnlyList<BitmapImage?>> Cache = new();
+    // Frames predecodificados e inmutables, compartidos (Panel y Benchmark
+    // usan el mismo mood). BitmapImage compone siempre en este entorno;
+    // SoftwareBitmapSource, no. Ancho de decodificación = display máximo.
+    private const int FramePx = 132;
+    private static readonly Dictionary<string, List<BitmapImage>> Frames = new();
 
     private DispatcherTimer? _timer;
-    private IReadOnlyList<BitmapImage?> _frames = Array.Empty<BitmapImage?>();
+    private List<BitmapImage>? _frames;
+    private int _cells;
+    // Ping-pong de opacidad: dos imágenes siempre Visible (nunca Collapsed,
+    // que no compone en este entorno); una a opacidad 1 y otra a 0.01
+    // (0.01 compone igual que visible pero es invisible al ojo; a 0 el
+    // compositor puede saltarla y el reveal muestra un blanco de 1 frame). Por tick
+    // se revela lo preparado el tick anterior y se prepara el siguiente en
+    // la oculta. Sin eventos, sin swaps de Source en visible: sin blancos.
+    private Image? _front;
+    private Image? _back;
     private int _index;
+    private int _staged = -1;
     private int _loaded;
+    private int _cycles;
+    private int _loadGen;
     private string? _currentKey;
     private INotifyPropertyChanged? _moodSource;
     private Storyboard? _breathBoard;
+    private DispatcherTimer? _groomArm;
+    private DispatcherTimer? _groomBack;
 
     public CaoCat()
     {
@@ -47,10 +71,11 @@ public sealed partial class CaoCat : UserControl
         ActualThemeChanged += OnActualThemeChanged;
         try
         {
-            // Diagnóstico: si un frame no decodifica, queda en la salida de depuración
-            // en lugar de fallar en silencio (la mascota nunca rompe la página).
-            if (FrameImage is not null)
-                FrameImage.ImageFailed += (_, e) => Debug.WriteLine($"[CaoCat] ImageFailed: {e.ErrorMessage}");
+            // Ping-pong de opacidad con frames predecodificados: dos imágenes
+            // siempre visibles (una a opacidad 0); por tick se revela lo ya
+            // compuesto y se prepara el siguiente. El layout se ajusta al
+            // Width real del control (48/64/96/132 según la página).
+            SizeChanged += OnSizeChanged;
         }
         catch (Exception ex) { Debug.WriteLine($"[CaoCat] ctor: {ex.Message}"); }
     }
@@ -76,9 +101,28 @@ public sealed partial class CaoCat : UserControl
 
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
+        Log("Loaded");
         AttachGlobalMood();
         ApplyCaptionVisibility();
+        InitBuffers();
+        LayoutStrip();
         ApplyMood();
+    }
+
+    /// <summary>
+    /// Inicializa el ping-pong (frontal + oculta, ambas siempre Visible; la
+    /// oculta va a opacidad 0 en XAML; aquí se reasegura). Nunca lanza.
+    /// </summary>
+    private void InitBuffers()
+    {
+        try
+        {
+            _front = FrameA;
+            _back = FrameB;
+            if (_front is not null) _front.Opacity = 1;
+            if (_back is not null) _back.Opacity = 0.01;
+        }
+        catch (Exception ex) { Debug.WriteLine($"[CaoCat] InitBuffers: {ex.Message}"); }
     }
 
     private void OnUnloaded(object sender, RoutedEventArgs e)
@@ -86,7 +130,43 @@ public sealed partial class CaoCat : UserControl
         DetachGlobalMood();
         StopTimer();
         StopBreath();
+        DisarmGroom();
     }
+
+    private void OnSizeChanged(object sender, SizeChangedEventArgs e) => LayoutStrip();
+
+    /// <summary>
+    /// Ajusta el viewport al Width real y dimensiona ambas imágenes del doble
+    /// búfer (cuadradas). Nunca lanza.
+    /// </summary>
+    private void LayoutStrip()
+    {
+        try
+        {
+            var d = double.IsNaN(Width) ? 64 : Width;
+            if (d <= 0) d = 64;
+            Log($"Layout size={d} frames={_frames?.Count ?? 0}");
+            if (Viewport is not null)
+            {
+                Viewport.Width = d;
+                Viewport.Height = d;
+                Viewport.Clip = new RectangleGeometry { Rect = new Rect(0, 0, d, d) };
+            }
+            if (FrameA is not null)
+            {
+                FrameA.Width = d;
+                FrameA.Height = d;
+            }
+            if (FrameB is not null)
+            {
+                FrameB.Width = d;
+                FrameB.Height = d;
+            }
+        }
+        catch (Exception ex) { Debug.WriteLine($"[CaoCat] LayoutStrip: {ex.Message}"); }
+    }
+
+    // CurrentChunkCells/LocalIndex del filmstrip retirados con ShowFrame.
 
     /// <summary>
     /// Sincronización global: todos los gatos visibles siguen a
@@ -158,31 +238,40 @@ public sealed partial class CaoCat : UserControl
             var (caption, _) = CatMoodCatalog.Resolve(Mood);
             CaptionText.Text = caption;
             var mood = MascotFlipbook.Normalize(Mood);
+            Log($"ApplyMood raw='{Mood}' norm='{mood}' key='{CurrentThemeKey()}/{mood}'");
             AutomationProperties.SetName(this, $"Mascota CA-O, estado {mood}");
             var key = $"{CurrentThemeKey()}/{mood}";
             if (key == _currentKey && _loaded > 1)
             {
-                // Mismo ciclo ya en marcha (p. ej. RenderHub re-aplica Warn en cada
-                // render): no reiniciar el índice ni el timer, o la animación nunca
-                // avanzaría del frame 0. Solo se reasegura el estado del timer.
-                if (Accessibility.ReducedMotion.ShouldAnimate) { StartTimer(); RestartBreath(); }
-                else { StopTimer(); StopBreath(); }
+                // Mismo ciclo ya en marcha: solo se reasegura el timer para que
+                // la animación siga avanzando.
+                StartTimer(); RestartBreath();
                 return;
             }
             _currentKey = key;
             _index = 0;
-            LoadFrames();
-            if (Accessibility.ReducedMotion.ShouldAnimate && _loaded > 1)
+            _staged = -1;
+            _cycles = 0;
+            if (Frames.TryGetValue(key, out var cached) && cached.Count > 0)
             {
-                StartTimer();
-                RestartBreath();
+                // Frames ya predecodificados: cambio instantáneo; primer frame
+                // directo y el ping-pong de opacidad toma el relevo en OnTick.
+                _frames = cached;
+                _loaded = cached.Count;
+                _cells = cached.Count;
+                Log($"Frames hit {key}: n={cached.Count}");
+                LayoutStrip();
+                Present(cached[0], 0);
+                if (_loaded > 1) { StartTimer(); RestartBreath(); }
+                else { StopTimer(); StopBreath(); }
             }
             else
             {
-                StopTimer();
-                StopBreath();
-                ShowFrame(0);
+                // Set nuevo: sigue mostrando el ciclo actual mientras se
+                // predecodifica en segundo plano; al terminar se cambia.
+                _ = LoadFramesAsync(key, CurrentThemeKey(), mood);
             }
+            ArmGroom(mood);
         }
         catch (Exception ex) { Debug.WriteLine($"[CaoCat] ApplyMood: {ex.Message}"); }
     }
@@ -190,56 +279,133 @@ public sealed partial class CaoCat : UserControl
     private string CurrentThemeKey() =>
         MascotFlipbook.NormalizeTheme(ActualTheme == ElementTheme.Dark ? "dark" : "light");
 
-    private void LoadFrames()
+    /// <summary>
+    /// Construye los tramos del mood: cada PNG se decodifica a celda de
+    /// 256px y se concatena en un solo bitmap ancho. El timer solo arranca
+    /// con el strip en memoria. Si otro mood gana la carrera, el perdedor se
+    /// descarta por generación. Nunca lanza.
+    /// </summary>
+    private static void Log(string message)
     {
-        var mood = MascotFlipbook.Normalize(Mood);
-        var theme = CurrentThemeKey();
-        var key = $"{theme}/{mood}";
-        if (!Cache.TryGetValue(key, out var frames))
+        try
         {
-            var list = new List<BitmapImage?>();
-            for (var i = 0; i < MascotFlipbook.FrameCount(mood); i++)
-                list.Add(TryLoadFrame(theme, mood, i));
-            frames = list;
-            Cache[key] = frames;
+            File.AppendAllText(
+                Path.Combine(Path.GetTempPath(), "caocat.log"),
+                $"{DateTime.Now:HH:mm:ss.fff} {message}{Environment.NewLine}");
         }
-        _frames = frames;
-        _loaded = 0;
-        foreach (var frame in _frames)
-            if (frame is not null) _loaded++;
-        if (_loaded == 0)
-            Debug.WriteLine($"[CaoCat] sin frames para {key}: la mascota quedará estática.");
-        ShowFrame(_index);
+        catch { }
+    }
+
+    private async Task LoadFramesAsync(string key, string theme, string mood)
+    {
+        var gen = ++_loadGen;
+        try
+        {
+            var count = MascotFlipbook.FrameCount(mood);
+            var list = new List<BitmapImage>();
+            for (var i = 0; i < count; i++)
+            {
+                var bmp = await TryDecodeFrameAsync(theme, mood, i);
+                if (gen != _loadGen || _currentKey != key) return;
+                if (bmp is not null) list.Add(bmp);
+            }
+            Log($"Frames done {key}: n={list.Count}");
+            if (gen != _loadGen || _currentKey != key) return;
+            if (list.Count == 0)
+            {
+                Log($"sin frames para {key}: la mascota quedará estática.");
+                Debug.WriteLine($"[CaoCat] sin frames para {key}: la mascota quedará estática.");
+                StopTimer();
+                StopBreath();
+                return;
+            }
+            Frames[key] = list;
+            _frames = list;
+            _loaded = list.Count;
+            _cells = list.Count;
+            _staged = -1;
+            Log($"Frames OK {key}: n={list.Count}");
+            LayoutStrip();
+            Present(list[0], 0);
+            StartTimer();
+            RestartBreath();
+        }
+        catch (Exception ex)
+        {
+            Log($"LoadFramesAsync {key}: {ex.GetType().Name}: {ex.Message}");
+            Debug.WriteLine($"[CaoCat] LoadFramesAsync {key}: {ex.Message}");
+        }
     }
 
     /// <summary>
-    /// Carga un frame: primero vía <c>ms-appx</c> (contrato WinUI para Content) y,
-    /// si falla, vía ruta absoluta de archivo. Nunca lanza: devuelve <c>null</c>.
+    /// Decodifica un frame a <c>BitmapImage</c> (vía <c>ms-appx</c> y, si
+    /// falla, vía ruta absoluta de archivo). Nunca lanza: devuelve
+    /// <c>null</c>.
     /// </summary>
-    private static BitmapImage? TryLoadFrame(string theme, string mood, int index)
+    private static async Task<BitmapImage?> TryDecodeFrameAsync(string theme, string mood, int index)
     {
         try
         {
-            return new BitmapImage(new Uri(MascotFlipbook.AppxUri(theme, mood, index)));
+            StorageFile? file = null;
+            try
+            {
+                file = await StorageFile.GetFileFromApplicationUriAsync(
+                    new Uri(MascotFlipbook.AppxUri(theme, mood, index)));
+            }
+            catch
+            {
+                var relative = MascotFlipbook.RelativePath(theme, mood, index)
+                    .Replace('/', Path.DirectorySeparatorChar);
+                var full = Path.Combine(AppContext.BaseDirectory, relative);
+                if (!File.Exists(full))
+                {
+                    Debug.WriteLine($"[CaoCat] falta frame: {full}");
+                    return null;
+                }
+                file = await StorageFile.GetFileFromPathAsync(full);
+            }
+            var bmp = new BitmapImage { DecodePixelWidth = FramePx };
+            using var stream = await file.OpenReadAsync();
+            await bmp.SetSourceAsync(stream);
+            return bmp;
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"[CaoCat] ms-appx {theme}/{mood}/f{index:00}: {ex.Message}");
+            Log($"decode {theme}/{mood}/f{index:00}: {ex.GetType().Name}: {ex.Message}");
+            Debug.WriteLine($"[CaoCat] decode {theme}/{mood}/f{index:00}: {ex.Message}");
+            return null;
         }
+    }
+
+    /// <summary>
+    /// Primera pintura: mismo frame en AMBAS imagenes (la oculta a 0.01
+    /// compone igual, invisible al ojo) y opacidades reaseguradas. El tick
+    /// siguiente revela superficie ya compuesta: sin blancos. Nunca lanza.
+    /// </summary>
+    private void Present(BitmapImage frame, int index)
+    {
         try
         {
-            var relative = MascotFlipbook.RelativePath(theme, mood, index)
-                .Replace('/', Path.DirectorySeparatorChar);
-            var full = Path.Combine(AppContext.BaseDirectory, relative);
-            if (File.Exists(full))
-                return new BitmapImage(new Uri(full));
-            Debug.WriteLine($"[CaoCat] falta frame: {full}");
+            _index = index;
+            _staged = -1;
+            if (_front is not null) { _front.Source = frame; _front.Opacity = 1; }
+            if (_back is not null) { _back.Source = frame; _back.Opacity = 0.01; }
         }
-        catch (Exception ex)
-        {
-            Debug.WriteLine($"[CaoCat] archivo {theme}/{mood}/f{index:00}: {ex.Message}");
-        }
-        return null;
+        catch (Exception ex) { Debug.WriteLine($"[CaoCat] Present: {ex.Message}"); }
+    }
+
+    private void OnFrameOpened(object sender, RoutedEventArgs e)
+    {
+        // Presentación directa: sin swaps. Se conserva la firma.
+        _ = sender;
+        _ = e;
+    }
+
+    private void OnFrameFailed(object sender, ExceptionRoutedEventArgs e)
+    {
+        // Presentación directa: sin swaps. Se conserva la firma.
+        _ = sender;
+        _ = e;
     }
 
     private void StartTimer()
@@ -261,19 +427,38 @@ public sealed partial class CaoCat : UserControl
     {
         try
         {
-            if (_frames.Count == 0) { StopTimer(); return; }
-            ShowFrame((_index + 1) % _frames.Count);
+            if (_frames is null || _cells == 0) { StopTimer(); return; }
+            // Ping-pong de opacidad con 1 tick de settle: se revela lo
+            // preparado el tick anterior (ya compuesto) y se prepara el
+            // siguiente en la oculta. Siempre hay una imagen con contenido
+            // listo a opacidad 1: estructuralmente sin blancos. Sin eventos.
+            if (_staged >= 0 && _staged < _frames.Count && _front is not null && _back is not null)
+            {
+                _back.Opacity = 1;
+                _front.Opacity = 0.01;
+                (_front, _back) = (_back, _front);
+                _index = _staged;
+                _staged = -1;
+            }
+            var target = (_index + 1) % Math.Max(1, _cells);
+            // Los moods de ocasión vuelven solos a Idle tras sus ciclos: cada
+            // animación es para su momento y no se queda pegada. Solo local:
+            // el mood global no se toca. Sleep persiste hasta que cambie.
+            if (target == 0 && MascotFlipbook.ReturnsToIdle(Mood) && ++_cycles >= MascotFlipbook.OneShotCycles(Mood))
+            {
+                try { SetMood("Idle"); } catch { }
+                return;
+            }
+            if (target < _frames.Count && _frames[target] is BitmapImage f && _back is not null)
+            {
+                _back.Source = f;
+                _staged = target;
+            }
         }
         catch (Exception ex) { Debug.WriteLine($"[CaoCat] OnTick: {ex.Message}"); StopTimer(); }
     }
 
-    private void ShowFrame(int index)
-    {
-        if (_frames.Count == 0) return;
-        _index = ((index % _frames.Count) + _frames.Count) % _frames.Count;
-        if (FrameImage is not null)
-            FrameImage.Source = _frames[_index];
-    }
+    // ShowFrame del filmstrip retirado: primera pintura con Present() y relevo por ping-pong de opacidad en OnTick.
 
     /// <summary>
     /// Respiración por composición (TranslateY + escala leve, AutoReverse en
@@ -286,8 +471,7 @@ public sealed partial class CaoCat : UserControl
         try
         {
             StopBreath();
-            if (!Accessibility.ReducedMotion.ShouldAnimate) return;
-            if (BreathTransform is null || FrameImage is null) return;
+            if (BreathTransform is null) return;
             var (liftPx, grow, ms) = BreathParams(MascotFlipbook.Normalize(Mood));
             var board = new Storyboard { AutoReverse = true, RepeatBehavior = RepeatBehavior.Forever };
             var up = new DoubleAnimation { From = 0, To = -liftPx, Duration = TimeSpan.FromMilliseconds(ms) };
@@ -320,6 +504,68 @@ public sealed partial class CaoCat : UserControl
         "Celebrate" => (6, 0.05, 700),
         "Warn" => (2, 0.02, 1200),
         "Sleep" => (4, 0.03, 2600),
+        "Groom" => (3, 0.02, 1200),
         _ => (3, 0.02, 1800),
     };
+
+    /// <summary>
+    /// Auto-aseo: si el gato lleva 25 s en Idle (local y global), reproduce un
+    /// ciclo de Groom y vuelve al mood global. Solo local: el resto de gatos y
+    /// las páginas no se enteran. Nunca lanza.
+    /// </summary>
+    private void ArmGroom(string mood)
+    {
+        try
+        {
+            DisarmGroom();
+            if (mood != "Idle") return;
+            _groomArm = new DispatcherTimer { Interval = TimeSpan.FromSeconds(25) };
+            _groomArm.Tick += OnGroomArm;
+            _groomArm.Start();
+        }
+        catch (Exception ex) { Debug.WriteLine($"[CaoCat] ArmGroom: {ex.Message}"); }
+    }
+
+    private void DisarmGroom()
+    {
+        try { if (_groomArm is not null) { _groomArm.Stop(); _groomArm.Tick -= OnGroomArm; } } catch { }
+        finally { _groomArm = null; }
+        try { if (_groomBack is not null) { _groomBack.Stop(); _groomBack.Tick -= OnGroomBack; } } catch { }
+        finally { _groomBack = null; }
+    }
+
+    private void OnGroomArm(object? sender, object e)
+    {
+        try
+        {
+            DisarmGroom();
+            if (MascotFlipbook.Normalize(Mood) != "Idle") return;
+            if (GlobalMood() != "Idle") return;
+            SetMood("Groom");
+            _groomBack = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromMilliseconds(MascotFlipbook.CycleMs("Groom") + 200),
+            };
+            _groomBack.Tick += OnGroomBack;
+            _groomBack.Start();
+        }
+        catch (Exception ex) { Debug.WriteLine($"[CaoCat] OnGroomArm: {ex.Message}"); }
+    }
+
+    private void OnGroomBack(object? sender, object e)
+    {
+        try
+        {
+            DisarmGroom();
+            if (MascotFlipbook.Normalize(Mood) != "Groom") return;
+            SetMood(GlobalMood());
+        }
+        catch (Exception ex) { Debug.WriteLine($"[CaoCat] OnGroomBack: {ex.Message}"); }
+    }
+
+    private static string GlobalMood()
+    {
+        try { return MascotFlipbook.Normalize(AppHost.Resolve<ViewModels.UiState>().MascotMood); }
+        catch { return "Idle"; }
+    }
 }

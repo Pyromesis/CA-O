@@ -135,6 +135,7 @@ function Get-CaoMaskFromImage {
     $src.Dispose()
     $State.W = $w; $State.H = $h; $State.M = $mask; $State.Lum = $lum
     return $State
+}
 # Conserva solo la mayor región oscura conexa (descarta motas y restos).
 function Remove-CaoSpecks {
     param($State)
@@ -250,6 +251,88 @@ function Get-CaoGroundAnchor {
 
 # Compone un frame final: color del tema, alfa suavizado en el borde, misma
 # escala y misma línea de suelo para todos los frames del ciclo.
+# Apertura morfolÃ³gica (erosiÃ³n + dilataciÃ³n, 4-vecinos): elimina bigotes,
+# pelillos y trazos finos conectados a la silueta sin deformarla.
+# Un trazo de ancho <= 2*Radius desaparece; la cola y las orejas (gruesas)
+# sobreviven intactas.
+function Invoke-CaoOpen {
+    param($State, [int]$Radius = 2)
+    $mask = $State.M; $w = $State.W; $h = $State.H
+    $nb = @(@(1, 0), @(-1, 0), @(0, 1), @(0, -1))
+    for ($r = 0; $r -lt $Radius; $r++) {
+        $next = New-Object 'bool[,]' $w, $h
+        for ($y = 0; $y -lt $h; $y++) {
+            for ($x = 0; $x -lt $w; $x++) {
+                if (-not $mask[$x, $y]) { continue }
+                $ok = $true
+                foreach ($d in $nb) {
+                    $nx = $x + $d[0]; $ny = $y + $d[1]
+                    if ($nx -lt 0 -or $ny -lt 0 -or $nx -ge $w -or $ny -ge $h -or -not $mask[$nx, $ny]) { $ok = $false; break }
+                }
+                $next[$x, $y] = $ok
+            }
+        }
+        $mask = $next
+    }
+    for ($r = 0; $r -lt $Radius; $r++) {
+        $next = New-Object 'bool[,]' $w, $h
+        for ($y = 0; $y -lt $h; $y++) {
+            for ($x = 0; $x -lt $w; $x++) {
+                if ($mask[$x, $y]) { $next[$x, $y] = $true; continue }
+                foreach ($d in $nb) {
+                    $nx = $x + $d[0]; $ny = $y + $d[1]
+                    if ($nx -lt 0 -or $ny -lt 0 -or $nx -ge $w -or $ny -ge $h) { continue }
+                    if ($mask[$nx, $ny]) { $next[$x, $y] = $true; break }
+                }
+            }
+        }
+        $mask = $next
+    }
+    $State.M = $mask
+    return $State
+}
+
+# Cierre morfológico (dilatación + erosión, 4-vecinos): sella microgrietas del
+# contorno (bordes grises anti-aliased bajo el umbral) para que Close-CaoHoles
+# pueda rellenar interiores. Radio pequeño: no fusiona huecos reales grandes
+# (entre patas, cola y cuerpo).
+function Invoke-CaoClose {
+    param($State, [int]$Radius = 2)
+    $mask = $State.M; $w = $State.W; $h = $State.H
+    $nb = @(@(1, 0), @(-1, 0), @(0, 1), @(0, -1))
+    for ($r = 0; $r -lt $Radius; $r++) {
+        $next = New-Object 'bool[,]' $w, $h
+        for ($y = 0; $y -lt $h; $y++) {
+            for ($x = 0; $x -lt $w; $x++) {
+                if ($mask[$x, $y]) { $next[$x, $y] = $true; continue }
+                foreach ($d in $nb) {
+                    $nx = $x + $d[0]; $ny = $y + $d[1]
+                    if ($nx -lt 0 -or $ny -lt 0 -or $nx -ge $w -or $ny -ge $h) { continue }
+                    if ($mask[$nx, $ny]) { $next[$x, $y] = $true; break }
+                }
+            }
+        }
+        $mask = $next
+    }
+    for ($r = 0; $r -lt $Radius; $r++) {
+        $next = New-Object 'bool[,]' $w, $h
+        for ($y = 0; $y -lt $h; $y++) {
+            for ($x = 0; $x -lt $w; $x++) {
+                if (-not $mask[$x, $y]) { continue }
+                $ok = $true
+                foreach ($d in $nb) {
+                    $nx = $x + $d[0]; $ny = $y + $d[1]
+                    if ($nx -lt 0 -or $ny -lt 0 -or $nx -ge $w -or $ny -ge $h -or -not $mask[$nx, $ny]) { $ok = $false; break }
+                }
+                $next[$x, $y] = $ok
+            }
+        }
+        $mask = $next
+    }
+    $State.M = $mask
+    return $State
+}
+
 function Export-CaoAppFrame {
     param(
         [string]$SourcePath,
@@ -260,11 +343,18 @@ function Export-CaoAppFrame {
         [int]$GroundY = 246,
         [int]$Threshold = 150,
         [double]$Feather = 40.0,
-        [switch]$Mirror
+        [switch]$Mirror,
+        [int]$ShiftX = 0,
+        [int]$ShiftY = 0,
+        [double]$ScaleMul = 1.0,
+        [int]$OpenRadius = 0,
+        [int]$CloseRadius = 2
     )
     $state = New-CaoMaskState -W 1 -H 1
     $state = Get-CaoMaskFromImage -State $state -Path $SourcePath -Threshold $Threshold
+    if ($OpenRadius -gt 0) { $state = Invoke-CaoOpen -State $state -Radius $OpenRadius }
     $state = Remove-CaoSpecks -State $state
+    if ($CloseRadius -gt 0) { $state = Invoke-CaoClose -State $state -Radius $CloseRadius }
     $state = Close-CaoHoles -State $state
     $stats = Get-CaoMaskStats -State $state
     if ($stats.Area -lt 400) {
@@ -301,10 +391,13 @@ function Export-CaoAppFrame {
     # corte en el lienzo (si no, la silueta se sale y el frame aparece cortado).
     $maxWidth = $Canvas - 16.0
     if ($w * $scale -gt $maxWidth) { $scale = $maxWidth / $w }
+    $scale = $scale * $ScaleMul
     $dstW = [int][math]::Round($w * $scale)
     $dstH = [int][math]::Round($h * $scale)
     $dstX = [int][math]::Round(($Canvas / 2.0) - ($anchor * $scale))
     $dstY = [int][math]::Round($GroundY - (($stats.MaxY + 1) * $scale))
+    $dstX += $ShiftX
+    $dstY += $ShiftY
 
     $out = New-Object System.Drawing.Bitmap($Canvas, $Canvas, [System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
     $g = [System.Drawing.Graphics]::FromImage($out)
@@ -437,6 +530,9 @@ function Get-CaoMoodPlan {
 }
 
 # ------------------------------------------------------------- flujo principal
+# Guardia dot-source: al importar (. .\generate-mascot-frames.ps1) desde
+# derive-mascot-frames.ps1 solo se definen funciones, no se genera nada.
+if ($MyInvocation.InvocationName -ne '.') {
 # La silueta base (una sola cola, estilo de la referencia) de la que parten los
 # ciclos. Debe ser un PNG con FONDO BLANCO: un PNG transparente se aplana a
 # negro dentro del motor y rompe la detección de silueta.

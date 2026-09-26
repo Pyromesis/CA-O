@@ -2,6 +2,11 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
+## [2.1.36] - 2026-09-26
+
+### Corregido
+- La mascota del Panel parpadeaba al cambiar de mood y en cada ciclo de animación: `CaoCat.Present()` escribía el `Source` directamente sobre la imagen visible (un fotograma con superficie sin componer = parpadeo). Ahora pinta el fotograma 0 en ambas caras del doble-buffer antes de mostrar y la cara oculta usa opacidad 0.01 en vez de 0 para forzar composición continua.
+
 ## [2.1.35] - 2026-09-23
 
 ### Añadido

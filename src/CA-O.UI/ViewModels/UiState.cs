@@ -143,7 +143,7 @@ public sealed class UiState : ObservableObject
         set => SetProperty(ref _analysisAgeLabel, value);
     }
 
-    /// <summary>Mood actual de la mascota (Idle/Working/Celebrate/Warn/Sleep). Fuente de verdad para CaoCat.</summary>
+    /// <summary>Mood actual de la mascota (Idle/Working/Celebrate/Warn/Sleep). Fuente de verdad para CaoCat. Groom es solo local de CaoCat, nunca global.</summary>
     public string MascotMood
     {
         get => _mascotMood;

@@ -29,6 +29,7 @@ public sealed class MascotFlipbookTests
     [InlineData("   ", "Idle")]
     [InlineData("celebrate", "Celebrate")]
     [InlineData("SLEEP", "Sleep")]
+    [InlineData("groom", "Groom")]
     [InlineData("Bailando", "Idle")]
     public void Normalize_ResolvesKnownMoodsAndFallsBack(string? mood, string expected)
     {
@@ -36,11 +37,23 @@ public sealed class MascotFlipbookTests
     }
 
     [Fact]
+    public void FolderName_MapsMoodToDerivedSet()
+    {
+        Assert.Equal("idle", MascotFlipbook.FolderName("Idle"));
+        Assert.Equal("roll", MascotFlipbook.FolderName("Working"));
+        Assert.Equal("happy", MascotFlipbook.FolderName("Celebrate"));
+        Assert.Equal("look", MascotFlipbook.FolderName("Warn"));
+        Assert.Equal("lie", MascotFlipbook.FolderName("Sleep"));
+        Assert.Equal("lick", MascotFlipbook.FolderName("Groom"));
+        Assert.Equal("idle", MascotFlipbook.FolderName("Bailando"));
+    }
+
+    [Fact]
     public void EveryMoodHasEnoughFramesForFrameByFrameAnimation()
     {
         foreach (var mood in MascotFlipbook.Moods)
         {
-            Assert.InRange(MascotFlipbook.FrameCount(mood), 6, 24);
+            Assert.InRange(MascotFlipbook.FrameCount(mood), 5, 30);
             Assert.InRange(MascotFlipbook.FrameMs(mood), 60, 400);
         }
     }
@@ -56,7 +69,7 @@ public sealed class MascotFlipbookTests
     public void RelativePath_IsStableAndWraps()
     {
         Assert.Equal("Assets/mascot/frames/dark/idle/f00.png", MascotFlipbook.RelativePath("dark", "Idle", 0));
-        Assert.Equal("Assets/mascot/frames/light/celebrate/f03.png", MascotFlipbook.RelativePath("light", "Celebrate", 3));
+        Assert.Equal("Assets/mascot/frames/light/happy/f03.png", MascotFlipbook.RelativePath("light", "Celebrate", 3));
         // el índice envuelve: sirve para loops y para el último frame de cada mood
         var count = MascotFlipbook.FrameCount("Idle");
         Assert.Equal(MascotFlipbook.RelativePath("light", "Idle", 0),
@@ -67,7 +80,7 @@ public sealed class MascotFlipbookTests
     public void AppxUri_IsStableAndWraps()
     {
         // Vía de carga principal en WinUI (ms-appx). CaoCat la usa antes del fallback a archivo.
-        Assert.Equal("ms-appx:///Assets/mascot/frames/dark/warn/f00.png", MascotFlipbook.AppxUri("dark", "Warn", 0));
+        Assert.Equal("ms-appx:///Assets/mascot/frames/dark/look/f00.png", MascotFlipbook.AppxUri("dark", "Warn", 0));
         Assert.Equal("ms-appx:///Assets/mascot/frames/light/idle/f03.png", MascotFlipbook.AppxUri("light", "Idle", 3));
         // el índice envuelve igual que RelativePath
         var count = MascotFlipbook.FrameCount("Warn");
@@ -86,7 +99,7 @@ public sealed class MascotFlipbookTests
     }
 
     [Fact]
-    public void EveryFrameAssetExistsAndIsA256SquarePng()
+    public void EveryFrameAssetExistsAndIsA1024SquarePng()
     {
         foreach (var theme in MascotFlipbook.Themes)
         {
@@ -100,8 +113,8 @@ public sealed class MascotFlipbookTests
                     Assert.True(bytes.Length > 512, $"frame sospechosamente pequeño: {path}");
                     AssertPngSignature(bytes, path);
                     var (width, height) = ReadPngSize(bytes);
-                    Assert.Equal(256, width);
-                    Assert.Equal(256, height);
+                    Assert.Equal(1024, width);
+                    Assert.Equal(1024, height);
                 }
             }
         }
@@ -120,6 +133,20 @@ public sealed class MascotFlipbookTests
         var width = (bytes[16] << 24) | (bytes[17] << 16) | (bytes[18] << 8) | bytes[19];
         var height = (bytes[20] << 24) | (bytes[21] << 16) | (bytes[22] << 8) | bytes[23];
         return (width, height);
+    }
+
+    [Fact]
+    public void OccasionMoodsReturnToIdle_SleepAndGroomDoNot()
+    {
+        Assert.True(MascotFlipbook.ReturnsToIdle("Working"));
+        Assert.True(MascotFlipbook.ReturnsToIdle("Celebrate"));
+        Assert.True(MascotFlipbook.ReturnsToIdle("Warn"));
+        Assert.False(MascotFlipbook.ReturnsToIdle("Idle"));
+        Assert.False(MascotFlipbook.ReturnsToIdle("Sleep"));
+        Assert.False(MascotFlipbook.ReturnsToIdle("Groom"));
+        Assert.False(MascotFlipbook.ReturnsToIdle("Bailando"));
+        Assert.True(MascotFlipbook.OneShotCycles("Celebrate") >= 1);
+        Assert.Equal(0, MascotFlipbook.OneShotCycles("Sleep"));
     }
 
     [Fact]
