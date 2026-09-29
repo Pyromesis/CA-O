@@ -29,9 +29,12 @@ public enum SystemCommandKey
     NetShIntIpReset,
     DismStartComponentCleanup,
     DismResetBase,
+    DismAnalyzeComponentStore,
     FsutilDisableDeleteNotifyOff,
     FsutilDisableDeleteNotifyOn,
     FsutilQueryDeleteNotify,
+    FsutilLastAccessQuery,
+    FsutilLastAccessSet,
     DefragRetrim,
     PowerCfgListSchemes,
     PowerCfgDeleteScheme,
@@ -67,6 +70,8 @@ public enum SystemCommandKey
     BcdEditDynamicTickYes,
     BcdEditDynamicTickNo,
     BcdEditDynamicTickDelete,
+    BcdEditEnum,
+    BcdEditSetTimeout,
 }
 
 /// <summary>Normalized result captured by the gateway.</summary>
@@ -208,6 +213,12 @@ public static partial class CommandPolicy
                 "/Online", "/Cleanup-Image", "/StartComponentCleanup", "/ResetBase") =>
                 Path.Combine(system32, "dism.exe"),
 
+            // Solo lectura del almacén: alimenta la decisión
+            // limpieza/ResetBase sin mutar nada.
+            SystemCommandKey.DismAnalyzeComponentStore when Eq(arguments,
+                "/Online", "/Cleanup-Image", "/AnalyzeComponentStore") =>
+                Path.Combine(system32, "dism.exe"),
+
             SystemCommandKey.FsutilDisableDeleteNotifyOff when Eq(arguments,
                 "behavior", "set", "DisableDeleteNotify", "0") =>
                 Path.Combine(system32, "fsutil.exe"),
@@ -218,6 +229,18 @@ public static partial class CommandPolicy
 
             SystemCommandKey.FsutilQueryDeleteNotify when Eq(arguments,
                 "behavior", "query", "DisableDeleteNotify") =>
+                Path.Combine(system32, "fsutil.exe"),
+
+            // NTFS last access: lectura y escritura 0-3 (0/2/3 gestionados
+            // por el sistema, 1 = no actualizar). Solo esos 4 valores.
+            SystemCommandKey.FsutilLastAccessQuery when Eq(arguments,
+                "behavior", "query", "disablelastaccess") =>
+                Path.Combine(system32, "fsutil.exe"),
+
+            SystemCommandKey.FsutilLastAccessSet when arguments.Count == 4 &&
+                arguments[0] == "behavior" && arguments[1] == "set" &&
+                arguments[2] == "disablelastaccess" &&
+                (arguments[3] is "0" or "1" or "2" or "3") =>
                 Path.Combine(system32, "fsutil.exe"),
 
             SystemCommandKey.DefragRetrim when Eq(arguments, "C:", "/L") =>
@@ -330,6 +353,17 @@ public static partial class CommandPolicy
 
             SystemCommandKey.BcdEditDynamicTickDelete when Eq(arguments,
                 "/deletevalue", "{current}", "disabledynamictick") =>
+                Path.Combine(system32, "bcdedit.exe"),
+
+            // Enumeración completa del BCD (lectura para contar entradas
+            // Windows antes de tocar el timeout).
+            SystemCommandKey.BcdEditEnum when Eq(arguments, "/enum") =>
+                Path.Combine(system32, "bcdedit.exe"),
+
+            // Timeout de arranque fijo a 5 s (único valor permitido:
+            // cualquier otro timeout se rechaza).
+            SystemCommandKey.BcdEditSetTimeout when Eq(arguments,
+                "/timeout", "5") =>
                 Path.Combine(system32, "bcdedit.exe"),
 
             // FASE 20: kernel trace lifecycle (DPC/ISR). Fixed profile and

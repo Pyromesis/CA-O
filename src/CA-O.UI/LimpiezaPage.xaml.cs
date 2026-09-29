@@ -20,13 +20,18 @@ public sealed partial class LimpiezaPage : Page
     private const uint SherbNoProgressUi = 0x2;
     private const uint SherbNoSound = 0x4;
 
+    // Auditoría 2026-09-29 (B2): stale-crash-dump-cleanup se fusionó en
+    // cleanup-crash-dumps-extended (incluye Minidump). El lote rápido usa la
+    // extendida: el consentimiento lo cubre el diálogo global de "Limpiar
+    // todo" (el flujo por botón sigue pidiendo su confirmación propia).
     private static readonly string[] QuickCleanIds =
     [
         "cleanup-windows-temp",
         "cleanup-delivery-optimization-cache",
         "cleanup-windows-update-cache",
-        "stale-crash-dump-cleanup",
+        "cleanup-crash-dumps-extended",
         "cleanup-app-caches",
+        "cleanup-memory-ram",
     ];
 
     private static readonly HashSet<string> HeavyIds = new(StringComparer.Ordinal)
@@ -36,6 +41,7 @@ public sealed partial class LimpiezaPage : Page
         "optimize-system-drive",
         "retrim-system-ssd",
         "cleanup-app-caches",
+        "analyze-component-store",
     };
 
     private static TimeSpan TimeoutFor(string id) =>
@@ -84,10 +90,12 @@ public sealed partial class LimpiezaPage : Page
             or "restore-system-managed-pagefile"
             or "disable-hibernate" => DiskStatusText,
         "enable-storage-sense" or "storage-sense-temp-cleanup"
-            or "storage-sense-recycle-bin-policy" => SenseStatusText,
+            or "storage-sense-recycle-bin-policy" or "configure-storage-sense" => SenseStatusText,
         "free-low-storage-space" => SpaceStatusText,
         "cleanup-prefetch-stale" or "cleanup-cbs-logs" or "cleanup-crash-dumps-extended"
-            or "cleanup-outlook-cache" or "cleanup-browser-code-cache" => DeepStatusText,
+            or "cleanup-outlook-cache" or "cleanup-browser-code-cache"
+            or "cleanup-gpu-shader-cache" or "cleanup-nvidia-downloader-cache"
+            or "analyze-component-store" => DeepStatusText,
         _ => CleanupStatusText,
     };
 
@@ -104,7 +112,9 @@ public sealed partial class LimpiezaPage : Page
             "disable-hibernate" => ("Desactivar hibernación",
                 "Libera varios GB (hiberfil.sys) pero desactiva hibernación e inicio rápido. Reversible. ¿Continuar?"),
             "cleanup-crash-dumps-extended" => ("Volcados extendidos",
-                "Borra LiveKernelReports, MEMORY.DMP y CrashDumps de usuario de más de 30 días. Dificulta depurar fallos antiguos y no se puede deshacer. ¿Continuar?"),
+                "Borra Minidump, LiveKernelReports, MEMORY.DMP y CrashDumps de usuario de más de 30 días. Dificulta depurar fallos antiguos y no se puede deshacer. ¿Continuar?"),
+            "cleanup-print-spooler-jobs" => ("Vaciar cola de impresión",
+                "Detiene el Spooler y borra los trabajos atascados (*.SPL/*.SHD). Los documentos en cola se pierden y no se puede deshacer. ¿Continuar?"),
             _ => (null, null),
         };
         if (title is null) return true;
@@ -144,7 +154,7 @@ public sealed partial class LimpiezaPage : Page
         var dialog = new ContentDialog
         {
             Title = "Limpieza rápida",
-            Content = "Se limpiarán temporales de Windows, caché Delivery Optimization, restos de Windows Update, minidumps antiguos y cachés de apps (Discord, Spotify, Slack; con cada app cerrada). ¿Continuar?",
+            Content = "Se limpiarán temporales de Windows, caché Delivery Optimization, restos de Windows Update, volcados extendidos (+30 días, incluye Minidump), cachés de apps (Discord, Spotify, Slack; con cada app cerrada) y memoria en espera (RAM). ¿Continuar?",
             PrimaryButtonText = "Limpiar todo",
             CloseButtonText = "Cancelar",
             DefaultButton = ContentDialogButton.Close,
@@ -217,6 +227,15 @@ public sealed partial class LimpiezaPage : Page
         catch (Exception ex)
         {
             var message = $"Servicio no disponible: {ex.Message}";
+            // Fallo de pipe = servicio caído: marcar unavailable para que el
+            // AutoCheck de Settings lo reintente (throttle 60 s).
+            try
+            {
+                var uiState = AppHost.Resolve<ViewModels.UiState>();
+                uiState.ServiceStatus = "unavailable";
+                uiState.ServiceCheckedUtc = DateTime.UtcNow;
+            }
+            catch { }
             if (target != null) target.Text = $"{optimizationId}: {message}";
             App.WriteCrashLog(ex);
             if (!batchRunning)

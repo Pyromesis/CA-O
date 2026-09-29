@@ -3,7 +3,7 @@
 ; (lee la versión de BuildConstants.cs y firma con CAO_SIGN_THUMBPRINT si existe)
 
 #ifndef AppVersion
-  #define AppVersion "2.1.36"
+  #define AppVersion "2.2.0"
 #endif
 #ifndef RepoRoot
   #define RepoRoot ".."
@@ -111,7 +111,7 @@ begin
   Sleep(800);
   Exec(ExpandConstant('{sys}\sc.exe'), 'delete ' + ServiceName, '', SW_HIDE, ewWaitUntilTerminated, Res);
   Sleep(800);
-  Exec(ExpandConstant('{sys}\sc.exe'), 'create ' + ServiceName + ' binPath= "' + SvcExe + '" start= demand DisplayName= "CA-O Privileged Service"', '', SW_HIDE, ewWaitUntilTerminated, Res);
+  Exec(ExpandConstant('{sys}\sc.exe'), 'create ' + ServiceName + ' binPath= "' + SvcExe + '" start= delayed-auto DisplayName= "CA-O Privileged Service"', '', SW_HIDE, ewWaitUntilTerminated, Res);
   if Res <> 0 then
   begin
     Log('ERROR: sc create devolvió ' + IntToStr(Res));

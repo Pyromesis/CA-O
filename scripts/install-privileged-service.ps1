@@ -39,13 +39,13 @@ if ($LASTEXITCODE -eq 0) {
     Start-Sleep -Seconds 1
 }
 
-sc.exe create $serviceName binPath= "`"$serviceBinary`"" start= demand DisplayName= "`"$serviceDisplay`"" | Out-Host
+sc.exe create $serviceName binPath= "`"$serviceBinary`"" start= delayed-auto DisplayName= "`"$serviceDisplay`"" | Out-Host
 if ($LASTEXITCODE -ne 0) { throw "sc create fallo ($LASTEXITCODE)" }
 sc.exe failure $serviceName reset= 86400 actions= restart/5000/restart/10000/reboot/60000 | Out-Host
 if ($LASTEXITCODE -ne 0) { throw "sc failure fallo ($LASTEXITCODE)" }
 # Verification (FASE 29)
 $qc = sc.exe qc $serviceName 2>&1 | Out-String
 $qfail = sc.exe qfailure $serviceName 2>&1 | Out-String
-if ($qc -notmatch 'DEMAND_START') { throw "sc qc fallo: $qc" }
+if ($qc -notmatch 'AUTO_START') { throw "sc qc fallo: $qc" }
 if ($qfail -notmatch '86400') { throw "sc qfailure fallo: $qfail" }
 Write-Host "Installed $serviceName (verificado). Start it explicitly with: sc.exe start $serviceName" -ForegroundColor Green

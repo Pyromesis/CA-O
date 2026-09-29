@@ -5,7 +5,7 @@ using System.Windows.Forms;
 // Instalador CA-O de un solo exe: ventana con progreso (sin consola).
 // Descarga el paquete, deriva al setup gráfico bonito y sale; si no hay
 // GUI, instala por aquí con la misma ventana de progreso.
-var productVersion = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "2.1.36";
+var productVersion = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "2.2.0";
 var logFile = Path.Combine(Path.GetTempPath(), "CA-O-Setup.log");
 try { File.AppendAllText(logFile, $"\n[{DateTime.Now:O}] Setup iniciado\n"); } catch { }
 
@@ -211,7 +211,7 @@ static async Task<int> RunInstallAsync(SetupForm ui, string productVersion, stri
     Run("sc.exe", $"delete {serviceName}", ignoreError: true);
     await Task.Delay(600, ct);
     var svcExe = Path.Combine(destSvc, "CA-O.Privileged.exe");
-    Run("sc.exe", $"create {serviceName} binPath= \"{svcExe}\" start= demand DisplayName= \"CA-O Privileged Service\"");
+    Run("sc.exe", $"create {serviceName} binPath= \"{svcExe}\" start= delayed-auto DisplayName= \"CA-O Privileged Service\"");
     Run("sc.exe", $"failure {serviceName} reset= 86400 actions= restart/5000/restart/10000/reboot/60000");
     Run("sc.exe", $"description {serviceName} \"CA-O {productVersion} servicio privilegiado\"");
 

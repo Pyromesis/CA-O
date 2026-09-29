@@ -340,6 +340,7 @@ public sealed partial class BenchmarkPage : Page
             await _vm.MeasureDnsAsync(linked.Token);
             DnsResultText.Text = _vm.DnsSummary;
             RenderDnsBars(_vm.DnsLastResults);
+            DnsApplyButton.Visibility = string.IsNullOrWhiteSpace(_vm.DnsPair) ? Visibility.Collapsed : Visibility.Visible;
         }
         catch (Exception ex)
         {
@@ -347,6 +348,53 @@ public sealed partial class BenchmarkPage : Page
             App.WriteCrashLog(ex);
         }
         finally { DnsButton.IsEnabled = true; }
+    }
+
+    private async void OnDnsApplyClick(object sender, RoutedEventArgs e)
+    {
+        var pair = _vm.DnsPair;
+        if (string.IsNullOrWhiteSpace(pair)) return;
+        var confirm = new ContentDialog
+        {
+            Title = $"Aplicar DNS {pair}",
+            Content = new TextBlock { Text = $"Se configurará {pair} (primario,secundario del mismo proveedor) en la interfaz activa. Requiere privilegios. ¿Continuar?", TextWrapping = TextWrapping.Wrap },
+            PrimaryButtonText = "Aplicar",
+            CloseButtonText = "Cancelar",
+            XamlRoot = Content.XamlRoot
+        };
+        if (await confirm.ShowAsync() != ContentDialogResult.Primary) return;
+        DnsApplyButton.IsEnabled = false;
+        try
+        {
+            // Interfaz activa: prioriza Ethernet/Wi-Fi física, ignora virtual/VPN (igual que Analizar).
+            string iface = "Wi-Fi";
+            try
+            {
+                var provider = AppHost.Resolve<CAO.Core.Interfaces.IDnsConfigurationProvider>();
+                var candidates = System.Net.NetworkInformation.NetworkInterface.GetAllNetworkInterfaces()
+                    .Where(n => n.OperationalStatus == System.Net.NetworkInformation.OperationalStatus.Up
+                        && n.NetworkInterfaceType != System.Net.NetworkInformation.NetworkInterfaceType.Loopback
+                        && n.GetIPProperties().GatewayAddresses.Count > 0
+                        && !provider.IsVirtualOrVpn(n.Name))
+                    .OrderBy(n => n.Name.Contains("Ethernet", StringComparison.OrdinalIgnoreCase) ? 0 : n.Name.Contains("Wi-Fi", StringComparison.OrdinalIgnoreCase) ? 1 : 2)
+                    .ThenBy(n => n.Name)
+                    .ToList();
+                if (candidates.Count > 0) iface = candidates[0].Name;
+            }
+            catch { }
+            var pipe = AppHost.Resolve<PrivilegedPipeClient>();
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+            var resp = await pipe.SetDnsAsync(iface, pair, cts.Token);
+            DnsResultText.Text = resp is { Accepted: true }
+                ? $"✓ DNS {pair} aplicado a {iface} — verificado"
+                : $"{ErrorCodes.UiBenchmarkFailed} [{resp?.ErrorCode}]: {resp?.SafeMessage}";
+        }
+        catch (Exception ex)
+        {
+            DnsResultText.Text = $"{ErrorCodes.UiBenchmarkFailed}: DNS no aplicado. [Técnico: {ex.GetType().Name}]";
+            App.WriteCrashLog(ex);
+        }
+        finally { DnsApplyButton.IsEnabled = true; }
     }
 
     /// <summary>Barras DNS top-4 por mediana (TextBlock + Rectangle, cap 160 px). Referencia: Analyze RenderDnsBars.</summary>

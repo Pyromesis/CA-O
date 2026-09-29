@@ -152,6 +152,7 @@
                         </StackPanel>
                         <Border Style="{StaticResource CaoDividerStyle}"/>
                         <Button x:Name="DnsButton" Content="Medir DNS" Click="OnDnsClick" Style="{StaticResource CaoElevatedButtonStyle}" FontSize="12" AutomationProperties.Name="Medir DNS"/>
+                        <Button x:Name="DnsApplyButton" Content="Aplicar par DNS" Click="OnDnsApplyClick" Style="{StaticResource CaoElevatedButtonStyle}" FontSize="12" Visibility="Collapsed" AutomationProperties.Name="Aplicar par DNS mismo proveedor" ToolTipService.ToolTip="Aplica primario y secundario del mismo proveedor en formato primario,secundario."/>
                         <TextBlock x:Name="DnsResultText" Style="{StaticResource CaoResultTextStyle}"/>
                         <StackPanel x:Name="DnsBarsPanel" Spacing="6"/>
                     </StackPanel>

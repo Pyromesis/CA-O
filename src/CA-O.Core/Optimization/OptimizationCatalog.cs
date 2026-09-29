@@ -27,11 +27,26 @@ public static class OptimizationCatalog
         "disk-cleanup-system-files",
         // restore-balanced-power-dc == restore-power-plan-after-gaming (powercfg /setactive SCHEME_BALANCED).
         "restore-power-plan-after-gaming",
+        // Auditoría 2026-09-29, eliminadas sin equivalente vivo (sin efecto
+        // real o funcionalidad retirada de Windows): sin alias canónico.
+        "disable-dynamic-tick",
+        "disable-cortana",
+        "gaming-display-refresh-rate-audit",
+        // Auditoría 2026-09-29, fusionadas (alias en RetiredAliases).
+        "configure-gaming-power-mode-ac",
+        "stale-crash-dump-cleanup",
+        "enable-storage-sense",
+        "storage-sense-temp-cleanup",
+        "storage-sense-recycle-bin-policy",
     };
 
     public static bool IsProductionId(string id) => !LegacyIds.Contains(id);
 
-    /// <summary>IDs retirados que siguen resolviendo a su canónica (historial y llamadas viejas).</summary>
+    /// <summary>IDs retirados que siguen resolviendo a su canónica (historial y llamadas viejas).
+    /// Solo duplicados/fusiones exactas tienen alias: las eliminadas sin
+    /// equivalente vivo (dynamic-tick, cortana, refresh-rate-audit) quedan
+    /// solo en LegacyIds y resuelven a sí mismas (fallo honesto, nunca se
+    /// aplica por error una optimización distinta no elegida).</summary>
     public static readonly IReadOnlyDictionary<string, string> RetiredAliases =
         new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
@@ -40,6 +55,12 @@ public static class OptimizationCatalog
             // M7: los 4 LegacyIds resuelven; antes 2 quedaban huérfanos.
             ["optimize-hdd-media-aware"] = "optimize-system-drive",
             ["set-best-performance-ac"] = "maximum-power-plan",
+            // Auditoría 2026-09-29: fusiones.
+            ["configure-gaming-power-mode-ac"] = "maximum-power-plan",
+            ["stale-crash-dump-cleanup"] = "cleanup-crash-dumps-extended",
+            ["enable-storage-sense"] = "configure-storage-sense",
+            ["storage-sense-temp-cleanup"] = "configure-storage-sense",
+            ["storage-sense-recycle-bin-policy"] = "configure-storage-sense",
         };
 
     public static string CanonicalIdFor(string id) =>
@@ -54,6 +75,8 @@ public static class OptimizationCatalog
     public static readonly ZeroMenuDelay ZeroMenuDelay = new();
     public static readonly DisableTransparency DisableTransparency = new();
     public static readonly DisableDynamicTick DisableDynamicTick = new();
+    public static readonly DisableEdgePrelaunch DisableEdgePrelaunch = new();
+    public static readonly SetBootTimeout SetBootTimeout = new();
 
     // Privacy & security (existing)
     public static readonly DisableTelemetry DisableTelemetry = new();
@@ -73,7 +96,12 @@ public static class OptimizationCatalog
 
     // Historical entries retained only for traceability (AllLegacy + LegacyIds);
     // optimize-hdd-media-aware, set-best-performance-ac y disk-cleanup-system-files
-    // están retirados de All (duplicados exactos). El resto sigue en All.
+    // están retirados de All (duplicados exactos). Auditoría 2026-09-29:
+    // disable-dynamic-tick, disable-cortana y gaming-display-refresh-rate-audit
+    // están retirados de All (eliminadas sin equivalente);
+    // configure-gaming-power-mode-ac, stale-crash-dump-cleanup y las 3 de
+    // Storage Sense están retirados de All (fusionados en su canónica).
+    // El resto sigue en All.
     public static readonly EnableWindowedGameOptimizations EnableWindowedGameOptimizations = new();
     public static readonly EnableVrr EnableVrr = new();
     public static readonly SetGamesHighPerformanceGpu SetGamesHighPerformanceGpu = new();
@@ -117,6 +145,13 @@ public static class OptimizationCatalog
     public static readonly CleanupCrashDumpsExtended CleanupCrashDumpsExtended = new();
     public static readonly CleanupOutlookCache CleanupOutlookCache = new();
     public static readonly CleanupBrowserCodeCache CleanupBrowserCodeCache = new();
+    public static readonly CleanupMemoryRam CleanupMemoryRam = new();
+    public static readonly ConfigureStorageSense ConfigureStorageSense = new();
+    public static readonly NtfsDisableLastAccess NtfsDisableLastAccess = new();
+    public static readonly DisableFastStartup DisableFastStartup = new();
+    public static readonly CleanupGpuShaderCache CleanupGpuShaderCache = new();
+    public static readonly CleanupNvidiaDownloaderCache CleanupNvidiaDownloaderCache = new();
+    public static readonly AnalyzeComponentStore AnalyzeComponentStore = new();
 
     // Network (existing + new)
     public static readonly NormalizeTcpAutoTuning NormalizeTcpAutoTuning = new();
@@ -156,18 +191,18 @@ public static class OptimizationCatalog
     public static readonly RepairWindowsUpdate RepairWindowsUpdate = new();
     public static readonly ResyncSystemClock ResyncSystemClock = new();
     public static readonly RestartPrintSpooler RestartPrintSpooler = new();
+    public static readonly CleanupPrintSpoolerJobs CleanupPrintSpoolerJobs = new();
     public static readonly RestartBluetoothService RestartBluetoothService = new();
     public static readonly RestartDnsClient RestartDnsClient = new();
     public static readonly RestartWindowsSearch RestartWindowsSearch = new();
     public static readonly RestartWindowsExplorer RestartWindowsExplorer = new();
     public static readonly RecoverWindowsExplorer RecoverWindowsExplorer = new();
 
-    /// <summary>Production catalog: 91 verified optimizations. All optimizations are now in production.</summary>
+    /// <summary>Production catalog: 93 verified optimizations. All optimizations are now in production.</summary>
     public static IReadOnlyList<IOptimization> All { get; } = new IOptimization[]
     {
         DisableBackgroundApps,
         DisableCopilot,
-        DisableCortana,
         DisableGameBarDvr,
         DisableSuggestions,
         DisableTelemetry,
@@ -182,22 +217,23 @@ public static class OptimizationCatalog
         EnableWindowedGameOptimizations,
         EnableVrr,
         ZeroMenuDelay,
-        DisableDynamicTick,
         DisableOneDriveAutostart,
         DisableSearchIndexing,
         MaximumPowerPlan,
         DisableHibernate,
+        DisableFastStartup,
+        DisableEdgePrelaunch,
+        SetBootTimeout,
         DisableVbs,
         NormalizeTcpAutoTuning,
         OptimizeSystemDrive,
+        NtfsDisableLastAccess,
         // Gaming Phase 1: promoted from legacy
         SetGamesHighPerformanceGpu,
         DisableBackgroundGameCaptures,
         DisableGameBarAutoLaunch,
-        ConfigureGamingPowerModeAc,
         RestoreDefaultGpuPreference,
         EnableAutoHdr,
-        GamingDisplayRefreshRateAudit,
         // Power Phase 2: promoted from legacy
         RestoreBalancedPowerDc,
         DisableUsbSelectiveSuspendAc,
@@ -207,13 +243,12 @@ public static class OptimizationCatalog
         // Storage Phase 3: promoted from legacy
         EnsureTrimEnabled,
         RetrimSystemSsd,
-        EnableStorageSense,
-        StorageSenseTempCleanup,
-        StorageSenseRecycleBinPolicy,
+        ConfigureStorageSense,
         CleanupWindowsTemp,
         CleanupDeliveryOptimizationCache,
         WindowsComponentStoreCleanup,
         WindowsComponentStoreResetBase,
+        AnalyzeComponentStore,
         FreeLowStorageSpace,
         RestoreSystemManagedPagefile,
         DefragmentHddOnly,
@@ -224,6 +259,9 @@ public static class OptimizationCatalog
         CleanupCrashDumpsExtended,
         CleanupOutlookCache,
         CleanupBrowserCodeCache,
+        CleanupGpuShaderCache,
+        CleanupNvidiaDownloaderCache,
+        CleanupMemoryRam,
         // Network Phase 4: promoted from legacy
         EnableRss,
         RestoreTcpChecksumOffload,
@@ -247,7 +285,6 @@ public static class OptimizationCatalog
         // System Phase 6: promoted from legacy
         CreateRestorePointBeforeOptimizationBatch,
         PendingRebootMaintenance,
-        StaleCrashDumpCleanup,
         OptimizeStartupRecoveryState,
         // Troubleshoot
         RestartWindowsAudioServices,
@@ -258,6 +295,7 @@ public static class OptimizationCatalog
         RepairWindowsUpdate,
         ResyncSystemClock,
         RestartPrintSpooler,
+        CleanupPrintSpoolerJobs,
         RestartBluetoothService,
         RestartDnsClient,
         RestartWindowsSearch,
@@ -265,11 +303,11 @@ public static class OptimizationCatalog
         RecoverWindowsExplorer,
     };
 
-    /// <summary>Catálogo completo histórico (66) - solo para tests de trazabilidad docs ↔ código. No usar en producción.</summary>
+    /// <summary>Catálogo completo histórico (67) - solo para tests de trazabilidad docs ↔ código. No usar en producción.</summary>
     public static IReadOnlyList<IOptimization> AllLegacy { get; } = new IOptimization[]
     {
         DisableVbs, MaximumPowerPlan, DisableVisualEffects, DisableSearchIndexing,
-        DisableBackgroundApps, ZeroMenuDelay, DisableTransparency,
+        DisableBackgroundApps, ZeroMenuDelay, DisableTransparency, DisableDynamicTick,
         DisableTelemetry, DisableCortana, DisableWidgets, DisableCopilot,
         DisableSuggestions, DisableOneDriveAutostart,
         DisableGameBarDvr, EnableGpuScheduling,

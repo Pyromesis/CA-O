@@ -96,14 +96,14 @@ Nunca se registran secretos, credenciales ni contenido de entrada del usuario (s
 - **i18n**: diccionario tipado es-ES/en-US (`Localizer`); migración a `.resw` planificada sin cambiar llamadas (`Localizer.Get(key)`).
 - **HAGS/VBS/MPO/etc.**: nunca tratados como ganancias universales; HAGS es WorkloadDependent+Conditional+RequiresReboot, VBS es Critical+SecurityTradeoff+ExpertOnly.
 
-## Pruebas (1103 passed, 0 failed — Release)
+## Pruebas (1207 passed, 0 failed — Release)
 
 | Suite | Cubre | Count |
 |---|---|---|
-| `CA-O.Core.Tests` | Contratos catálogo 91, `AnalysisStateStore` (save/load/corrupt), `GameCompatibility` (VBS bloqueado), transacciones, scoring, health, ledger one-shot | 643 |
-| `CA-O.Security.Tests` | IPC validator (`Ping`/`Apply` cross-check), `IpcPingTests`, inyección | 238 |
+| `CA-O.Core.Tests` | Contratos catálogo 93, `AnalysisStateStore` (save/load/corrupt), `GameCompatibility` (VBS bloqueado), transacciones, scoring, health, ledger one-shot | 733 |
+| `CA-O.Security.Tests` | IPC validator (`Ping`/`Apply` cross-check), `IpcPingTests`, inyección | 248 |
 | `CA-O.Integration.Tests` | `E2EFlowsTests` 9 pruebas (8 casos numerados + benchmark: Abrir→Analizar→Persistir→Vanguard→Restore→Benchmark) + `TransactionJournalRecovery` + contrato docs | 49 |
 | `CA-O.Infrastructure.Tests` | `HistoryRobustness` (malformed), `SnapshotRepository` (TX identity), `SystemContextCache` dual-TTL | 55 |
 | `CA-O.Benchmark.Tests` | `SystemBenchmarkRunner` (suelo 3%, mediana) | 17 |
-| `CA-O.UI.Tests` | `ViewModelTests` (Analyze/Dashboard con `SystemAnalysisService` + `Correlation`) | 101 |
-| **Total** | **Gates 1-5 `verify.ps1` + `build-release` con `gui-installer`** | **1103** |
+| `CA-O.UI.Tests` | `ViewModelTests` (Analyze/Dashboard con `SystemAnalysisService` + `Correlation`) | 105 |
+| **Total** | **Gates 1-5 `verify.ps1` + `build-release` con `gui-installer`** | **1207** |

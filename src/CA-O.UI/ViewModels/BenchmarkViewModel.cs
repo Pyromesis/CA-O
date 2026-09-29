@@ -25,6 +25,12 @@ public sealed partial class BenchmarkViewModel : ObservableObject
 
     private IReadOnlyList<DnsBenchmarkResult>? _dnsLastResults;
 
+    /// <summary>
+    /// Par mismo-proveedor listo para aplicar ("primario,secundario"); vacío
+    /// si no hay medición válida. Nunca mezcla proveedores.
+    /// </summary>
+    public string DnsPair { get; private set; } = string.Empty;
+
     /// <summary>Últimos resultados DNS medidos (para pintar barras en la UI).</summary>
     public IReadOnlyList<DnsBenchmarkResult>? DnsLastResults
     {
@@ -125,12 +131,24 @@ public sealed partial class BenchmarkViewModel : ObservableObject
             var provider = new DnsBenchmarkProvider();
             var results = await provider.BenchmarkAsync(null, ct);
             var best = DnsBenchmarkProvider.PickBest(results);
-            DnsSummary = best is null ? "Sin respuesta DNS medible." :
-                $"Mejor: {best.Resolver} {best.MedianLatencyMs:0.0} ms (jitter {best.JitterMs:0.0} ms, {best.Successes}/{best.Attempts})";
+            if (best is null)
+            {
+                DnsSummary = "Sin respuesta DNS medible.";
+                DnsPair = string.Empty;
+            }
+            else
+            {
+                // Secundario mismo-proveedor: nunca mezclar (igual que Analizar).
+                var second = DnsBenchmarkProvider.PickConsistentSecondary(best, results);
+                DnsPair = second is null ? best.Resolver : $"{best.Resolver},{second.Resolver}";
+                DnsSummary = second is null
+                    ? $"Mejor: {best.Resolver} {best.MedianLatencyMs:0.0} ms (jitter {best.JitterMs:0.0} ms, {best.Successes}/{best.Attempts}) — mismo proveedor en ambos campos."
+                    : $"Primario: {best.Resolver} {best.MedianLatencyMs:0.0} ms · Secundario: {second.Resolver} (mismo proveedor, sin mezclar) — aplicar \"{DnsPair}\"";
+            }
             DnsLastResults = results; // propiedad para pintar barras + guardar DnsAfterMs si hay sesión
         }
-        catch (OperationCanceledException) { DnsSummary = "Medición DNS cancelada."; }
-        catch (Exception ex) { DnsSummary = $"{ErrorCodes.UiBenchmarkFailed}: DNS no medido. [Técnico: {ex.GetType().Name}]"; }
+        catch (OperationCanceledException) { DnsSummary = "Medición DNS cancelada."; DnsPair = string.Empty; }
+        catch (Exception ex) { DnsSummary = $"{ErrorCodes.UiBenchmarkFailed}: DNS no medido. [Técnico: {ex.GetType().Name}]"; DnsPair = string.Empty; }
     }
 
     public async Task MeasureFluencyAsync(IFrameCapture capture, CancellationToken ct)

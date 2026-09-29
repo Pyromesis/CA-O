@@ -60,24 +60,48 @@ public sealed class MaximumPowerPlan : IOptimization
 
         var activate = await context.Executor.ExecuteAsync(
             SystemCommandKey.PowerCfgSetActiveScheme, ["/setactive", HighPerformanceGuid], ct);
-        var code = activate.ExitCode;
-        var output = activate.StdOut;
-        if (code != 0)
+        if (activate.Success)
+            return OperationResult.Ok("Plan de máximo rendimiento activado.");
+
+        // El plan Alto no existe como tal: antes de duplicar Ultimate se
+        // comprueba si ya existe algún esquema útil (/L). Duplicar en cada
+        // Apply creaba planes huérfanos (churn que luego había que limpiar
+        // con remove-unused-custom-power-plans): se reutiliza si ya está.
+        var list = await context.Executor.ExecuteAsync(
+            SystemCommandKey.PowerCfgListSchemes, ["/L"], ct);
+        var schemes = list.Success ? ParseSchemeGuids(list.StdOut) : [];
+        if (schemes.Contains(UltimatePerformanceGuid))
         {
-            // Hidden plan may not exist yet: duplicate Ultimate, then
-            // activate Ultimate (antes reintentaba High, que seguía sin existir).
-            var duplicate = await context.Executor.ExecuteAsync(
-                SystemCommandKey.PowerCfgDuplicateScheme, ["/duplicatescheme", UltimatePerformanceGuid], ct);
-            var retry = await context.Executor.ExecuteAsync(
+            var reuse = await context.Executor.ExecuteAsync(
                 SystemCommandKey.PowerCfgSetActiveScheme, ["/setactive", UltimatePerformanceGuid], ct);
-            code = retry.ExitCode;
-            output = retry.StdOut + duplicate.StdErr;
-            if (code != 0)
-            {
-                return OperationResult.Fail("No se pudo activar el plan de rendimiento.", output);
-            }
+            return reuse.Success
+                ? OperationResult.Ok("Plan de máximo rendimiento activado (esquema existente reutilizado).")
+                : OperationResult.Fail("No se pudo activar el plan de rendimiento.", reuse.StdErr);
+        }
+
+        // Ni High activable ni Ultimate listado: duplicar una sola vez y activar.
+        var duplicate = await context.Executor.ExecuteAsync(
+            SystemCommandKey.PowerCfgDuplicateScheme, ["/duplicatescheme", UltimatePerformanceGuid], ct);
+        var retry = await context.Executor.ExecuteAsync(
+            SystemCommandKey.PowerCfgSetActiveScheme, ["/setactive", UltimatePerformanceGuid], ct);
+        if (retry.ExitCode != 0)
+        {
+            return OperationResult.Fail("No se pudo activar el plan de rendimiento.", retry.StdOut + duplicate.StdErr);
         }
         return OperationResult.Ok("Plan de máximo rendimiento activado.");
+    }
+
+    internal static HashSet<string> ParseSchemeGuids(string output)
+    {
+        var found = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (string.IsNullOrEmpty(output))
+            return found;
+        foreach (Match match in Regex.Matches(output,
+            @"Power Scheme GUID:\s*([0-9a-fA-F-]{36})", RegexOptions.IgnoreCase))
+        {
+            found.Add(match.Groups[1].Value);
+        }
+        return found;
     }
 
     public async Task<VerificationResult> VerifyAsync(OptimizationContext context, CancellationToken ct = default)

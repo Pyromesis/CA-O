@@ -107,7 +107,7 @@ if ($LASTEXITCODE -eq 0) {
     Start-Sleep -Seconds 2
 }
 
-& sc.exe create $svcName binPath= "`"$svcExePath`"" start= demand obj= LocalSystem DisplayName= "`"$svcDisplayName`"" description= "`"$svcDescription`""
+& sc.exe create $svcName binPath= "`"$svcExePath`"" start= delayed-auto obj= LocalSystem DisplayName= "`"$svcDisplayName`"" description= "`"$svcDescription`""
 if ($LASTEXITCODE -ne 0) { throw "sc create failed (exit code $LASTEXITCODE)" }
 
 # Recovery policy
@@ -117,9 +117,9 @@ if ($LASTEXITCODE -ne 0) { throw "sc failure failed (exit code $LASTEXITCODE)" }
 Write-Host "== 3b/5 Verifying Service Registration ==" -ForegroundColor Cyan
 $qc = sc.exe qc $svcName 2>&1 | Out-String
 $qfail = sc.exe qfailure $svcName 2>&1 | Out-String
-if ($qc -notmatch 'DEMAND_START' -or $qc -notmatch [regex]::Escape($svcExePath)) { throw "sc qc verification failed: $qc" }
+if ($qc -notmatch 'AUTO_START' -or $qc -notmatch [regex]::Escape($svcExePath)) { throw "sc qc verification failed: $qc" }
 if ($qfail -notmatch 'RESTART.*5000' -or $qfail -notmatch '86400') { throw "sc qfailure verification failed: $qfail" }
-Write-Host 'Service verified: demand start + recovery policy OK' -ForegroundColor Green
+Write-Host 'Service verified: delayed-auto start + recovery policy OK' -ForegroundColor Green
 
 Write-Host "== 4/5 Hardening Data ACLs ==" -ForegroundColor Cyan
 & (Join-Path $scriptRoot 'harden-data-acls.ps1')

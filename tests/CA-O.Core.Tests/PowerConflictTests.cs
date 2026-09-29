@@ -21,12 +21,15 @@ public sealed class PowerConflictTests
     [Fact]
     public void OtherPlanActive_IsBlocked_NamingActive()
     {
+        // configure-gaming-power-mode-ac se retiró (alias de
+        // maximum-power-plan): el conflicto se prueba entre los dos
+        // miembros vivos del grupo.
         var r = OptimizationConflicts.EvaluatePowerScheme(
-            "configure-gaming-power-mode-ac", PowerSchemes.HighPerformanceGuid);
+            "maximum-power-plan", PowerSchemes.BalancedGuid);
         Assert.Equal(OptimizationConflicts.ConflictOutcome.Blocked, r.Outcome);
         Assert.NotNull(r.ActiveMemberId);
         Assert.Contains(r.ActiveMemberId, r.MessageEs, StringComparison.Ordinal);
-        Assert.Contains("configure-gaming-power-mode-ac", r.MessageEs, StringComparison.Ordinal);
+        Assert.Contains("maximum-power-plan", r.MessageEs, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -59,11 +62,10 @@ public sealed class PowerConflictTests
         var siblings = new List<(string Id, OptimizationState State)>
         {
             ("maximum-power-plan", OptimizationState.AppliedByCao),
-            ("configure-gaming-power-mode-ac", OptimizationState.NotApplied),
             ("restore-balanced-power-dc", OptimizationState.NotApplied),
         };
         Assert.Equal("maximum-power-plan",
-            OptimizationConflicts.FindAppliedSibling("configure-gaming-power-mode-ac", siblings));
+            OptimizationConflicts.FindAppliedSibling("restore-balanced-power-dc", siblings));
         Assert.Null(OptimizationConflicts.FindAppliedSibling("maximum-power-plan", siblings));
         Assert.Null(OptimizationConflicts.FindAppliedSibling("flush-dns-cache", siblings));
     }

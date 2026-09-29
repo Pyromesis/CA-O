@@ -23,7 +23,6 @@ public sealed class DangerousGatingTests
     [Theory]
     [InlineData("disable-vbs")]
     [InlineData("windows-component-store-resetbase")]
-    [InlineData("disable-dynamic-tick")]
     public void Dangerous_Is_ExpertOnly(string id)
     {
         var def = OptimizationCatalog.All
@@ -40,7 +39,7 @@ public sealed class DangerousGatingTests
             CatalogProjections.BatchDefault, new MemoryRegistry(), SystemContextFactory.Default());
         var byId = recommendations.ToDictionary(r => r.OptimizationId, StringComparer.OrdinalIgnoreCase);
 
-        foreach (var id in new[] { "disable-vbs", "windows-component-store-resetbase", "disable-dynamic-tick" })
+        foreach (var id in new[] { "disable-vbs", "windows-component-store-resetbase" })
         {
             Assert.True(byId.ContainsKey(id), id + " debe existir en BatchDefault para evaluar la policy real.");
             Assert.NotEqual(RecommendationBucket.Recommended, byId[id].Bucket);

@@ -1,7 +1,7 @@
 # Política de privacidad — CA-O
 
 Titular: CA-NEXT-PROJECT · Contacto: ca.next.project@gmail.com
-Última actualización: 2026-09-26. Versión vigente para CA-O 2.1.36 y siguientes.
+Última actualización: 2026-09-29. Versión vigente para CA-O 2.2.0 y siguientes.
 
 ## Resumen
 

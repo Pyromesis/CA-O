@@ -659,6 +659,16 @@ public sealed partial class AnalyzePage : Page
     private async Task ApplyBestDnsAsync()
     {
         if (_bestDns == null) return;
+        // Defensa en el apply: si el par llega mezclado (snapshot viejo o
+        // estado a mano), normalizar al mismo proveedor antes de enviar.
+        // El engine vuelve a normalizar como barrera final.
+        if (_secondDns is not null &&
+            !CAO.Shared.Networking.DnsResolverPairs.IsSameProvider(_bestDns.Resolver, _secondDns.Resolver))
+        {
+            var (_, fixedSecondary) = CAO.Shared.Networking.DnsResolverPairs.ResolvePair(_bestDns.Resolver);
+            _secondDns = fixedSecondary is null ? null :
+                new DnsBenchmarkResult(fixedSecondary, null, null, 0, 0, 0);
+        }
         var pair = _secondDns is null ? _bestDns.Resolver : $"{_bestDns.Resolver},{_secondDns.Resolver}";
         var pairLabel = _secondDns is null
             ? $"primario {_bestDns.Resolver}"

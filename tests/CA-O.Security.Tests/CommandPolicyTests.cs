@@ -31,6 +31,11 @@ public sealed class CommandPolicyTests
     [InlineData(SystemCommandKey.WprStartCpuFileMode, new[] { "-start", "CPU", "-filemode" }, "wpr.exe")]
     [InlineData(SystemCommandKey.LogmanDeleteSession, new[] { "delete", "CAO-DPC", "-ets" }, "logman.exe")]
     [InlineData(SystemCommandKey.TaskKillExplorer, new[] { "/F", "/IM", "explorer.exe" }, "taskkill.exe")]
+    [InlineData(SystemCommandKey.FsutilLastAccessQuery, new[] { "behavior", "query", "disablelastaccess" }, "fsutil.exe")]
+    [InlineData(SystemCommandKey.FsutilLastAccessSet, new[] { "behavior", "set", "disablelastaccess", "1" }, "fsutil.exe")]
+    [InlineData(SystemCommandKey.DismAnalyzeComponentStore, new[] { "/Online", "/Cleanup-Image", "/AnalyzeComponentStore" }, "dism.exe")]
+    [InlineData(SystemCommandKey.BcdEditEnum, new[] { "/enum" }, "bcdedit.exe")]
+    [InlineData(SystemCommandKey.BcdEditSetTimeout, new[] { "/timeout", "5" }, "bcdedit.exe")]
     public void KnownKeysResolveToCanonicalExecutable(SystemCommandKey key, string[] arguments, string tool)
     {
         var resolved = CommandPolicy.Resolve(key, arguments);
@@ -60,6 +65,11 @@ public sealed class CommandPolicyTests
     [InlineData(SystemCommandKey.PowerCfgSetActiveScheme, new[] { "/setactive", "SCHEME_CUSTOM" })] // unknown scheme
     [InlineData(SystemCommandKey.BcdEditHypervisorOff, new[] { "/set", "{current}", "hypervisorlaunchtype", "on" })] // restore path is pinned to Auto
     [InlineData(SystemCommandKey.NetShTcpAutotuningNormal, new[] { "int", "tcp", "set", "global", "autotuninglevel=huge" })] // undocumented level
+    [InlineData(SystemCommandKey.FsutilLastAccessSet, new[] { "behavior", "set", "disablelastaccess", "4" })] // only 0-3
+    [InlineData(SystemCommandKey.FsutilLastAccessSet, new[] { "behavior", "set", "disablelastaccess" })] // wrong token count
+    [InlineData(SystemCommandKey.BcdEditSetTimeout, new[] { "/timeout", "30" })] // timeout is pinned to 5
+    [InlineData(SystemCommandKey.BcdEditEnum, new[] { "/enum", "{current}" })] // fixed shape, no store id
+    [InlineData(SystemCommandKey.DismAnalyzeComponentStore, new[] { "/Online", "/Cleanup-Image", "/AnalyzeComponentStore", "/ResetBase" })] // analyze never mutates
     public void UnexpectedArgumentsResolveToNull(SystemCommandKey key, string[] arguments)
     {
         Assert.Null(CommandPolicy.Resolve(key, arguments));

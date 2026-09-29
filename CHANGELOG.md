@@ -2,6 +2,22 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
+## [2.2.0] - 2026-09-29
+
+### Añadido
+- 8 optimizaciones nuevas: `ntfs-disable-last-access`, `disable-fast-startup`, `cleanup-gpu-shader-cache`, `cleanup-nvidia-downloader-cache`, `analyze-component-store` (diagnóstico), `cleanup-print-spooler-jobs`, `disable-edge-prelaunch` y `set-boot-timeout` (solo multiboot; NotApplicable en arranque único).
+- Limpieza de RAM (`cleanup-memory-ram`): EmptyWorkingSet por proceso + purga de standby en SYSTEM, con mensajes honestos (efecto temporal, no acelera).
+- El benchmark de DNS ya mide y aplica el par mismo-proveedor (primario + secundario consistente) con botón "Aplicar par DNS".
+
+### Cambiado
+- Servicio privilegiado persistente: arranque `delayed-auto` en los 6 puntos de instalación, AutoCheck que reintenta `unavailable` cada 60 s y readiness con ping hasta 8 s tras instalar/arrancar.
+- Estado del servicio real en la UI: `unavailable` (pipe ausente) ya no colapsa a `rejected`.
+- Catálogo: 93 optimizaciones (Batch 65, Repair 15, Diagnostic 4, Restore 9). Fusionadas las 3 tarjetas de Storage Sense en una y Minidump absorbido por la limpieza extendida de crash dumps.
+- Eliminadas `disable-dynamic-tick` (placebo), `configure-gaming-power-mode-ac` (duplicada de maximum-power-plan) y `gaming-display-refresh-rate-audit` (sin efecto).
+
+### Corregido
+- `disable-nic-power-saving-ac` comprueba batería real en precondiciones; `maximum-power-plan` reutiliza el esquema existente en vez de duplicar planes huérfanos; `restore-default-gpu-preference` revierte token a token; `SetBootTimeout` cuenta también el encabezado en español y usa `Regex.Count`.
+
 ## [2.1.36] - 2026-09-26
 
 ### Corregido

@@ -379,9 +379,7 @@ public sealed partial class MainWindow : Window
             }
             // Pipe inalcanzable (servicio detenido/no instalado) devuelve
             // rejection CAO-IPC-007/008: "unavailable", no "rejected".
-            uiState.ServiceStatus = resp is { Accepted: true } ? "connected"
-                : resp is { ErrorCode: ErrorCodes.IpcPipeNotFound or ErrorCodes.IpcTimeout } ? "unavailable"
-                : "rejected";
+            uiState.ServiceStatus = ServiceStatusMapper.FromPing(resp is { Accepted: true }, resp?.ErrorCode);
             uiState.ServiceCheckedUtc = DateTime.UtcNow;
             if (uiState.ServiceStatus == "connected")
             {

@@ -55,12 +55,7 @@ public sealed partial class SettingsViewModel : ObservableObject
             // Estados canónicos en inglés: los muestra MainWindow/Dashboard/Settings sin bifurcar por idioma.
             // Un pipe inalcanzable (servicio detenido/no instalado) devuelve
             // rejection CAO-IPC-007/008: eso es "unavailable", no "rejected".
-            if (response is { Accepted: true })
-                ServiceStatus = "connected";
-            else if (response is { ErrorCode: ErrorCodes.IpcPipeNotFound or ErrorCodes.IpcTimeout })
-                ServiceStatus = "unavailable";
-            else
-                ServiceStatus = "rejected";
+            ServiceStatus = ServiceStatusMapper.FromPing(response is { Accepted: true }, response?.ErrorCode);
             ServiceCheckedUtc = DateTime.UtcNow;
             _state.ServiceStatus = ServiceStatus;
             _state.ServiceCheckedUtc = ServiceCheckedUtc;

@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.IO;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using CAO.Shared;
 using CAO.UI.Helpers;
 
 namespace CAO.UI.Pages;
@@ -127,9 +128,6 @@ public sealed partial class SettingsPage : Page
     private static bool IsConnected(string? status) =>
         status is "connected" or "conectado";
 
-    private static bool NeedsVerification(string? status) =>
-        status is null or "unknown" or "unavailable" or "no disponible";
-
     private void RenderServiceState()
     {
         if (ServiceStatusText is null || ServiceDetailText is null) return;
@@ -175,11 +173,17 @@ public sealed partial class SettingsPage : Page
     {
         try
         {
-            if (_autoCheckAttempted || _vm is null || _uiState is null) return;
+            if (_vm is null || _uiState is null) return;
             if (_vm.IsCheckingService) return;
-            if (!NeedsVerification(_uiState.ServiceStatus)) return;
+            var status = _uiState.ServiceStatus;
+            if (!ServiceStatusMapper.NeedsVerification(status)) return;
+            // unavailable reintenta aunque ya hubiera un intento previo
+            // (el servicio puede volver tras una limpieza o un arranque
+            // lento): throttle 60 s; el resto mantiene 5 min.
+            if (_autoCheckAttempted && !ServiceStatusMapper.IsUnavailable(status)) return;
+            var throttle = ServiceStatusMapper.AutoCheckThrottle(status);
             if (_uiState.ServiceCheckedUtc.HasValue &&
-                DateTime.UtcNow - _uiState.ServiceCheckedUtc.Value < TimeSpan.FromMinutes(5))
+                DateTime.UtcNow - _uiState.ServiceCheckedUtc.Value < throttle)
                 return;
             _autoCheckAttempted = true;
             await RefreshServiceStatusAsync();
@@ -198,14 +202,16 @@ public sealed partial class SettingsPage : Page
         ServiceDetailText.Text = "";
         try
         {
-            // Tras un reinicio el servicio (start=demand) queda detenido: el ping
-            // falla y parece "perdido para siempre". Intento best-effort de
-            // levantarlo antes de reportar, la UI corre elevada (requireAdministrator).
+            // Tras un reinicio el servicio (delayed-auto) puede seguir en
+            // arranque: el ping falla y parece "perdido para siempre".
+            // Intento best-effort de levantarlo + espera de readiness con
+            // ping al pipe (hasta 8 s) antes de reportar. La UI corre
+            // elevada (requireAdministrator).
             if (IsAdmin())
             {
                 try { TryStartServiceBestEffort(); } catch { }
                 if (!IsServiceRunning())
-                    await Task.Delay(800);
+                    await WaitForServiceReadyAsync();
             }
             await _vm.CheckServiceCommand.ExecuteAsync(null);
             SyncViewModelFromSharedState();
@@ -258,6 +264,31 @@ public sealed partial class SettingsPage : Page
                 s?.WaitForExit(8000);
             }
             catch { }
+        }
+        catch { }
+    }
+
+    /// <summary>
+    /// Readiness tras sc start: ping al pipe hasta 8 s (cada 500 ms) en vez
+    /// del delay fijo. Async sin bloquear la UI; nunca lanza.
+    /// </summary>
+    private static async Task WaitForServiceReadyAsync()
+    {
+        try
+        {
+            var pipe = AppHost.Resolve<PrivilegedPipeClient>();
+            var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(8);
+            while (DateTime.UtcNow < deadline)
+            {
+                try
+                {
+                    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+                    var resp = await pipe.PingAsync(cts.Token);
+                    if (resp is { Accepted: true }) return;
+                }
+                catch { }
+                try { await Task.Delay(500); } catch { }
+            }
         }
         catch { }
     }
@@ -875,7 +906,7 @@ if (-not (Test-Path $svcExe)) {{
     exit 1
 }}
 
-# Si el servicio existe pero está detenido (caso típico tras reinicio: start=demand),
+# Si el servicio existe pero está detenido (caso típico tras reinicio si aún arranca: delayed-auto),
 # basta con arrancarlo.
 $qc = sc.exe query $serviceName 2>&1 | Out-String
 $exists = $LASTEXITCODE -eq 0 -or ($qc -notmatch 'does not exist' -and $qc -match 'CAO')
@@ -895,7 +926,7 @@ if ($exists) {{
     Start-Sleep -Seconds 1
 }}
 
-sc.exe create $serviceName binPath= ""$svcExe"" start= demand DisplayName= ""CA-O Privileged Service"" | Out-Host
+sc.exe create $serviceName binPath= ""$svcExe"" start= delayed-auto DisplayName= ""CA-O Privileged Service"" | Out-Host
 if ($LASTEXITCODE -ne 0) {{ throw 'sc create falló' }}
 sc.exe failure $serviceName reset= 86400 actions= restart/5000/restart/10000/reboot/60000 | Out-Host
 sc.exe description $serviceName ""CA-O {version} servicio privilegiado"" | Out-Host

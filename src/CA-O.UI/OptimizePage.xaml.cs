@@ -503,7 +503,9 @@ public sealed partial class OptimizePage : Page
             using var cts = new CancellationTokenSource(TimeoutFor(optimizationId));
             var pipe = AppHost.Resolve<PrivilegedPipeClient>();
             var response = await pipe.SendAsync(operation, optimizationId, cts.Token);
-            uiState.ServiceStatus = response is { Accepted: true } ? "connected" : "rejected";
+            // Pipe inalcanzable (CAO-IPC-007/008) = servicio caído =
+            // "unavailable", no "rejected" (igual que MainWindow).
+            uiState.ServiceStatus = ServiceStatusMapper.FromPing(response is { Accepted: true }, response?.ErrorCode);
             if (response is { Accepted: true })
             {
                 var applied = operation == PrivilegedOperationKind.ApplyOptimization;
@@ -613,11 +615,14 @@ public sealed partial class OptimizePage : Page
         }
     }
 
+    // Espejo de TimeoutProfile.HeavyOptimizationIds (C3: sin el id retirado
+    // disk-cleanup-system-files; con cleanup-app-caches y analyze-component-store).
     private static TimeSpan TimeoutFor(string optimizationId) => optimizationId switch
     {
         "windows-component-store-cleanup" or "windows-component-store-resetbase"
             or "optimize-system-drive" or "retrim-system-ssd" or "defragment-hdd-only"
-            or "disk-cleanup-system-files" or "cleanup-windows-update-cache" or "reset-network-stack-repair" or "repair-windows-update" => TimeSpan.FromMinutes(20),
+            or "cleanup-windows-update-cache" or "cleanup-app-caches" or "analyze-component-store"
+            or "reset-network-stack-repair" or "repair-windows-update" => TimeSpan.FromMinutes(20),
         _ => TimeSpan.FromSeconds(60),
     };
 

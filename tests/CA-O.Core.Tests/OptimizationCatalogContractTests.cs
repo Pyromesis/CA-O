@@ -30,6 +30,11 @@ public sealed class OptimizationCatalogContractTests
     [InlineData("set-best-performance-ac", "maximum-power-plan")]
     [InlineData("disk-cleanup-system-files", "cleanup-windows-update-cache")]
     [InlineData("restore-power-plan-after-gaming", "restore-balanced-power-dc")]
+    [InlineData("configure-gaming-power-mode-ac", "maximum-power-plan")]
+    [InlineData("stale-crash-dump-cleanup", "cleanup-crash-dumps-extended")]
+    [InlineData("enable-storage-sense", "configure-storage-sense")]
+    [InlineData("storage-sense-temp-cleanup", "configure-storage-sense")]
+    [InlineData("storage-sense-recycle-bin-policy", "configure-storage-sense")]
     public void RetiredDuplicatesStayOutOfProductionButTraceable(string retiredId, string canonicalId)
     {
         Assert.Contains(retiredId, OptimizationCatalog.LegacyIds);
@@ -45,14 +50,14 @@ public sealed class OptimizationCatalogContractTests
     public void IdsAreUnique()
     {
         var ids = OptimizationCatalog.All.Select(o => o.Definition.Id).ToList();
-        Assert.Equal(91, ids.Count); // 87 + 5 limpiezas nuevas (prefetch, CBS, volcados ext, Outlook, navegadores) - 1 duplicado retirado (restore-power-plan-after-gaming)
+        Assert.Equal(93, ids.Count); // 92 −3 eliminadas −1 fusión gaming-power −1 fusión minidump −2 fusión Sense (3→1) +8 nuevas +1 Sense unificada = 93
         Assert.Equal(ids.Count, ids.Distinct(StringComparer.Ordinal).Count());
     }
 
     [Fact]
-    public void LegacyCatalogKeeps66ForTraceability()
+    public void LegacyCatalogKeeps67ForTraceability()
     {
-        Assert.Equal(66, OptimizationCatalog.AllLegacy.Count);
+        Assert.Equal(67, OptimizationCatalog.AllLegacy.Count);
         foreach (var legacyId in OptimizationCatalog.LegacyIds)
         {
             Assert.Contains(OptimizationCatalog.AllLegacy, o => o.Definition.Id.Equals(legacyId, StringComparison.OrdinalIgnoreCase));

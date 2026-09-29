@@ -191,14 +191,14 @@ public sealed class NewOptimizationsTests
         {
             "disable-nagle-tcp-acks", "disable-wifi-background-scan",
             "disable-pointer-precision", "mouse-driver-queue-trim", "mmcss-system-responsiveness",
-            "defragment-hdd-only", "cleanup-windows-update-cache", "disable-dynamic-tick",
+            "defragment-hdd-only", "cleanup-windows-update-cache",
         })
         {
             var optimization = OptimizationCatalog.All.First(o => o.Definition.Id == id);
             Assert.False(string.IsNullOrWhiteSpace(optimization.Definition.NameEs));
             Assert.False(string.IsNullOrWhiteSpace(optimization.Definition.TooltipEs));
         }
-        Assert.Equal(91, OptimizationCatalog.All.Count); // 87 + 5 limpiezas nuevas - 1 duplicado retirado (restore-power-plan-after-gaming)
+        Assert.Equal(93, OptimizationCatalog.All.Count); // 92 −3 eliminadas −1 fusión gaming-power −1 fusión minidump −2 fusión Sense (3→1) +8 nuevas +1 Sense unificada = 93
     }
 
     [Theory]

@@ -1,14 +1,14 @@
 # CA-O Optimization Catalog
 
-Calidad sobre cantidad. **91 optimizaciones verificadas en producción. 4 optimizaciones históricas retiradas del catálogo de producción; no se incluyen en `OptimizationCatalog.All` y quedan en `AllLegacy` solo para trazabilidad.** Cada entrada responde qué cambia, por qué, con qué evidencia, qué riesgo y seguridad afecta, si es reversible y cómo se verifica.
+Calidad sobre cantidad. **93 optimizaciones verificadas en producción. 12 optimizaciones históricas retiradas del catálogo de producción; no se incluyen en `OptimizationCatalog.All` y quedan en `AllLegacy` solo para trazabilidad.** Cada entrada responde qué cambia, por qué, con qué evidencia, qué riesgo y seguridad afecta, si es reversible y cómo se verifica.
 
 ## Summary
 
 Existing optimizations: 18 (histórico)
 New optimizations: 50 (histórico)
 Total histórico: 68
-**Producción verificada: 91** (ninguna entrada parcial; 4 históricas retiradas y excluidas)
-**Históricas retiradas: 4** (permanecen en `AllLegacy` solo para trazabilidad)
+**Producción verificada: 93** (ninguna entrada parcial; 12 históricas retiradas y excluidas)
+**Históricas retiradas: 12** (permanecen en `AllLegacy` solo para trazabilidad)
 
 ## Evidence model
 
@@ -41,24 +41,30 @@ Nunca se deshabilita silenciosamente Secure Boot/TPM/VBS/HVCI/Defender/firewall.
 - `SecuritySensitive` — `SecurityTradeoff`/`ReducedProtection` (p. ej. `disable-vbs` con anticheat activo).
 - `NotApplicable` — precondiciones no cumplidas (p. ej. Gaming sin Windows 11) o ids legacy.
 
-La columna `Batch` indica si la optimización entra en `CatalogProjections.BatchDefault` (67 de 91): los sets `Repair` (14), `Diagnostic` (4) y `Restore` (6) se excluyen del lote automático y viven en sus propias vistas (Solucionar, diagnósticos, restauración).
+La columna `Batch` indica si la optimización entra en `CatalogProjections.BatchDefault` (65 de 93): los sets `Repair` (15), `Diagnostic` (4) y `Restore` (9) se excluyen del lote automático y viven en sus propias vistas (Solucionar, diagnósticos, restauración).
 
-## Optimization registry — Producción verificada (91)
+## Optimization registry — Producción verificada (93)
 
 | Id | Categoria | Impacto | Evidencia | Riesgo | Compatibilidad | Reversible | Flags | Batch |
 |---|---|---|---|---|---|---|---|---|
+| analyze-component-store | Storage | DiagnosticOnly | Official | Safe | Compatible | Sí | — | No |
 | cleanup-app-caches | Storage | Small | Vendor | Low | Compatible | No | NotReversible | Sí |
 | cleanup-browser-code-cache | Storage | Small | Empirical | Low | Compatible | No | NotReversible | Sí |
 | cleanup-cbs-logs | Storage | None | Empirical | Low | Compatible | No | NotReversible | Sí |
 | cleanup-crash-dumps-extended | Storage | Small | Official | Moderate | Compatible | No | NotReversible | Sí |
 | cleanup-delivery-optimization-cache | Storage | Small | Official | Low | Compatible | No | NotReversible | Sí |
+| cleanup-gpu-shader-cache | Storage | Small | Vendor | Low | Compatible | No | NotReversible | Sí |
+| cleanup-memory-ram | Performance | Small | Official | Low | Compatible | No | NotReversible | Sí |
+| cleanup-nvidia-downloader-cache | Storage | Small | Vendor | Low | Compatible | No | NotReversible | Sí |
 | cleanup-outlook-cache | Storage | Small | Empirical | Low | Compatible | No | NotReversible | Sí |
 | cleanup-prefetch-stale | Storage | None | Empirical | Low | Compatible | No | NotReversible | Sí |
 | cleanup-windows-temp | Storage | Small | Official | Low | Compatible | No | NotReversible | Sí |
 | cleanup-windows-update-cache | Storage | Small | Official | Low | Compatible | No | NotReversible | Sí |
+| cleanup-print-spooler-jobs | Performance | Small | Official | Moderate | Compatible | No | NotReversible | No |
 | clear-icon-thumbnail-cache | Performance | Tiny | Official | Low | Compatible | No | NotReversible | Sí |
-| configure-gaming-power-mode-ac | Gaming | WorkloadDependent | Official | Low | Compatible | Sí | — | Sí |
 | configure-interrupt-moderation-for-low-latency | Network | WorkloadDependent | Vendor | Moderate | Conditional | Sí | — | Sí |
+| configure-storage-sense | Storage | Tiny | Official | Low | Compatible | Sí | — | Sí |
+| configure-storage-sense | Storage | Tiny | Official | Low | Compatible | Sí | — | Sí |
 | create-restore-point-before-optimization-batch | Storage | None | Official | Safe | Compatible | Sí | — | Sí |
 | defragment-hdd-only | Storage | Small | Official | Low | Compatible | No | NotReversible | Sí |
 | delay-safe-third-party-service-start | Performance | Small | Empirical | Low | Compatible | Sí | — | Sí |
@@ -67,8 +73,8 @@ La columna `Batch` indica si la optimización entra en `CatalogProjections.Batch
 | disable-background-game-captures | Gaming | Small | Vendor | Low | Compatible | Sí | — | Sí |
 | disable-bluetooth-absolute-volume | Performance | Tiny | Official | Low | Conditional | Sí | — | No |
 | disable-copilot | PrivacySecurity | None | Vendor | Low | Compatible | Sí | — | Sí |
-| disable-cortana | PrivacySecurity | None | Official | Low | Compatible | Sí | — | Sí |
-| disable-dynamic-tick | Performance | Small | Empirical | Moderate | Conditional | Sí | ExpertOnly, RequiresReboot | Sí |
+| disable-edge-prelaunch | Performance | Small | Official | Low | Compatible | Sí | — | Sí |
+| disable-fast-startup | Performance | Tiny | Official | Low | Compatible | Sí | — | Sí |
 | disable-game-bar-auto-launch | Gaming | Tiny | Official | Safe | Compatible | Sí | — | Sí |
 | disable-game-bar-dvr | Gaming | WorkloadDependent | Vendor | Low | Compatible | Sí | — | Sí |
 | disable-heavy-startup-apps | Performance | Small | Empirical | Moderate | Compatible | Sí | — | Sí |
@@ -93,18 +99,18 @@ La columna `Batch` indica si la optimización entra en `CatalogProjections.Batch
 | enable-game-mode | Gaming | WorkloadDependent | Official | Low | Compatible | Sí | — | Sí |
 | enable-gpu-scheduling | Gaming | WorkloadDependent | Vendor | Moderate | Conditional | Sí | RequiresReboot | Sí |
 | enable-rss | Network | Small | Vendor | Low | Conditional | Sí | — | Sí |
-| enable-storage-sense | Storage | Tiny | Official | Low | Compatible | Sí | — | Sí |
+| enable-rss | Network | Small | Vendor | Low | Conditional | Sí | — | Sí |
 | enable-vrr | Gaming | WorkloadDependent | Official | Low | Conditional | Sí | — | Sí |
 | enable-windowed-game-optimizations | Gaming | WorkloadDependent | Official | Low | Conditional | Sí | — | Sí |
 | ensure-trim-enabled | Storage | Small | Official | Low | Compatible | Sí | — | Sí |
 | fix-microphone-access | Performance | Tiny | Official | Low | Compatible | Sí | — | No |
 | flush-dns-cache | Network | Tiny | Official | Low | Compatible | Sí | OneShot | No |
 | free-low-storage-space | Storage | DiagnosticOnly | Official | Safe | Compatible | Sí | — | No |
-| gaming-display-refresh-rate-audit | Gaming | None | Official | Safe | Compatible | Sí | — | No |
 | maximum-power-plan | Performance | Small | Official | Low | Compatible | Sí | — | Sí |
 | mmcss-system-responsiveness | Gaming | Small | Empirical | Low | Compatible | Sí | — | Sí |
 | mouse-driver-queue-trim | Gaming | Tiny | Empirical | Moderate | Conditional | Sí | RequiresReboot | Sí |
 | normalize-tcp-autotuning | Network | WorkloadDependent | Official | Low | Conditional | Sí | — | Sí |
+| ntfs-disable-last-access | Storage | Small | Official | Low | Compatible | Sí | OneShot, RequiresReboot | Sí |
 | optimize-startup-recovery-state | Storage | DiagnosticOnly | Official | Safe | Compatible | Sí | — | No |
 | optimize-system-drive | Storage | None | Official | Low | Compatible | No | NotReversible | Sí |
 | pending-reboot-maintenance | Storage | DiagnosticOnly | Official | Safe | Compatible | Sí | — | No |
@@ -119,27 +125,25 @@ La columna `Batch` indica si la optimización entra en `CatalogProjections.Batch
 | restart-windows-audio-services | Performance | Small | Official | Low | Compatible | No | NotReversible | No |
 | restart-windows-explorer | Performance | Small | Official | Moderate | Compatible | No | NotReversible | No |
 | restart-windows-search | Performance | Small | Official | Low | Compatible | No | NotReversible | No |
-| restore-balanced-power-dc | Performance | Small | Official | Low | Compatible | Sí | — | Sí |
-| restore-default-gpu-preference | Gaming | Tiny | Official | Low | Compatible | Sí | — | Sí |
+| restore-balanced-power-dc | Performance | Small | Official | Low | Compatible | Sí | — | No |
+| restore-default-gpu-preference | Gaming | Tiny | Official | Low | Compatible | Sí | — | No |
 | restore-large-send-offload | Network | Tiny | Vendor | Low | Conditional | Sí | — | No |
 | restore-sysmain-default | Performance | Small | Official | Low | Compatible | Sí | — | No |
 | restore-system-managed-pagefile | Storage | Small | Official | Low | Compatible | Sí | RequiresReboot | No |
 | restore-tcp-checksum-offload | Network | Tiny | Vendor | Low | Conditional | Sí | — | No |
 | restore-udp-checksum-offload | Network | Tiny | Vendor | Low | Conditional | Sí | — | No |
-| restore-windows-search-default | Performance | Small | Official | Low | Compatible | Sí | — | Sí |
+| restore-windows-search-default | Performance | Small | Official | Low | Compatible | Sí | — | No |
 | restore-windows-tcp-congestion-default | Network | Small | Official | Low | Compatible | Sí | OneShot | No |
 | resync-system-clock | Performance | Tiny | Official | Low | Compatible | No | NotReversible | No |
 | retrim-system-ssd | Storage | Small | Official | Low | Compatible | No | NotReversible | Sí |
+| set-boot-timeout | Performance | Tiny | Official | Low | Conditional | Sí | — | Sí |
 | set-games-high-performance-gpu | Gaming | WorkloadDependent | Official | Low | Conditional | Sí | — | Sí |
 | set-wireless-adapter-max-performance-ac | Performance | Small | Official | Low | Conditional | Sí | OneShot | Sí |
-| stale-crash-dump-cleanup | Storage | Tiny | Official | Low | Compatible | No | NotReversible | Sí |
-| storage-sense-recycle-bin-policy | Storage | Tiny | Official | Low | Compatible | Sí | — | Sí |
-| storage-sense-temp-cleanup | Storage | Tiny | Official | Low | Compatible | Sí | — | Sí |
 | windows-component-store-cleanup | Storage | Small | Official | Moderate | Compatible | No | NotReversible | Sí |
 | windows-component-store-resetbase | Storage | Moderate | Official | High | Compatible | No | NotReversible, ExpertOnly, OneShot **[Gated: ExpertOnly+RestorePoint]** | Sí |
 | zero-menu-delay | Performance | Tiny | Heuristic | Safe | Compatible | Sí | — | Sí |
 
-*4 optimizaciones históricas retiradas del catálogo de producción; permanecen en `AllLegacy` solo para trazabilidad. Ver `OptimizationCatalog.AllLegacy`.*
+*12 optimizaciones históricas retiradas del catálogo de producción; permanecen en `AllLegacy` solo para trazabilidad. Ver `OptimizationCatalog.AllLegacy`.*
 
 ## Optimizaciones retiradas (históricas; no forman parte del catálogo activo)
 
@@ -147,6 +151,14 @@ La columna `Batch` indica si la optimización entra en `CatalogProjections.Batch
 - `optimize-hdd-media-aware` (duplicado de `optimize-system-drive`; alias en `RetiredAliases`)
 - `disk-cleanup-system-files` (duplicado exacto de `cleanup-windows-update-cache`; alias en `LegacyIds`)
 - `restore-power-plan-after-gaming` (duplicado de `restore-balanced-power-dc`; alias en `LegacyIds`)
+- `disable-dynamic-tick` (eliminada auditoría 2026-09-29: sin efecto medible; sin alias, solo `LegacyIds`)
+- `disable-cortana` (eliminada auditoría 2026-09-29: Cortana retirada de Windows; sin alias, solo `LegacyIds`)
+- `gaming-display-refresh-rate-audit` (eliminada auditoría 2026-09-29: diagnóstico sin acción; sin alias, solo `LegacyIds`)
+- `configure-gaming-power-mode-ac` (fusionada en `maximum-power-plan`; alias en `RetiredAliases`)
+- `stale-crash-dump-cleanup` (fusionada en `cleanup-crash-dumps-extended`; alias en `RetiredAliases`)
+- `enable-storage-sense` (fusionada en `configure-storage-sense`; alias en `RetiredAliases`)
+- `storage-sense-temp-cleanup` (fusionada en `configure-storage-sense`; alias en `RetiredAliases`)
+- `storage-sense-recycle-bin-policy` (fusionada en `configure-storage-sense`; alias en `RetiredAliases`)
 
 ## Detailed definitions
 
@@ -156,11 +168,17 @@ Ratón 1:1 sin aceleración
 ### mouse-driver-queue-trim
 Cola de ratón 32
 
+### disable-edge-prelaunch
+Sin precarga de Edge (AllowPrelaunch=0)
+
+### disable-fast-startup
+Apagado completo (HiberbootEnabled=0); no duplica a disable-hibernate
+
 ### mmcss-system-responsiveness
 Prioridad MMCSS al juego
 
-### disable-dynamic-tick
-Tick estable bcdedit
+### set-boot-timeout
+Menú de arranque a 5 s, solo multiboot
 
 ### enable-game-mode
 
@@ -256,17 +274,14 @@ Separa Game DVR de capturas
 ### disable-game-bar-auto-launch
 Evita inicio automatico
 
-### configure-gaming-power-mode-ac
-AC -> Best Performance
-
-### restore-default-gpu-preference
-Restaura preferencia
+### restore-default-gpu-preference **[Restore]**
+Limpia tokens GPU de CA-O sin tocar el resto
 
 ### enable-auto-hdr
-Visual, no FPS
+Visual, no FPS (Detect Unknown en build 26100+)
 
-### gaming-display-refresh-rate-audit **[Diagnostic]**
-Audita Hz
+### ntfs-disable-last-access
+Sin last access NTFS (fsutil, acción única, requiere reinicio)
 
 ### disable-usb-selective-suspend-ac
 Solo Competitive AC (powercfg, acción única)
@@ -277,7 +292,7 @@ Solo AC PCIe (powercfg, acción única)
 ### set-wireless-adapter-max-performance-ac
 Wi-Fi max rendimiento (powercfg, acción única)
 
-### restore-balanced-power-dc
+### restore-balanced-power-dc **[Restore]**
 DC -> Balanced
 
 ### remove-unused-custom-power-plans
@@ -292,14 +307,8 @@ ReTrim SSD
 ### optimize-system-drive
 defrag /O segun medio
 
-### enable-storage-sense
-Storage Sense
-
-### storage-sense-temp-cleanup
-Temporales
-
-### storage-sense-recycle-bin-policy
-Papelera 7-90 dias
+### configure-storage-sense
+Storage Sense completo (6 valores de una vez)
 
 ### cleanup-windows-temp
 Temporales Windows
@@ -323,7 +332,13 @@ Prefetch *.pf +30d (solo espacio)
 CBS *.log +30d (solo espacio)
 
 ### cleanup-crash-dumps-extended
-LiveKernelReports + MEMORY.DMP + CrashDumps por usuario (+30d)
+Minidump + LiveKernelReports + MEMORY.DMP + CrashDumps por usuario (+30d)
+
+### cleanup-gpu-shader-cache
+Shaders NVIDIA/AMD/Intel (+50 MB, nunca drivers)
+
+### cleanup-nvidia-downloader-cache
+Instaladores viejos de GeForce Experience
 
 ### cleanup-outlook-cache
 Adjuntos temp Outlook Content.Outlook +7d
@@ -331,14 +346,20 @@ Adjuntos temp Outlook Content.Outlook +7d
 ### cleanup-browser-code-cache
 Cachés regenerables Chrome/Edge/Teams (nunca sesiones)
 
+### cleanup-memory-ram
+EmptyWorkingSet por proceso + purga standby en SYSTEM (efecto temporal, no acelera)
+
 ### windows-component-store-cleanup
 DISM StartComponentCleanup
 
 ### windows-component-store-resetbase **[Gated: ExpertOnly+RestorePoint]**
 DISM ResetBase, irreversible, acción única
 
+### analyze-component-store **[Diagnostic]**
+DISM AnalyzeComponentStore: tamaño WinSxS + recomendación (solo informa)
+
 ### free-low-storage-space **[Diagnostic]**
-Umbrales 10/15/20%
+Umbral fijo 10 GB libres en C:
 
 ### restore-system-managed-pagefile **[Restore]**
 System Managed
@@ -394,17 +415,17 @@ Disable tareas
 ### restore-sysmain-default **[Restore]**
 Restaura SysMain
 
-### restore-windows-search-default
+### restore-windows-search-default **[Restore]**
 Restaura Search
 
 ### create-restore-point-before-optimization-batch
 SRSetRestorePoint
 
+### cleanup-print-spooler-jobs **[Repair]**
+Vacía *.SPL/*.SHD con Spooler detenido (pide confirmación)
+
 ### pending-reboot-maintenance **[Diagnostic]**
 Detecta reboot
-
-### stale-crash-dump-cleanup
-Dumps antiguos
 
 ### optimize-startup-recovery-state **[Diagnostic]**
 Audita boot

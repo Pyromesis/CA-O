@@ -256,7 +256,7 @@ private async Task InstallAsync()
                 Run("sc.exe", $"delete {serviceName}", true);
                 await Task.Delay(600);
             }
-            Run("sc.exe", $"create {serviceName} binPath= \"{Path.Combine(destSvc, "CA-O.Privileged.exe")}\" start= demand DisplayName= \"CA-O Privileged Service\"");
+            Run("sc.exe", $"create {serviceName} binPath= \"{Path.Combine(destSvc, "CA-O.Privileged.exe")}\" start= delayed-auto DisplayName= \"CA-O Privileged Service\"");
             Run("sc.exe", $"failure {serviceName} reset= 86400 actions= restart/5000/restart/10000/reboot/60000");
             Run("sc.exe", $"description {serviceName} \"CA-O {CAO.Shared.Constants.BuildConstants.ProductVersion} servicio privilegiado - IPC Named Pipe con ACL + replay guard\"");
 

@@ -30,6 +30,7 @@ public sealed class SystemCommandGateway : IPrivilegedCommandExecutor
     {
         SystemCommandKey.DismStartComponentCleanup => HeavyTimeout,
         SystemCommandKey.DismResetBase => HeavyTimeout,
+        SystemCommandKey.DismAnalyzeComponentStore => HeavyTimeout,
         SystemCommandKey.DefragC => HeavyTimeout,
         SystemCommandKey.DefragHdd => HeavyTimeout,
         SystemCommandKey.DefragRetrim => HeavyTimeout,

@@ -125,8 +125,12 @@ public sealed class DisableNicPowerSavingAc : IOptimization
         });
     }
 
+    // Auditoría 2026-09-29 (C1): la precondición anunciaba "Solo con
+    // alimentación AC" pero nunca lo comprobaba. Patrón de las Power* AC.
     public Task<PreconditionResult> CheckPreconditionsAsync(SystemContext context, CancellationToken ct = default) =>
-        Task.FromResult(PreconditionResult.Ok("Solo con alimentación AC."));
+        Task.FromResult(context.OnBattery
+            ? PreconditionResult.Fail("Solo con alimentación AC: conecte el cargador.")
+            : PreconditionResult.Ok("Con alimentación AC."));
 
     public Task<OptimizationPreview> PreviewAsync(IRegistryAccessor registry, CancellationToken ct = default)
     {

@@ -11,12 +11,13 @@ namespace CAO.Core.Optimization;
 /// </summary>
 public static class OptimizationConflicts
 {
-    /// <summary>Planes de energía: un solo esquema activo (GUID canónico).</summary>
+    /// <summary>Planes de energía: un solo esquema activo (GUID canónico).
+    /// configure-gaming-power-mode-ac se retiró (auditoría 2026-09-29,
+    /// alias de maximum-power-plan): fuera del grupo.</summary>
     public static IReadOnlyDictionary<string, string> PowerSchemeTargets { get; } =
         new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
             ["maximum-power-plan"] = PowerSchemes.HighPerformanceGuid,
-            ["configure-gaming-power-mode-ac"] = PowerSchemes.UltimatePerformanceGuid,
             ["restore-balanced-power-dc"] = PowerSchemes.BalancedGuid,
         };
 

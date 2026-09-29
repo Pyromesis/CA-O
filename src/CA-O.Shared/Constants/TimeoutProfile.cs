@@ -29,6 +29,10 @@ public static class TimeoutProfile
     /// <summary>
     /// Optimizaciones cuyo Apply/Revert despacha hasta <see cref="DispatchHeavy"/>
     /// en el servicio. Compartido por servicio, gateway y cliente UI.
+    /// Auditoría 2026-09-29 (C3): cleanup-app-caches puede tardar minutos
+    /// (el cliente esperaba 20 min y el servicio mataba a 60 s);
+    /// disk-cleanup-system-files sale (id retirado); analyze-component-store
+    /// entra (DISM puede superar 60 s en equipos lentos).
     /// </summary>
     public static readonly HashSet<string> HeavyOptimizationIds = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -37,8 +41,9 @@ public static class TimeoutProfile
         "optimize-system-drive",
         "retrim-system-ssd",
         "defragment-hdd-only",
-        "disk-cleanup-system-files",
         "cleanup-windows-update-cache",
+        "cleanup-app-caches",
+        "analyze-component-store",
         "reset-network-stack-repair",
         "repair-windows-update",
     };
