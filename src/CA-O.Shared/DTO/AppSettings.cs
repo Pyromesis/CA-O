@@ -33,6 +33,12 @@ public sealed class UiSettings
     /// </summary>
     [JsonPropertyName("read_only_mode")]
     public bool ReadOnlyMode { get; set; }
+
+    [JsonPropertyName("minimize_to_tray")]
+    public bool MinimizeToTray { get; set; } = true;
+
+    [JsonPropertyName("close_to_tray")]
+    public bool CloseToTray { get; set; } = true;
 }
 
 /// <summary>Cached system information from the last scan.</summary>

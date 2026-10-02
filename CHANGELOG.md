@@ -2,6 +2,15 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
+## [2.2.1] - 2026-10-02
+
+### Añadido
+- Minimizar a la bandeja: cerrar (X) y minimizar envían la ventana a la bandeja (`CloseToTray`/`MinimizeToTray`, activados por defecto y persistentes), con menú Abrir/minimizar/cerrar/Salir y single-instance (la 2ª instancia restaura la 1ª y sale). Nueva tarjeta "Bandeja del sistema" en Ajustes (es/en). `TrayIconManager` Win32 puro, sin WinForms.
+
+### Corregido
+- Icono de bandeja invisible (slot gris con tooltip "CA-O" en el flyout de iconos ocultos): `EnsureCreated`/`Show` ya nunca hacen `NIM_ADD` sin `NIF_ICON`, y `ResolveIcon` encadena fallbacks (small → large → `LoadImage` 16/32 → icono del exe → `IDI_APPLICATION`) con log en `%LocalAppData%\CA-O\logs`.
+- ICO regenerado: badge teal sobre fondo sólido 100 % opaco (`scripts/regenerate-app-icon.py`, 7 tamaños 16–256), sin cambios en taskbar ni TitleBar.
+
 ## [2.2.0] - 2026-09-29
 
 ### Añadido

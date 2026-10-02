@@ -33,6 +33,8 @@ internal static class AppHost
         services.AddSingleton<UiState>();
 
         // Infrastructure
+        // Persisted settings (%AppData%\CA-O\settings.json, atómico)
+        services.AddSingleton<ISettingsStore, JsonSettingsStore>();
         services.AddSingleton<ISystemInfoProvider, WmiSystemInfoProvider>();
         services.AddSingleton<SystemContextProvider>();
         services.AddSingleton<ISystemContextProvider>(sp => sp.GetRequiredService<SystemContextProvider>());

@@ -1,4 +1,5 @@
 using System.Text;
+using System.Threading;
 using Microsoft.UI.Xaml;
 using Windows.Storage;
 
@@ -7,6 +8,12 @@ namespace CAO.UI;
 public partial class App : Application
 {
     private Window? _window;
+
+    /// <summary>Instancia unica: mutex + evento para restaurar la ventana existente.</summary>
+    private static Mutex? _instanceMutex;
+    private static EventWaitHandle? _showEvent;
+    private const string SingleInstanceMutexName = @"Local\CA-O-SingleInstance";
+    private const string ShowWindowEventName = @"Local\CA-O-ShowWindow";
 
     /// <summary>Cronómetro de arranque frío para diagnosticar lentitud.</summary>
     internal static readonly System.Diagnostics.Stopwatch BootWatch = System.Diagnostics.Stopwatch.StartNew();
@@ -29,9 +36,21 @@ public partial class App : Application
 
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
+        if (!EnsureSingleInstance())
+            return;
         try
         {
             AppHost.Initialize();
+        // Bandeja: hidrata prefs persistidas antes de crear la ventana.
+        try
+        {
+            var store = AppHost.Resolve<CAO.Core.Abstractions.ISettingsStore>();
+            var uiState = AppHost.Resolve<CAO.UI.ViewModels.UiState>();
+            var saved = store.Load();
+            uiState.MinimizeToTray = saved.Ui.MinimizeToTray;
+            uiState.CloseToTray = saved.Ui.CloseToTray;
+        }
+        catch (Exception ex) { WriteCrashLog(ex); /* degraded: defaults true, no bloquea arranque */ }
         // Phase 1 startup: load persisted analysis centrally via AnalysisSessionService (§7)
         try
         {
@@ -69,6 +88,43 @@ public partial class App : Application
 
     [System.Runtime.InteropServices.DllImport("user32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
     private static extern int MessageBoxW(IntPtr hWnd, string text, string caption, uint type);
+
+    /// <summary>
+    /// Instancia unica: si CA-O ya corre, senaliza a la ventana existente
+    /// (se restaura desde la bandeja) y esta copia sale sin crear ventana.
+    /// </summary>
+    /// <returns>false si ya habia otra instancia (no continuar el arranque).</returns>
+    private bool EnsureSingleInstance()
+    {
+        try
+        {
+            _instanceMutex = new Mutex(true, SingleInstanceMutexName, out bool created);
+            if (!created)
+            {
+                try { using var signal = EventWaitHandle.OpenExisting(ShowWindowEventName); signal.Set(); }
+                catch { }
+                return false;
+            }
+            _showEvent = new EventWaitHandle(false, EventResetMode.AutoReset, ShowWindowEventName);
+            new Thread(ListenForShowRequests) { IsBackground = true }.Start();
+            return true;
+        }
+        catch { return true; /* degraded: sin mutex, arranque normal */ }
+    }
+
+    /// <summary>Bucle de fondo: restaura la ventana cuando otra copia la senaliza.</summary>
+    private void ListenForShowRequests()
+    {
+        try
+        {
+            while (_showEvent != null && _showEvent.WaitOne())
+            {
+                try { _window?.DispatcherQueue.TryEnqueue(() => (_window as MainWindow)?.RestoreFromTray()); }
+                catch { }
+            }
+        }
+        catch { }
+    }
 
     private static void ShowFatalError(Exception ex)
     {

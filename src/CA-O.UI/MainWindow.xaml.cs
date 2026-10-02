@@ -1,3 +1,4 @@
+using CAO.UI.Helpers;
 using CAO.UI.Pages;
 using Microsoft.UI;
 using Microsoft.UI.Xaml;
@@ -18,6 +19,11 @@ public sealed partial class MainWindow : Window
     public static Action<string>? ApplyThemeGlobally { get; private set; }
 
     public static new MainWindow? Current { get; private set; }
+
+    /// <summary>Bandeja del sistema (minimize-to-tray / close-to-tray). Null si la creacion fallo.</summary>
+    private TrayIconManager? _tray;
+    private ViewModels.UiState? _uiState;
+    private bool _allowClose;
     public void SelectRoute(string tag)
     {
         foreach (var item in EnumerateItems())
@@ -50,6 +56,8 @@ public sealed partial class MainWindow : Window
             root.ActualThemeChanged += (_, _) => UpdateCaptionButtonColors();
         TrySetWindowIcon();
         var uiState = AppHost.Resolve<ViewModels.UiState>();
+        _uiState = uiState;
+        AttachTrayIcon();
         uiState.LanguageChanged += (_, language) => ApplyLocalization();
         uiState.PropertyChanged += (_, e) =>
         {
@@ -341,6 +349,117 @@ public sealed partial class MainWindow : Window
             if (File.Exists(iconPath)) AppWindow.SetIcon(iconPath);
         }
         catch { }
+    }
+
+    /// <summary>
+    /// Crea el icono de bandeja y suscribe Closing/minimizado.
+    /// Toda la logica vive en TrayIconManager; aqui solo el cableado ventana.
+    /// </summary>
+    private void AttachTrayIcon()
+    {
+        try
+        {
+            _tray = new TrayIconManager();
+            var iconPath = Path.Combine(AppContext.BaseDirectory, "Assets", "app-icon.ico");
+            _tray.EnsureCreated(iconPath, "CA-O");
+            SyncTrayMenu();
+            _tray.OpenRequested += (_, _) => DispatcherQueue.TryEnqueue(RestoreFromTray);
+            _tray.ExitRequested += (_, _) => DispatcherQueue.TryEnqueue(() =>
+            {
+                _allowClose = true;
+                Close();
+            });
+            _tray.MinimizeToTrayChanged += (_, v) => { if (_uiState != null) _uiState.MinimizeToTray = v; };
+            _tray.CloseToTrayChanged += (_, v) => { if (_uiState != null) _uiState.CloseToTray = v; };
+            AppWindow.Closing += OnAppWindowClosing;
+            WatchMinimizeToTray(WinRT.Interop.WindowNative.GetWindowHandle(this));
+            Closed += (_, _) => _tray?.Dispose();
+            if (_uiState != null)
+                _uiState.PropertyChanged += (_, e) =>
+                {
+                    if (e.PropertyName is nameof(ViewModels.UiState.MinimizeToTray)
+                        or nameof(ViewModels.UiState.CloseToTray))
+                        DispatcherQueue.TryEnqueue(SyncTrayMenu);
+                };
+        }
+        catch { _tray = null; }
+    }
+
+    /// <summary>X => bandeja cuando close_to_tray; salida real solo desde el menu del icono.</summary>
+    private void OnAppWindowClosing(AppWindow sender, AppWindowClosingEventArgs args)
+    {
+        if (_allowClose) return;
+        if (_uiState?.CloseToTray == true)
+        {
+            args.Cancel = true;
+            DispatcherQueue.TryEnqueue(() =>
+            {
+                AppWindow.Hide();
+                _tray?.Show();
+                SyncTrayMenu();
+            });
+        }
+    }
+
+    // Minimizar => ocultar a bandeja mediante subclase Win32 de la ventana
+    // (este SDK no expone OverlappedPresenter.StateChanged). El delegado vive
+    // en campo para que el GC no lo libere mientras la ventana existe.
+    private delegate nint TrayWndProc(nint hWnd, uint msg, nint wParam, nint lParam);
+    private TrayWndProc? _traySubclass;
+    private nint _prevWndProc;
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern nint SetWindowLongPtr(nint hWnd, int nIndex, TrayWndProc newProc);
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern nint CallWindowProc(nint lpPrevWndFunc, nint hWnd, uint msg, nint wParam, nint lParam);
+
+    private void WatchMinimizeToTray(nint hwnd)
+    {
+        try
+        {
+            _traySubclass = TrayWindowProc;
+            _prevWndProc = SetWindowLongPtr(hwnd, -4 /* GWLP_WNDPROC */, _traySubclass);
+        }
+        catch { }
+    }
+
+    private nint TrayWindowProc(nint hWnd, uint msg, nint wParam, nint lParam)
+    {
+        const uint wmSysCommand = 0x0112;
+        const nint scMinimize = 0xF020;
+        if (msg == wmSysCommand && (wParam & 0xFFF0) == scMinimize && _uiState?.MinimizeToTray == true)
+        {
+            DispatcherQueue.TryEnqueue(() =>
+            {
+                AppWindow.Hide();
+                _tray?.Show();
+            });
+            return nint.Zero;
+        }
+        return CallWindowProc(_prevWndProc, hWnd, msg, wParam, lParam);
+    }
+
+    /// <summary>Restaura la ventana desde la bandeja (doble clic, Abrir o segunda instancia).</summary>
+    internal void RestoreFromTray()
+    {
+        try
+        {
+            if (AppWindow.Presenter is OverlappedPresenter overlapped
+                && overlapped.State == OverlappedPresenterState.Minimized)
+                overlapped.Restore();
+            else
+                AppWindow.Show();
+            Activate();
+            _tray?.Hide();
+        }
+        catch { try { Activate(); } catch { } }
+    }
+
+    private void SyncTrayMenu()
+    {
+        if (_uiState is null) return;
+        _tray?.SyncMenu(_uiState.MinimizeToTray, _uiState.CloseToTray);
     }
 
     private async Task CheckForUpdatesAsync()

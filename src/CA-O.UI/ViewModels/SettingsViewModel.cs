@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using CAO.Core.Abstractions;
 using CAO.Shared;
 
 namespace CAO.UI.ViewModels;
@@ -9,14 +10,25 @@ public sealed partial class SettingsViewModel : ObservableObject
 {
     private readonly UiState _state;
     private readonly PrivilegedPipeClient _pipe;
+    private readonly ISettingsStore _store;
 
-    public SettingsViewModel(UiState state, PrivilegedPipeClient pipe)
+    public SettingsViewModel(UiState state, PrivilegedPipeClient pipe, ISettingsStore store)
     {
         _state = state;
         _pipe = pipe;
+        _store = store;
+        try
+        {
+            var persisted = _store.Load();
+            state.MinimizeToTray = persisted.Ui.MinimizeToTray;
+            state.CloseToTray = persisted.Ui.CloseToTray;
+        }
+        catch { }
         _expertMode = state.ExpertMode;
         _theme = state.Theme;
         _language = state.Language;
+        _minimizeToTray = state.MinimizeToTray;
+        _closeToTray = state.CloseToTray;
         _serviceStatus = state.ServiceStatus;
         _serviceCheckedUtc = state.ServiceCheckedUtc;
     }
@@ -24,6 +36,8 @@ public sealed partial class SettingsViewModel : ObservableObject
     [ObservableProperty] private bool _expertMode;
     [ObservableProperty] private string _theme;
     [ObservableProperty] private string _language;
+    [ObservableProperty] private bool _minimizeToTray;
+    [ObservableProperty] private bool _closeToTray;
     [ObservableProperty] private string _serviceStatus;
     [ObservableProperty] private DateTime? _serviceCheckedUtc;
     [ObservableProperty] private bool _isCheckingService;
@@ -42,6 +56,33 @@ public sealed partial class SettingsViewModel : ObservableObject
     partial void OnLanguageChanged(string value)
     {
         if (value != _state.Language) _state.Language = value;
+    }
+
+    partial void OnMinimizeToTrayChanged(bool value)
+    {
+        _state.MinimizeToTray = value;
+        PersistTrayPrefs();
+    }
+
+    partial void OnCloseToTrayChanged(bool value)
+    {
+        _state.CloseToTray = value;
+        PersistTrayPrefs();
+    }
+
+    private void PersistTrayPrefs()
+    {
+        try
+        {
+            var settings = _store.Load();
+            settings.Ui.MinimizeToTray = _state.MinimizeToTray;
+            settings.Ui.CloseToTray = _state.CloseToTray;
+            _store.Save(settings);
+        }
+        catch (Exception ex)
+        {
+            try { App.WriteCrashLog(ex); } catch { }
+        }
     }
 
     [RelayCommand]

@@ -15,6 +15,8 @@ public sealed class UiState : ObservableObject
     private bool _expertMode;
     private string _theme = "system";
     private string _language = "es-ES";
+    private bool _minimizeToTray = true;
+    private bool _closeToTray = true;
     private DateTime? _lastAnalysisUtc;
     private string _serviceStatus = "unknown";
     private string _serviceVersion = string.Empty;
@@ -53,6 +55,20 @@ public sealed class UiState : ObservableObject
     {
         get => _language;
         set { if (SetProperty(ref _language, value)) LanguageChanged?.Invoke(this, value); }
+    }
+
+    /// <summary>Minimizar envía la ventana a la bandeja del sistema en vez de a la barra de tareas.</summary>
+    public bool MinimizeToTray
+    {
+        get => _minimizeToTray;
+        set => SetProperty(ref _minimizeToTray, value);
+    }
+
+    /// <summary>Cerrar (X) oculta la ventana en la bandeja en vez de salir; la salida real es desde el menú del icono.</summary>
+    public bool CloseToTray
+    {
+        get => _closeToTray;
+        set => SetProperty(ref _closeToTray, value);
     }
 
     public DateTime? LastAnalysisUtc

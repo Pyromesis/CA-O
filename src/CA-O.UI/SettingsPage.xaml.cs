@@ -37,6 +37,8 @@ public sealed partial class SettingsPage : Page
             DataContext = _vm;
             ExpertSwitch.IsOn = _vm.ExpertMode;
             ExpertWarnBar.IsOpen = _vm.ExpertMode;
+            MinimizeToTraySwitch.IsOn = _vm.MinimizeToTray;
+            CloseToTraySwitch.IsOn = _vm.CloseToTray;
             Select(ThemeBox, _vm.Theme);
             Select(LanguageBox, _vm.Language);
             
@@ -88,6 +90,12 @@ public sealed partial class SettingsPage : Page
             if (ThemeLabel != null) ThemeLabel.Text = Localizer.Get("settings.theme") ?? "Tema";
             if (LanguageLabel != null) LanguageLabel.Text = Localizer.Get("settings.language") ?? "Idioma";
             if (ExpertSwitch != null) ExpertSwitch.Header = Localizer.Get("settings.expertMode") ?? "Modo Expert";
+            if (TrayTitleText != null) TrayTitleText.Text = Localizer.Get("settings.trayTitle") ?? "Bandeja del sistema";
+            if (TrayDescText != null) TrayDescText.Text = Localizer.Get("settings.trayDesc") ?? "CA-O sigue ejecutándose en segundo plano";
+            if (MinimizeToTraySwitch != null) MinimizeToTraySwitch.Header = Localizer.Get("settings.minimizeToTray") ?? "Minimizar a la bandeja";
+            if (MinimizeToTrayDescText != null) MinimizeToTrayDescText.Text = Localizer.Get("settings.minimizeToTrayDesc") ?? "Al minimizar, la ventana se oculta en la bandeja.";
+            if (CloseToTraySwitch != null) CloseToTraySwitch.Header = Localizer.Get("settings.closeToTray") ?? "Cerrar a la bandeja";
+            if (CloseToTrayDescText != null) CloseToTrayDescText.Text = Localizer.Get("settings.closeToTrayDesc") ?? "Al cerrar con la X, la app se oculta en la bandeja en vez de salir.";
             if (ExpertWarnBar != null) ExpertWarnBar.Message = Localizer.Get("optimize.expertWarning") ?? "Modo Expert habilitado";
             if (ServiceInstallButton != null) ServiceInstallButton.Content = Localizer.Get("settings.serviceInstall") ?? "Instalar ahora";
             if (ServiceExplanationBar != null)
@@ -314,6 +322,18 @@ public sealed partial class SettingsPage : Page
         if (_vm is null || ExpertSwitch is null) return;
         _vm.ExpertMode = ExpertSwitch.IsOn;
         ExpertWarnBar.IsOpen = ExpertSwitch.IsOn;
+    }
+
+    private void OnMinimizeToTrayToggled(object sender, RoutedEventArgs e)
+    {
+        if (_vm is null || MinimizeToTraySwitch is null) return;
+        _vm.MinimizeToTray = MinimizeToTraySwitch.IsOn;
+    }
+
+    private void OnCloseToTrayToggled(object sender, RoutedEventArgs e)
+    {
+        if (_vm is null || CloseToTraySwitch is null) return;
+        _vm.CloseToTray = CloseToTraySwitch.IsOn;
     }
 
     private void OnThemeSelected(object sender, SelectionChangedEventArgs e)
