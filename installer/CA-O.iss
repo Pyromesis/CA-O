@@ -3,7 +3,7 @@
 ; (lee la versión de BuildConstants.cs y firma con CAO_SIGN_THUMBPRINT si existe)
 
 #ifndef AppVersion
-  #define AppVersion "2.2.1"
+  #define AppVersion "2.2.2"
 #endif
 #ifndef RepoRoot
   #define RepoRoot ".."
@@ -106,6 +106,15 @@ begin
     MsgBox('No se encontró el servicio privilegiado en:' + #13#10 + SvcExe + #13#10 + 'La instalación continuará, pero deberá reinstalar.', mbError, MB_OK);
     Exit;
   end;
+  // El servicio se instala en equipos que nunca tuvieron .NET: si el payload no
+  // trae su propio runtime, el proceso aborta dentro del apphost antes de hablar
+  // con el SCM (StartService ERROR 1053 / SERVICE_NEVER_STARTED). No lo registres.
+  if not FileExists(ExpandConstant('{app}\service\coreclr.dll')) then
+  begin
+    Log('ERROR: payload del servicio no es self-contained (falta coreclr.dll)');
+    MsgBox('El paquete del servicio no incluye su propio runtime de .NET (falta coreclr.dll).' + #13#10 + 'El servicio no podría arrancar en este equipo. Descarga el instalador de nuevo.', mbError, MB_OK);
+    Exit;
+  end;
   // Reinstalación limpia: si existía de una versión anterior, fuera.
   Exec(ExpandConstant('{sys}\sc.exe'), 'stop ' + ServiceName, '', SW_HIDE, ewWaitUntilTerminated, Res);
   Sleep(800);
@@ -122,7 +131,17 @@ begin
   Exec(ExpandConstant('{sys}\sc.exe'), 'description ' + ServiceName + ' "CA-O servicio privilegiado - IPC Named Pipe con ACL + replay guard"', '', SW_HIDE, ewWaitUntilTerminated, Res);
   Exec(ExpandConstant('{sys}\sc.exe'), 'start ' + ServiceName, '', SW_HIDE, ewWaitUntilTerminated, Res);
   if Res <> 0 then
-    Log('WARN: sc start devolvió ' + IntToStr(Res) + ' (servicio registrado pero detenido: la app lo arrancará).');
+  begin
+    // Antes esto solo dejaba una línea en el log: el usuario se quedaba sin
+    // diagnóstico. Un servicio registrado y parado es el fallo reportado.
+    Log('ERROR: sc start devolvió ' + IntToStr(Res) + ' (servicio registrado pero NO en ejecución)');
+    Exec(ExpandConstant('{sys}\sc.exe'), 'query ' + ServiceName, '', SW_HIDE, ewWaitUntilTerminated, Res);
+    MsgBox('El servicio CAO.Privileged quedó registrado pero NO arrancó.' + #13#10 + #13#10 +
+           'Causas frecuentes:' + #13#10 +
+           '- El equipo no tiene el runtime de .NET y el antivirus bloqueó el payload.' + #13#10 +
+           '- El antivirus o una política bloqueó "C:\Program Files\CA-O\service".' + #13#10 + #13#10 +
+           'Abre "Visor de eventos > Aplicación" para ver el error exacto del servicio.', mbError, MB_OK);
+  end;
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);

@@ -2,6 +2,16 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
+## [2.2.2] - 2026-10-03
+
+### Corregido
+- El servicio privilegiado no arrancaba en una instalación nueva ni en la actualización de una existente: el payload se publicaba framework-dependent (`--self-contained false`) y ningún instalador incluye el runtime de .NET, así que el apphost abortaba con "You must install .NET to run this application" antes de llamar a `StartServiceCtrlDispatcher` y el SCM reportaba `StartService ERROR 1053` con `ESTADO_DE_SALIDA_DE_WIN32 1` aunque el servicio estuviera correctamente registrado. `CA-O.Privileged` es ahora `<SelfContained>true</SelfContained>` y los tres scripts de publish publican el servicio con `--self-contained true /p:PublishSingleFile=false /p:PublishTrimmed=false`.
+- Actualizar ya deja el servicio operativo en máquinas sin .NET instalado: los dos instaladores detienen y borran el servicio previo, copian el payload self-contained en `<install>\service`, lo re-registran (`delayed-auto` + `sc failure reset= 86400`) y arrancan el servicio.
+
+### Añadido
+- Verificación de payload self-contained en `build-release.ps1`, `install.ps1` y `publish-privileged-service.ps1`: si falta `coreclr.dll` en el publish del servicio, el script falla y el release no se puede construir.
+- 5 tests de regresión de contrato de empaquetado en `tests/CA-O.Integration.Tests/PrivilegedServicePackagingTests.cs`: el csproj declara `SelfContained`, ningún script de publish pasa `--self-contained false` y `build-release.ps1` comprueba `coreclr.dll`.
+
 ## [2.2.1] - 2026-10-02
 
 ### Añadido

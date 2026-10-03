@@ -73,7 +73,7 @@ dotnet publish $uiProject -c $Configuration -r $RuntimeIdentifier --self-contain
 if ($LASTEXITCODE -ne 0) { throw "Publish UI failed with exit code $LASTEXITCODE" }
 
 Write-Host "Publishing Privileged Service..." -ForegroundColor Gray
-dotnet publish $serviceProject -c $Configuration -r $RuntimeIdentifier --self-contained false --output $serviceOutput --no-restore
+dotnet publish $serviceProject -c $Configuration -r $RuntimeIdentifier --self-contained true /p:PublishSingleFile=false /p:PublishTrimmed=false --output $serviceOutput --no-restore
 if ($LASTEXITCODE -ne 0) { throw "Publish Service failed with exit code $LASTEXITCODE" }
 
 # Verify publish outputs
@@ -81,6 +81,10 @@ $uiExe = Join-Path $uiOutput (Get-BuildConstant 'UiExecutable')
 $svcExe = Join-Path $serviceOutput (Get-BuildConstant 'ServiceExecutable')
 if (-not (Test-Path $uiExe)) { throw "UI executable not found at $uiExe" }
 if (-not (Test-Path $svcExe)) { throw "Service executable not found at $svcExe" }
+
+# Self-contained is mandatory: without it the apphost aborts before
+# StartServiceCtrlDispatcher on machines without the .NET runtime.
+if (-not (Test-Path (Join-Path $serviceOutput 'coreclr.dll'))) { throw "Privileged service payload is not self-contained (coreclr.dll missing at $serviceOutput)" }
 
 Write-Host "== 2/5 Copying to Program Files ==" -ForegroundColor Cyan
 $target = Join-Path $env:ProgramFiles (Get-BuildConstant 'InstallDirectoryName')

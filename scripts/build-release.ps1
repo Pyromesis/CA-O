@@ -99,11 +99,18 @@ if (-not (Test-Path $uiPriPath)) { throw "UI .pri not found at $uiPriPath" }
 
 Write-Host '== Publish Privileged Service ==' -ForegroundColor Cyan
 $serviceProject = Join-Path $repository 'src\CA-O.Privileged\CA-O.Privileged.csproj'
-dotnet publish $serviceProject --configuration $Configuration --runtime $RuntimeIdentifier --self-contained false --output $serviceOutput --no-restore
+dotnet publish $serviceProject --configuration $Configuration --runtime $RuntimeIdentifier --self-contained true /p:PublishSingleFile=false /p:PublishTrimmed=false --output $serviceOutput --no-restore
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 $svcExePath = Join-Path $serviceOutput (Get-BuildConstant 'ServiceExecutable')
 if (-not (Test-Path $svcExePath)) { throw "Service executable not found at $svcExePath" }
+
+# The service runs on machines that never had the .NET SDK, so it must ship its
+# own runtime. A framework-dependent apphost aborts before StartServiceCtrlDispatcher,
+# which the SCM reports as "StartService ERROR 1053" / SERVICE_NEVER_STARTED.
+if (-not (Test-Path (Join-Path $serviceOutput 'coreclr.dll'))) {
+    throw "Privileged service payload is not self-contained (coreclr.dll missing in $serviceOutput)"
+}
 
 Write-Host '== Publish Uninstaller (GUI, no single-file) ==' -ForegroundColor Cyan
 $uninstallProject = Join-Path $repository 'src\CA-O.Uninstaller\CA-O.Uninstaller.csproj'

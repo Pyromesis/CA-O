@@ -245,6 +245,15 @@ private async Task InstallAsync()
             }
             await CopyWithRetry(Path.GetDirectoryName(payloadUi)!, destUi);
             await CopyWithRetry(Path.GetDirectoryName(payloadService)!, destSvc);
+            // El servicio se instala en equipos que nunca tuvieron el SDK de .NET: si el payload
+            // no trae su propio runtime, el proceso aborta dentro del apphost antes de hablar con
+            // el SCM (StartService ERROR 1053 / SERVICE_NEVER_STARTED). No se registra así.
+            if (!File.Exists(Path.Combine(destSvc, "coreclr.dll")))
+            {
+                throw new InvalidOperationException(
+                    $"El paquete del servicio en {destSvc} no es self-contained (falta coreclr.dll). " +
+                    "El servicio no podría arrancar en este equipo. Vuelve a descargar el instalador.");
+            }
             var installedExe = Path.Combine(destUi, "CA-O.UI.exe");
             Log($"Instalado en {installedExe} ({new FileInfo(installedExe).Length / 1024 / 1024} MB)");
 
@@ -259,6 +268,27 @@ private async Task InstallAsync()
             Run("sc.exe", $"create {serviceName} binPath= \"{Path.Combine(destSvc, "CA-O.Privileged.exe")}\" start= delayed-auto DisplayName= \"CA-O Privileged Service\"");
             Run("sc.exe", $"failure {serviceName} reset= 86400 actions= restart/5000/restart/10000/reboot/60000");
             Run("sc.exe", $"description {serviceName} \"CA-O {CAO.Shared.Constants.BuildConstants.ProductVersion} servicio privilegiado - IPC Named Pipe con ACL + replay guard\"");
+
+            // El servicio arranca ahora, no en el próximo reinicio: con start= delayed-auto
+            // basta con un sc start tras registrar.
+            UpdateProgress(65, "Arrancando servicio...", "Arrancando el servicio privilegiado");
+            Run("sc.exe", $"start {serviceName}", true);
+            bool serviceRunning = false;
+            for (int attempt = 0; attempt < 20 && !serviceRunning; attempt++)
+            {
+                await Task.Delay(500);
+                try
+                {
+                    // La salida de sc query viene traducida (DETENIDO / EN EJECUCIÓN), así que se
+                    // consulta el enum de PowerShell, que siempre devuelve el nombre en inglés.
+                    var status = RunCapture("powershell.exe", $"-NoProfile -NonInteractive -Command (Get-Service -Name {serviceName}).Status");
+                    serviceRunning = status.Contains("Running", StringComparison.OrdinalIgnoreCase);
+                }
+                catch (Exception ex) { Log($"  Estado del servicio no disponible: {ex.Message}"); }
+            }
+            Log(serviceRunning
+                ? $"  Servicio {serviceName} en RUNNING"
+                : $"  AVISO: {serviceName} no arrancó. Revisa el Visor de eventos > Aplicación.");
 
             UpdateProgress(80, "Creando accesos directos...", "Creando atajos en Menu Inicio y Escritorio");
             // Reemplazar, no duplicar: en reinstalación/actualización se borran los atajos
