@@ -53,15 +53,13 @@ public sealed class CleanupNvidiaDownloaderCache : IOptimization
             return (0, 0);
         int files = 0;
         long bytes = 0;
-        try
+        // CAO-BUG-2026-10-06: la enumeracion cruda abortaba en el primer
+        // subarbol sin acceso y por tanto contaba cero para toda la carpeta.
+        foreach (var path in SafeFileEnumeration.Files(dir))
         {
-            foreach (var file in new DirectoryInfo(dir).EnumerateFiles("*", SearchOption.AllDirectories))
-            {
-                try { bytes += file.Length; files++; }
-                catch { }
-            }
+            try { bytes += new FileInfo(path).Length; files++; }
+            catch { }
         }
-        catch { }
         return (files, bytes);
     }
 
@@ -81,17 +79,19 @@ public sealed class CleanupNvidiaDownloaderCache : IOptimization
         if (string.IsNullOrWhiteSpace(dir) || !Directory.Exists(dir))
             return Task.FromResult(OperationResult.Ok("Sin carpeta de descargas NVIDIA en este equipo."));
 
-        FileInfo[] candidates;
-        try { candidates = new DirectoryInfo(dir).GetFiles("*", SearchOption.AllDirectories); }
-        catch { return Task.FromResult(OperationResult.Fail("No se pudo listar la carpeta de descargas NVIDIA.", "list-failed")); }
-
         int files = 0;
         long bytes = 0;
-        foreach (var file in candidates)
+        // CAO-BUG-2026-10-06: GetFiles(AllDirectories) devolvia null en cuanto
+        // una subcarpeta denyaba el acceso, y eso se traducía en un "list-failed"
+        // que abortaba la limpieza SIN borrar nada aunque el resto de la carpeta
+        // fuera perfectamente legible. Con la enumeracion segura el recorrido
+        // continua por donde puede.
+        foreach (var path in SafeFileEnumeration.Files(dir))
         {
             ct.ThrowIfCancellationRequested();
             try
             {
+                var file = new FileInfo(path);
                 bytes += file.Length;
                 file.Delete();
                 files++;

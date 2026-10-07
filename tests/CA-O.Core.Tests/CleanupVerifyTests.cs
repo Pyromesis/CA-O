@@ -50,6 +50,29 @@ public sealed class CleanupVerifyTests : IDisposable
         ];
     }
 
+    /// <summary>Objetivo con nombre de fichero concreto (p.ej. MEMORY.DMP):
+    /// solo existe en el propio directorio, nunca en sus subdirectorios.</summary>
+    private sealed class ExactNameCleanup(string dir, string name) : TempFileCleanupOptimization
+    {
+        public override OptimizationDefinition Definition => new()
+        {
+            Id = "test-exact-name-cleanup",
+            NameEs = "Prueba nombre exacto",
+            NameEn = "Test exact name",
+            DescriptionEs = "Limpieza de prueba con nombre concreto",
+            DescriptionEn = "Test cleanup with an exact file name",
+            Evidence = EvidenceLevel.Benchmark,
+            Risk = RiskLevel.Safe,
+            Compatibility = CompatibilityStatus.Compatible,
+            SecurityImpact = SecurityImpact.None,
+        };
+
+        protected override IReadOnlyList<(string Directory, string Pattern, int OlderThanDays)> Targets { get; } =
+        [
+            (dir, name, 1),
+        ];
+    }
+
     private string WriteFile(string name, int ageDays, bool lockExclusive = false)
     {
         var path = Path.Combine(_dir, name);
@@ -106,5 +129,29 @@ public sealed class CleanupVerifyTests : IDisposable
         var verify = await opt.VerifyAsync(Context(new MemoryRegistry()));
         Assert.Equal(VerificationStatus.Passed, verify.Status);
         Assert.Equal(OptimizationState.AppliedByCao, opt.Detect(new MemoryRegistry()));
+    }
+
+    [Fact]
+    public async Task ExactFileName_IsResolvedInItsOwnDirectory_NotRecursively()
+    {
+        // CAO-BUG-2026-10-06: cleanup-crash-dumps-extended declara
+        // (%SystemRoot%, "MEMORY.DMP", 30). Con SearchOption.AllDirectories
+        // ese unico fichero obligaba a recorrer TODO C:\Windows (WinSxS
+        // incluido) cuatro o cinco veces por cada apply.
+        var nested = Path.Combine(_dir, "nested");
+        Directory.CreateDirectory(nested);
+        var rootFile = WriteFile("MEMORY.DMP", 2);
+        var nestedFile = Path.Combine(nested, "MEMORY.DMP");
+        File.WriteAllText(nestedFile, "x");
+        File.SetLastWriteTimeUtc(nestedFile, DateTime.UtcNow.AddDays(-2));
+        var opt = new ExactNameCleanup(_dir, "MEMORY.DMP");
+
+        var apply = await opt.ApplyAsync(Context(new MemoryRegistry()));
+
+        Assert.True(apply.Success, apply.MessageEs);
+        Assert.False(File.Exists(rootFile), "El fichero del directorio objetivo debe eliminarse.");
+        Assert.True(
+            File.Exists(nestedFile),
+            "Un nombre de fichero concreto no debe Localizarse dentro de subdirectorios.");
     }
 }

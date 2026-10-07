@@ -2,6 +2,39 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
+## [2.2.3] - 2026-10-07
+
+Bajada de correccion tras una auditoria completa del pipeline UI -> IPC -> servicio -> Core (21 rondas). Todos los hallazgos quedaron cerrados: ninguno sigue pendiente.
+
+### Corregido
+- **"Limpiar temporales" no limpiaba y se quedaba cargando.** Causa raiz unica: `CrashRecoveryService.HasPendingRecovery()` consultaba el estado en vivo de cada transaccion incompleta del journal ANTES de comprobar si esa transaccion habia llegado siquiera a la fase `Apply`. Con 88 entradas obsoletas reales y un recorrido recursivo completo del arbol de ficheros por entrada (15.000+ ficheros en el TEMP del usuario), el guard tardaba minutos; la UI caducaba antes (90 s), el cliente abandonaba la lectura, la transaccion nunca se creaba y el progreso indeterminado se quedaba arriba para siempre. Ahora el guard comprueba la fase primero y se detiene en la primera transaccion bloqueante.
+- **"Aplicar recomendados" fallaba siempre.** Misma causa: el guard se comia el techo de 60 s del lote y el error se reportaba como "Servicio no disponible" cuando el servicio estaba perfectamente vivo.
+- **La suplantacion de hilo no sobrevive a un `await`.** `WindowsIdentity.RunImpersonated` restaura el token cuando el delegado devuelve su Task, no cuando la Task completa, de modo que a partir del primer `await` del despacho todo continuaba como SYSTEM: `RegistryAccessor` abria el HKCU equivocado y las limpiezas de caché resolvian el perfil equivocado. El SID del llamante se propaga ahora en un `AsyncLocal` (`CallerContext`) y se resuelve de forma explicita (`CallerProfile`, `HKEY_USERS\<sid>`).
+- **Cada apply exitoso dejaba una transaccion abierta para siempre.** El journal registraba `Commit` ANTES de las fases de benchmark y ninguna fase de benchmark es terminal, asi que la entrada nunca se cerraba: el journal crecia sin limite (88 de 98 entradas medidas) y el guard se arrastraba con el. `Commit` se journaliza ahora al final.
+- **El lote de recomendados paraba en el primer fallo** y sin aislamiento por item: un timeout abortaba el resto y el mensaje mentia. Ahora cada item va protegido, el lote nunca se corta por un fallo y el resumen dice cuantos se aplicaron de cuantos.
+- **Un segundo dialogo cerraba la aplicacion.** El overlay pertenece a cada `Page` y no cubre el NavigationView, asi que se podia abrir "Limpiar todo" mientras corria el lote de recomendados; el `ShowAsync` perdedor lanzaba dentro de un `async void` sin try. Los 34 dialogos pasan ahora por un helper con exclusion y try.
+- **Enumeracion recursiva insegura en 6 ficheros de limpieza de cache.** `SearchOption.AllDirectories` lanza en el primer subarbol sin acceso (y el listado entero se pierde) y sigue las junctions sin techo de tiempo, en un proceso SYSTEM. Ahora `EnumerationOptions` con `IgnoreInaccessible` y sin reparse points.
+- **El mutex de snapshots perdia la exclusion en silencio** al agotarse la espera (se descartaba el `bool` de `WaitOne`), y el journal de transacciones no tenia poda ni reutilizaba el parseo.
+- **Todos los fallos llegaban a la UI como `CAO-TXN-003`.** El servicio descartaba el codigo real del motor, asi que `CAO-TXN-004`, `CAO-SEC-020`, `CAO-GAME-001`, `not-admin` y `no-restore-point` eran indistinguibles para el usuario.
+- **Los espejos manuales de `TimeoutProfile` en las paginas caducaban antes que el servicio** (90 s y 60 s frente a los 21 min reales del cliente).
+- **La ventana de Ajustes se congelaba hasta 13 s** por `sc.exe` en el hilo de UI; el analisis del Dashboard se congelaba por el barrido del journal en el hilo de UI.
+- **El servicio nunca escribia sus propios errores en su log** y si los mandaba enteros al cliente (rutas, claves de registro, HRESULT).
+- **Falsos "ya aplicado"** en las limpiezas: si no habia nada que inspeccionar (Directorio de la aplicacion ausente, subarbol sin acceso) `Detect` respondia "aplicado" y la limpieza quedaba como un no-op con apariencia de exito. Tambien la limpieza de caché de navegadores solo cubria el perfil `Default`.
+- **El lote mostraba la barra clavada** en el porcentaje anterior mientras un id pesado tardaba hasta 20 min, indistinguible de un cuelgue.
+
+### Anadido
+- **Recuperacion de transacciones.** `OptimizationEngine.RecoverAsync` mas la operacion IPC `RecoverTransaction` y una tarjeta nueva en Restaurar con botones *Revertir* y *Descartar*. Antes, si `HasPendingRecovery` era verdadero, apply y revert fallaban con `CAO-TXN-004` y no habia ninguna salida: el equipo quedaba inutilizable. Si el rollback falla, la transaccion NO se cierra para poder reintentar o descartar.
+- El servicio revisa al arrancar si hay recuperaciones pendientes y lo deja en su log (`RecoveryStartupReporter`), sin revertir: revertir es mutar el sistema y debe ser decision del usuario, no un efecto secundario de un reinicio.
+- **El codigo de error real viaja al cliente** y la recuperacion muestra solo decisiones bloqueantes (antes el Dashboard y Restaurar anunciaban operaciones incompletas de forma permanente sin que existiera nada pendiente).
+
+### Cambiado
+- Estructura del registro de recuperaciones: ahora lleva TransactionId, id de optimizacion y decision, que es lo que necesita el boton para actuar sobre una transaccion concreta.
+- 5 ids de limpieza de temporales se declaran pesados (recorren el arbol entero), con un unico techo de tiempo compartido en vez de copias por pagina.
+- 62 tests nuevos (1216 -> 1278).
+
+### Eliminado
+- `docs/mascot.md` y la especificacion de diseno de UI: documentacion de proceso, no del producto.
+
 ## [2.2.2] - 2026-10-03
 
 ### Corregido

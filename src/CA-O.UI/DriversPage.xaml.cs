@@ -175,7 +175,7 @@ public sealed partial class DriversPage : Page
             DefaultButton = ContentDialogButton.Close,
             XamlRoot = Content.XamlRoot,
         };
-        if (await confirm.ShowAsync() != ContentDialogResult.Primary) return;
+        if (await UiDialogs.ShowAsync(confirm) != ContentDialogResult.Primary) return;
 
         UpdateAllButton.IsEnabled = false;
         UpdateAllStatusText.Visibility = Visibility.Visible;
@@ -329,7 +329,7 @@ public sealed partial class DriversPage : Page
             DefaultButton = ContentDialogButton.Close,
             XamlRoot = Content.XamlRoot,
         };
-        if (await confirm.ShowAsync() != ContentDialogResult.Primary) return;
+        if (await UiDialogs.ShowAsync(confirm) != ContentDialogResult.Primary) return;
 
         PhantomStatusText.Visibility = Visibility.Visible;
         PhantomStatusText.Text = $"Limpiando {valid.Count} fantasmas…";
@@ -442,7 +442,7 @@ public sealed partial class DriversPage : Page
             DefaultButton = ContentDialogButton.Close,
             XamlRoot = Content.XamlRoot,
         };
-        if (await confirm.ShowAsync() != ContentDialogResult.Primary) return;
+        if (await UiDialogs.ShowAsync(confirm) != ContentDialogResult.Primary) return;
 
         DriverUpdateResultText.Visibility = Visibility.Visible;
         DriverUpdateResultText.Text = $"Descargando e instalando {picked.Count} drivers (puede tardar muchos minutos)…";
@@ -499,7 +499,7 @@ public sealed partial class DriversPage : Page
             DefaultButton = ContentDialogButton.Close,
             XamlRoot = Content.XamlRoot,
         };
-        if (await confirm.ShowAsync() != ContentDialogResult.Primary) return;
+        if (await UiDialogs.ShowAsync(confirm) != ContentDialogResult.Primary) return;
 
         FixStatusText.Visibility = Visibility.Visible;
         FixStatusText.Text = $"Respaldando {row.Title}…";
@@ -566,7 +566,7 @@ public sealed partial class DriversPage : Page
             DefaultButton = ContentDialogButton.Close,
             XamlRoot = Content.XamlRoot,
         };
-        if (await confirm.ShowAsync() != ContentDialogResult.Primary) return;
+        if (await UiDialogs.ShowAsync(confirm) != ContentDialogResult.Primary) return;
 
         FixStatusText.Visibility = Visibility.Visible;
         FixStatusText.Text = $"Corrigiendo {row.Title}...";
@@ -669,7 +669,7 @@ public sealed partial class DriversPage : Page
             DefaultButton = ContentDialogButton.Primary,
             XamlRoot = Content.XamlRoot,
         };
-        var picked = await choice.ShowAsync();
+        var picked = await UiDialogs.ShowAsync(choice);
         if (picked == ContentDialogResult.Primary)
         {
             await DownloadOfficialFlowAsync(row);
@@ -752,7 +752,7 @@ public sealed partial class DriversPage : Page
             DefaultButton = ContentDialogButton.Primary,
             XamlRoot = Content.XamlRoot,
         };
-        if (await offerDialog.ShowAsync() != ContentDialogResult.Primary) return;
+        if (await UiDialogs.ShowAsync(offerDialog) != ContentDialogResult.Primary) return;
         if (offersList.SelectedItem is not CatalogOfferRow offer)
         {
             InfStatusText.Text = "Elige una oferta primero.";
@@ -827,7 +827,7 @@ public sealed partial class DriversPage : Page
                 DefaultButton = ContentDialogButton.Primary,
                 XamlRoot = Content.XamlRoot,
             };
-            if (await infDialog.ShowAsync() != ContentDialogResult.Primary) return;
+            if (await UiDialogs.ShowAsync(infDialog) != ContentDialogResult.Primary) return;
             if (infList.SelectedItem is not CatalogInfRow infRow) return;
             infPath = infRow.FullPath;
         }
@@ -857,7 +857,7 @@ public sealed partial class DriversPage : Page
             DefaultButton = ContentDialogButton.Close,
             XamlRoot = Content.XamlRoot,
         };
-        if (await confirm.ShowAsync() != ContentDialogResult.Primary) return;
+        if (await UiDialogs.ShowAsync(confirm) != ContentDialogResult.Primary) return;
 
         InfStatusText.Visibility = Visibility.Visible;
         InfStatusText.Text = $"Instalando {Path.GetFileName(infPath)}...";

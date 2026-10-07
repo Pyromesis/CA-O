@@ -63,11 +63,20 @@ public sealed class CrashRecoveryService
         foreach (var incomplete in _journal.Incomplete())
         {
             var hasSnapshot = _snapshots.TryLoad(incomplete.TransactionId, out var record);
-            var live = SafeDetect(incomplete.OptimizationId);
             var phaseReachedApply = incomplete.LastPhase is TransactionPhase.Apply
                 or TransactionPhase.Verify
                 or TransactionPhase.BenchmarkStarted
                 or TransactionPhase.Commit;
+
+            // CAO-BUG-2026-10-06: la deteccion en vivo se hace DESPUES de comprobar
+            // si la transaccion llego a Apply. Sin Apply el veredicto solo puede ser
+            // SafeToIgnore/Unknown (ninguno bloquea) y un Unknown ya lo produce un
+            // snapshot ausente o ilegible, asi que la deteccion no puede cambiar el
+            // resultado. Antes se ejecutaba siempre y en la familia de limpieza eso
+            // significa recorrer el arbol de ficheros entero: con el historial real
+            // (88 entradas, 22 de cleanup-windows-temp) esta llamada bloqueaba el
+            // hilo de UI durante minutos en cada Analizar del Dashboard.
+            var live = phaseReachedApply ? SafeDetect(incomplete.OptimizationId) : OptimizationState.Unknown;
 
             RecoveryDecision decision;
             if (!hasSnapshot || record is null)
@@ -112,10 +121,43 @@ public sealed class CrashRecoveryService
     }
 
     /// <summary>True when any pending recovery must block new mutations (FASE 12).</summary>
-    public bool HasPendingRecovery() =>
-        Scan().Any(candidate => candidate.Decision is RecoveryDecision.RollbackRequired
-                                                or RecoveryDecision.RecoveryRequired
-                                                or RecoveryDecision.Corrupted);
+    /// <remarks>
+    /// Equivalent to filtering <see cref="Scan"/> by the blocking decisions, but
+    /// without paying for live-state detection that cannot change the outcome.
+    /// A transaction that never reached Apply resolves to SafeToIgnore or
+    /// Unknown, and neither blocks, so it is skipped without detecting.
+    /// CAO-BUG-2026-10-06: this runs on the privileged service dispatch thread on
+    /// every apply; detection is a full recursive disk enumeration that costs
+    /// seconds, and the journal accumulates one stuck entry per successful apply.
+    /// </remarks>
+    public bool HasPendingRecovery()
+    {
+        foreach (var incomplete in _journal.Incomplete())
+        {
+            // Same set as the phaseReachedApply test in Scan(): without a snapshot
+            // the outcome is Corrupted only when Apply was reached, and with a
+            // snapshot it is SafeToIgnore/Unknown. None of those block.
+            if (incomplete.LastPhase is not (TransactionPhase.Apply
+                or TransactionPhase.Verify
+                or TransactionPhase.BenchmarkStarted
+                or TransactionPhase.Commit))
+            {
+                continue;
+            }
+
+            if (!_snapshots.TryLoad(incomplete.TransactionId, out var record) || record is null)
+            {
+                return true; // Corrupted
+            }
+
+            if (!LiveMatchesPreState(record.State, SafeDetect(incomplete.OptimizationId)))
+            {
+                return true; // RollbackRequired
+            }
+        }
+
+        return false;
+    }
 
     private bool LiveMatchesPreState(OptimizationSnapshot preState, OptimizationState live)
     {

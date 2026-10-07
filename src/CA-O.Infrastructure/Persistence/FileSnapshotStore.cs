@@ -30,10 +30,43 @@ public sealed class FileSnapshotStore : ISnapshotStore
         _mutexName = @"Global\CA-O-Snapshot-" + Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(_root)))[..8];
     }
 
+    /// <summary>
+    /// Tiempo maximo de espera por el mutex global del directorio de snapshots.
+    /// CAO-BUG-2026-10-06: estaba incrustado como literal; es interno para que las
+    /// pruebas puedan acortarlo y verificar el comportamiento al agotarse.
+    /// </summary>
+    internal static TimeSpan GlobalLockTimeout = TimeSpan.FromSeconds(30);
+
+    /// <summary>Nombre del mutex global que protege <see cref="_root"/>.</summary>
+    internal string GlobalMutexName => _mutexName;
+
     private IDisposable AcquireGlobalLock()
     {
+        // CAO-BUG-2026-10-06: el bool de WaitOne se descartaba, asi que al agotarse
+        // la espera el trabajo continuaba SIN exclusion y el ReleaseMutex sobre un
+        // mutex no poseido se perdia en el catch vacio de MutexReleaser. Perder la
+        // exclusion en silencio permite que otra instancia de CA-O borre o corrompa
+        // un snapshot mientras este lo verifica. Ahora el fallo es explicito.
+        // No se degrada a "trabajar sin lock": un false en TryLoad lo interpretaria
+        // CrashRecoveryService como "snapshot ausente" => Corrupted => bloquearia
+        // todo apply/revert. Un TimeoutException sube hasta la UI como un rechazo IPC
+        // visible, que es lo que corresponde.
         var mutex = new System.Threading.Mutex(false, _mutexName);
-        try { mutex.WaitOne(TimeSpan.FromSeconds(30)); } catch (AbandonedMutexException) { }
+        try
+        {
+            if (!mutex.WaitOne(GlobalLockTimeout))
+            {
+                mutex.Dispose();
+                throw new TimeoutException(
+                    $"No se pudo tomar el mutex de snapshots en {GlobalLockTimeout.TotalSeconds:0} s; otro proceso de CA-O esta usando el directorio de snapshots.");
+            }
+        }
+        catch (AbandonedMutexException)
+        {
+            // AbandonedMutexException concede la propiedad del mutex: hay que
+            // continuar con el lock tomado, igual que antes del arreglo.
+        }
+
         return new MutexReleaser(mutex);
     }
 

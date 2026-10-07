@@ -55,6 +55,7 @@ public sealed class OptimizationTransaction
     private readonly IHistoryLogger? _history;
     private readonly ITransactionJournal? _journal;
     private readonly CallerIdentity? _caller;
+    private readonly OptimizationState? _preDetectedState;
 
     /// <summary>Unique id persisted across transitions and used as snapshot identity (P0-3).</summary>
     public Guid TransactionId { get; }
@@ -68,7 +69,8 @@ public sealed class OptimizationTransaction
         ISnapshotStore? snapshots = null,
         IHistoryLogger? history = null,
         ITransactionJournal? journal = null,
-        CallerIdentity? caller = null)
+        CallerIdentity? caller = null,
+        OptimizationState? preDetectedState = null)
     {
         _optimization = optimization;
         _registry = registry;
@@ -79,6 +81,7 @@ public sealed class OptimizationTransaction
         _history = history;
         _journal = journal;
         _caller = caller;
+        _preDetectedState = preDetectedState;
         TransactionId = Guid.NewGuid();
     }
 
@@ -120,13 +123,28 @@ public sealed class OptimizationTransaction
         // Garantiza que una optimización solo se activa una vez aunque el
         // llamante tenga estado obsoleto (el Detect manda, no la UI).
         OptimizationState liveState;
-        try
+        // CAO-BUG-2026-10-06: el motor (OptimizationEngine) ya calcula el estado
+        // real antes de construir la transaccion, para el control de idempotencia
+        // previo. Volver a Detect aqui suponia una SEGUNDA recorrido completo del
+        // arbol de ficheros: en las limpiezas de temporales eso son >15.000
+        // ficheros en el TEMP del usuario, segundos por apply. Se reutiliza el
+        // estado ya leído. Unknown significa "no se pudo determinar": en ese caso
+        // la transaccion sigue detectando por su cuenta, porque aqui no se puede
+        // afirmar que el llamante lo haya leído de verdad.
+        if (_preDetectedState is { } supplied && supplied != OptimizationState.Unknown)
         {
-            liveState = _optimization.Detect(_registry);
+            liveState = supplied;
         }
-        catch
+        else
         {
-            liveState = OptimizationState.Unknown;
+            try
+            {
+                liveState = _optimization.Detect(_registry);
+            }
+            catch
+            {
+                liveState = OptimizationState.Unknown;
+            }
         }
         if (liveState == OptimizationState.AppliedByCao)
         {
@@ -287,7 +305,13 @@ public sealed class OptimizationTransaction
 
         // ---- COMMIT ----
         var pendingReboot = verification.ObservedState == OptimizationState.PendingReboot;
-        Journal(TransactionPhase.Commit);
+        // CAO-BUG-2026-10-06: el journal de Commit se escribia AQUI, antes de las
+        // fases de benchmark. Ninguna fase de benchmark es terminal, y una
+        // transaccion se considera completa solo si su ULTIMO evento anadido es
+        // terminal, de modo que cada apply exitoso dejaba una entrada
+        // permanentemente incompleta (88 de 98 ficheros en el historico real) y
+        // CrashRecoveryService tenia que inspeccionar el estado en vivo de cada
+        // una. El Commit se journaliza ahora al final, tras el benchmark.
         Log(definition.Id, "apply", true, definition.Id,
             applyResult: "success",
             verification: status == VerificationStatus.NotApplicable ? "not-applicable"
@@ -313,6 +337,12 @@ public sealed class OptimizationTransaction
             benchmarkError = ex.Message;
             Journal(TransactionPhase.BenchmarkFailed);
         }
+
+        // Cierre real de la transaccion. Se journaliza DESPUES del benchmark para
+        // que sea el ultimo evento anadido y por tanto el terminal. Si el benchmark
+        // falla (BenchmarkFailed) el Commit igualmente cierra la transaccion: el
+        // cambio ya estaba aplicado y verificado antes de benchmarkar.
+        Journal(TransactionPhase.Commit);
 
         var committed = Report(true, TransactionPhase.Commit,
             pendingReboot ? apply.MessageEs + " Requiere reinicio." : apply.MessageEs,

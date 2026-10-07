@@ -33,6 +33,12 @@ public static class TimeoutProfile
     /// (el cliente esperaba 20 min y el servicio mataba a 60 s);
     /// disk-cleanup-system-files sale (id retirado); analyze-component-store
     /// entra (DISM puede superar 60 s en equipos lentos).
+    /// CAO-BUG-2026-10-06: entra ademas la familia de limpieza de ficheros
+    /// temporales, que recorre el arbol completo de cada objetivo (y
+    /// cleanup-crash-dumps-extended llegaban a recorrer C:\Windows entero).
+    /// Medido en produccion: &gt;15k ficheros solo en el %TEMP% del usuario.
+    /// Fuera de este conjunto el servicio las cortaba a los 60 s mientras la
+    /// UI esperaba 90 s: el trabajo se perdia y se repetia en el reintento.
     /// </summary>
     public static readonly HashSet<string> HeavyOptimizationIds = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -46,5 +52,10 @@ public static class TimeoutProfile
         "analyze-component-store",
         "reset-network-stack-repair",
         "repair-windows-update",
+        "cleanup-windows-temp",
+        "cleanup-crash-dumps-extended",
+        "cleanup-browser-code-cache",
+        "cleanup-gpu-shader-cache",
+        "cleanup-nvidia-downloader-cache",
     };
 }

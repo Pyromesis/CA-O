@@ -2,6 +2,8 @@ using System.Runtime.InteropServices;
 using System.Threading;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using CAO.UI.Helpers;
+using CAO.Shared;
 using CAO.Shared.IPC;
 using CAO.UI.Controls;
 
@@ -34,18 +36,17 @@ public sealed partial class LimpiezaPage : Page
         "cleanup-memory-ram",
     ];
 
-    private static readonly HashSet<string> HeavyIds = new(StringComparer.Ordinal)
-    {
-        "windows-component-store-cleanup",
-        "windows-component-store-resetbase",
-        "optimize-system-drive",
-        "retrim-system-ssd",
-        "cleanup-app-caches",
-        "analyze-component-store",
-    };
+    // CAO-BUG-2026-10-06: la tabla de tiempos pesados era una copia local de
+    // TimeoutProfile.HeavyOptimizationIds y se quedó corta (le faltaban
+    // cleanup-windows-update-cache, defragment-hdd-only, reset-network-stack-repair
+    // y repair-windows-update). El servicio y el cliente IPC dan 20 min a esos ids,
+    // pero esta página les daba 90 s: el CTS de la UI expiraba primero, el cliente
+    // relanzaba OperationCanceledException y la limpieza se quedaba colgada sin
+    // borrar nada. Se usa la fuente única para que no vuelva a divergir.
+    private static bool IsHeavy(string id) => TimeoutProfile.HeavyOptimizationIds.Contains(id);
 
     private static TimeSpan TimeoutFor(string id) =>
-        HeavyIds.Contains(id) ? TimeSpan.FromMinutes(20) : TimeSpan.FromSeconds(90);
+        IsHeavy(id) ? TimeoutProfile.DispatchHeavy : TimeoutProfile.ClientResponseDefault;
 
     public LimpiezaPage()
     {
@@ -132,7 +133,7 @@ public sealed partial class LimpiezaPage : Page
                     DefaultButton = ContentDialogButton.Close,
                     XamlRoot = Content.XamlRoot,
                 };
-                await warn.ShowAsync();
+                await UiDialogs.ShowAsync(warn);
                 return false;
             }
         }
@@ -146,11 +147,19 @@ public sealed partial class LimpiezaPage : Page
             DefaultButton = ContentDialogButton.Close,
             XamlRoot = Content.XamlRoot,
         };
-        return await dialog.ShowAsync() == ContentDialogResult.Primary;
+        return await UiDialogs.ShowAsync(dialog) == ContentDialogResult.Primary;
     }
+
+    // CAO-BUG-2026-10-06: mismo motivo que en OptimizePage. El estado visual
+    // (CleanupProgressCard, CleanupRing, CleanupProgressBar) se compartia sin
+    // proteccion frente a un segundo lote: el finally del primero apagaba el
+    // anillo mientras el segundo seguía corriendo y la barra se quedaba
+    // colgada sin salida visible, el sintoma "se queda cargando".
+    private bool _busy;
 
     private async void OnCleanAllClick(object sender, RoutedEventArgs e)
     {
+        if (_busy) return;
         var dialog = new ContentDialog
         {
             Title = "Limpieza rápida",
@@ -160,8 +169,10 @@ public sealed partial class LimpiezaPage : Page
             DefaultButton = ContentDialogButton.Close,
             XamlRoot = Content.XamlRoot,
         };
-        if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
+        if (await UiDialogs.ShowAsync(dialog) != ContentDialogResult.Primary) return;
 
+        _busy = true;
+        CleanAllButton.IsEnabled = false;
         Mascot.Set("Working");
         ShowCleanupProgress("Limpieza rápida en curso…", 0);
         var parts = new List<string>();
@@ -191,6 +202,8 @@ public sealed partial class LimpiezaPage : Page
         }
         finally
         {
+            _busy = false;
+            CleanAllButton.IsEnabled = true;
             try { await Task.Delay(1500); } catch { }
             HideCleanupProgress();
         }
@@ -207,12 +220,18 @@ public sealed partial class LimpiezaPage : Page
         {
             using var cts = new CancellationTokenSource(TimeoutFor(optimizationId));
             var pipe = AppHost.Resolve<PrivilegedPipeClient>();
-            if (target != null && HeavyIds.Contains(optimizationId)) target.Text = $"{optimizationId}: en curso (puede tardar minutos)...";
+            if (target != null && IsHeavy(optimizationId)) target.Text = $"{optimizationId}: en curso (puede tardar minutos)...";
             var response = await pipe.ApplyAsync(optimizationId, cts.Token);
             var ok = response is { Accepted: true };
+            // CAO-BUG-2026-10-06: se descartaba el SafeMessage real del servicio
+            // y se pintaba siempre "✓ Completado.", así que un "No quedaban
+            // ficheros antiguos para limpiar." o un 0 ficheros aparecía como
+            // éxito y el usuario veía "no los limpia" sin diagnóstico.
+            // El contrato del lote depende de que el mensaje empiece por '✓'.
+            var detail = string.IsNullOrWhiteSpace(response?.SafeMessage) ? null : response!.SafeMessage!.Trim();
             var message = ok
-                ? "✓ Completado."
-                : $"Rechazado [{response?.ErrorCode}]: {response?.SafeMessage ?? "sin respuesta"}";
+                ? detail is null ? "✓ Completado." : $"✓ {detail}"
+                : $"Rechazado [{response?.ErrorCode}]: {detail ?? "sin respuesta"}";
             if (target != null) target.Text = $"{optimizationId}: {message}";
             if (!batchRunning)
             {
@@ -288,7 +307,7 @@ public sealed partial class LimpiezaPage : Page
             DefaultButton = ContentDialogButton.Close,
             XamlRoot = Content.XamlRoot,
         };
-        if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
+        if (await UiDialogs.ShowAsync(dialog) != ContentDialogResult.Primary) return;
 
         Mascot.Set("Working");
         ShowCleanupProgress("Vaciando papelera…", null);
@@ -345,7 +364,7 @@ public sealed partial class LimpiezaPage : Page
             DefaultButton = ContentDialogButton.Close,
             XamlRoot = Content.XamlRoot,
         };
-        if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
+        if (await UiDialogs.ShowAsync(dialog) != ContentDialogResult.Primary) return;
 
         Mascot.Set("Working");
         ShowCleanupProgress($"Aplicando timer {label}…", null);

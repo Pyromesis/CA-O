@@ -279,8 +279,13 @@ try { request = JsonSerializer.Deserialize<IpcRequest>(line, JsonOptions); }
             }
             // 4) Suplantar SOLO alrededor del despacho al motor: HKCU y las
             // rutas de perfil (%TEMP%, etc.) deben resolverse en el hive del
-            // llamante, no en el de SYSTEM. La validación/autorización ya
-            // quedó atrás como SYSTEM. El gate solo cubre esta sección.
+            // llamante, no en el de SYSTEM. La validacion/autorizacion ya
+            // quedo atras como SYSTEM. El gate solo cubre esta seccion.
+            //
+            // CAO-BUG-2026-10-06 (F1): esto antes se apoyaba unicamente en
+            // la suplantacion de hilo y por tanto solo era correcto hasta el
+            // primer await del despacho; el SID del llamante se propaga ahora
+            // ademas en un AsyncLocal (ver el bloque del try/finally).
             IpcResponse response;
             using (callerIdentity)
             {
@@ -295,12 +300,26 @@ try { request = JsonSerializer.Deserialize<IpcRequest>(line, JsonOptions); }
                 }
                 try
                 {
+                    // CAO-BUG-2026-10-06 (F1): la suplantacion de HILO no
+                    // sobrevive a un await. RunImpersonated devuelve el Task en
+                    // cuanto el delegado devuelve su Task, y en un metodo async
+                    // eso ocurre en el PRIMER await; todas las continuaciones
+                    // posteriores corren ya como SYSTEM. Por eso el SID del
+                    // llamante se propaga aparte, en un AsyncLocal que si viaja
+                    // con las continuaciones, y lo consumen RegistryAccessor y
+                    // CallerProfile para resolver HKCU y las rutas de perfil de
+                    // forma explicita, sin depender del token del hilo.
+                    CAO.Core.Abstractions.CallerContext.CurrentUserSid = caller.Sid;
                     var token = callerIdentity.AccessToken;
                     response = await WindowsIdentity.RunImpersonated(token,
                         () => DispatchOperationAsync(request, caller, dispatchCts.Token));
                 }
                 finally
                 {
+                    // El AsyncLocal se propaga a las continuaciones, asi que
+                    // hay que restaurarlo explicitamente o el despacho
+                    // siguiente heredaria el SID de este.
+                    CAO.Core.Abstractions.CallerContext.CurrentUserSid = null;
                     _gate.Release();
                 }
             }
@@ -415,7 +434,8 @@ catch (Exception ex)
                 }
                 catch (Exception ex)
                 {
-                    return IpcResponse.Rejected(ErrorCodes.TxnApplyFailed, $"Error aplicando DNS: {ex.Message}");
+                    logger.LogError(ex, "Fallo aplicando DNS. Op={Operation} Id={RequestId}", request.Operation, request.RequestId);
+                    return IpcResponse.Rejected(ErrorCodes.TxnApplyFailed, CAO.Core.Abstractions.SafeErrorMessages.DispatchFailure("Error aplicando DNS", ex));
                 }
             }
 
@@ -428,7 +448,8 @@ catch (Exception ex)
                 }
                 catch (Exception ex)
                 {
-                    return IpcResponse.Rejected(ErrorCodes.TxnApplyFailed, $"Error corrigiendo driver: {ex.Message}");
+                    logger.LogError(ex, "Fallo corrigiendo driver. Op={Operation} Id={RequestId}", request.Operation, request.RequestId);
+                    return IpcResponse.Rejected(ErrorCodes.TxnApplyFailed, CAO.Core.Abstractions.SafeErrorMessages.DispatchFailure("Error corrigiendo driver", ex));
                 }
             }
 
@@ -441,7 +462,8 @@ catch (Exception ex)
                 }
                 catch (Exception ex)
                 {
-                    return IpcResponse.Rejected(ErrorCodes.TxnApplyFailed, $"Error instalando driver: {ex.Message}");
+                    logger.LogError(ex, "Fallo instalando driver. Op={Operation} Id={RequestId}", request.Operation, request.RequestId);
+                    return IpcResponse.Rejected(ErrorCodes.TxnApplyFailed, CAO.Core.Abstractions.SafeErrorMessages.DispatchFailure("Error instalando driver", ex));
                 }
             }
 
@@ -454,7 +476,8 @@ catch (Exception ex)
                 }
                 catch (Exception ex)
                 {
-                    return IpcResponse.Rejected(ErrorCodes.TxnApplyFailed, $"Error limpiando fantasmas: {ex.Message}");
+                    logger.LogError(ex, "Fallo limpiando dispositivos fantasma. Op={Operation} Id={RequestId}", request.Operation, request.RequestId);
+                    return IpcResponse.Rejected(ErrorCodes.TxnApplyFailed, CAO.Core.Abstractions.SafeErrorMessages.DispatchFailure("Error limpiando fantasmas", ex));
                 }
             }
 
@@ -468,7 +491,8 @@ catch (Exception ex)
                 }
                 catch (Exception ex)
                 {
-                    return IpcResponse.Rejected(ErrorCodes.TxnApplyFailed, $"Error buscando drivers: {ex.Message}");
+                    logger.LogError(ex, "Fallo buscando drivers. Op={Operation} Id={RequestId}", request.Operation, request.RequestId);
+                    return IpcResponse.Rejected(ErrorCodes.TxnApplyFailed, CAO.Core.Abstractions.SafeErrorMessages.DispatchFailure("Error buscando drivers", ex));
                 }
             }
 
@@ -483,7 +507,8 @@ catch (Exception ex)
                 }
                 catch (Exception ex)
                 {
-                    return IpcResponse.Rejected(ErrorCodes.TxnApplyFailed, $"Error instalando drivers: {ex.Message}");
+                    logger.LogError(ex, "Fallo instalando drivers. Op={Operation} Id={RequestId}", request.Operation, request.RequestId);
+                    return IpcResponse.Rejected(ErrorCodes.TxnApplyFailed, CAO.Core.Abstractions.SafeErrorMessages.DispatchFailure("Error instalando drivers", ex));
                 }
             }
 
@@ -502,7 +527,8 @@ catch (Exception ex)
                 }
                 catch (Exception ex)
                 {
-                    return IpcResponse.Rejected(ErrorCodes.TxnApplyFailed, $"Error respaldando driver: {ex.Message}");
+                    logger.LogError(ex, "Fallo respaldando driver. Op={Operation} Id={RequestId}", request.Operation, request.RequestId);
+                    return IpcResponse.Rejected(ErrorCodes.TxnApplyFailed, CAO.Core.Abstractions.SafeErrorMessages.DispatchFailure("Error respaldando driver", ex));
                 }
             }
 
@@ -520,7 +546,8 @@ catch (Exception ex)
                 }
                 catch (Exception ex)
                 {
-                    return IpcResponse.Rejected(ErrorCodes.TxnApplyFailed, $"Error buscando en el catálogo: {ex.Message}");
+                    logger.LogError(ex, "Fallo buscando en el catálogo. Op={Operation} Id={RequestId}", request.Operation, request.RequestId);
+                    return IpcResponse.Rejected(ErrorCodes.TxnApplyFailed, CAO.Core.Abstractions.SafeErrorMessages.DispatchFailure("Error buscando en el catálogo", ex));
                 }
             }
 
@@ -539,7 +566,8 @@ catch (Exception ex)
                 }
                 catch (Exception ex)
                 {
-                    return IpcResponse.Rejected(ErrorCodes.TxnApplyFailed, $"Error descargando driver: {ex.Message}");
+                    logger.LogError(ex, "Fallo descargando driver. Op={Operation} Id={RequestId}", request.Operation, request.RequestId);
+                    return IpcResponse.Rejected(ErrorCodes.TxnApplyFailed, CAO.Core.Abstractions.SafeErrorMessages.DispatchFailure("Error descargando driver", ex));
                 }
             }
 
@@ -556,6 +584,32 @@ catch (Exception ex)
                     applied = actual,
                     appliedMs = TimerResolution.FormatMs(actual),
                 }, JsonOptions));
+            }
+
+            // CAO-BUG-2026-10-06 (N-1): RecoverTransactionPayload no implementa
+            // IOptimizationIdPayload (no lleva un id de optimización sino un id de
+            // transacción), así que se atiende ANTES del descarte por payload
+            // incompatible que hay justo debajo. Sin esta operación, un equipo con
+            // recuperación pendiente queda sin salida: apply y revert están
+            // bloqueados y nadie podía cerrar la transacción.
+            if (request.Operation == PrivilegedOperationKind.RecoverTransaction)
+            {
+                if (request.Payload is not RecoverTransactionPayload recover)
+                {
+                    return IpcResponse.Rejected(ErrorCodes.IpcPayloadSchemaInvalid, "Operación no disponible.");
+                }
+
+                try
+                {
+                    return FromResult(await engine.RecoverAsync(recover.TransactionId, recover.DiscardChanges, caller, ct));
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "Fallo recuperando la transacción {TransactionId}.", recover.TransactionId);
+                    return IpcResponse.Rejected(
+                        ErrorCodes.TxnApplyFailed,
+                        CAO.Core.Abstractions.SafeErrorMessages.DispatchFailure("Error recuperando la operación pendiente", ex));
+                }
             }
 
             if (request.Payload is not IOptimizationIdPayload idPayload)
@@ -598,7 +652,15 @@ catch (Exception ex)
     }
 
     private static IpcResponse FromResult(CAO.Core.Abstractions.OperationResult result) =>
-        result.Success ? IpcResponse.Ok() : IpcResponse.Rejected(ErrorCodes.TxnApplyFailed, result.MessageEs);
+        // CAO-BUG-2026-10-06: antes se emitia siempre ErrorCodes.TxnApplyFailed
+        // (CAO-TXN-003) y se perdia OperationResult.Error, con lo que la UI recibia
+        // el mismo codigo para cualquier fallo (recuperacion pendiente, modo de solo
+        // lectura, juego bloqueado, sin permisos, sin punto de restauracion...). La
+        // politica de "que codigo viaja" vive en Core para poder testearla sin
+        // romper el limite de dependencias que impide testear este servicio.
+        result.Success
+            ? IpcResponse.Ok()
+            : IpcResponse.Rejected(CAO.Core.Abstractions.OperationResultCodes.WireCode(result.Error), result.MessageEs);
 
     private static IpcResponse Snapshot(SnapshotDescriptor descriptor) =>
         IpcResponse.Ok($"Snapshot capturado: {descriptor.SnapshotId} ({descriptor.EntryCount} entradas).");

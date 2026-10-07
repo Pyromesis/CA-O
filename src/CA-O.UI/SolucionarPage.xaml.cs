@@ -1,5 +1,6 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using CAO.UI.Helpers;
 using CAO.Shared.IPC;
 using CAO.UI.Controls;
 
@@ -37,7 +38,7 @@ public sealed partial class SolucionarPage : Page
             DefaultButton = ContentDialogButton.Close,
             XamlRoot = Content.XamlRoot,
         };
-        if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
+        if (await UiDialogs.ShowAsync(dialog) != ContentDialogResult.Primary) return;
         await RunFixAsync(id, StatusBoxFor(id), confirm: false);
     }
 
@@ -72,7 +73,7 @@ public sealed partial class SolucionarPage : Page
                 DefaultButton = ContentDialogButton.Close,
                 XamlRoot = Content.XamlRoot,
             };
-            if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
+            if (await UiDialogs.ShowAsync(dialog) != ContentDialogResult.Primary) return;
         }
 
         Mascot.Set("Working");

@@ -41,18 +41,15 @@ public sealed class DiskCleanupSystemFiles : IOptimization
     private static IReadOnlyList<string> PendingFiles()
     {
         var found = new List<string>();
-        DirectoryInfo info;
-        try { info = new DirectoryInfo(DownloadDir); }
-        catch { return found; }
-        if (!info.Exists) return found;
-        FileInfo[] files;
-        try { files = info.GetFiles("*.*", SearchOption.AllDirectories); }
-        catch { return found; }
-        foreach (var file in files)
+        if (!Directory.Exists(DownloadDir)) return found;
+        // CAO-BUG-2026-10-06: GetFiles(AllDirectories) devolvia null en el
+        // primer subarbol sin acceso y se traducía en cero ficheros pendientes,
+        // con lo que Detect contestaba "ya aplicada" sin haber mirado el arbol.
+        try
         {
-            try { found.Add(file.FullName); }
-            catch { }
+            foreach (var path in SafeFileEnumeration.Files(DownloadDir, "*.*")) found.Add(path);
         }
+        catch { }
         return found;
     }
 

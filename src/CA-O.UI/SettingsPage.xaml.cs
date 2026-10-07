@@ -217,8 +217,17 @@ public sealed partial class SettingsPage : Page
             // elevada (requireAdministrator).
             if (IsAdmin())
             {
-                try { TryStartServiceBestEffort(); } catch { }
-                if (!IsServiceRunning())
+                // CAO-BUG-2026-10-06: ambos ayudantes lanzan sc.exe y leen la
+                // salida de forma sincrona (ReadToEnd + WaitForExit hasta 8 s).
+                // Con el servicio parado esa espera congelaba la ventana entera
+                // al abrir Ajustes. Se ejecutan fuera del hilo de UI y en el
+                // mismo paso, para no lanzar sc query dos veces.
+                var serviceRunning = await Task.Run(() =>
+                {
+                    TryStartServiceBestEffort();
+                    return IsServiceRunning();
+                });
+                if (!serviceRunning)
                     await WaitForServiceReadyAsync();
             }
             await _vm.CheckServiceCommand.ExecuteAsync(null);
@@ -515,7 +524,7 @@ public sealed partial class SettingsPage : Page
                 DefaultButton = ContentDialogButton.Close,
                 XamlRoot = Content.XamlRoot,
             };
-            if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
+            if (await UiDialogs.ShowAsync(dialog) != ContentDialogResult.Primary) return;
 
             // La URL y el tag vienen de la API de GitHub: re-validar aquí
             // (https + host GitHub, tag con forma de versión) antes de
@@ -721,7 +730,7 @@ public sealed partial class SettingsPage : Page
                     DefaultButton = ContentDialogButton.Primary,
                     XamlRoot = Content.XamlRoot,
                 };
-                if (await handoff.ShowAsync() == ContentDialogResult.Primary)
+                if (await UiDialogs.ShowAsync(handoff) == ContentDialogResult.Primary)
                     Application.Current.Exit();
                 else
                     UpdateDetailText.Text = $"Instalador disponible en: {payloadDir} (la app sigue abierta).";

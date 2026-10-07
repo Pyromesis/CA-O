@@ -72,8 +72,17 @@ public sealed partial class DashboardViewModel : ObservableObject
         {
             var correlation = CAO.Shared.Correlation.New();
             try { _logger.Info("Dashboard", $"Analyze correlation={correlation}", correlation); } catch { }
-            var candidates = _recoveryService.Scan();
-            _state.RecoveryCandidates = candidates.Select(c => c.OptimizationId).ToList();
+            // CAO-BUG-2026-10-06: solo las decisiones bloqueantes representan una
+            // recuperacion pendiente real. Incluir SafeToIgnore/Unknown hacia que
+            // Dashboard y Restaurar anunciaran "Operaciones incompletas" de forma
+            // permanente y apuntaran a una recuperacion que no existe.
+            var candidates = _recoveryService.Scan()
+                .Where(c => c.Decision is CAO.Core.Rollback.RecoveryDecision.RollbackRequired
+                    or CAO.Core.Rollback.RecoveryDecision.RecoveryRequired
+                    or CAO.Core.Rollback.RecoveryDecision.Corrupted)
+                .Select(c => new RecoveryCandidateInfo(c.TransactionId, c.OptimizationId, c.Decision.ToString()))
+                .ToList();
+            _state.RecoveryCandidates = candidates;
 
             var result = await _analysisService.RunAsync(ct);
             if (result.Context != null) _state.Context = result.Context;

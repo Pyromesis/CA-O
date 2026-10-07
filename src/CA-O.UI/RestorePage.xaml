@@ -70,6 +70,43 @@
                 </Border>
             </Grid>
 
+            <Border x:Name="PendingRecoveryCard" Style="{StaticResource CaoCardStyle}" Visibility="Collapsed">
+                <StackPanel Spacing="8">
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <Border Style="{StaticResource CaoCardIconStyle}" Background="{StaticResource CaoAmberSoftBrush}">
+                            <FontIcon Glyph="&#xE7BA;" FontSize="16" Foreground="{StaticResource CaoAmberSolidBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <StackPanel Spacing="2" VerticalAlignment="Center">
+                            <TextBlock Text="Operaciones pendientes de recuperación" Style="{StaticResource CaoSectionTitleStyle}"/>
+                            <TextBlock Text="Mientras haya una, el servicio rechaza aplicar y revertir (CAO-TXN-004)" Style="{StaticResource CaoSectionSubtitleStyle}"/>
+                        </StackPanel>
+                    </StackPanel>
+                    <ListView x:Name="PendingRecoveryList" SelectionMode="None" MaxHeight="260">
+                        <ListView.ItemContainerStyle>
+                            <Style TargetType="ListViewItem">
+                                <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                <Setter Property="Margin" Value="0,3"/>
+                            </Style>
+                        </ListView.ItemContainerStyle>
+                        <ListView.ItemTemplate>
+                            <DataTemplate>
+                                <Grid ColumnSpacing="10">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                    <StackPanel Spacing="2" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding OptimizationId}" Style="{StaticResource CaoCardTitleStyle}" TextWrapping="Wrap"/>
+                                        <TextBlock Style="{StaticResource CaoSectionSubtitleStyle}" TextWrapping="Wrap">
+                                            <Run Text="TX:" /><Run Text="{Binding TransactionId}" /><Run Text=" — " /><Run Text="{Binding Decision}" />
+                                        </TextBlock>
+                                    </StackPanel>
+                                    <Button Grid.Column="1" Content="Revertir" Tag="{Binding TransactionId}" Click="OnRecoverClick" FontSize="12" MinHeight="32" Style="{StaticResource CaoPrimaryButtonStyle}" AutomationProperties.Name="Revertir la operación pendiente y cerrar la transacción"/>
+                                    <Button Grid.Column="2" Content="Descartar" Tag="{Binding TransactionId}" Click="OnDiscardClick" FontSize="12" MinHeight="32" Style="{StaticResource CaoElevatedButtonStyle}" AutomationProperties.Name="Descartar la operación pendiente sin revertir cambios"/>
+                                </Grid>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
+                </StackPanel>
+            </Border>
+
             <Border x:Name="EmptySnapshotsCard" Style="{StaticResource CaoCardStyle}" Visibility="Collapsed">
                 <StackPanel Spacing="6" HorizontalAlignment="Center" Padding="12">
                     <FontIcon Glyph="&#xE777;" FontSize="22" Opacity="0.35" HorizontalAlignment="Center"/>

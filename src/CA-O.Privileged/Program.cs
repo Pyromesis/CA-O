@@ -52,11 +52,21 @@ internal static class Program
                 new CAO.Infrastructure.Windows.Execution.SystemCommandGateway(),
                 services.GetRequiredService<ISystemContextProvider>(),
                 journal, () => recovery.HasPendingRecovery(), null,
-                services.GetRequiredService<CAO.Core.Interfaces.IDnsConfigurationProvider>());
+                services.GetRequiredService<CAO.Core.Interfaces.IDnsConfigurationProvider>(),
+                // CAO-BUG-2026-10-06 (N-1): sin inyectar el gestor de recuperación
+                // el motor no puede cerrar una transacción pendiente, y con
+                // HasPendingRecovery en true cualquier apply o revert devolvía
+                // CAO-TXN-004 sin salida posible.
+                recovery: recovery);
             engineRef = engine;
             return engine;
         });
         builder.Services.AddSingleton<IPrivilegedCallerAuthorizer, AdministratorsOnlyAuthorizer>();
+        // CAO-BUG-2026-10-06 (F2): el gestor de recuperación se registraba pero
+        // nadie lo consultaba. Este hosted service lo revisa al arrancar y deja el
+        // detalle en el registro del servicio. Se registra ANTES del pipe para que
+        // la revisión empiece antes de aceptar peticiones.
+        builder.Services.AddHostedService<RecoveryStartupReporter>();
         builder.Services.AddHostedService<PrivilegedPipeService>();
         builder.Services.AddWindowsService(options => options.ServiceName = BuildConstants.ServiceName);
         return builder.Build().RunAsync();

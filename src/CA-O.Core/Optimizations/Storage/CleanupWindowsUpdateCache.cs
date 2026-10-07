@@ -48,8 +48,11 @@ public sealed class CleanupWindowsUpdateCache : IOptimization
     {
         try
         {
-            return new DirectoryInfo(dir).Exists
-                ? Directory.EnumerateFiles(dir, "*", SearchOption.AllDirectories).Count()
+            return Directory.Exists(dir)
+                // CAO-BUG-2026-10-06: la enumeracion cruda devolvia 0 en cuanto
+                // una subcarpeta denyaba el acceso, con lo que Detect informaba
+                // "ya aplicada" sin haber recorrido el arbol entero.
+                ? SafeFileEnumeration.Files(dir).Count()
                 : 0;
         }
         catch { return 0; }
@@ -92,7 +95,7 @@ public sealed class CleanupWindowsUpdateCache : IOptimization
         long bytes = 0L;
         try
         {
-            foreach (var path in Directory.EnumerateFiles(CacheDirectory, "*", SearchOption.AllDirectories))
+            foreach (var path in SafeFileEnumeration.Files(CacheDirectory))
             {
                 ct.ThrowIfCancellationRequested();
                 try

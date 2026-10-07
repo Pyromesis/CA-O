@@ -175,20 +175,30 @@ public sealed class PrivilegedPipeClient
             // Validar tamaño antes de enviar
             if (System.Text.Encoding.UTF8.GetByteCount(json) > IpcProtocol.MaxRequestBytes)
                 return IpcResponse.Rejected(ErrorCodes.IpcRequestTooLarge, "Solicitud excede 64KB.");
-            using (var writer = new StreamWriter(pipe, System.Text.Encoding.UTF8, 1024, leaveOpen: true) { AutoFlush = true })
-            {
-                await writer.WriteLineAsync(json.AsMemory(), ct).ConfigureAwait(false);
-                writer.Flush();
-            }
-            // Leer una línea de respuesta con el timeout del llamante ACOTADO
-            // al techo de la operación (nunca más allá del despacho del
-            // servicio + margen): un servicio colgado responde CAO-IPC-007
-            // en vez de congelar la UI.
+            // CAO-BUG-2026-10-06: el techo de la operacion se armaba DESPUES de
+            // escribir la peticion, de modo que la escritura solo observaba el
+            // token del llamante y no tenia techo propio. Todos los metodos
+            // declaran ct = default, asi que cualquier llamada que omitiera el
+            // token dejaba la escritura esperando indefinidamente, y el total de
+            // la comunicacion era "escritura + techo", no "techo". Ahora el
+            // mismo techo gobierna la ida y la vuelta: la escritura no puede
+            // gastar su parte del presupuesto y el intercambio completo queda
+            // acotado. Una escritura agotada cae en el catch de
+            // OperationCanceledException y se traduce en un rechazo IPC limpio
+            // (CAO-IPC-007), no en una excepcion que tumba el lote de la UI.
             var responseCeiling = HeavyOperations.Contains(operation) || IsHeavyOptimization(payload)
                 ? ResponseTimeoutHeavy
                 : ResponseTimeoutDefault;
-            using var readCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-            readCts.CancelAfter(responseCeiling);
+            using var exchangeCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            exchangeCts.CancelAfter(responseCeiling);
+            using (var writer = new StreamWriter(pipe, System.Text.Encoding.UTF8, 1024, leaveOpen: true) { AutoFlush = true })
+            {
+                await writer.WriteLineAsync(json.AsMemory(), exchangeCts.Token).ConfigureAwait(false);
+                writer.Flush();
+            }
+            // Leer una linea de respuesta con el techo de la operacion ACOTADO
+            // al despacho del servicio mas su margen: un servicio colgado
+            // responde CAO-IPC-007 en vez de congelar la UI.
             string? line;
             using (var reader = new StreamReader(pipe, System.Text.Encoding.UTF8, false, 1024, leaveOpen: true))
             {
@@ -196,7 +206,7 @@ public sealed class PrivilegedPipeClient
                 // respuesta gigante (servicio comprometido o salida sin
                 // truncar) congela la UI u OOM. Espejo del ReadBoundedLine
                 // del servicio.
-                line = await ReadBoundedLineAsync(reader, IpcProtocol.MaxResponseBytes + 1024, readCts.Token).ConfigureAwait(false);
+                line = await ReadBoundedLineAsync(reader, IpcProtocol.MaxResponseBytes + 1024, exchangeCts.Token).ConfigureAwait(false);
             }
             if (line is null)
                 return IpcResponse.Rejected(ErrorCodes.IpcMalformedRequest, "Respuesta excede 256KB.");
@@ -241,6 +251,21 @@ public sealed class PrivilegedPipeClient
 
     public async Task<IpcResponse?> RevertAsync(string optimizationId, CancellationToken ct = default) =>
         Map(await SendAsync(PrivilegedOperationKind.RevertOptimization, optimizationId, ct));
+
+    /// <summary>
+    /// Cierra una transaccion pendiente de recuperacion.
+    /// CAO-BUG-2026-10-06 (N-1): mientras <c>HasPendingRecovery</c> es verdadero el
+    /// servicio rechaza todo apply y todo revert con <c>CAO-TXN-004</c>; esta es la
+    /// unica via para desbloquear el equipo. Con <paramref name="discardChanges"/>
+    /// en falso se intenta el rollback desde el snapshot; en true el usuario acepta
+    /// el estado actual y solo se cierra la entrada del journal.
+    /// </summary>
+    public async Task<IpcResponse?> RecoverAsync(
+        Guid transactionId, bool discardChanges = false, CancellationToken ct = default) =>
+        Map(await SendPayloadAsync(
+            PrivilegedOperationKind.RecoverTransaction,
+            new RecoverTransactionPayload(transactionId, discardChanges),
+            ct));
 
     public Task<IpcResponse?> PingAsync(CancellationToken ct = default) =>
         SendAsync(PrivilegedOperationKind.Ping, string.Empty, ct);

@@ -23,6 +23,14 @@ public sealed partial class RestoreViewModel : ObservableObject
     [ObservableProperty] private string _recoveryHint = string.Empty;
     [ObservableProperty] private bool _isEmpty;
 
+    /// <summary>
+    /// Operaciones pendientes de recuperacion. CAO-BUG-2026-10-06 (N-1): antes solo
+    /// se mostraba el texto y no habia ninguna accion posible, con el servicio
+    /// rechazando tanto aplicar como revertir (<c>CAO-TXN-004</c>).
+    /// </summary>
+    [ObservableProperty] private IReadOnlyList<RecoveryCandidateInfo> _pendingRecoveries = Array.Empty<RecoveryCandidateInfo>();
+    [ObservableProperty] private bool _hasPendingRecoveries;
+
     [RelayCommand]
     private async Task RefreshAsync(CancellationToken ct = default)
     {
@@ -42,7 +50,11 @@ public sealed partial class RestoreViewModel : ObservableObject
         }
         // No se pisa un error de lectura con el mensaje por defecto.
         if (string.IsNullOrEmpty(RecoveryHint))
-            RecoveryHint = _state.RecoveryCandidates.Count == 0 ? "Sin recuperaciones pendientes." : $"Recuperación requerida: {string.Join(", ", _state.RecoveryCandidates)}";
+            RecoveryHint = _state.RecoveryCandidates.Count == 0
+                ? "Sin recuperaciones pendientes."
+                : $"Recuperación requerida: {string.Join(", ", _state.RecoveryCandidates.Select(r => r.OptimizationId))}";
+        PendingRecoveries = _state.RecoveryCandidates;
+        HasPendingRecoveries = _state.RecoveryCandidates.Count > 0;
     }
 
     [RelayCommand]
@@ -56,6 +68,37 @@ public sealed partial class RestoreViewModel : ObservableObject
         catch (Exception ex)
         {
             RecoveryHint = $"Restauración falló (servicio no disponible): {ex.Message}";
+        }
+    }
+
+    /// <summary>
+    /// Cierra una transaccion pendiente de recuperacion. CAO-BUG-2026-10-06 (N-1):
+    /// mientras el servicio detecta una recuperacion pendiente rechaza tanto
+    /// <c>ApplyAsync</c> como <c>RevertAsync</c> con <c>CAO-TXN-004</c>, y
+    /// <c>CrashRecoveryService.MarkRecovered</c> no lo llamaba nadie, de modo que el
+    /// equipo quedaba sin salida. Con <paramref name="discardChanges"/> en falso se
+    /// revierte desde el snapshot; en true el usuario acepta el estado actual y solo
+    /// se cierra la entrada del journal.
+    /// </summary>
+    /// </summary>
+    /// No es un <c>[RelayCommand]</c>: CommunityToolkit no genera un comando para
+    /// una firma <c>(Guid, bool, CancellationToken)</c> y no merece la pena
+    /// empaquetar los dos argumentos en un tipo solo por eso.
+    /// </summary>
+    public async Task RecoverAsync(Guid transactionId, bool discardChanges, CancellationToken ct = default)
+    {
+        try
+        {
+            var resp = await _pipe.RecoverAsync(transactionId, discardChanges, ct);
+            RecoveryHint = resp is { Accepted: true }
+                ? (discardChanges
+                    ? "✓ Operación descartada: los cambios NO se revirtieron y la transacción quedó cerrada."
+                    : "✓ Operación recuperada: los cambios se revirtieron y la transacción quedó cerrada.")
+                : $"Rechazado [{resp?.ErrorCode}]: {resp?.SafeMessage}";
+        }
+        catch (Exception ex)
+        {
+            RecoveryHint = $"Recuperación falló (servicio no disponible): {ex.Message}";
         }
     }
 }

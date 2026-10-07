@@ -50,7 +50,10 @@ public sealed class CleanupGpuShaderCache : IOptimization
     {
         var found = new List<string>();
         string local;
-        try { local = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData); }
+        // CAO-BUG-2026-10-06 (F1): con la suplantacion perdida tras el primer
+        // await (ver CallerContext), GetFolderPath devolvia el %LOCALAPPDATA%
+        // de SYSTEM y la limpieza de shaders no encontraba la cache del usuario.
+        try { local = CallerProfile.Folder(Environment.SpecialFolder.LocalApplicationData); }
         catch { return found; }
         if (string.IsNullOrWhiteSpace(local))
             return found;
@@ -71,17 +74,7 @@ public sealed class CleanupGpuShaderCache : IOptimization
     {
         long bytes = 0;
         foreach (var dir in ExistingDirs())
-        {
-            try
-            {
-                foreach (var file in new DirectoryInfo(dir).EnumerateFiles("*", SearchOption.AllDirectories))
-                {
-                    try { bytes += file.Length; }
-                    catch { }
-                }
-            }
-            catch { }
-        }
+            bytes += SafeFileEnumeration.BytesIn(dir);
         return bytes;
     }
 
@@ -101,17 +94,16 @@ public sealed class CleanupGpuShaderCache : IOptimization
         long bytes = 0;
         foreach (var dir in ExistingDirs())
         {
-            FileInfo[] candidates;
-            try
-            {
-                candidates = new DirectoryInfo(dir).GetFiles("*", SearchOption.AllDirectories);
-            }
-            catch { continue; }
-            foreach (var file in candidates)
+            // CAO-BUG-2026-10-06: GetFiles(AllDirectories) abortaba la limpieza
+            // entera en cuanto una subcarpeta denyaba el acceso, y materializaba
+            // ademas el array completo en memoria. Ahora se enumera en streaming
+            // con la enumeracion segura compartida.
+            foreach (var path in SafeFileEnumeration.Files(dir))
             {
                 ct.ThrowIfCancellationRequested();
                 try
                 {
+                    var file = new FileInfo(path);
                     // Solo ficheros de caché: jamás se borran carpetas (la
                     // estructura la recrea el driver) ni nada fuera de
                     // estas 4 rutas. En uso → se omite.
@@ -157,13 +149,23 @@ public sealed class CleanupGpuShaderCache : IOptimization
 
     public Task<OptimizationPreview> PreviewAsync(IRegistryAccessor registry, CancellationToken ct = default)
     {
-        var lines = ExistingDirs().Select(dir => new PreviewLine
+        // CAO-BUG-2026-10-06: CacheBytes() se llamaba DENTRO del Select, o sea
+        // una vez por cada carpeta de cache, y cada llamada ya recorria todas.
+        // Ademas cada linea mostraba el total de TODAS las carpetas, no el de la
+        // suya, de modo que la vista previa senalaba la carpeta equivocada.
+        // Ahora cada linea mide la suya y solo se recorre una vez por carpeta.
+        var lines = new List<PreviewLine>();
+        foreach (var dir in ExistingDirs())
         {
-            Kind = "Cleanup",
-            Target = dir,
-            Before = $"{CacheBytes() / 1024 / 1024} MB en caché",
-            After = "ficheros eliminados (solo caché)",
-        }).ToList();
+            var ownBytes = SafeFileEnumeration.BytesIn(dir);
+            lines.Add(new PreviewLine
+            {
+                Kind = "Cleanup",
+                Target = dir,
+                Before = $"{ownBytes / 1024 / 1024} MB en caché",
+                After = "ficheros eliminados (solo caché)",
+            });
+        }
         if (lines.Count == 0)
         {
             lines.Add(new PreviewLine

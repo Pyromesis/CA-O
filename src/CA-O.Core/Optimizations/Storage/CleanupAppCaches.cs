@@ -66,7 +66,7 @@ public sealed class CleanupAppCaches : IOptimization
 
     internal static string BaseDirectory(AppCacheTarget target)
     {
-        try { return Path.Combine(Environment.GetFolderPath(target.BaseKind), target.AppDir); }
+        try { return Path.Combine(CallerProfile.Folder(target.BaseKind), target.AppDir); }
         catch { return string.Empty; }
     }
 
@@ -78,13 +78,11 @@ public sealed class CleanupAppCaches : IOptimization
         {
             try
             {
-                var dir = new DirectoryInfo(Path.Combine(baseDir, sub));
-                if (!dir.Exists) continue;
-                foreach (var file in dir.EnumerateFiles("*", SearchOption.AllDirectories))
-                {
-                    try { bytes += file.Length; }
-                    catch { }
-                }
+                var path = Path.Combine(baseDir, sub);
+                if (!Directory.Exists(path)) continue;
+                // CAO-BUG-2026-10-06: la enumeracion cruda abortaba la cuenta de
+                // la aplicacion entera en cuanto una subcarpeta denyaba el acceso.
+                bytes += SafeFileEnumeration.BytesIn(path);
             }
             catch { }
         }
@@ -100,15 +98,18 @@ public sealed class CleanupAppCaches : IOptimization
         {
             try
             {
-                var dir = new DirectoryInfo(Path.Combine(baseDir, sub));
-                if (!dir.Exists) continue;
-                foreach (var file in dir.EnumerateFiles("*", SearchOption.AllDirectories))
+                var path = Path.Combine(baseDir, sub);
+                if (!Directory.Exists(path)) continue;
+                // CAO-BUG-2026-10-06: la enumeracion cruda cortaba el borrado de
+                // la aplicacion entera en cuanto una subcarpeta denyaba el acceso,
+                // dejando caches sin tocar y sin avisar.
+                foreach (var file in SafeFileEnumeration.Files(path))
                 {
                     ct.ThrowIfCancellationRequested();
                     try
                     {
-                        bytes += file.Length;
-                        file.Delete();
+                        bytes += new FileInfo(file).Length;
+                        File.Delete(file);
                         files++;
                     }
                     catch { /* en uso o sin acceso: se omite */ }

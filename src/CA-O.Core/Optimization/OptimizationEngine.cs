@@ -39,7 +39,8 @@ public sealed class OptimizationEngine
         Func<bool>? hasPendingRecovery = null,
         ISettingsStore? settings = null,
         Core.Interfaces.IDnsConfigurationProvider? dnsProvider = null,
-        Func<bool>? isRunningAsAdmin = null)
+        Func<bool>? isRunningAsAdmin = null,
+        CAO.Core.Rollback.CrashRecoveryService? recovery = null)
     {
         _registry = registry;
         _restorePoints = restorePoints;
@@ -53,9 +54,11 @@ public sealed class OptimizationEngine
         _settings = settings;
         _dnsProvider = dnsProvider;
         _isRunningAsAdmin = isRunningAsAdmin ?? IsRunningAsAdmin;
+        _recovery = recovery;
     }
 
     private readonly CAO.Core.Rollback.ITransactionJournal? _journal;
+    private readonly CAO.Core.Rollback.CrashRecoveryService? _recovery;
     private readonly Func<bool>? _hasPendingRecovery;
     private readonly ISettingsStore? _settings;
     private readonly Func<bool> _isRunningAsAdmin;
@@ -186,7 +189,11 @@ public sealed class OptimizationEngine
 
         var optimization = Resolve(optimizationId);
         var transaction = new OptimizationTransaction(
-            optimization, _registry, context, _services, _executor, _snapshots, _history, _journal, caller);
+            optimization, _registry, context, _services, _executor, _snapshots, _history, _journal, caller,
+            // CAO-BUG-2026-10-06: preState se acaba de leer con el mismo Detect un
+            // par de lineas mas arriba. Pasarlo aqui evita que la transaccion
+            // repita el recorrido (en las limpiezas de temporales, segundos).
+            preState);
         var report = await transaction.RunAsync(ct);
 
         if (report.Success && optimization.Definition.Flags.HasFlag(OptimizationFlags.OneShot))
@@ -284,6 +291,122 @@ public sealed class OptimizationEngine
 
         LogLegacy(optimizationId, "revert", result.Success, record.State, error: result.Error, caller: caller);
         return result;
+    }
+
+    /// <summary>
+    /// Cierra una transaccion pendiente (N-1). Es la UNICA salida cuando
+    /// <see cref="_hasPendingRecovery"/> es verdadero: mientras haya una
+    /// recuperacion pendiente, <see cref="ApplyAsync"/> y
+    /// <see cref="RevertAsync"/> responden <c>CAO-TXN-004</c>, asi que sin este
+    /// metodo el equipo quedaba bloqueado sin ninguna accion de recuperacion.
+    /// </summary>
+    /// <param name="transactionId">Transaccion incompleta a cerrar.</param>
+    /// <param name="discardChanges">
+    /// Si es verdadero NO se toca el sistema: se acepta el estado actual y solo
+    /// se cierra la entrada del journal (queda registrado como no recuperada).
+    /// Si es falso se intenta el rollback desde el snapshot de la transaccion.
+    /// </param>
+    public async Task<OperationResult> RecoverAsync(
+        Guid transactionId,
+        bool discardChanges = false,
+        Shared.Security.CallerIdentity? caller = null,
+        CancellationToken ct = default)
+    {
+        if (!_isRunningAsAdmin())
+        {
+            return OperationResult.Fail("Se requieren permisos de administrador para recuperar una operación.", "not-admin");
+        }
+
+        if (_recovery is null)
+        {
+            return OperationResult.Fail("El servicio no tiene registrado el gestor de recuperación.", "recovery-unavailable");
+        }
+
+        // Idempotente: si la transaccion ya no esta pendiente, la intencion del
+        // llamante ya se cumple y no hay nada que hacer.
+        var candidate = _recovery.Scan().FirstOrDefault(c => c.TransactionId == transactionId);
+        if (candidate is null)
+        {
+            return OperationResult.Ok("La operación ya no está pendiente de recuperación.");
+        }
+
+        if (discardChanges)
+        {
+            // Camino sin rollback: no muta el sistema, solo cierra el journal.
+            _recovery.MarkRecovered(transactionId, candidate.OptimizationId, recovered: false);
+            LogLegacy(candidate.OptimizationId, "recover", true, new OptimizationSnapshot(), error: ErrorCodes.RollbackFailed, caller: caller);
+            return OperationResult.Ok(
+                $"Se descartó el registro de '{candidate.OptimizationId}'. Los cambios de esa operación NO se revirtieron.");
+        }
+
+        if (_settings?.Load().Ui.ReadOnlyMode == true)
+        {
+            return OperationResult.Fail(
+                "Modo de solo lectura activo: la reversión está deshabilitada. Desactívelo para recuperar, o descarte la operación.",
+                ErrorCodes.SecReadOnlyMode);
+        }
+
+        if (candidate.Decision is not CAO.Core.Rollback.RecoveryDecision.RollbackRequired)
+        {
+            return OperationResult.Fail(
+                $"La operación '{candidate.OptimizationId}' está en estado {candidate.Decision}: no hay un snapshot fiable para revertirla. Descártela si acepta el estado actual.",
+                "recovery-not-reversible");
+        }
+
+        if (!_snapshots.TryLoad(transactionId, out var record) || record is null)
+        {
+            return OperationResult.Fail("No hay snapshot guardado para esta operación; no se puede revertir.", "no-snapshot");
+        }
+
+        IOptimization optimization;
+        try
+        {
+            optimization = Resolve(candidate.OptimizationId);
+        }
+        catch (Exception ex)
+        {
+            return OperationResult.Fail($"No se reconoce la optimización '{candidate.OptimizationId}'.", ex.Message);
+        }
+        PrepareServiceAwareOptimization(optimization);
+
+        // Mismo lock de recurso que RevertAsync: una recuperacion restaura estado,
+        // y un apply intercalado sobre el mismo recurso la dejaria a medias.
+        IAsyncDisposable lease;
+        try
+        {
+            lease = await Rollback.ResourceLockManager.Shared.AcquireAsync(
+                optimization.ResourceKeys, CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            return OperationResult.Fail($"Recurso ocupado, reintente: {ex.Message}", "resource-busy");
+        }
+        await using var _ = lease;
+
+        var context = new OptimizationContext { Registry = _registry, Executor = _executor, Services = _services };
+        OperationResult result;
+        try
+        {
+            result = await optimization.RevertAsync(context, record.State, ct);
+        }
+        catch (Exception ex)
+        {
+            result = OperationResult.Fail($"Error inesperado revirtiendo '{candidate.OptimizationId}'.", ex.Message);
+        }
+
+        // Si el rollback falla NO se cierra la transaccion: el usuario puede
+        // reintentar o descartar. Cerrarla en falso dejaria el sistema con
+        // cambios a medias y sin rastro de que estaban pendientes.
+        if (!result.Success)
+        {
+            return result;
+        }
+
+        _recovery.MarkRecovered(transactionId, candidate.OptimizationId, recovered: true);
+        _snapshots.Delete(transactionId);
+        LogLegacy(candidate.OptimizationId, "recover", true, record.State, caller: caller);
+        return OperationResult.Ok(
+            $"Operación '{candidate.OptimizationId}' recuperada: los cambios se revirtieron y la transacción quedó cerrada.");
     }
 
     /// <summary>Persists a fresh snapshot under a NEW transaction identity (P0-3).</summary>

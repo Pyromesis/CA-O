@@ -1,6 +1,7 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
+using CAO.UI.Helpers;
 using Microsoft.UI.Xaml.Media;
 using CAO.Core.Diagnostics;
 using CAO.Infrastructure.Networking;
@@ -87,7 +88,12 @@ public sealed partial class AnalyzePage : Page
             if (persisted?.Context != null)
             {
                 _viewModel.HydrateFromPersistedAnalysis(persisted);
-                RenderFromViewModel();
+                // OnNavigatedTo es void por firma de la API: aquí no se puede
+                // await. El render es progresivo (rellena cada módulo según
+                // termina) y no compite con ApplyTexts ni con
+                // UpdateFreshnessBanner, que no tocan los TextBlocks que este
+                // método escribe; el discard deja la intención explícita.
+                _ = RenderFromViewModel();
             }
         }
         ApplyTexts();
@@ -274,7 +280,7 @@ public sealed partial class AnalyzePage : Page
             CloseButtonText = "Cerrar",
             XamlRoot = Content.XamlRoot,
         };
-        await dialog.ShowAsync();
+        await UiDialogs.ShowAsync(dialog);
     }
 
     private void RenderDiagnostics()
@@ -352,7 +358,7 @@ public sealed partial class AnalyzePage : Page
             var results = await _viewModel.RunAsync(_cts.Token);
 
             // Render parcial tolerante a fallos individuales ( §10 )
-            RenderFromViewModel();
+            await RenderFromViewModel();
             LoadPersisted();
             // Auto-ejecutar diagnósticos integrados + DNS benchmark y DPC como parte del análisis completo.
             // Techo propio: si el análisis principal consumió casi todo el
@@ -434,11 +440,17 @@ public sealed partial class AnalyzePage : Page
         _viewModel.CancelCommand.Execute(null);
     }
 
-    private async void RenderFromViewModel()
+    private async Task RenderFromViewModel()
     {
         // Las mediciones síncronas se descargan a fondo para no congelar la
-        // UI en equipos lentos; todo el método está protegido porque un
-        // async void no debe dejar escapar excepciones.
+        // UI en equipos lentos.
+        // CAO-BUG-2026-10-06: esto era async void y se llamaba sin await, de
+        // modo que LoadPersisted() y PersistDisplaySnapshot() continuaban
+        // mientras este método seguía escribiendo los TextBlocks: la foto a
+        // disco podía quedar a medio renderizar y el orden de escritura
+        // quedaba indeterminado. Devuelve Task y el flujo lo espera. El
+        // try/catch se conserva para que un fallo de render no rompa el
+        // análisis.
         var renderToken = _cts?.Token ?? CancellationToken.None;
         try
         {
@@ -681,7 +693,7 @@ public sealed partial class AnalyzePage : Page
             CloseButtonText = "Cancelar",
             XamlRoot = Content.XamlRoot
         };
-        if (await confirm.ShowAsync() != ContentDialogResult.Primary) return;
+        if (await UiDialogs.ShowAsync(confirm) != ContentDialogResult.Primary) return;
         try
         {
             DnsBestText.Text = $"Aplicando DNS {pairLabel}...";
@@ -730,12 +742,12 @@ public sealed partial class AnalyzePage : Page
             {
                 DnsBestText.Text = $"✓ DNS {pairLabel} aplicado a {iface} — verificado";
                 var ok = new ContentDialog { Title = Localizer.Get("dns.applied"), Content = new TextBlock { Text = $"{Localizer.Get("dns.applied")} {iface}\n{Localizer.Get("dns.primary")}: {pair}\n{Localizer.Get("dns.verified")}", TextWrapping = TextWrapping.Wrap }, CloseButtonText = "Aceptar", XamlRoot = Content.XamlRoot };
-                await ok.ShowAsync();
+                await UiDialogs.ShowAsync(ok);
             }
             else
             {
                 var fallback = new ContentDialog { Title = Localizer.Get("dns.failed"), Content = new TextBlock { Text = $"{Localizer.Get("dns.failed")} [{resp?.ErrorCode}]: {resp?.SafeMessage}", TextWrapping = TextWrapping.Wrap }, CloseButtonText = "Aceptar", XamlRoot = Content.XamlRoot };
-                await fallback.ShowAsync();
+                await UiDialogs.ShowAsync(fallback);
                 DnsBestText.Text = $"{Localizer.Get("dns.failed")} — {resp?.ErrorCode}";
             }
         }
@@ -743,7 +755,7 @@ public sealed partial class AnalyzePage : Page
         {
             DnsBestText.Text = $"{Localizer.Get("dns.failed")}: {ex.Message}";
             var err = new ContentDialog { Title = Localizer.Get("dns.failed"), Content = new TextBlock { Text = $"{Localizer.Get("dns.failed")}\n{ex.Message}", TextWrapping = TextWrapping.Wrap }, CloseButtonText = "Aceptar", XamlRoot = Content.XamlRoot };
-            await err.ShowAsync();
+            await UiDialogs.ShowAsync(err);
         }
     }
 

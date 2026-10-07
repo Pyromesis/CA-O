@@ -2,7 +2,7 @@ using CAO.Shared;
 
 namespace CAO.Core.Optimizations.Storage;
 
-/// <summary>Deletes regenerable browser code caches (Chrome/Edge Default +
+/// <summary>Deletes regenerable browser code caches (Chrome/Edge every profile +
 /// classic Teams): Cache/Code Cache/GPUCache/ShaderCache only. NEVER Local
 /// Storage, IndexedDB, Login Data or history: sessions live there. Files in
 /// use (open browser) are skipped: close browsers first.</summary>
@@ -13,16 +13,42 @@ public sealed class CleanupBrowserCodeCache : TempFileCleanupOptimization
 
     protected override IReadOnlyList<(string Directory, string Pattern, int OlderThanDays)> Targets => BuildTargets();
 
+    /// <summary>
+    /// Caches regenerables de TODOS los perfiles de un directorio "User Data".
+    /// CAO-BUG-2026-10-06: antes se recorria solo el perfil "Default" fijo. Un
+    /// perfil real no se llama siempre Default: Chrome y Edge crean "Profile 1",
+    /// "Profile 2"... para el resto. Cubriendo solo "Default", el navegador que el
+    /// usuario usa a diario se quedaba sin limpiar, y como el unico perfil
+    /// cubierto no tenia nada que borrar el optimizador reportaba exito
+    /// indefinidamente, igual que un no-op. Basta con recorrer los subdirectorios
+    /// y quedarse con los que contienen alguna cache regenerable: asi se excluyen
+    /// tambien las carpetas propias del navegador (Crashpad, ShaderCache,
+    /// GraphiteDawnCache...) que no son perfiles.
+    /// </summary>
+    internal static IReadOnlyList<(string Directory, string Pattern, int OlderThanDays)> CacheTargetsUnder(string userDataDirectory)
+    {
+        List<(string Directory, string Pattern, int OlderThanDays)> list = [];
+        if (!Directory.Exists(userDataDirectory))
+            return list;
+        foreach (var profile in Directory.GetDirectories(userDataDirectory))
+        {
+            foreach (var sub in SafeSubdirs)
+            {
+                var dir = Path.Combine(profile, sub);
+                if (Directory.Exists(dir))
+                    list.Add((dir, "*.*", 1));
+            }
+        }
+        return list;
+    }
+
     private static IReadOnlyList<(string Directory, string Pattern, int OlderThanDays)> BuildTargets()
     {
         List<(string Directory, string Pattern, int OlderThanDays)> list = [];
-        foreach (var sub in SafeSubdirs)
-        {
-            foreach (var dir in ProfileSubDirs("AppData", "Local", "Google", "Chrome", "User Data", "Default", sub))
-                list.Add((dir, "*.*", 1));
-            foreach (var dir in ProfileSubDirs("AppData", "Local", "Microsoft", "Edge", "User Data", "Default", sub))
-                list.Add((dir, "*.*", 1));
-        }
+        foreach (var userData in ProfileSubDirs("AppData", "Local", "Google", "Chrome", "User Data"))
+            list.AddRange(CacheTargetsUnder(userData));
+        foreach (var userData in ProfileSubDirs("AppData", "Local", "Microsoft", "Edge", "User Data"))
+            list.AddRange(CacheTargetsUnder(userData));
         foreach (var sub in TeamsSubdirs)
         {
             foreach (var dir in ProfileSubDirs("AppData", "Roaming", "Microsoft", "Teams", sub))
@@ -40,7 +66,7 @@ public sealed class CleanupBrowserCodeCache : TempFileCleanupOptimization
         NameEn = "Clean browser caches",
         DescriptionEs = "Vacía cachés regenerables de Chrome, Edge y Teams. Nunca toca sesiones, contraseñas ni historial. Cierra cada app antes.",
         DescriptionEn = "Empties regenerable Chrome, Edge and Teams caches. Never touches sessions, passwords or history. Close each app first.",
-        TooltipEs = "Solo Cache/Code Cache/GPUCache/ShaderCache del perfil Default. Lo que esté en uso se omite. Mantenimiento no reversible.",
+        TooltipEs = "Solo Cache/Code Cache/GPUCache/ShaderCache de todos los perfiles de Chrome, Edge y Teams. Lo que esté en uso se omite. Mantenimiento no reversible.",
         Category = OptimizationCategory.Storage,
         ExpectedImpact = PerformanceImpact.Small,
         Evidence = EvidenceLevel.Empirical,

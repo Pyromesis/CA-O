@@ -27,7 +27,7 @@ public sealed partial class RestorePage : Page
         RecoveryHintText.Text = _vm.RecoveryHint;
         _vm.PropertyChanged += (_, e) =>
         {
-            if (e.PropertyName is null or nameof(ViewModels.RestoreViewModel.Snapshots) or nameof(ViewModels.RestoreViewModel.RecoveryHint) or nameof(ViewModels.RestoreViewModel.IsEmpty))
+            if (e.PropertyName is null or nameof(ViewModels.RestoreViewModel.Snapshots) or nameof(ViewModels.RestoreViewModel.RecoveryHint) or nameof(ViewModels.RestoreViewModel.IsEmpty) or nameof(ViewModels.RestoreViewModel.HasPendingRecoveries))
                 DispatcherQueue.TryEnqueue(RenderVm);
         };
         RenderVm();
@@ -52,6 +52,94 @@ public sealed partial class RestorePage : Page
         SnapshotsList.Visibility = _vm.IsEmpty ? Visibility.Collapsed : Visibility.Visible;
         SnapshotsList.ItemsSource = _vm.SnapshotInfos;
         RecoveryHintText.Text = _vm.RecoveryHint;
+        // CAO-BUG-2026-10-06 (N-1): la tarjeta solo aparece si hay una operacion
+        // pendiente y es la unica via para desbloquear el equipo cuando el
+        // servicio rechaza aplicar y revertir.
+        PendingRecoveryCard.Visibility = _vm.HasPendingRecoveries ? Visibility.Visible : Visibility.Collapsed;
+        PendingRecoveryList.ItemsSource = _vm.PendingRecoveries;
+    }
+
+    /// <summary>
+    /// Revierte una operacion pendiente desde su snapshot y cierra la transaccion.
+    /// CAO-BUG-2026-10-06 (N-1): sin esta accion el equipo se quedaba bloqueado,
+    /// porque el servicio devuelve <c>CAO-TXN-004</c> mientras haya recuperacion
+    /// pendiente, tanto al aplicar como al revertir.
+    /// </summary>
+    private async void OnRecoverClick(object sender, RoutedEventArgs e) =>
+        await RunRecoverAsync(sender, discardChanges: false);
+
+    /// <summary>
+    /// Cierra la transaccion aceptando el estado actual, sin revertir cambios.
+    /// Es la unica salida cuando el snapshot no permite una reverticion fiable.
+    /// </summary>
+    private async void OnDiscardClick(object sender, RoutedEventArgs e) =>
+        await RunRecoverAsync(sender, discardChanges: true);
+
+    private async Task RunRecoverAsync(object sender, bool discardChanges)
+    {
+        if (sender is not Button { Tag: Guid transactionId }) return;
+
+        var what = discardChanges
+            ? "se descartará el registro y los cambios NO se revertirán"
+            : "se revertirán los cambios desde el snapshot";
+        var confirm = new ContentDialog
+        {
+            Title = discardChanges ? "Confirmar descarte" : "Confirmar recuperación",
+            Content = new TextBlock
+            {
+                Text = $"Operación {transactionId:D}. Con esta acción {what}. Mientras quede una operación pendiente el servicio rechaza cualquier otro cambio.",
+                TextWrapping = TextWrapping.Wrap
+            },
+            PrimaryButtonText = discardChanges ? "Descartar" : "Recuperar",
+            CloseButtonText = "Cancelar",
+            DefaultButton = ContentDialogButton.Close,
+            XamlRoot = Content.XamlRoot
+        };
+        if (await UiDialogs.ShowAsync(confirm) != ContentDialogResult.Primary) return;
+
+        Mascot.Set("Working");
+        ShowRestoreProgress(discardChanges
+            ? $"Descartando la operación {transactionId:D}…"
+            : $"Revirtiendo la operación {transactionId:D}…");
+        try
+        {
+            using var recoverCts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+            await _vm.RecoverAsync(transactionId, discardChanges, recoverCts.Token);
+            var hint = _vm.RecoveryHint;
+            var isSuccess = hint.Contains('✓');
+            ShowRestoreProgress(isSuccess ? hint : $"No se pudo recuperar: {hint}", done: true);
+            if (isSuccess) Mascot.CelebrateThenIdle(DispatcherQueue);
+            else Mascot.Set("Warn");
+            var resultDialog = new ContentDialog
+            {
+                Title = isSuccess ? "Recuperación completada" : "Recuperación no completada",
+                Content = new TextBlock { Text = hint, TextWrapping = TextWrapping.Wrap },
+                CloseButtonText = "Aceptar",
+                DefaultButton = ContentDialogButton.Close,
+                XamlRoot = Content.XamlRoot
+            };
+            await UiDialogs.ShowAsync(resultDialog);
+            _vm.RefreshCommand.Execute(null);
+            RenderVm();
+            try { await Task.Delay(1500); } catch { }
+            HideRestoreProgress();
+        }
+        catch (Exception ex)
+        {
+            RecoveryHintText.Text = $"Recuperación falló (servicio no disponible): {ex.Message}";
+            Mascot.Set("Warn");
+            ShowRestoreProgress($"Recuperación falló: {ex.Message}", done: true);
+            var errDialog = new ContentDialog
+            {
+                Title = "Error en recuperación",
+                Content = new TextBlock { Text = $"No se pudo cerrar la operación {transactionId:D}:\n{ex.Message}\n\nVerifica que el servicio CAO.Privileged esté en ejecución.", TextWrapping = TextWrapping.Wrap },
+                CloseButtonText = "Aceptar",
+                XamlRoot = Content.XamlRoot
+            };
+            await UiDialogs.ShowAsync(errDialog);
+            try { await Task.Delay(1500); } catch { }
+            HideRestoreProgress();
+        }
     }
 
     private void OnRefreshClick(object sender, RoutedEventArgs e) => _vm.RefreshCommand.Execute(null);
@@ -86,7 +174,7 @@ public sealed partial class RestorePage : Page
             CloseButtonText = "Cerrar",
             XamlRoot = Content.XamlRoot
         };
-        await dialog.ShowAsync();
+        await UiDialogs.ShowAsync(dialog);
     }
 
     private async void OnRestoreClick(object sender, RoutedEventArgs e)
@@ -106,7 +194,7 @@ public sealed partial class RestorePage : Page
             DefaultButton = ContentDialogButton.Close,
             XamlRoot = Content.XamlRoot
         };
-        if (await confirm.ShowAsync() != ContentDialogResult.Primary) return;
+        if (await UiDialogs.ShowAsync(confirm) != ContentDialogResult.Primary) return;
 
         Mascot.Set("Working");
         ShowRestoreProgress($"Restaurando snapshot {snapshotId}…");
@@ -128,7 +216,7 @@ public sealed partial class RestorePage : Page
                 DefaultButton = ContentDialogButton.Close,
                 XamlRoot = Content.XamlRoot
             };
-            await resultDialog.ShowAsync();
+            await UiDialogs.ShowAsync(resultDialog);
             _vm.RefreshCommand.Execute(null);
             RenderVm();
             try { await Task.Delay(1500); } catch { }
@@ -146,7 +234,7 @@ public sealed partial class RestorePage : Page
                 CloseButtonText = "Aceptar",
                 XamlRoot = Content.XamlRoot
             };
-            await errDialog.ShowAsync();
+            await UiDialogs.ShowAsync(errDialog);
             try { await Task.Delay(1500); } catch { }
             HideRestoreProgress();
         }

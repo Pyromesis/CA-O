@@ -362,7 +362,7 @@ public sealed partial class BenchmarkPage : Page
             CloseButtonText = "Cancelar",
             XamlRoot = Content.XamlRoot
         };
-        if (await confirm.ShowAsync() != ContentDialogResult.Primary) return;
+        if (await UiDialogs.ShowAsync(confirm) != ContentDialogResult.Primary) return;
         DnsApplyButton.IsEnabled = false;
         try
         {

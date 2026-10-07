@@ -32,15 +32,10 @@ public sealed class CleanupService
         long total = 0;
         foreach (var root in Roots.Where(Directory.Exists))
         {
-            try
-            {
-                foreach (var file in Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories))
-                {
-                    try { total += new FileInfo(file).Length; }
-                    catch { /* locked or gone */ }
-                }
-            }
-            catch { /* access denied on some subtree */ }
+            // CAO-BUG-2026-10-06: la enumeracion cruda se paraba en el primer
+            // subarbol sin acceso, de modo que la estimacion informaba de muy
+            // poco cuando en realidad habia caches inaccesibles sin contar.
+            total += SafeFileEnumeration.BytesIn(root);
         }
         return total;
     }

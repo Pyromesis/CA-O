@@ -66,22 +66,29 @@ public sealed partial class DashboardPage : Page
         Unloaded += OnUnloaded;
         Loaded += async (_, __) =>
         {
-            Helpers.UiAnimations.PlayEntrance(PageContent);
-            try { ArmSleepTimer(); } catch { /* la mascota nunca rompe la página */ }
-            RenderHub();
-            if (uiState.Context is null)
+            // CAO-BUG-2026-10-06: este manejador es async void y solo la carga
+            // inicial tinha try. Un fallo en PlayEntrance, RenderHub o
+            // ServiceInfoBar escapaba al despachador y terminaba la aplicacion.
+            try
             {
-                try
+                Helpers.UiAnimations.PlayEntrance(PageContent);
+                try { ArmSleepTimer(); } catch { /* la mascota nunca rompe la página */ }
+                RenderHub();
+                if (uiState.Context is null)
                 {
-                    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-                    await _vm.LoadCommand.ExecuteAsync(null);
-                    RenderHub();
+                    try
+                    {
+                        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+                        await _vm.LoadCommand.ExecuteAsync(null);
+                        RenderHub();
+                    }
+                    catch (Exception ex) { App.WriteCrashLog(ex); }
                 }
-                catch (Exception ex) { App.WriteCrashLog(ex); }
+                ServiceInfoBar.IsOpen = uiState.ServiceStatus is not ("connected" or "conectado");
+                _ = SampleLiveAsync();
+                App.BootMark("Panel interactivo");
             }
-            ServiceInfoBar.IsOpen = uiState.ServiceStatus is not ("connected" or "conectado");
-            _ = SampleLiveAsync();
-            App.BootMark("Panel interactivo");
+            catch (Exception ex) { App.WriteCrashLog(ex); }
         };
     }
 

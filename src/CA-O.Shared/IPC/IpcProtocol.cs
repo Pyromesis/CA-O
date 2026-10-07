@@ -37,6 +37,7 @@ public enum PrivilegedOperationKind
     ExportDriver,
     SearchCatalogDrivers,
     DownloadCatalogDriver,
+    RecoverTransaction,
 }
 
 /// <summary>
@@ -67,6 +68,7 @@ public interface IOptimizationIdPayload : ITypedPayload
 [JsonDerivedType(typeof(ExportDriverPayload), "exportdriver")]
 [JsonDerivedType(typeof(SearchCatalogDriversPayload), "searchcatalog")]
 [JsonDerivedType(typeof(DownloadCatalogDriverPayload), "downloadcatalog")]
+[JsonDerivedType(typeof(RecoverTransactionPayload), "recover")]
 public interface ITypedPayload
 {
 }
@@ -140,6 +142,15 @@ public sealed record SearchCatalogDriversPayload(string HardwareId, string Devic
 
 /// <summary>Descarga+extrae una oferta del catálogo (solo GUIDs de búsqueda).</summary>
 public sealed record DownloadCatalogDriverPayload(string UpdateId, string HardwareId = "") : ITypedPayload;
+
+/// <summary>
+/// Cierra una transaccion pendiente. CAO-BUG-2026-10-06 (N-1): mientras
+/// <c>HasPendingRecovery</c> es verdadero, apply y revert estan bloqueados, asi que
+/// sin esta operacion el equipo queda sin salida. <paramref name="DiscardChanges"/>
+/// es la via de "descartar": el usuario acepta el estado actual y solo se cierra
+/// la entrada del journal; en falso se intenta el rollback desde el snapshot.
+/// </summary>
+public sealed record RecoverTransactionPayload(Guid TransactionId, bool DiscardChanges = false) : ITypedPayload;
 
 public sealed record PingResponse(string ServiceVersion, int ProtocolVersion, int ProcessId, bool IsSystem, string Status);
 public sealed record ServiceStatusResponse(string ServiceVersion, int ProtocolVersion, int ProcessId, bool IsSystem, string Status, IReadOnlyList<string> Capabilities);

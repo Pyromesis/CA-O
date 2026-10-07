@@ -139,7 +139,7 @@ public sealed partial class MainWindow : Window
                     DefaultButton = ContentDialogButton.Primary,
                     XamlRoot = Content.XamlRoot,
                 };
-                await dialog.ShowAsync();
+                await UiDialogs.ShowAsync(dialog);
                 try
                 {
                     if (ContentFrame.Content is Pages.AnalyzePage page)

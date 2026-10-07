@@ -21,7 +21,7 @@ public sealed class UiState : ObservableObject
     private string _serviceStatus = "unknown";
     private string _serviceVersion = string.Empty;
     private DateTime? _serviceCheckedUtc;
-    private IReadOnlyList<string> _recoveryCandidates = Array.Empty<string>();
+    private IReadOnlyList<RecoveryCandidateInfo> _recoveryCandidates = Array.Empty<RecoveryCandidateInfo>();
     private string _freshnessLabel = string.Empty;
     private string _staleReason = string.Empty;
     private string _analysisAgeLabel = string.Empty;
@@ -134,8 +134,16 @@ public sealed class UiState : ObservableObject
         set => SetProperty(ref _serviceCheckedUtc, value);
     }
 
-    /// <summary>Optimization ids left Incomplete by a previous crash (spec 13).</summary>
-    public IReadOnlyList<string> RecoveryCandidates
+    /// <summary>
+    /// Operaciones que quedaron incompletas tras un cierre inesperado (spec 13) y
+    /// cuya decision de <c>Scan</c> es bloqueante. CAO-BUG-2026-10-06 (N-1):
+    /// antes solo guardaba el id de optimizacion, y con el servicio en modo
+    /// recuperacion tanto aplicar como revertir devuelven <c>CAO-TXN-004</c>: sin
+    /// el TransactionId no habia ninguna forma de cerrar la transaccion, asi que el
+    /// equipo quedaba sin salida. Ahora cada entrada lleva lo necesario para
+    /// ejecutar la recuperacion.
+    /// </summary>
+    public IReadOnlyList<RecoveryCandidateInfo> RecoveryCandidates
     {
         get => _recoveryCandidates;
         set => SetProperty(ref _recoveryCandidates, value);

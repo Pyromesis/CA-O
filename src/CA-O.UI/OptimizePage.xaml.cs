@@ -86,8 +86,18 @@ public sealed partial class OptimizePage : Page
         FilterExperimentalButton.Content = $"{Localizer.Get("optimize.filterExperimental")} ({exp})";
         FilterAppliedButton.Content = $"{Localizer.Get("optimize.filterApplied")} ({applied})";
         // highlight active (estilos premium Cao; el activo en acento, el resto filtro estable)
-        var activeStyle = (Microsoft.UI.Xaml.Style)Application.Current.Resources["CaoAccentButtonStyle"];
-        var idleStyle = (Microsoft.UI.Xaml.Style)Application.Current.Resources["CaoFilterButtonStyle"];
+        // CAO-BUG-2026-10-06: estas dos busquedas con casteo directo escapaban por
+        // OnApplyClick/OnRevertClick (async void sin try) y por Render() dentro
+        // del catch, cerrando la aplicacion si el diccionario aun no estaba
+        // disponible o faltara una clave. Si falta, los botones conservan su
+        // estilo anterior en vez de tumbar la pagina.
+        var resources = Application.Current?.Resources;
+        if (resources is null) return;
+        if (!resources.TryGetValue("CaoAccentButtonStyle", out var accent)
+            || accent is not Microsoft.UI.Xaml.Style activeStyle
+            || !resources.TryGetValue("CaoFilterButtonStyle", out var idle)
+            || idle is not Microsoft.UI.Xaml.Style idleStyle)
+            return;
         FilterAllButton.Style = _activeFilter == null && !_appliedOnly ? activeStyle : idleStyle;
         FilterRecommendedButton.Style = _activeFilter == RecommendationBucket.Recommended && !_appliedOnly ? activeStyle : idleStyle;
         FilterOptionalButton.Style = _activeFilter == RecommendationBucket.Optional && !_appliedOnly ? activeStyle : idleStyle;
@@ -345,7 +355,7 @@ public sealed partial class OptimizePage : Page
             else if (offerRevert) dialog.PrimaryButtonText = "Sí, revertir";
             if (offerApply || offerRevert)
                 dialog.PrimaryButtonStyle = (Style)Application.Current.Resources["AccentButtonStyle"];
-            var result = await dialog.ShowAsync();
+            var result = await UiDialogs.ShowAsync(dialog);
             if (result == ContentDialogResult.Primary)
             {
                 if (offerRevert) await RunOperationAsync(PrivilegedOperationKind.RevertOptimization, id);
@@ -475,7 +485,7 @@ public sealed partial class OptimizePage : Page
                 DefaultButton = ContentDialogButton.Primary,
                 XamlRoot = Content.XamlRoot,
             };
-            if (await dialog.ShowAsync() != ContentDialogResult.Primary)
+            if (await UiDialogs.ShowAsync(dialog) != ContentDialogResult.Primary)
             {
                 return;
             }
@@ -559,7 +569,7 @@ public sealed partial class OptimizePage : Page
                     DefaultButton = ContentDialogButton.Close,
                     XamlRoot = Content.XamlRoot
                 };
-                await appliedDialog.ShowAsync();
+                await UiDialogs.ShowAsync(appliedDialog);
             }
             if (operation == PrivilegedOperationKind.RevertOptimization)
             {
@@ -571,7 +581,7 @@ public sealed partial class OptimizePage : Page
                     DefaultButton = ContentDialogButton.Close,
                     XamlRoot = Content.XamlRoot
                 };
-                await dialog.ShowAsync();
+                await UiDialogs.ShowAsync(dialog);
             }
 
             try
@@ -615,19 +625,29 @@ public sealed partial class OptimizePage : Page
         }
     }
 
-    // Espejo de TimeoutProfile.HeavyOptimizationIds (C3: sin el id retirado
-    // disk-cleanup-system-files; con cleanup-app-caches y analyze-component-store).
-    private static TimeSpan TimeoutFor(string optimizationId) => optimizationId switch
-    {
-        "windows-component-store-cleanup" or "windows-component-store-resetbase"
-            or "optimize-system-drive" or "retrim-system-ssd" or "defragment-hdd-only"
-            or "cleanup-windows-update-cache" or "cleanup-app-caches" or "analyze-component-store"
-            or "reset-network-stack-repair" or "repair-windows-update" => TimeSpan.FromMinutes(20),
-        _ => TimeSpan.FromSeconds(60),
-    };
+    // CAO-BUG-2026-10-06: ya no se mantiene una copia manual de
+    // TimeoutProfile.HeavyOptimizationIds. La copia iba por detras y su
+    // defecto era 60 s para todo lo que no fuera "pesado", mientras el
+    // cliente IPC concede TimeoutProfile.ClientResponseDefault (90 s): la UI
+    // cancelaba antes de que el servicio respondiera y el lote terminaba en
+    // "Servicio no disponible: A task was canceled."
+    private static bool IsHeavy(string optimizationId) =>
+        TimeoutProfile.HeavyOptimizationIds.Contains(optimizationId);
+
+    private static TimeSpan TimeoutFor(string optimizationId) =>
+        IsHeavy(optimizationId) ? TimeoutProfile.DispatchHeavy : TimeoutProfile.ClientResponseDefault;
+
+    // CAO-BUG-2026-10-06: el estado visual (BusyRing, TxRing, TxProgressBar,
+    // TransactionProgressCard) era compartido sin ninguna proteccion frente a
+    // un segundo lote concurrente. Dos lotes simultaneos (el primero
+    // terminado, el segundo en curso) dejaban los anillos parados y la tarjeta
+    // a medias, que es exactamente el sintoma "se queda cargando". Solo puede
+    // haber un lote por pagina.
+    private bool _busy;
 
     private async void OnApplyRecommendedClick(object sender, RoutedEventArgs e)
     {
+        if (_busy) return;
         var uiState = AppHost.Resolve<ViewModels.UiState>();
         var recommended = uiState.Recommendations
             .Where(recommendation => recommendation.Bucket == RecommendationBucket.Recommended &&
@@ -642,6 +662,8 @@ public sealed partial class OptimizePage : Page
             return;
         }
 
+        _busy = true;
+        ApplyRecommendedButton.IsEnabled = false;
         BusyRing.IsActive = true;
         TransactionProgressCard.Visibility = Visibility.Visible;
         TxRing.IsActive = true;
@@ -658,22 +680,58 @@ public sealed partial class OptimizePage : Page
                 var id = recommended[i];
                 TxText.Text = $"Aplicando {id} ({i + 1}/{recommended.Count})…";
                 StatusText.Text = TxText.Text;
-                TxProgressBar.Value = (double)i / recommended.Count * 100;
+                TxProgressBar.Value = (double)(appliedOk.Count + failures.Count) / recommended.Count * 100;
                 TxPercentText.Text = $"{TxProgressBar.Value:0}%";
-                using var cts = new CancellationTokenSource(TimeoutFor(id));
-                var pipe = AppHost.Resolve<PrivilegedPipeClient>();
-                var response = await pipe.SendAsync(PrivilegedOperationKind.ApplyOptimization, id, cts.Token);
-                if (response is not { Accepted: true })
+                // CAO-BUG-2026-10-06: cada id se aísla. Antes una excepción (p.ej.
+                // el CTS expirando) saltaba directamente al catch exterior, el
+                // lote se detenía en el primer fallo y el mensaje "Servicio no
+                // disponible" mentía: el servicio estaba bien. Además se perdía
+                // el avance ya realizado y al reintentar se reaplicaba.
+                try
                 {
-                    failures.Add($"{id}: [{response?.ErrorCode}] {response?.SafeMessage ?? "sin respuesta"}");
-                    break; // stop the batch on first failure (spec 124)
+                    // CAO-BUG-2026-10-06: la barra se quedaba clavada en el porcentaje
+                    // del lote anterior mientras un id pesado llegaba a tardar 20
+                    // minutos, indistinguible de un cuelgue. Durante cada id la barra
+                    // pasa a indeterminado y se anuncia el techo, de modo que un
+                    // silencio largo se lee como esperable y no como un fallo.
+                    var budget = TimeoutFor(id);
+                    TxProgressBar.IsIndeterminate = true;
+                    TxPercentText.Text = string.Empty;
+                    TxText.Text = IsHeavy(id)
+                        ? $"Aplicando {id} ({i + 1}/{recommended.Count}). Puede tardar varios minutos."
+                        : $"Aplicando {id} ({i + 1}/{recommended.Count}). Hasta {budget.TotalSeconds:0} s.";
+                    StatusText.Text = TxText.Text;
+                    using var cts = new CancellationTokenSource(budget);
+                    var pipe = AppHost.Resolve<PrivilegedPipeClient>();
+                    var response = await pipe.SendAsync(PrivilegedOperationKind.ApplyOptimization, id, cts.Token);
+                    if (response is { Accepted: true })
+                    {
+                        appliedOk.Add(id);
+                        uiState.AppliedThisSession.Add(id);
+                    }
+                    else
+                    {
+                        failures.Add($"{id}: [{response?.ErrorCode}] {response?.SafeMessage ?? "sin respuesta"}");
+                    }
                 }
-                appliedOk.Add(id);
-                uiState.AppliedThisSession.Add(id);
-                TxProgressBar.Value = (double)appliedOk.Count / recommended.Count * 100;
+                catch (OperationCanceledException)
+                {
+                    failures.Add($"{id}: tiempo de espera agotado ({TimeoutFor(id).TotalSeconds:0} s)");
+                }
+                catch (Exception ex)
+                {
+                    failures.Add($"{id}: {ex.Message}");
+                    App.WriteCrashLog(ex);
+                }
+                finally
+                {
+                    // La barra vuelve a ser determinista al terminar cada id, para
+                    // que el porcentaje del lote refleje el avance real.
+                    TxProgressBar.IsIndeterminate = false;
+                }
+                TxProgressBar.Value = (double)(appliedOk.Count + failures.Count) / recommended.Count * 100;
                 TxPercentText.Text = $"{TxProgressBar.Value:0}%";
             }
-            foreach (var ok in appliedOk) uiState.AppliedThisSession.Add(ok);
 
             try
             {
@@ -684,42 +742,55 @@ public sealed partial class OptimizePage : Page
             {
                 App.WriteCrashLog(refreshEx);
             }
-            foreach (var ok in appliedOk) uiState.AppliedThisSession.Add(ok);
-            Render();
+Render();
             StatusText.Text = failures.Count == 0
                 ? $"✓ Aplicados {appliedOk.Count} cambios recomendados y verificados. Figuran como Activos."
-                : $"Lote detenido: {string.Join("; ", failures)}";
-            TxText.Text = failures.Count == 0 ? $"Verificado ✓ — {appliedOk.Count}/{recommended.Count} aplicados" : "Lote detenido — revisa el fallo";
-            TxProgressBar.Value = failures.Count == 0 ? 100 : (double)appliedOk.Count / recommended.Count * 100;
-            TxPercentText.Text = $"{TxProgressBar.Value:0}%";
+                : $"✓ Aplicados {appliedOk.Count} de {recommended.Count}; {failures.Count} sin completar: {string.Join("; ", failures)}";
+            TxText.Text = failures.Count == 0
+                ? $"Verificado ✓ — {appliedOk.Count}/{recommended.Count} aplicados"
+                : $"Verificado ✓ — {appliedOk.Count}/{recommended.Count} aplicados, {failures.Count} con fallo";
+            TxProgressBar.Value = 100;
+            TxPercentText.Text = "100%";
             if (failures.Count == 0) Mascot.CelebrateThenIdle(DispatcherQueue);
             else Mascot.Set("Warn");
             var batchDialog = new ContentDialog
             {
-                Title = failures.Count == 0 ? $"✓ {appliedOk.Count} cambios aplicados" : "Lote detenido",
+                Title = failures.Count == 0 ? $"✓ {appliedOk.Count} cambios aplicados" : "Aplicación parcial",
                 Content = new TextBlock
                 {
                     Text = failures.Count == 0
                         ? $"Se aplicaron y verificaron {appliedOk.Count} cambios.\nYa figuran como Activos y no se pueden volver a aplicar.\nSnapshots disponibles en Restaurar."
-                        : $"Se aplicaron {appliedOk.Count} antes del fallo y el lote se DETUVO (los ya aplicados SIGUEN aplicados; revierte cada uno en Restaurar si lo necesitas).\nFallo: {string.Join("; ", failures)}",
+                        : $"Se aplicaron y verificaron {appliedOk.Count} de {recommended.Count} cambios; el resto falló y queda pendiente, puedes reintentarlo.\nFallos: {string.Join("; ", failures)}",
                     TextWrapping = TextWrapping.Wrap
                 },
                 CloseButtonText = "Aceptar",
                 DefaultButton = ContentDialogButton.Close,
                 XamlRoot = Content.XamlRoot
             };
-            await batchDialog.ShowAsync();
+            await UiDialogs.ShowAsync(batchDialog);
         }
         catch (Exception ex)
         {
-            StatusText.Text = $"Servicio no disponible: {ex.Message}";
-            TxText.Text = "Servicio no disponible";
+            // CAO-BUG-2026-10-06: con el lote ya aislado por ítem, aquí solo
+            // puede fallar el refresco o el diálogo. Decir "Servicio no
+            // disponible" mentía. Y Render() sin guardar convertía un fallo de
+            // UI en un segundo fallo de UI, dejando los anillos girando.
+            var applied = appliedOk.Count;
+            StatusText.Text = applied > 0
+                ? $"✓ Aplicados {applied} cambios; el resumen no pudo completarse: {ex.Message}"
+                : $"No se pudo completar la operación: {ex.Message}";
+            TxText.Text = applied > 0 ? $"Verificado ✓ — {applied} aplicados" : "Operación incompleta";
+            TxProgressBar.IsIndeterminate = false;
+            TxProgressBar.Value = applied > 0 ? 100 : 0;
+            TxPercentText.Text = applied > 0 ? "100%" : "0%";
             Mascot.Set("Warn");
-            Render();
+            try { Render(); } catch { }
             App.WriteCrashLog(ex);
         }
         finally
         {
+            _busy = false;
+            ApplyRecommendedButton.IsEnabled = true;
             BusyRing.IsActive = false;
             TxRing.IsActive = false;
             await Task.Delay(1500);

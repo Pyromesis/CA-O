@@ -265,6 +265,21 @@ public sealed class AuditOptimizationsTests
         Assert.Contains("analyze-component-store", TimeoutProfile.HeavyOptimizationIds);
     }
 
+    // CAO-BUG-2026-10-06: la familia de limpieza de temporales recorre el arbol
+    // entero de cada objetivo (y cleanup-crash-dumps-extended, hasta C:\Windows
+    // entero). Sin figurar en HeavyOptimizationIds el servicio las mataba a los
+    // 60 s, la UI esperaba 90 s y el trabajo se perdia a medias para siempre.
+    [Theory]
+    [InlineData("cleanup-windows-temp")]
+    [InlineData("cleanup-crash-dumps-extended")]
+    [InlineData("cleanup-browser-code-cache")]
+    [InlineData("cleanup-gpu-shader-cache")]
+    [InlineData("cleanup-nvidia-downloader-cache")]
+    public void TempCleanupFamily_IsHeavy(string id)
+    {
+        Assert.Contains(id, TimeoutProfile.HeavyOptimizationIds);
+    }
+
     // ---- BLOQUE C4: restores fuera del lote ----
 
     [Theory]

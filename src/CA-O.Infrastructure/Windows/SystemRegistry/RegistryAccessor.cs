@@ -31,6 +31,37 @@ public sealed class RegistryAccessor : IRegistryAccessor
 
     private static RegistryKey OpenCurrentUser(bool writable, out bool owned)
     {
+        // CAO-BUG-2026-10-06 (F1): RegOpenCurrentUser devuelve el HKCU del
+        // token AMBIENTE del hilo. El servicio lo abria dentro de
+        // WindowsIdentity.RunImpersonated(token, () => DispatchOperationAsync(...)),
+        // pero esa suplantacion es de hilo y RunImpersonated la retira cuando el
+        // delegado devuelve la Task, no cuando la Task completa. En una funcion
+        // async el delegado devuelve la Task en el PRIMER await, asi que todo lo
+        // posterior (incluido el Detect y la escritura de HKCN) corria con el
+        // token de SYSTEM. Con el SID del llamante en el contexto se abre
+        // HKEY_USERS\<sid>, que es explicito y no depende de ningun token: el
+        // servicio es SYSTEM y puede abrir el hive de cualquier usuario.
+        var callerSid = CallerContext.CurrentUserSid;
+        if (OperatingSystem.IsWindows() && callerSid is not null)
+        {
+            try
+            {
+                var userKey = Registry.Users.OpenSubKey(callerSid, writable: writable);
+                if (userKey is not null)
+                {
+                    owned = true;
+                    return userKey;
+                }
+            }
+            catch (Exception ex) when (ex is UnauthorizedAccessException
+                                          or System.Security.SecurityException
+                                          or IOException
+                                          or ArgumentException)
+            {
+                // Fallback al comportamiento basado en token.
+            }
+        }
+
         if (OperatingSystem.IsWindows())
         {
             try
