@@ -167,47 +167,10 @@ public partial class App : Application
         catch { }
     }
     /// <summary>Startup/crash diagnostics written to %LocalAppData%\CA-O\logs (Fase 26). Never under Program Files.</summary>
-    internal static void WriteCrashLog(Exception ex)
-    {
-        try
-        {
-            var logDir = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "CA-O", "logs");
-            Directory.CreateDirectory(logDir);
-            var path = Path.Combine(logDir, "cao-ui-crash.log");
-            RotateCrashLogIfNeeded(path);
-            var sb = new StringBuilder()
-                .AppendLine("---- " + DateTime.UtcNow.ToString("o") + " ----")
-                .AppendLine(ex.GetType().FullName)
-                .AppendLine(ex.Message)
-                .AppendLine(ex.StackTrace);
-            var inner = ex.InnerException;
-            int depth = 0;
-            while (inner != null && depth < 10)
-            {
-                depth++;
-                sb.AppendLine("--- Inner ---");
-                sb.AppendLine(inner.GetType().FullName);
-                sb.AppendLine(inner.Message);
-                sb.AppendLine(inner.StackTrace);
-                inner = inner.InnerException;
-            }
-            try { sb.AppendLine("HResult: 0x" + ex.HResult.ToString("X")); } catch { }
-            File.AppendAllText(path, sb.ToString(), Encoding.UTF8);
-        }
-        catch
-        {
-            try
-            {
-                var fallback = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
-                    "CA-O", "logs", "cao-ui-crash.log");
-                Directory.CreateDirectory(Path.GetDirectoryName(fallback)!);
-                var text = DateTime.UtcNow.ToString("o") + " " + ex.GetType().Name + ": " + ex.Message + (ex.InnerException != null ? " Inner: " + ex.InnerException.Message : "") + Environment.NewLine;
-                File.AppendAllText(fallback, text, Encoding.UTF8);
-            }
-            catch { }
-        }
-    }
+    /// <summary>
+    /// Kept as the name every page already calls. The writer itself moved to
+    /// <see cref="Helpers.CrashLog"/> so that a test can log a failure without
+    /// loading the WinUI application type into the test host.
+    /// </summary>
+    internal static void WriteCrashLog(Exception ex) => Helpers.CrashLog.Write(ex);
 }

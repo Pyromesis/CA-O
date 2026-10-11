@@ -217,6 +217,72 @@
                     <TextBlock Style="{StaticResource CaoSectionTitleStyle}" Text="05  ESTABILIDAD" />
                     <TextBlock Style="{StaticResource CaoSectionSubtitleStyle}"
                                Text="{x:Bind ViewModel.StabilitySummary, Mode=OneWay}" />
+
+                    <TextBlock Style="{StaticResource CaoCardTitleStyle}"
+                               Margin="0,16,0,0"
+                               Text="Ajustes pendientes tras un reinicio" />
+                    <TextBlock Style="{StaticResource CaoListItemDetailStyle}"
+                               Text="{x:Bind ViewModel.RecoverySummary, Mode=OneWay}" />
+                    <ItemsControl Margin="0,8,0,0"
+                                  ItemsSource="{x:Bind ViewModel.PendingRecoveries}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:OverclockRecoveryRow">
+                                <Border Style="{StaticResource CaoCardStyle}" Margin="0,0,0,8">
+                                    <StackPanel Padding="12">
+                                        <TextBlock Style="{StaticResource CaoListItemTitleStyle}" Text="{x:Bind Knob}" />
+                                        <TextBlock Style="{StaticResource CaoListItemDetailStyle}" Text="{x:Bind Action}" />
+                                        <TextBlock Style="{StaticResource CaoListItemDetailStyle}" Text="{x:Bind Reason}" />
+                                        <TextBlock Style="{StaticResource CaoListItemDetailStyle}" Text="{x:Bind Detail}" />
+                                        <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                            <Button Content="Revertir"
+                                                    Style="{StaticResource CaoPrimaryButtonStyle}"
+                                                    Command="{x:Bind RevertCommand}"
+                                                    CommandParameter="{x:Bind}" />
+                                            <Button Content="Mantener"
+                                                    Margin="8,0,0,0"
+                                                    Style="{StaticResource CaoElevatedButtonStyle}"
+                                                    Command="{x:Bind KeepCommand}"
+                                                    CommandParameter="{x:Bind}" />
+                                            <Button Content="Descartar"
+                                                    Margin="8,0,0,0"
+                                                    Style="{StaticResource CaoElevatedButtonStyle}"
+                                                    Command="{x:Bind DiscardCommand}"
+                                                    CommandParameter="{x:Bind}" />
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <TextBlock Style="{StaticResource CaoCardTitleStyle}"
+                               Margin="0,16,0,0"
+                               Text="Techo real de cada ajuste" />
+                    <TextBlock Style="{StaticResource CaoListItemDetailStyle}"
+                               Text="Lo que el driver impone, no lo que el perfil pide. Sin techo conocido no se inventa un rango." />
+                    <ItemsControl Margin="0,8,0,0"
+                                  ItemsSource="{x:Bind ViewModel.Ceilings}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:OverclockCeilingRow">
+                                <Grid Padding="0,6" ColumnSpacing="12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="260" />
+                                        <ColumnDefinition Width="200" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0"
+                                               Style="{StaticResource CaoListItemTitleStyle}"
+                                               Text="{x:Bind Knob}" />
+                                    <TextBlock Grid.Column="1"
+                                               Style="{StaticResource CaoListItemDetailStyle}"
+                                               Text="{x:Bind Range}" />
+                                    <TextBlock Grid.Column="2"
+                                               Style="{StaticResource CaoListItemDetailStyle}"
+                                               Text="{x:Bind Reason}" />
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
                 </StackPanel>
             </Border>
 

@@ -163,7 +163,10 @@ public sealed class OverclockDeltaTests
     [Fact]
     public void Build_CarriesTheCeilingsThrough_Untouched()
     {
-        var ceilings = new[] { new DeltaCeiling(DeltaAxis.Cpu, 95d, "C", "overclock-delta-ceiling-thermal") };
+        var ceilings = new[]
+        {
+            new TuningCeiling(new KnobId("nvidia.gpu.coreClockOffset"), "MHz", -500d, 500d, null),
+        };
 
         var report = OverclockDeltaBuilder.Build(Sample(100), Sample(110), ceilings);
 
@@ -184,14 +187,14 @@ public sealed class OverclockDeltaTests
     }
 
     [Theory]
-    [MemberData(nameof(ReportTypes))]
-    public void Report_NeverCarriesAKnob(Type reportType)
+    [MemberData(nameof(DeltaTypes))]
+    public void Delta_NeverCarriesAKnob(Type deltaType)
     {
         // Overclocking is not additive: more power lifts the memory clock
         // ceiling while eating thermal headroom, so a delta cannot be split
         // across knobs. The guarantee is structural rather than a promise,
         // because no field exists where a knob could travel.
-        var offenders = reportType
+        var offenders = deltaType
             .GetProperties(BindingFlags.Public | BindingFlags.Instance)
             .Where(p => typeof(KnobId).IsAssignableFrom(p.PropertyType))
             .Select(p => p.Name)
@@ -200,14 +203,28 @@ public sealed class OverclockDeltaTests
         Assert.Empty(offenders);
     }
 
-    public static TheoryData<Type> ReportTypes() =>
+    public static TheoryData<Type> DeltaTypes() =>
     [
-        typeof(OverclockDeltaReport),
         typeof(DeltaAxisRow),
-        typeof(DeltaCeiling),
         typeof(DeltaSample),
         typeof(AxisMeasurement),
     ];
+
+    [Fact]
+    public void Ceiling_NamesTheKnobItBounded()
+    {
+        // The other half of the same rule. A ceiling is a fact about one
+        // setting ("this one stopped here"), not a share of the result, so
+        // this is the one place in the report allowed to name a knob.
+        var knob = new KnobId("nvidia.gpu.coreClockOffset");
+
+        var ceiling = new TuningCeiling(knob, "MHz", -500d, 500d, null);
+
+        Assert.Equal(knob, ceiling.Knob);
+        Assert.Equal(-500d, ceiling.Min);
+        Assert.Equal(500d, ceiling.Max);
+        Assert.Null(ceiling.ReasonKey);
+    }
 
     private static DeltaAxisRow Row(OverclockDeltaReport report, DeltaAxis axis) =>
         report.Axes.Single(r => r.Axis == axis);

@@ -48,12 +48,17 @@ public sealed record DeltaSample(DateTimeOffset TakenAtUtc, IReadOnlyList<AxisMe
 }
 
 /// <summary>
-/// The ceiling that stopped an axis from going further: the thermal limit, the
-/// driver constraint, or the stability ceiling the tuner found by bisection.
-/// A null <see cref="Value"/> means "no ceiling known", which is not the same
-/// thing as "no ceiling".
+/// The ceiling that stopped a single setting from going further: the thermal
+/// limit the firmware enforces, the range the driver accepts, or the stability
+/// ceiling the tuner found by bisection. A null <see cref="Min"/> and
+/// <see cref="Max"/> means "no ceiling known", which is not the same thing as
+/// "no ceiling".
+///
+/// Unlike a delta, a ceiling belongs to a knob. Naming which setting hit its
+/// limit is a fact about that setting, not a share of the result: nothing here
+/// claims the knob produced the profile delta.
 /// </summary>
-public sealed record DeltaCeiling(DeltaAxis Axis, double? Value, string Unit, string ReasonKey);
+public sealed record TuningCeiling(KnobId Knob, string Unit, double? Min, double? Max, string? ReasonKey);
 
 /// <summary>One axis of the before/after comparison.</summary>
 public sealed record DeltaAxisRow(
@@ -67,18 +72,20 @@ public sealed record DeltaAxisRow(
     string? ReasonKey);
 
 /// <summary>
-/// What the profile actually bought. Note what is missing: there is no knob
-/// anywhere in this type. A profile is applied as a package and its effect is
-/// measured as a package; overclocking is not additive (more power raises the
-/// memory clock ceiling but eats thermal headroom), so splitting the delta
-/// across knobs would be arithmetic fiction dressed up as a measurement.
+/// What the profile actually bought. A profile is applied as a package and its
+/// effect is measured as a package; overclocking is not additive (more power
+/// raises the memory clock ceiling but eats thermal headroom), so splitting
+/// the delta across knobs would be arithmetic fiction dressed up as a
+/// measurement. That is why no delta row names a knob. The ceilings do name
+/// one, because "this setting hit its limit" is a fact about the setting, not
+/// a share of the result.
 /// </summary>
 public sealed record OverclockDeltaReport(
     DateTimeOffset MeasuredAtUtc,
     DeltaVerdict Verdict,
     double NoiseFloorPercent,
     IReadOnlyList<DeltaAxisRow> Axes,
-    IReadOnlyList<DeltaCeiling> Ceilings)
+    IReadOnlyList<TuningCeiling> Ceilings)
 {
     /// <summary>False when every axis came back NoData: the UI shows "no data", never 0%.</summary>
     public bool HasData => Axes.Any(r => r.Verdict is not DeltaVerdict.NoData);
@@ -112,7 +119,7 @@ public static class OverclockDeltaBuilder
     public static OverclockDeltaReport Build(
         DeltaSample baseline,
         DeltaSample candidate,
-        IReadOnlyList<DeltaCeiling>? ceilings = null,
+        IReadOnlyList<TuningCeiling>? ceilings = null,
         double noiseFloorPercent = BenchmarkPolicy.MinimumEffectPercent)
     {
         var rows = new List<DeltaAxisRow>();

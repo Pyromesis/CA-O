@@ -119,10 +119,9 @@ public sealed class OverclockPageTests
     [Fact]
     public async Task Overclock_NoControl_IsActionable_WhenNoBackendIsPresent()
     {
-        var vm = new OverclockViewModel(
+        var vm = OverclockTestHarness.Create(
             new EmptyRegistry(),
-            Array.Empty<IOverclockBackend>(),
-            new Infrastructure.Gaming.GameDetectionProvider());
+            Array.Empty<IOverclockBackend>());
 
         await vm.RefreshCommand.ExecuteAsync(null);
 
@@ -143,10 +142,9 @@ var gpu = new FakeBackend(OverclockCatalog.NvapiBackendId, OverclockComponent.Gp
         var memory = new FakeBackend(OverclockCatalog.SmbiosMemoryBackendId, OverclockComponent.Memory, writeAllowed: false);
         var registry = new OverclockReadOnlyRegistry(gpu, memory);
 
-        var vm = new OverclockViewModel(
+        var vm = OverclockTestHarness.Create(
             registry,
-            new IOverclockBackend[] { gpu, memory },
-            new Infrastructure.Gaming.GameDetectionProvider());
+            new IOverclockBackend[] { gpu, memory });
 
         await vm.RefreshCommand.ExecuteAsync(null);
 
@@ -167,10 +165,9 @@ var gpu = new FakeBackend(OverclockCatalog.NvapiBackendId, OverclockComponent.Gp
         // dejar la seccion vacia en silencio.
         var registry = new OverclockReadOnlyRegistry(gpu);
 
-        var vm = new OverclockViewModel(
+        var vm = OverclockTestHarness.Create(
             registry,
-            new IOverclockBackend[] { gpu },
-            new Infrastructure.Gaming.GameDetectionProvider());
+            new IOverclockBackend[] { gpu });
 
         await vm.RefreshCommand.ExecuteAsync(null);
 

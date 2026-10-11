@@ -232,10 +232,9 @@ public sealed class OverclockDeltaViewModelTests
             .ToArray();
 
     private static OverclockViewModel ViewModel(IOverclockDeltaSource source, IOverclockDeltaStore? store = null) =>
-        new(
+        OverclockTestHarness.Create(
             new OverclockReadOnlyRegistry(),
             [],
-            new GameDetectionProvider(),
             source,
             store ?? new InMemoryDeltaStore());
 

@@ -3,11 +3,14 @@ using System.Globalization;
 using System.Text;
 using CAO.Core.Overclock;
 using CAO.Core.Overclock.Reporting;
+using CAO.Core.Overclock.Recovery;
 using CAO.Infrastructure.Gaming;
+using CAO.UI.Helpers;
 using CAO.Infrastructure.Overclock;
 using CAO.Infrastructure.Overclock.Reporting;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using System.Windows.Input;
 
 namespace CAO.UI.ViewModels;
 
@@ -57,6 +60,26 @@ public sealed record OverclockReadingRow(string Label, string Value, string Evid
 public sealed record OverclockGameRow(string Name, string Executable, string Source, string State);
 
 /// <summary>
+/// A tuning run this machine restarted while it was open. The user picks what
+/// happens to it (design D4): there is no option that is "the right one", and
+/// the row says why it is being offered rather than claiming the machine hung.
+/// </summary>
+public sealed record OverclockRecoveryRow(
+    string RunId,
+    string Knob,
+    string Action,
+    string Reason,
+    string Detail,
+    ICommand RevertCommand,
+    ICommand KeepCommand,
+    ICommand DiscardCommand);
+
+/// <summary>
+/// The bound the hardware actually imposes on a setting. Naming the setting
+/// here is a fact about the setting, not a share of the measured result.
+/// </summary>
+public sealed record OverclockCeilingRow(string Knob, string Range, string Reason);
+/// <summary>
 /// One axis of the before/after comparison. There is no knob on it: the
 /// profile is measured as a package, because overclocking is not additive and
 /// splitting the delta per knob would be arithmetic dressed as measurement.
@@ -79,6 +102,7 @@ public sealed partial class OverclockViewModel : ObservableObject
     private readonly IOverclockBackendRegistry _registry;
     private readonly IReadOnlyList<IOverclockBackend> _backends;
     private readonly GameDetectionProvider _games;
+    private readonly Func<CancellationToken, Task<IReadOnlyList<DetectedGame>>> _detectGames;
 
     private IOverclockDeltaSource? _deltaSource;
     private IOverclockDeltaStore? _store;
@@ -86,7 +110,8 @@ public sealed partial class OverclockViewModel : ObservableObject
     private DeltaSample? _candidate;
     private OverclockDeltaReport? _report;
     private OverclockDeltaReport? _storedReport;
-
+    private OverclockRecoveryService? _recovery;
+    private IOverclockCeilingSource? _ceilingSource;
     public OverclockViewModel()
         : this(OverclockReadOnlyRegistry.CreateDefault(), DefaultBackends(), new GameDetectionProvider())
     {
@@ -97,13 +122,19 @@ public sealed partial class OverclockViewModel : ObservableObject
         IReadOnlyList<IOverclockBackend> backends,
         GameDetectionProvider games,
         IOverclockDeltaSource? deltaSource = null,
-        IOverclockDeltaStore? store = null)
+        IOverclockDeltaStore? store = null,
+        OverclockRecoveryService? recovery = null,
+        IOverclockCeilingSource? ceilingSource = null,
+        Func<CancellationToken, Task<IReadOnlyList<DetectedGame>>>? detectGames = null)
     {
         _registry = registry;
         _backends = backends;
         _games = games;
         _deltaSource = deltaSource;
         _store = store;
+        _recovery = recovery;
+        _ceilingSource = ceilingSource;
+        _detectGames = detectGames ?? games.DetectAsync;
     }
 
     /// <summary>
@@ -115,6 +146,21 @@ public sealed partial class OverclockViewModel : ObservableObject
 
     private IOverclockDeltaStore Store =>
         _store ??= new FileOverclockDeltaStore();
+
+    /// <summary>
+    /// The recovery engine, wired on first use with the real checkpoint store,
+    /// the real boot probe and the same backend list the section already probes.
+    /// Injectable so the page can be driven through every decision without a
+    /// machine that actually restarted mid-tuning.
+    /// </summary>
+    private OverclockRecoveryService Recovery =>
+        _recovery ??= new OverclockRecoveryService(
+            new FileTuningCheckpointStore(),
+            new SystemBootHealthProbe(),
+            new BackendTuningTargetResolver(DefaultBackends()));
+
+    private IOverclockCeilingSource CeilingSource =>
+        _ceilingSource ??= new NvidiaTuningCeilingSource(NvmlTuningApi.Instance);
 
     // Single source of truth: the registry decides the composition, the
     // ViewModel never re-lists the backends by hand (that divergence is
@@ -149,6 +195,8 @@ public sealed partial class OverclockViewModel : ObservableObject
     [ObservableProperty]
     private string _baselineSummary = string.Empty;
 
+    [ObservableProperty]
+    private string _recoverySummary = string.Empty;
     public ObservableCollection<OverclockKnobRow> CpuKnobs { get; } = [];
 
     public ObservableCollection<OverclockKnobRow> GpuKnobs { get; } = [];
@@ -165,6 +213,9 @@ public sealed partial class OverclockViewModel : ObservableObject
 
     public ObservableCollection<OverclockDeltaRow> DeltaRows { get; } = [];
 
+    public ObservableCollection<OverclockRecoveryRow> PendingRecoveries { get; } = [];
+
+    public ObservableCollection<OverclockCeilingRow> Ceilings { get; } = [];
     /// <summary>Reentrancy guard: a second probe while one is running is dropped, not queued.</summary>
     [RelayCommand]
     private async Task RefreshAsync(CancellationToken ct)
@@ -190,6 +241,8 @@ public sealed partial class OverclockViewModel : ObservableObject
             GpuReadings.Clear();
             MemoryReadings.Clear();
             Games.Clear();
+            PendingRecoveries.Clear();
+            Ceilings.Clear();
 
             foreach (var knob in capabilities.Knobs)
             {
@@ -213,7 +266,8 @@ public sealed partial class OverclockViewModel : ObservableObject
 
             Summarize(capabilities);
             await LoadSavedDeltaAsync(ct).ConfigureAwait(true);
-            StatusLine = Localizer.Format("overclock_probe_done", capabilities.Knobs.Count);
+            await LoadCeilingsAsync(ct).ConfigureAwait(true);
+            await LoadPendingRecoveriesAsync(ct).ConfigureAwait(true);            StatusLine = Localizer.Format("overclock_probe_done", capabilities.Knobs.Count);
         }
         catch (OperationCanceledException)
         {
@@ -222,7 +276,7 @@ public sealed partial class OverclockViewModel : ObservableObject
         catch (Exception ex)
         {
             StatusLine = Localizer.Get("overclock_probe_failed");
-            App.WriteCrashLog(ex);
+            CrashLog.Write(ex);
         }
         finally
         {
@@ -271,7 +325,7 @@ public sealed partial class OverclockViewModel : ObservableObject
         catch (Exception ex)
         {
             StatusLine = Localizer.Get("overclock-delta-failed");
-            App.WriteCrashLog(ex);
+            CrashLog.Write(ex);
         }
         finally
         {
@@ -321,7 +375,7 @@ public sealed partial class OverclockViewModel : ObservableObject
             // The report is already on screen by now: failing to cache it must
             // not take the measurement down with it.
             StatusLine = Localizer.Get("overclock-delta-save-failed");
-            App.WriteCrashLog(ex);
+            CrashLog.Write(ex);
         }
         finally
         {
@@ -346,7 +400,7 @@ public sealed partial class OverclockViewModel : ObservableObject
             {
                 // A missing or unreadable cache is a normal state, not a
                 // reason to stop showing the hardware.
-                App.WriteCrashLog(ex);
+                CrashLog.Write(ex);
                 return;
             }
         }
@@ -498,7 +552,7 @@ public sealed partial class OverclockViewModel : ObservableObject
             catch (Exception ex)
             {
                 // One backend failing must not blank the other two sections.
-                App.WriteCrashLog(ex);
+                CrashLog.Write(ex);
                 readings = [new OverclockReading(backend.Id, "-", Shared.EvidenceLevel.Unknown, "overclock-readings-failed")];
             }
 
@@ -519,7 +573,7 @@ public sealed partial class OverclockViewModel : ObservableObject
 
     private async Task FillGamesAsync(CancellationToken ct)
     {
-        var detected = await _games.DetectAsync(ct).ConfigureAwait(true);
+        var detected = await _detectGames(ct).ConfigureAwait(true);
         foreach (var game in detected)
         {
             Games.Add(new OverclockGameRow(
@@ -713,6 +767,171 @@ public sealed partial class OverclockViewModel : ObservableObject
     private static string FormatTime(DateTimeOffset at) =>
         at.ToLocalTime().ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture);
 
+    /// <summary>
+    /// Scans for runs that survived a restart and offers each one to the user.
+    ///
+    /// The scan runs on a worker thread because it opens every checkpoint file
+    /// and asks the boot probe, and a failure there must never take the hardware
+    /// view down with it: a machine whose boot state cannot be read still has to
+    /// show its clocks.
+    /// </summary>
+    private async Task LoadPendingRecoveriesAsync(CancellationToken ct)
+    {
+        PendingRecoveries.Clear();
+        RecoverySummary = string.Empty;
+
+        IReadOnlyList<RecoveryOutcome> outcomes;
+        try
+        {
+            outcomes = await Task.Run(() => Recovery.RecoverAllAsync(ct), ct).ConfigureAwait(true);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            RecoverySummary = Localizer.Get("overclock-recovery-scan-failed");
+            CrashLog.Write(ex);
+            return;
+        }
+
+        foreach (var outcome in outcomes)
+        {
+            if (outcome.NeedsUserDecision)
+            {
+                PendingRecoveries.Add(ToRecoveryRow(outcome));
+            }
+        }
+
+        RecoverySummary = PendingRecoveries.Count == 0
+            ? Localizer.Get("overclock-recovery-none")
+            : Localizer.Format("overclock-recovery-pending", PendingRecoveries.Count);
+    }
+
+    /// <summary>Applies the user's choice to one open run, then re-scans.</summary>
+    private async Task ResolveRecoveryAsync(
+        OverclockRecoveryRow row,
+        RecoveryChoice choice,
+        CancellationToken ct)
+    {
+        // A dropped row must not be reported as a resolution.
+        if (IsBusy || !Guid.TryParse(row.RunId, out var runId))
+        {
+            return;
+        }
+
+        IsBusy = true;
+        try
+        {
+            StatusLine = Localizer.Get("overclock-recovery-resolving");
+            var result = await Recovery.ResolveAsync(runId, choice, ct).ConfigureAwait(true);
+
+            // Succeeded and RunClosed are different things: a revert the driver
+            // refused leaves the run open on purpose, and saying otherwise would
+            // hide a machine that is still running the value that crashed it.
+            StatusLine = Localizer.Format(
+                result.Succeeded ? "overclock-recovery-done" : "overclock-recovery-failed",
+                Localizer.Get(result.ReasonKey ?? OverclockRecoveryService.ReasonBackendUnavailable));
+        }
+        catch (OperationCanceledException)
+        {
+            StatusLine = Localizer.Get("overclock_cancelled");
+        }
+        catch (Exception ex)
+        {
+            StatusLine = Localizer.Get("overclock-recovery-failed");
+            CrashLog.Write(ex);
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+
+        await LoadPendingRecoveriesAsync(CancellationToken.None).ConfigureAwait(true);
+    }
+
+    [RelayCommand]
+    private Task RevertRecoveryAsync(OverclockRecoveryRow row, CancellationToken ct) =>
+        ResolveRecoveryAsync(row, RecoveryChoice.Revert, ct);
+
+    [RelayCommand]
+    private Task KeepRecoveryAsync(OverclockRecoveryRow row, CancellationToken ct) =>
+        ResolveRecoveryAsync(row, RecoveryChoice.Keep, ct);
+
+    [RelayCommand]
+    private Task DiscardRecoveryAsync(OverclockRecoveryRow row, CancellationToken ct) =>
+        ResolveRecoveryAsync(row, RecoveryChoice.Discard, ct);
+
+    /// <summary>
+    /// The commands travel with the row on purpose. Inside a DataTemplate an
+    /// x:Bind cannot reach the page that owns the ViewModel, and reaching for a
+    /// Binding with ElementName just to avoid it would trade the compiler's
+    /// check for a silent null.
+    /// </summary>
+    private OverclockRecoveryRow ToRecoveryRow(RecoveryOutcome outcome) =>
+        new(
+            outcome.RunId.ToString(),
+            outcome.Knob.Value,
+            Localizer.Get(ActionKey(outcome.Action)),
+            outcome.FailureReasonKey is { } failure ? Localizer.Get(failure) : Localizer.Get(outcome.ReasonKey),
+            Localizer.Format("overclock-recovery-detail", outcome.Knob.Value),
+            RevertRecoveryCommand,
+            KeepRecoveryCommand,
+            DiscardRecoveryCommand);
+
+    private static string ActionKey(RecoveryAction action) => action switch
+    {
+        RecoveryAction.AutoRevert => "overclock-recovery-action-auto",
+        RecoveryAction.NotifyUser => "overclock-recovery-action-notify",
+        _ => "overclock-recovery-action-none",
+    };
+
+    /// <summary>
+    /// Reads the real bounds the driver imposes. Missing is not the same as
+    /// unbounded, so a knob whose range could not be read still gets a row with
+    /// its reason instead of silently disappearing.
+    /// </summary>
+    private async Task LoadCeilingsAsync(CancellationToken ct)
+    {
+        Ceilings.Clear();
+
+        try
+        {
+            var ceilings = await Task.Run(() => CeilingSource.ReadAsync(ct).AsTask(), ct).ConfigureAwait(true);
+            foreach (var ceiling in ceilings)
+            {
+                Ceilings.Add(ToCeilingRow(ceiling));
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            CrashLog.Write(ex);
+        }
+    }
+
+    private static OverclockCeilingRow ToCeilingRow(TuningCeiling ceiling)
+    {
+        var range = ceiling.Min is { } min && ceiling.Max is { } max
+            ? Localizer.Format(
+                "overclock-ceiling-range",
+                CeilingNumber(min),
+                CeilingNumber(max),
+                Localizer.Get(ceiling.Unit))
+            : string.Empty;
+
+        return new(
+            ceiling.Knob.Value,
+            range,
+            ceiling.ReasonKey is null ? string.Empty : Localizer.Get(ceiling.ReasonKey));
+    }
+
+    private static string CeilingNumber(double value) =>
+        value.ToString("0.##", CultureInfo.InvariantCulture);
     private static class OverclockCatalogBackendIds
     {
         public const string Cpu = "intel-policy";

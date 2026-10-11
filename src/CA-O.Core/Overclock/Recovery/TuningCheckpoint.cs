@@ -75,6 +75,16 @@ public sealed record TuningCheckpoint
     [JsonPropertyName("uncleanBoots")]
     public int ConsecutiveUncleanBoots { get; init; }
 
+        /// <summary>
+    /// Arranque contra el que este run ya fue evaluado por el recovery. Sin este
+    /// marcador, abrir la página dos veces dentro del mismo arranque contaría el mismo
+    /// reinicio dos veces y el revert automático se dispararía en el primero, que es
+    /// justo lo que D4 promete no hacer. Un cuelgue necesita dos arranques, no dos
+    /// visitas a la página.
+    /// </summary>
+    [JsonPropertyName("evaluatedBootUtc")]
+    public DateTimeOffset? LastEvaluatedBootUtc { get; init; }
+
     public bool IsTerminal => Phase is CheckpointPhase.Closed or CheckpointPhase.AutoReverted;
 
     public TuningCheckpoint Touch(CheckpointPhase phase, DateTimeOffset now) =>
