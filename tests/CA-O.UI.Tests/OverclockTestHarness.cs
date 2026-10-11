@@ -34,7 +34,11 @@ internal static class OverclockTestHarness
         IOverclockDeltaStore? store = null,
         IReadOnlyList<TuningCeiling>? ceilings = null,
         IReadOnlyList<TuningCheckpoint>? openRuns = null,
-        ITuningTarget? target = null)
+        ITuningTarget? target = null,
+        IStabilityProbe? probe = null,
+        IValidatedProfileStore? profileStore = null,
+        ITuningCheckpointStore? checkpointStore = null,
+        IOverclockJournal? journal = null)
     {
         target ??= new HarnessTarget();
         var checkpoints = new HarnessCheckpointStore(openRuns ?? []);
@@ -51,7 +55,11 @@ internal static class OverclockTestHarness
             store: store,
             recovery: recovery,
             ceilingSource: new HarnessCeilingSource(ceilings ?? []),
-            gameSource: gameSource ?? new HarnessGameSource());
+            gameSource: gameSource ?? new HarnessGameSource(),
+            probe: probe,
+            profileStore: profileStore,
+            checkpointStore: checkpointStore,
+            journal: journal);
     }
 
     /// <summary>Builds a view model over an empty registry: no knobs, no backends.</summary>

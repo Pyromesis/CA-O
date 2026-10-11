@@ -25,9 +25,9 @@ public static class OverclockCatalog
             "knob_nvidia_power_limit", "knob_nvidia_power_limit_desc", requiresReboot: false,
             presets:
             [
-                (OverclockProfile.Conservative, 100),
-                (OverclockProfile.Balanced, 110),
-                (OverclockProfile.Performance, 120),
+                (OverclockProfile.Conservative, 100d),
+                (OverclockProfile.Balanced, 110d),
+                (OverclockProfile.Performance, 120d),
             ]),
 
         Build(new KnobId("nvidia.gpu.thermalLimit"), OverclockComponent.Gpu,
@@ -35,9 +35,9 @@ public static class OverclockCatalog
             "knob_nvidia_thermal_limit", "knob_nvidia_thermal_limit_desc", requiresReboot: false,
             presets:
             [
-                (OverclockProfile.Conservative, 83),
-                (OverclockProfile.Balanced, 86),
-                (OverclockProfile.Performance, 90),
+                (OverclockProfile.Conservative, 83d),
+                (OverclockProfile.Balanced, 86d),
+                (OverclockProfile.Performance, 90d),
             ],
             // CA-O never raises this past the driver's own default for the profile
             // Conservative; the ceiling is what the engine negotiates downward.
@@ -53,7 +53,7 @@ public static class OverclockCatalog
             "knob_nvidia_core_offset", "knob_nvidia_core_offset_desc", requiresReboot: false,
             presets:
             [
-                (OverclockProfile.Conservative, 0),
+                (OverclockProfile.Conservative, 0d),
                 (OverclockProfile.Balanced, 60_000_000d),
                 (OverclockProfile.Performance, 120_000_000d),
             ],
@@ -65,7 +65,7 @@ public static class OverclockCatalog
             "knob_nvidia_mem_offset", "knob_nvidia_mem_offset_desc", requiresReboot: false,
             presets:
             [
-                (OverclockProfile.Conservative, 0),
+                (OverclockProfile.Conservative, 0d),
                 (OverclockProfile.Balanced, 250_000_000d),
                 (OverclockProfile.Performance, 500_000_000d),
             ],
@@ -76,9 +76,9 @@ public static class OverclockCatalog
             "knob_nvidia_fan_target", "knob_nvidia_fan_target_desc", requiresReboot: false,
             presets:
             [
-                (OverclockProfile.Conservative, 0),
-                (OverclockProfile.Balanced, 0),
-                (OverclockProfile.Performance, 15),
+                (OverclockProfile.Conservative, 0d),
+                (OverclockProfile.Balanced, 0d),
+                (OverclockProfile.Performance, 15d),
             ]),
 
         // Read-only reporting knob: CA-O measures the thermal ceiling and shows it,
@@ -103,9 +103,9 @@ public static class OverclockCatalog
             "knob_amd_power_limit", "knob_amd_power_limit_desc", requiresReboot: false,
             presets:
             [
-                (OverclockProfile.Conservative, 100),
-                (OverclockProfile.Balanced, 110),
-                (OverclockProfile.Performance, 120),
+                (OverclockProfile.Conservative, 100d),
+                (OverclockProfile.Balanced, 110d),
+                (OverclockProfile.Performance, 120d),
             ],
             backendId: AmdAdlxBackendId),
     ];
@@ -133,9 +133,9 @@ public static class OverclockCatalog
             "knob_cpu_max_freq", "knob_cpu_max_freq_desc", requiresReboot: false,
             presets:
             [
-                (OverclockProfile.Conservative, 100),
-                (OverclockProfile.Balanced, 100),
-                (OverclockProfile.Performance, 100),
+                (OverclockProfile.Conservative, 100d),
+                (OverclockProfile.Balanced, 100d),
+                (OverclockProfile.Performance, 100d),
             ]),
     ];
 

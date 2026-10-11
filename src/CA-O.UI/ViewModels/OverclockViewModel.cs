@@ -3,12 +3,16 @@ using System.Globalization;
 using System.Text;
 using CAO.Core.Overclock;
 using CAO.Core.Overclock.Reporting;
+using CAO.Core.Overclock.Stability;
 using CAO.Core.Overclock.Recovery;
 using CAO.Core.Overclock.Gaming;
 using CAO.Infrastructure.Overclock.Gaming;
 using CAO.UI.Helpers;
 using CAO.Infrastructure.Overclock;
 using CAO.Infrastructure.Overclock.Reporting;
+using CAO.Infrastructure.Persistence;
+using System;
+using System.Collections.Generic;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using System.Windows.Input;
@@ -80,6 +84,8 @@ public sealed record OverclockRecoveryRow(
 /// here is a fact about the setting, not a share of the measured result.
 /// </summary>
 public sealed record OverclockCeilingRow(string Knob, string Range, string Reason);
+/// <summary>One writable knob with its tune button. The command travels with the row because inside a DataTemplate an x:Bind cannot reach the page ViewModel.</summary>
+public sealed record OverclockTuningRow(string KnobId, string Label, string Detail, ICommand TuneCommand);
 /// <summary>
 /// One axis of the before/after comparison. There is no knob on it: the
 /// profile is measured as a package, because overclocking is not additive and
@@ -115,6 +121,12 @@ public sealed partial class OverclockViewModel : ObservableObject
     private OverclockDeltaReport? _storedReport;
     private OverclockRecoveryService? _recovery;
     private IOverclockCeilingSource? _ceilingSource;
+    private IStabilityProbe? _tuningProbe;
+    private IValidatedProfileStore? _profileStore;
+    private ITuningCheckpointStore? _checkpointStore;
+    private IOverclockJournal? _journal;
+    private readonly Dictionary<string, OverclockKnob> _lastKnobs = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, string> _lastDriverVersions = new(StringComparer.Ordinal);
     public OverclockViewModel()
         : this(OverclockReadOnlyRegistry.CreateDefault(), DefaultBackends())
     {
@@ -127,7 +139,11 @@ public sealed partial class OverclockViewModel : ObservableObject
         IOverclockDeltaStore? store = null,
         OverclockRecoveryService? recovery = null,
         IOverclockCeilingSource? ceilingSource = null,
-        IGameOverclockSource? gameSource = null)
+        IGameOverclockSource? gameSource = null,
+        IStabilityProbe? probe = null,
+        IValidatedProfileStore? profileStore = null,
+        ITuningCheckpointStore? checkpointStore = null,
+        IOverclockJournal? journal = null)
     {
         _registry = registry;
         _backends = backends;
@@ -136,6 +152,10 @@ public sealed partial class OverclockViewModel : ObservableObject
         _recovery = recovery;
         _ceilingSource = ceilingSource;
         _gameSource = gameSource;
+        _tuningProbe = probe;
+        _profileStore = profileStore;
+        _checkpointStore = checkpointStore;
+        _journal = journal;
     }
 
     /// <summary>
@@ -169,6 +189,18 @@ public sealed partial class OverclockViewModel : ObservableObject
 
     private IOverclockCeilingSource CeilingSource =>
         _ceilingSource ??= new NvidiaTuningCeilingSource(NvmlTuningApi.Instance);
+
+    private IStabilityProbe TuningProbe =>
+        _tuningProbe ??= new WmiClockStallProbe();
+
+    private IValidatedProfileStore ProfileStore =>
+        _profileStore ??= new FileValidatedProfileStore();
+
+    private ITuningCheckpointStore CheckpointStore =>
+        _checkpointStore ??= new FileTuningCheckpointStore();
+
+    private IOverclockJournal JournalFor(Guid runId) =>
+        _journal ?? new TransactionOverclockJournal(new FileTransactionJournal(), runId);
 
     // Single source of truth: the registry decides the composition, the
     // ViewModel never re-lists the backends by hand (that divergence is
@@ -224,6 +256,8 @@ public sealed partial class OverclockViewModel : ObservableObject
     public ObservableCollection<OverclockRecoveryRow> PendingRecoveries { get; } = [];
 
     public ObservableCollection<OverclockCeilingRow> Ceilings { get; } = [];
+
+    public ObservableCollection<OverclockTuningRow> TuningTargets { get; } = [];
     /// <summary>Reentrancy guard: a second probe while one is running is dropped, not queued.</summary>
     [RelayCommand]
     private async Task RefreshAsync(CancellationToken ct)
@@ -251,6 +285,9 @@ public sealed partial class OverclockViewModel : ObservableObject
             Games.Clear();
             PendingRecoveries.Clear();
             Ceilings.Clear();
+            TuningTargets.Clear();
+            _lastKnobs.Clear();
+            _lastDriverVersions.Clear();
 
             foreach (var knob in capabilities.Knobs)
             {
@@ -266,6 +303,13 @@ public sealed partial class OverclockViewModel : ObservableObject
                     default:
                         MemoryKnobs.Add(row);
                         break;
+                }
+
+                _lastKnobs[knob.Id.Value] = knob;
+                if (row.IsActionable)
+                {
+                    TuningTargets.Add(new OverclockTuningRow(
+                        knob.Id.Value, row.Label, row.Range, StartTuningCommand));
                 }
             }
 
@@ -669,6 +713,14 @@ public sealed partial class OverclockViewModel : ObservableObject
         ResultSummary = _report is null
             ? Localizer.Get("overclock-result-pending")
             : VerdictLabel(_report.Verdict);
+
+        foreach (var detail in capabilities.Details)
+        {
+            if (detail.DriverVersion is { Length: > 0 } version)
+            {
+                _lastDriverVersions[detail.BackendId] = version;
+            }
+        }
     }
 
     private IOverclockBackend? FindBackend(string backendId) =>
@@ -980,6 +1032,176 @@ public sealed partial class OverclockViewModel : ObservableObject
 
     private static string CeilingNumber(double value) =>
         value.ToString("0.##", CultureInfo.InvariantCulture);
+    /// <summary>
+    /// Runs the stability bisection on one knob, then keeps the answer. A run that
+    /// reaches its ceiling without a fault becomes a validated profile, which is
+    /// the only thing that unlocks game rows: nothing else is allowed to.
+    /// The announced ceiling is the catalog Performance preset for the knob.
+    /// </summary>
+    [RelayCommand]
+    private async Task StartTuningAsync(string knobId, CancellationToken ct)
+    {
+        if (IsBusy)
+        {
+            return;
+        }
+
+        if (!_lastKnobs.TryGetValue(knobId, out var knob) || FindBackend(knob.BackendId) is not { } backend)
+        {
+            StatusLine = Localizer.Get("overclock-tuning-unknown");
+            return;
+        }
+
+        IsBusy = true;
+        try
+        {
+            StatusLine = Localizer.Get("overclock-tuning-running");
+            var progress = new Progress<TuningProgress>(p =>
+                StabilitySummary = Localizer.Format(
+                    "overclock-tuning-point",
+                    p.PointIndex,
+                    p.EstimatedPoints,
+                    p.Value.Scalar.ToString("0.##", CultureInfo.InvariantCulture)));
+
+            // Driver P/Invoke, WMI and file I/O: none of it belongs on the UI thread.
+            var outcome = await Task.Run(
+                () => ExecuteTuningAsync(knob, backend, progress, ct), ct).ConfigureAwait(true);
+
+            await FinishTuningAsync(knob, backend, outcome, ct).ConfigureAwait(true);
+        }
+        catch (OperationCanceledException)
+        {
+            StatusLine = Localizer.Get("overclock_cancelled");
+        }
+        catch (Exception ex)
+        {
+            StatusLine = Localizer.Get("overclock-tuning-failed");
+            CrashLog.Write(ex);
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    private sealed record TuningOutcome(
+        TuningRunResult? Result,
+        string? FailureReasonKey,
+        double StartValue,
+        double Ceiling,
+        Guid RunId);
+
+    private async Task<TuningOutcome> ExecuteTuningAsync(
+        OverclockKnob knob,
+        IOverclockBackend backend,
+        IProgress<TuningProgress> progress,
+        CancellationToken ct)
+    {
+        var runId = Guid.NewGuid();
+        var target = new BackendTuningTarget(backend);
+
+        var read = await backend.ReadAsync(knob.Id, ct).ConfigureAwait(false);
+        if (!read.Success)
+        {
+            // No start value, no run. Inventing one would tune from a lie.
+            return new TuningOutcome(null, read.FailureReasonKey ?? "overclock-tuning-no-start", 0, 0, runId);
+        }
+
+        if (knob.PresetValue(OverclockProfile.Performance) is not { } preset)
+        {
+            // No catalog ceiling, no announced ceiling, no run.
+            return new TuningOutcome(null, "overclock-tuning-unknown", read.Value.Scalar, read.Value.Scalar, runId);
+        }
+
+        var ceiling = preset.Scalar;
+        if (ceiling <= read.Value.Scalar)
+        {
+            return new TuningOutcome(null, "overclock-tuning-at-ceiling", read.Value.Scalar, ceiling, runId);
+        }
+
+        await CheckpointStore.SaveAsync(new TuningCheckpoint
+        {
+            RunId = runId,
+            BackendId = backend.Id,
+            Knob = knob.Id.Value,
+            Component = knob.Component.ToString(),
+            AppliedValue = read.Value.Scalar,
+            LastKnownGoodValue = read.Value.Scalar,
+            Phase = CheckpointPhase.Started,
+            UpdatedAtUtc = DateTimeOffset.UtcNow,
+        }, ct).ConfigureAwait(false);
+
+        var engine = new TuningEngine(JournalFor(runId));
+        var request = new TuningRequest(
+            runId,
+            knob,
+            target,
+            TuningProbe,
+            ProposedCeiling: ceiling,
+            Step: knob.Step,
+            StepDuration: TimeSpan.FromSeconds(10),
+            Thresholds: StabilityThresholds.Default,
+            Metrics: [ProbeMetric.EffectiveClockStall])
+        {
+            StartingValue = read.Value.Scalar,
+            Ceiling = ceiling,
+        };
+
+        var result = await engine.RunAsync(request, progress, ct).ConfigureAwait(false);
+        return new TuningOutcome(result, null, read.Value.Scalar, ceiling, runId);
+    }
+
+    private async Task FinishTuningAsync(
+        OverclockKnob knob,
+        IOverclockBackend backend,
+        TuningOutcome outcome,
+        CancellationToken ct)
+    {
+        if (outcome.Result is null)
+        {
+            StatusLine = Localizer.Get(outcome.FailureReasonKey ?? "overclock-tuning-failed");
+            return;
+        }
+
+        var result = outcome.Result;
+        var validated = result.Status is TuningStatus.CeilingReached or TuningStatus.StabilityCeilingFound;
+        await CheckpointStore.SaveAsync(new TuningCheckpoint
+        {
+            RunId = outcome.RunId,
+            BackendId = backend.Id,
+            Knob = knob.Id.Value,
+            Component = knob.Component.ToString(),
+            AppliedValue = result.AppliedValue.Scalar,
+            LastKnownGoodValue = result.AppliedValue.Scalar,
+            StableCeiling = result.StableCeiling,
+            Phase = validated ? CheckpointPhase.Closed : CheckpointPhase.Interrupted,
+            UpdatedAtUtc = DateTimeOffset.UtcNow,
+        }, ct).ConfigureAwait(true);
+
+        if (validated)
+        {
+            await ProfileStore.SaveAsync(new ValidatedOverclockProfile(
+                knob.Id,
+                knob.Component,
+                result.AppliedValue.Scalar,
+                result.StableCeiling,
+                DateTimeOffset.UtcNow,
+                _lastDriverVersions.TryGetValue(backend.Id, out var driver) ? driver : null,
+                result.Points.Count), ct).ConfigureAwait(true);
+
+            StatusLine = Localizer.Get("overclock-tuning-validated");
+            StabilitySummary = Localizer.Format("overclock-tuning-points", result.Points.Count);
+            await FillGamesAsync(ct).ConfigureAwait(true);
+            await LoadCeilingsAsync(ct).ConfigureAwait(true);
+        }
+        else
+        {
+            StatusLine = Localizer.Get(result.Status == TuningStatus.Rejected
+                ? "overclock-tuning-rejected"
+                : "overclock-tuning-interrupted");
+        }
+    }
+
     private static class OverclockCatalogBackendIds
     {
         public const string Cpu = "intel-policy";

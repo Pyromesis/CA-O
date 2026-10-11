@@ -67,6 +67,14 @@ public interface IAntiCheatScanner
 public interface IGameProfileRepository
 {
     IReadOnlyList<GameOverclockProfile> List();
+
+    /// <summary>
+    /// Async over the same answer. The default keeps the sync one so existing
+    /// repositories do not change; stores backed by disk override it so the
+    /// page never blocks the UI thread on file I/O.
+    /// </summary>
+    Task<IReadOnlyList<GameOverclockProfile>> ListAsync(CancellationToken ct) =>
+        Task.FromResult(List());
 }
 
 /// <summary>The repository that has no validated profile, because none has been produced yet.</summary>
@@ -85,7 +93,10 @@ public sealed class SystemGameOverclockSource : IGameOverclockSource
     private readonly IGameProfileRepository _profiles;
 
     public SystemGameOverclockSource()
-        : this(new GameDetectionProvider(), new AntiCheatScanProvider(), new EmptyGameProfileRepository())
+        : this(
+            new GameDetectionProvider(),
+            new AntiCheatScanProvider(),
+            new StoreBackedGameProfileRepository(new CAO.Core.Overclock.Reporting.FileValidatedProfileStore()))
     {
     }
 
@@ -122,7 +133,7 @@ public sealed class SystemGameOverclockSource : IGameOverclockSource
             detected = [];
         }
 
-        var profiles = _profiles.List();
+        var profiles = await _profiles.ListAsync(ct).ConfigureAwait(false);
         var entries = new List<GameOverclockEntry>(detected.Count);
         foreach (var game in detected)
         {

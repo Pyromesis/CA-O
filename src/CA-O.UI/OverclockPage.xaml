@@ -224,6 +224,32 @@
 
                     <TextBlock Style="{StaticResource CaoCardTitleStyle}"
                                Margin="0,16,0,0"
+                               Text="Ajuste guiado por estabilidad" />
+                    <TextBlock Style="{StaticResource CaoListItemDetailStyle}"
+                               Text="La biseccion recorre el ajuste hasta su techo y solo guarda la respuesta si ningun punto falla. Sin ejecutarlo no hay perfil validado." />
+                    <ItemsControl Margin="0,8,0,0"
+                                  ItemsSource="{x:Bind ViewModel.TuningTargets}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:OverclockTuningRow">
+                                <Grid Margin="0,0,0,6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Style="{StaticResource CaoListItemTitleStyle}" Text="{x:Bind Label}" />
+                                    <TextBlock Grid.Column="1" Style="{StaticResource CaoListItemDetailStyle}" Text="{x:Bind Detail}" />
+                                    <Button Grid.Column="2"
+                                            Content="Ajustar"
+                                            Style="{StaticResource CaoElevatedButtonStyle}"
+                                            Command="{x:Bind TuneCommand}"
+                                            CommandParameter="{x:Bind KnobId}" />
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <TextBlock Style="{StaticResource CaoCardTitleStyle}"
+                               Margin="0,16,0,0"
                                Text="Ajustes pendientes tras un reinicio" />
                     <TextBlock Style="{StaticResource CaoListItemDetailStyle}"
                                Text="{x:Bind ViewModel.RecoverySummary, Mode=OneWay}" />

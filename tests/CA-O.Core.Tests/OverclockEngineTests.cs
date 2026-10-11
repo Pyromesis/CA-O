@@ -753,6 +753,27 @@ public sealed class OverclockCatalogTests
     }
 
     [Fact]
+    public void Catalog_ScalarPresets_CarryScalars_NotIndexes()
+    {
+        // Trampa real del lenguaje: (Performance, 120) con literal int cae en
+        // implicit operator KnobValue(int) => FromIndex, no FromScalar. Un preset
+        // escalar guardado como indice es Scalar=0 y el tuning creeria que el techo
+        // ya esta alcanzado. Los presets pueden superar el rango (el backend recorta
+        // contra los limites del driver), pero nunca pueden ser indices.
+        var knobs = OverclockCatalog.NvidiaGpuKnobs
+            .Concat(OverclockCatalog.AmdGpuKnobs)
+            .Concat(OverclockCatalog.CpuPolicyKnobs)
+            .Concat(OverclockCatalog.MemoryKnobs);
+
+        foreach (var knob in knobs.Where(k => k.Kind == KnobKind.Scalar))
+        {
+            foreach (var preset in knob.Presets)
+            {
+                Assert.Equal(0, preset.Value.Index);
+            }
+        }
+    }
+    [Fact]
     public void Catalog_KnobsRequiringReboot_AreSurfaced()
     {
         // Si un knob exige reinicio, la UI tiene que decirlo. Ninguno de los actuales lo

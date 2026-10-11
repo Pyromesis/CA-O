@@ -30,6 +30,12 @@ public static class CaOPaths
     /// restorable record on disk (design D4).
     /// </summary>
     public static string OverclockRunsDirectory => Path.Combine(ProgramDataRoot, "overclock", "runs");
+
+    /// <summary>
+    /// Validated tuning answers, one JSON file per knob. A game profile may only
+    /// reference what is stored here: anything else was never measured.
+    /// </summary>
+    public static string OverclockProfilesDirectory => Path.Combine(ProgramDataRoot, "overclock", "profiles");
 }
 
 /// <summary>IPC constants shared by UI client and privileged service.</summary>
