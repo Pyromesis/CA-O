@@ -2,6 +2,20 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
+## [Unreleased]
+
+### Anadido
+- **Pestana Overclock** (`OverclockPage`, ruta `overclock`; Benchmark intacto). 6 secciones: procesador, graficos, memoria, juegos, estabilidad, resultado. i18n es-ES/en-US.
+- **Catalogo declarativo de 11 knobs** (6 NVIDIA, 2 CPU por politica, 2 memoria solo lectura, 1 AMD) con riesgo, evidencia y dependencias; ningun knob con evidencia `Unknown`.
+- **Escritura real donde el vendor la permite**: NVIDIA via NVML (relojes + potencia), AMD via ADLX (potencia), CPU via `powercfg` + flujo guiado XTU/IPF. Limites honestos: sin MSR no hay OC de reloj de CPU; sin SPD no hay timings de memoria.
+- **Tuning con biseccion + recovery D4**: checkpoint antes de cada paso; 1er arranque sucio avisa (Revertir/Mantener/Descartar), 2do consecutivo revierte a LastKnownGood.
+- **Delta honesto**: solo total del perfil (mediana, suelo 3 %) + techo por eje; prohibido atribuir delta por knob.
+- **Puerta anti-cheat en perfiles de juego**: KernelLevel bloquea siempre; sin `LaunchOptions` ni `ProcessPriority` por construccion.
+- **Docs**: README, ARCHITECTURE, OPTIMIZATION-CATALOG y CHANGELOG documentan Overclock.
+
+### Probado
+- Suite completa: **1692 passed, 0 failed** en Release (referencia 2.2.3: 1278; Overclock aporta +414).
+
 ## [2.2.3] - 2026-10-07
 
 Bajada de correccion tras una auditoria completa del pipeline UI -> IPC -> servicio -> Core (21 rondas). Todos los hallazgos quedaron cerrados: ninguno sigue pendiente.

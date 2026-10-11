@@ -31,6 +31,17 @@ Total histórico: 68
 
 Nunca se deshabilita silenciosamente Secure Boot/TPM/VBS/HVCI/Defender/firewall. VBS/HVCI requiere Expert + confirmacion.
 
+## Catalogo Overclock (separado del de 93)
+
+Los ajustes de overclock NO son entradas de `OptimizationCatalog` y no aparecen en la tabla de arriba: viven en su propio catalogo declarativo (`src/CA-O.Core/Overclock/Catalog/OverclockCatalog.cs`), con 11 knobs servidos por 4 backends (`src/CA-O.Infrastructure/Overclock/`):
+
+- `nvidia.gpu.powerLimit`, `nvidia.gpu.thermalLimit`, `nvidia.gpu.coreClockOffset`, `nvidia.gpu.memoryClockOffset`, `nvidia.gpu.fanTarget`, `nvidia.gpu.clockReadout` (NVAPI lectura + NVML escritura, evidencia Vendor)
+- `cpu.policy.boostMode`, `cpu.policy.maxFrequencyPercent` (powercfg + XTU guiado, evidencia Official)
+- `memory.smbios.nominalSpeed`, `memory.smbios.configuredSpeed` (SMBIOS solo lectura, evidencia Official)
+- `amd.gpu.powerLimit` (ADLX, evidencia Vendor; verificado contra headers, pendiente de ejecucion en silicio AMD)
+
+Reglas que comparte con este catalogo: ninguna entrada con evidencia `Unknown`, dependencias explicitas (`Requires`/`PairsWith`), riesgo declarado por knob y verificacion con read-back (una escritura que no se pega es fallo, nunca exito). El delta se reporta por perfil completo, nunca por ajuste (`OverclockDeltaBuilder`).
+
 ## Buckets de recomendación
 
 `RecommendationEngine.Classify` asigna cada optimización a un bucket según contexto (Windows 11 para Gaming, SSD, AC, sin throttling, sin anticheat):

@@ -59,6 +59,7 @@ Step 5 targets `NoteBar` (`SnapshotsList` collapses when empty on first run). Ma
 | Recomendaciones + scoring | `Core/Scoring/` | Buckets analyze-first + score 0-100 |
 | Known-issues | `Core/Compatibility/KnownIssueMatcher.cs` + store JSON en Infrastructure | DB versionada con override drop-in en `%ProgramData%\CA-O\known-issues.json` |
 | Detección de juegos / anti-cheats | `Infrastructure/Gaming/` | Procesos conocidos; lectura de servicios/drivers |
+| Overclock honesto | `Core/Overclock/` (catalogo, TuningEngine, recovery D4, delta) + `Infrastructure/Overclock/` (NVML, ADLX, policy) | Biseccion con checkpoints; 1er arranque sucio avisa, 2do revierte; delta total del perfil, nunca por ajuste |
 
 Desviaciones documentadas respecto al árbol literal del prompt: `Core/Services` conserva accesores reutilizados por el servicio; `Infrastructure/SystemInterop` agrupa proveedores WMI en lugar de dividirlos por carpeta Windows/*; ETW queda como limitación documentada (DPC/ISR por contador, atribución por driver futura vía trazas).
 
@@ -98,6 +99,9 @@ Safe · Balanced · Gaming · Competitive · Privacy · Security · Productivity
 | `%ProgramData%\CA-O\history.jsonl` | `JsonHistoryLogger` hash-chain SHA-256: `seq, prevHash, hash, entry` — `ReadLast` tolera líneas corruptas, `VerifyIntegrity` reporta | `VerifyIntegrity` warnings, nunca crash |
 | `%ProgramData%\CA-O\snapshots/{txid}/` | `snapshot.json + manifest.json + integrity.json (SHA256)` — TX identity, `FindLatestForOptimization` | `SnapshotRepository` (UI nunca `Directory.GetDirectories`) |
 | `%ProgramData%\CA-O\benchmarks\baseline.json` | `SystemBenchmarkResult` + `BenchmarkRunHeader` | Mediana de trials, suelo 3% |
+| `%ProgramData%\CA-O\overclock\runs\*.json` | Checkpoints de tuning (Started/StepApplied/Interrupted/AutoReverted/Closed) + LastEvaluatedBootUtc | Escritura atomica tmp+move, cuarentena .corrupt, nunca se borra evidencia |
+| `%ProgramData%\CA-O\overclock\profiles\*.json` | Perfiles validados por knob (un fichero por ajuste) | Escritura atomica, solo tras run estable hasta su techo |
+| `%ProgramData%\CA-O\benchmarks\overclock-delta.json` | Ultimo informe de delta (linea base vs candidato) | Via BenchmarkStore atomico; informe vacio = Sin datos |
 | `%AppData%\CA-O\settings.json` | Preferencias UI + `UiState.LastAnalysisUtc` restaurado al iniciar | 3 fases startup sin bloquear UI |
 
 Nunca se registran secretos, credenciales ni contenido de entrada del usuario (spec 75, 116).
@@ -110,14 +114,14 @@ Nunca se registran secretos, credenciales ni contenido de entrada del usuario (s
 - **i18n**: diccionario tipado es-ES/en-US (`Localizer`); migración a `.resw` planificada sin cambiar llamadas (`Localizer.Get(key)`).
 - **HAGS/VBS/MPO/etc.**: nunca tratados como ganancias universales; HAGS es WorkloadDependent+Conditional+RequiresReboot, VBS es Critical+SecurityTradeoff+ExpertOnly.
 
-## Pruebas (1278 passed, 0 failed — Release)
+## Pruebas (1692 passed, 0 failed — Release)
 
 | Suite | Cubre | Count |
 |---|---|---|
-| `CA-O.Core.Tests` | Contratos catálogo 93, `AnalysisStateStore` (save/load/corrupt), `GameCompatibility` (VBS bloqueado), transacciones, scoring, health, ledger one-shot | 786 |
-| `CA-O.Security.Tests` | IPC validator (`Ping`/`Apply` cross-check), `IpcPingTests`, inyección | 248 |
+| `CA-O.Core.Tests` | Contratos catálogo 93, `AnalysisStateStore` (save/load/corrupt), `GameCompatibility` (VBS bloqueado), transacciones, scoring, health, ledger one-shot | 928 |
+| `CA-O.Security.Tests` | IPC validator (`Ping`/`Apply` cross-check), `IpcPingTests`, inyección | 274 |
 | `CA-O.Integration.Tests` | `E2EFlowsTests` 9 pruebas (8 casos numerados + benchmark: Abrir→Analizar→Persistir→Vanguard→Restore→Benchmark) + `TransactionJournalRecovery` + contrato docs + `PrivilegedServicePackagingTests` (payload self-contained) | 60 |
-| `CA-O.Infrastructure.Tests` | `HistoryRobustness` (malformed), `SnapshotRepository` (TX identity), `SystemContextCache` dual-TTL | 58 |
+| `CA-O.Infrastructure.Tests` | `HistoryRobustness` (malformed), `SnapshotRepository` (TX identity), `SystemContextCache` dual-TTL | 191 |
 | `CA-O.Benchmark.Tests` | `SystemBenchmarkRunner` (suelo 3%, mediana) | 17 |
-| `CA-O.UI.Tests` | `ViewModelTests` (Analyze/Dashboard con `SystemAnalysisService` + `Correlation`) | 109 |
-| **Total** | **Gates 1-5 `verify.ps1` + `build-release` con `gui-installer`** | **1278** |
+| `CA-O.UI.Tests` | `ViewModelTests` (Analyze/Dashboard con `SystemAnalysisService` + `Correlation`) | 222 |
+| **Total** | **Gates 1-5 `verify.ps1` + `build-release` con `gui-installer`** | **1692** |

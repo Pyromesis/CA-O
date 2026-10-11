@@ -6,7 +6,7 @@
 [![.NET 10](https://img.shields.io/badge/.NET%2010-512BD4?style=flat-square&logo=dotnet&logoColor=white)](global.json)
 [![WinUI 3](https://img.shields.io/badge/WinUI%203-00B7C3?style=flat-square&logo=windows&logoColor=white)](https://microsoft.github.io/microsoft-ui-xaml/)
 [![Build](https://img.shields.io/badge/build-passing-brightgreen?style=flat-square)](https://github.com/Pyromesis/CA-O/actions)
-[![Tests](https://img.shields.io/badge/tests-1278%20passed-brightgreen?style=flat-square)](#-pruebas)
+[![Tests](https://img.shields.io/badge/tests-1692%20passed-brightgreen?style=flat-square)](#-pruebas)
 [![Release](https://img.shields.io/badge/release-v2.2.3-blue?style=flat-square)](https://github.com/Pyromesis/CA-O/releases/tag/v2.2.3)
 [![License](https://img.shields.io/badge/license-privado-lightgrey?style=flat-square)](#licencia)
 
@@ -50,7 +50,7 @@ La UI **siempre eleva** (`app.manifest` `requireAdministrator` → UAC en cada i
 **En números:**
 - **93 optimizaciones** con efecto real verificado (transaccionales) + `AllLegacy` para trazabilidad
 - **12 páginas** WinUI 3 con Mica, `NavigationView`, animaciones de entrada, i18n `es-ES`/`en-US` instantáneo
-- **1278 tests** en 6 suites (todos en verde en el release 2.2.3)
+- **1692 tests** en 6 suites (todos en verde)
 - **0 telemetría externa**, 0 dependencias web, 0 comandos arbitrarios
 
 ---
@@ -63,6 +63,7 @@ La UI **siempre eleva** (`app.manifest` `requireAdministrator` → UAC en cada i
 | **OPTIMIZE** | Solo lo medido genera recomendación | `RecommendationEngine` clasifica exactamente 1 bucket por optimización consultando `SystemContext` real |
 | **BENCHMARK** | Sin promesas falsas | Flujo 5 pasos con mediana de trials, suelo de ruido 3 %, veredictos `Mejora medible` / `Sin mejora` / `Regresión`. No se simulan FPS |
 | **RECOVER** | Todo es reversible | Snapshot **antes** de mutar, journal `transactions/{txid}.jsonl`, hash-chain `history.jsonl` + `integrity.json` SHA-256 |
+| **OVERCLOCK** | Tuning con evidencia, sin promesas | Catalogo declarativo de knobs + TuningEngine (biseccion) + recovery D4 + delta no aditivo con suelo 3 % |
 
 **Decisión fundacional:** *¿Cuál es la mejor configuración para ESTE Windows, ESTE hardware, ESTE driver, ESTE juego y ESTE objetivo?* — no *¿qué tweaks tiene Internet?*
 
@@ -80,7 +81,7 @@ La UI **siempre eleva** (`app.manifest` `requireAdministrator` → UAC en cada i
 | **Perf** | System.Diagnostics.PerformanceCounter | **10.0.0** | `% DPC Time` / `% Interrupt Time` |
 | **Servicios** | System.ServiceProcess.ServiceController | **8.0.1** | `CAO.Privileged` como `BackgroundService` |
 | **Build** | `Directory.Packages.props` + `Directory.Build.props` + `Version.props` (single source `2.2.3`) | Centralizado | Un lugar para bump de versión/paquetes |
-| **Tests** | xUnit 2.9.2 + Microsoft.NET.Test.Sdk 17.11.1 | — | 1278 tests en Release |
+| **Tests** | xUnit 2.9.2 + Microsoft.NET.Test.Sdk 17.11.1 | — | 1692 tests en Release |
 | **Seguridad** | CodeQL + `dotnet audit` + Dependabot + CycloneDX SBOM | CI | Cadena de suministro auditada |
 
 > **Self-contained:** los artefactos de release no requieren runtime instalado. El instalador es `self-contained` sin `single-file` (requisito WinUI 3).
@@ -206,12 +207,12 @@ CA-O.sln  (.NET 10 · LangVersion 13 · WinUI 3)
 │   ├── CA-O.Setup/                  # Consola fallback (sc.exe create/start)
 │   └── CA-O.Uninstaller/            # ARP uninstaller (sc stop/delete + rmdir)
 ├── tests/                           # 1278 tests, Release
-│   ├── CA-O.Core.Tests/             # 786: catalog (93), AnalysisStateStore, GameCompatibility, transacciones
-│   ├── CA-O.Integration.Tests/      # 49: E2E 9 pruebas (8 casos + benchmark) + TransactionJournalRecovery + ArchitectureDependency
-│   ├── CA-O.Security.Tests/         # 248: IpcValidator (+timer/nonce), ReplayCache, CommandPolicy (incl. `@` ACPI)
-│   ├── CA-O.Infrastructure.Tests/   # 55: HistoryRobustness, SnapshotRepository, PhantomBatchValidation
+│   ├── CA-O.Core.Tests/             # 928: catalog (93), AnalysisStateStore, GameCompatibility, transacciones
+│   ├── CA-O.Integration.Tests/      # 60: E2E 9 pruebas (8 casos + benchmark) + TransactionJournalRecovery + ArchitectureDependency
+│   ├── CA-O.Security.Tests/         # 274: IpcValidator (+timer/nonce), ReplayCache, CommandPolicy (incl. `@` ACPI)
+│   ├── CA-O.Infrastructure.Tests/   # 191: HistoryRobustness, SnapshotRepository, PhantomBatchValidation
 │   ├── CA-O.Benchmark.Tests/        # 17: suelo 3%, mediana
-│   ├── CA-O.UI.Tests/               # 105: ViewModels, Localizer, AppUpdater (Zip-Slip), DriverConflicts
+│   ├── CA-O.UI.Tests/               # 222: ViewModels, Localizer, AppUpdater (Zip-Slip), DriverConflicts
 │   └── CA-O.Benchmark.Tests/
 ├── docs/                            # ARCHITECTURE.md, SECURITY.md, THREAT-MODEL.md, OPTIMIZATION-CATALOG.md, IPC_PROTOCOL.md, TRANSACTIONS.md
 ├── scripts/                         # build.ps1, test.ps1, verify.ps1, build-release.ps1, package.ps1, install-privileged-service.ps1, harden-data-acls.ps1, …
@@ -545,6 +546,17 @@ Detecta juegos (Valorant, Fortnite, Apex, CS2, OW2, LoL, R6, CoD, Destiny 2) y a
 
 ---
 
+
+### 8. Overclock honesto
+
+Pestana `Overclock` (`OverclockPage.xaml`, ruta `overclock`; Benchmark intacto). 6 secciones: procesador, graficos, memoria, juegos, estabilidad, resultado.
+
+- **Catalogo declarativo, no tweaks sueltos.** 11 knobs con riesgo, evidencia y dependencias (`Core/Overclock/Catalog/OverclockCatalog.cs`): 6 NVIDIA, 2 CPU por politica, 2 memoria solo lectura, 1 AMD. Ninguno con evidencia `Unknown`.
+- **Escritura real donde el vendor la permite.** GPU NVIDIA via NVML (`NvmlInterop.cs`: relojes + limite de potencia), GPU AMD via ADLX (`AmdAdlxInterop.cs`: limite de potencia), CPU via `powercfg` + flujo guiado XTU/IPF. Sin XTU no hay OC de CPU: se dice, no se finge.
+- **Limites honestos por construccion.** Sin acceso MSR no hay overclock de reloj de CPU desde una app sin driver firmado; el SPD de memoria solo lo expone el firmware en el arranque. CPU = politica + XTU guiado, memoria = SMBIOS solo lectura.
+- **Tuning con biseccion y recovery D4** (`TuningEngine.cs`, `OverclockRecoveryService.cs`). Checkpoint antes de cada paso en `%ProgramData%\CA-O\overclock\runs\`; primer arranque sucio avisa con 3 botones, segundo consecutivo revierte a LastKnownGood.
+- **Delta honesto: el OC no es aditivo.** Solo delta total del perfil (mediana, suelo 3 %) + techo que limito cada eje; prohibido atribuir delta por knob (`OverclockDeltaBuilder`, test `Delta_NeverCarriesAKnob`).
+- **Puerta anti-cheat.** KernelLevel bloquea aunque el escaneo salga limpio; un escaneo que no pudo mirar no es un equipo limpio. Sin `LaunchOptions` ni `ProcessPriority` por construccion (guard estatico `OverclockGameSafetyTests`).
 ## Motores internos
 
 | Motor | Ubicación | Qué hace |
@@ -556,6 +568,7 @@ Detecta juegos (Valorant, Fortnite, Apex, CS2, OW2, LoL, R6, CoD, Destiny 2) y a
 | **Compatibilidad** | `Core/Compatibility/KnownIssueMatcher` + JSON store | DB versionada con override drop-in `%ProgramData%\CA-O\known-issues.json` |
 | **Gaming** | `Core/Gaming/GameCompatibilityPolicy` + `Infrastructure/Gaming/*` | Matriz 24 entradas, lectura `Services`/`drivers` |
 | **Benchmark** | `Infrastructure/Benchmarking/SystemBenchmarkRunner` | CPU/mem/disco, mediana, suelo 3 % |
+| **Overclock** | `Core/Overclock/` + `Infrastructure/Overclock/` | Knobs declarativos + TuningEngine + recovery D4 + delta no aditivo |
 | **Análisis** | `Infrastructure/Services/SystemAnalysisService` | `WhenAll` paralelo + `CancellationToken` + 5 s timeout por provider |
 | **Scoring perfiles** | `Core/Scoring/ProfileEngine` | Safe/Balanced/Gaming/Competitive/Privacy/Security/Maintenance/Expert/Custom — consultan `SystemContext`, ninguno es lista fija |
 
@@ -608,6 +621,7 @@ Cada perfil es **dinámico** — no es lista fija. Ej. `maximum-power-plan` solo
 | **Gaming** | `AnalyzePage.xaml` (sección juegos) | Juegos detectados + anti-cheats del análisis + bloqueos por anti-cheat en Optimizar |
 | **Diagnóstico** | `AnalyzePage.xaml` | 6 dimensiones paralelas con interpretación natural ("CPU Normal", "GPU RTX 4070 12 GB driver 551.61") — "no disponible" si API ausente |
 | **Benchmark** | `BenchmarkPage.xaml` | Flujo 5 pasos + `Baseline/After/Comparison/Verdict` + suelo 3 % |
+| **Overclock** | `OverclockPage.xaml` | 6 secciones + tuning real + delta honesto + puerta anti-cheat |
 | **Restaurar** | `RestorePage.xaml` | `snapshots/{txid}/` por fecha, `TxId`, conteo, build, `[Revertir]` + verificación |
 | **Historial** | `HistoryPage.xaml` | `history.jsonl` timeline + hash-chain verify + filtros + `corruptedCount` warning |
 | **Limpieza** | `LimpiezaPage.xaml` | Temporales por optimización + `Ejecutar todo`, papelera con confirmación, DNS y **timer resolution** (0,5/1,0 ms) vía IPC |
@@ -749,17 +763,17 @@ powershell -ExecutionPolicy Bypass -File scripts/harden-data-acls.ps1
 
 ## Pruebas
 
-**1278 pruebas en 6 suites, todas en Release:**
+**1692 pruebas en 6 suites, todas en Release:**
 
 | Suite | Cubre | Cant. |
 |---|---|---|
-| `CA-O.Core.Tests` | Contratos catálogo (93), `AnalysisStateStore` (save/load/corrupt/schema), `GameCompatibility` (VBS bloqueado), `OptimizationTransaction` (snapshot/apply/verify/rollback), `RecommendationEngine`, `KnownIssueMatcher`, `HealthEngine`, 93 definiciones `IOptimization` + `FixDriver`/`InstallDriver` motor, one-shots (`OneShotLedger`, regla `one-shot`) | **786** |
-| `CA-O.Security.Tests` | `IpcRequestValidator` (version/nonce mín. 16/freshness/size/schema, timer, SetDns 1–2 IPs, FixDriver/InstallDriver), `ReplayCache` (TTL, single-use atómico), `CommandPolicy` (allowlist, PATH-hijacking, injection, pnputil, `@` ACPI), `WindowsCallerInspector` (SID/SessionId/elevación), `PrivilegedIpcSecurityTests` (oversized/malformed/flood) | **248** |
+| `CA-O.Core.Tests` | Contratos catálogo (93), `AnalysisStateStore` (save/load/corrupt/schema), `GameCompatibility` (VBS bloqueado), `OptimizationTransaction` (snapshot/apply/verify/rollback), `RecommendationEngine`, `KnownIssueMatcher`, `HealthEngine`, 93 definiciones `IOptimization` + `FixDriver`/`InstallDriver` motor, one-shots (`OneShotLedger`, regla `one-shot`), overclock F0-F7 (tuning/estabilidad/recovery/delta/juego/AMD) | **928** |
+| `CA-O.Security.Tests` | `IpcRequestValidator` (version/nonce mín. 16/freshness/size/schema, timer, SetDns 1–2 IPs, FixDriver/InstallDriver), `ReplayCache` (TTL, single-use atómico), `CommandPolicy` (allowlist, PATH-hijacking, injection, pnputil, `@` ACPI), `WindowsCallerInspector` (SID/SessionId/elevación), `PrivilegedIpcSecurityTests` (oversized/malformed/flood) | **274** |
 | `CA-O.Integration.Tests` | `E2EFlowsTests` 9 pruebas (8 casos numerados + benchmark), `TransactionJournalRecovery` (Incomplete→RollbackRequired), `ArchitectureDependencyTests`, `DocumentationCodeConsistencyTests` (docs↔código), `PrivilegedServicePackagingTests` (contrato self-contained del servicio) | **60** |
-| `CA-O.Infrastructure.Tests` | `HistoryRobustness` (líneas malformadas), `SnapshotRepository` (TX identity), `SystemContextCache` dual-TTL, `DnsBenchmark`, `PhantomBatchValidation` (IDs reales + barrido vivo) | **58** |
+| `CA-O.Infrastructure.Tests` | `HistoryRobustness` (líneas malformadas), `SnapshotRepository` (TX identity), `SystemContextCache` dual-TTL, `DnsBenchmark`, `PhantomBatchValidation` (IDs reales + barrido vivo), backends overclock (NVML/ADLX/policy) + recovery + ceilings + juego) | **191** |
 | `CA-O.Benchmark.Tests` | `SystemBenchmarkRunner` (suelo 3 %, mediana, trials) | **17** |
-| `CA-O.UI.Tests` | `ViewModelTests` (Analyze/Dashboard con `SystemAnalysisService` + `CorrelationId`), `LocalizerTests`, `AppUpdater` (extracción con progreso + Zip-Slip), `DriverConflicts`, `VendorDriverSupport`, `UnblockTree`, `MascotFlipbookTests`, `MascotMoodTests` | **109** |
-| **Total** | **Gates 1-5 `verify.ps1` + `build-release` con `gui-installer`** | **1278** |
+| `CA-O.UI.Tests` | `ViewModelTests` (Analyze/Dashboard con `SystemAnalysisService` + `CorrelationId`), `LocalizerTests`, `AppUpdater` (extracción con progreso + Zip-Slip), `DriverConflicts`, `VendorDriverSupport`, `UnblockTree`, `MascotFlipbookTests`, `MascotMoodTests`, Overclock (tuning/delta/recovery/juego) | **222** |
+| **Total** | **Gates 1-5 `verify.ps1` + `build-release` con `gui-installer`** | **1692** |
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts/test.ps1
@@ -847,7 +861,7 @@ Consulta [CONTRIBUTING.md](CONTRIBUTING.md).
 2. Tests que **fallen sin el parche** (TDD)
 3. Toda optimización nueva implementa `IOptimization` con `Definition` completa + reversibilidad exacta + `PreviewAsync`
 4. Si usa comando externo → patrón exacto en `CommandPolicy` + test en `CommandPolicyTests` (anti-inyección)
-5. `scripts/verify.ps1` en verde (5 gates + 1278 tests)
+5. `scripts/verify.ps1` en verde (5 gates + 1692 tests)
 6. PR con evidencia, impacto seguridad/compatibilidad, captura `OptimizePage` Before/After
 
 ---
