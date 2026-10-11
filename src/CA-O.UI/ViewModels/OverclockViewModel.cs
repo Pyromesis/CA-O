@@ -125,6 +125,12 @@ public sealed partial class OverclockViewModel : ObservableObject
     private IValidatedProfileStore? _profileStore;
     private ITuningCheckpointStore? _checkpointStore;
     private IOverclockJournal? _journal;
+    internal static readonly TimeSpan DefaultRowTimeout = TimeSpan.FromSeconds(30);
+
+    internal const string RowTimedOutReasonKey = "overclock-row-timed-out";
+
+    private readonly TimeSpan _rowTimeout;
+
     private readonly Dictionary<string, OverclockKnob> _lastKnobs = new(StringComparer.Ordinal);
     private readonly Dictionary<string, string> _lastDriverVersions = new(StringComparer.Ordinal);
     public OverclockViewModel()
@@ -143,10 +149,12 @@ public sealed partial class OverclockViewModel : ObservableObject
         IStabilityProbe? probe = null,
         IValidatedProfileStore? profileStore = null,
         ITuningCheckpointStore? checkpointStore = null,
-        IOverclockJournal? journal = null)
+        IOverclockJournal? journal = null,
+        TimeSpan? rowTimeout = null)
     {
         _registry = registry;
         _backends = backends;
+        _rowTimeout = rowTimeout ?? DefaultRowTimeout;
         _deltaSource = deltaSource;
         _store = store;
         _recovery = recovery;
@@ -291,9 +299,16 @@ public sealed partial class OverclockViewModel : ObservableObject
             _lastKnobs.Clear();
             _lastDriverVersions.Clear();
 
-            foreach (var knob in capabilities.Knobs)
+            // The knob loop runs on a worker thread: ResolveState asks the write gates
+            // synchronously, and a backend that answers slowly must never freeze the
+            // window. Every knob gets its own ceiling so one that never answers degrades
+            // to a row instead of hanging the section. Adds stay here because the
+            // collections are bound to the UI thread.
+            var builtRows = await Task.Run(
+                () => BuildAllRowsAsync(capabilities, ct), ct).ConfigureAwait(true);
+
+            foreach (var (knob, row) in builtRows)
             {
-                var row = await BuildRowAsync(knob, capabilities, ct).ConfigureAwait(true);
                 switch (knob.Component)
                 {
                     case OverclockComponent.Cpu:
@@ -335,6 +350,7 @@ public sealed partial class OverclockViewModel : ObservableObject
         catch (OperationCanceledException)
         {
             StatusLine = Localizer.Get("overclock_cancelled");
+            CrashLog.Step("refresh.cancelled");
         }
         catch (Exception ex)
         {
@@ -347,6 +363,54 @@ public sealed partial class OverclockViewModel : ObservableObject
             IsBusy = false;
         }
     }
+
+    /// <summary>
+    /// Builds every knob row off the UI thread with one ceiling per knob.
+    /// Only row data is produced here; the Adds happen back on the UI thread.
+    /// </summary>
+    private async Task<List<(OverclockKnob Knob, OverclockKnobRow Row)>> BuildAllRowsAsync(
+        OverclockCapabilities capabilities,
+        CancellationToken ct)
+    {
+        var rows = new List<(OverclockKnob, OverclockKnobRow)>();
+        foreach (var knob in capabilities.Knobs)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            OverclockKnobRow row;
+            try
+            {
+                // The linked token lets cooperative backends cancel early;
+                // WaitAsync is the hard ceiling for the ones that cannot.
+                using var knobCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                knobCts.CancelAfter(_rowTimeout);
+                row = await BuildRowAsync(knob, capabilities, knobCts.Token)
+                    .WaitAsync(_rowTimeout, ct)
+                    .ConfigureAwait(false);
+            }
+            catch (TimeoutException)
+            {
+                row = TimedOutRow(knob);
+            }
+
+            rows.Add((knob, row));
+        }
+
+        return rows;
+    }
+
+    private OverclockKnobRow TimedOutRow(OverclockKnob knob) =>
+        new(
+            knob.Id.Value,
+            Localizer.Get(knob.LabelKey),
+            Localizer.Get(knob.DescriptionKey),
+            Localizer.Get(RowTimedOutReasonKey),
+            DescribeRange(knob),
+            Localizer.GetEvidenceLabel(knob.Evidence),
+            OverclockControlState.DriverBlocked,
+            StateLabel(OverclockControlState.DriverBlocked),
+            Localizer.Get(RowTimedOutReasonKey),
+            IsActionable: false);
 
     /// <summary>
     /// Captures the "before" pass. Without one there is nothing to compare

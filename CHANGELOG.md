@@ -1,8 +1,18 @@
-# Changelog
+﻿# Changelog
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
 ## [Unreleased]
+
+## [2.2.8] - 2026-10-11
+
+### Corregido
+- **Overclock ya no puede quedarse colgado en "Sondeando hardware".** El bucle por ajuste corria entero en el hilo UI con llamadas nativas sin timeout (NVML/WMI): si una no volvia, la pagina quedaba en sondeo eterno sin filas y sin log. Ahora el loop va en background con timeout de 30 s por ajuste; el que agota pasa a fila degradada (`overclock-row-timed-out`, no accionable) y el sondeo siempre termina.
+- **Limpieza de temporales informa lo omitido y vacia carpetas vacias.** El mensaje dice cuantos ficheros elimino y cuantos omitio (recientes de menos de 1 dia o en uso); ademas borra las carpetas vacias que quedaban (antes solo borraba ficheros y el %TEMP% parecia intacto).
+- **Retencion automatica de zips de release.** `package.ps1` conserva solo la version en curso en `artifacts/` para que no se acumulen gigas de versiones viejas.
+
+### Probado
+- Suite completa: **1705 passed, 0 failed** en Release (2.2.7: 1701; +2 timeouts de filas Overclock, +2 tests de carpetas vacias).
 
 ## [2.2.7] - 2026-10-11
 

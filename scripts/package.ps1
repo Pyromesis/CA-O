@@ -54,6 +54,19 @@ $stableHash = (Get-FileHash $stableZip -Algorithm SHA256).Hash
 "$stableHash  $stableName" | Set-Content "$stableZip.sha256"
 Write-Host "== Estable: $stableName + .sha256 ==" -ForegroundColor Green
 
+# Retencion: cada release sellaba un zip con timestamp + copia estable sin
+# borrar nunca nada (17 GB acumulados hasta la 2.2.7). Se conservan solo los
+# ficheros de la version en curso; los antiguos ya estan publicados en
+# GitHub Releases y no aportan nada en disco.
+$keepVersionPattern = "*$ProductVersion*"
+Get-ChildItem "artifacts" -Filter "CA-O-*-win-x64*.zip" -File |
+    Where-Object { $_.Name -notlike $keepVersionPattern } |
+    Remove-Item -Force
+Get-ChildItem "artifacts" -Filter "CA-O-*-win-x64*.zip.sha256" -File |
+    Where-Object { $_.Name -notlike $keepVersionPattern } |
+    Remove-Item -Force
+Write-Host "== Retencion: en artifacts solo queda $ProductVersion ==" -ForegroundColor Green
+
 # SBOM estándar (FASE 31): CycloneDX vía dotnet-CycloneDX si está instalada;
 # sin la herramienta, se advierte y el release NO debe publicarse sin SBOM.
 $hasTool = (dotnet tool list --global | Select-String -Quiet "cyclonedx")

@@ -38,7 +38,8 @@ internal static class OverclockTestHarness
         IStabilityProbe? probe = null,
         IValidatedProfileStore? profileStore = null,
         ITuningCheckpointStore? checkpointStore = null,
-        IOverclockJournal? journal = null)
+        IOverclockJournal? journal = null,
+        TimeSpan? rowTimeout = null)
     {
         target ??= new HarnessTarget();
         var checkpoints = new HarnessCheckpointStore(openRuns ?? []);
@@ -59,7 +60,8 @@ internal static class OverclockTestHarness
             probe: probe,
             profileStore: profileStore,
             checkpointStore: checkpointStore,
-            journal: journal);
+            journal: journal,
+            rowTimeout: rowTimeout);
     }
 
     /// <summary>Builds a view model over an empty registry: no knobs, no backends.</summary>

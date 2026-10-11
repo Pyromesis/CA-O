@@ -154,4 +154,43 @@ public sealed class CleanupVerifyTests : IDisposable
             File.Exists(nestedFile),
             "Un nombre de fichero concreto no debe Localizarse dentro de subdirectorios.");
     }
+
+    [Fact]
+    public async Task EmptySubdirs_AreRemoved_WithTheFiles()
+    {
+        var emptied = Path.Combine(_dir, "emptied");
+        Directory.CreateDirectory(emptied);
+        var inner = Path.Combine(emptied, "old.txt");
+        File.WriteAllText(inner, "x");
+        File.SetLastWriteTimeUtc(inner, DateTime.UtcNow.AddDays(-2));
+        var alreadyEmpty = Path.Combine(_dir, "already-empty");
+        Directory.CreateDirectory(alreadyEmpty);
+        WriteFile("fresh.txt", 0);
+        var opt = new ScratchCleanup(_dir);
+
+        var apply = await opt.ApplyAsync(Context(new MemoryRegistry()));
+
+        Assert.True(apply.Success, apply.MessageEs);
+        Assert.False(File.Exists(inner));
+        Assert.False(Directory.Exists(emptied), "La carpeta que quedo vacia debe eliminarse.");
+        Assert.False(Directory.Exists(alreadyEmpty), "La carpeta ya vacia debe eliminarse.");
+        Assert.True(File.Exists(Path.Combine(_dir, "fresh.txt")));
+        Assert.Contains("carpeta", apply.MessageEs, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Subdirs_WithRecentFiles_AreKept()
+    {
+        var kept = Path.Combine(_dir, "kept");
+        Directory.CreateDirectory(kept);
+        var recent = Path.Combine(kept, "recent.txt");
+        File.WriteAllText(recent, "x");
+        var opt = new ScratchCleanup(_dir);
+
+        var apply = await opt.ApplyAsync(Context(new MemoryRegistry()));
+
+        Assert.True(apply.Success, apply.MessageEs);
+        Assert.True(Directory.Exists(kept));
+        Assert.True(File.Exists(recent));
+    }
 }

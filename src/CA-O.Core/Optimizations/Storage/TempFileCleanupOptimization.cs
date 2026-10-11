@@ -223,6 +223,7 @@ public abstract class TempFileCleanupOptimization : IOptimization
     {
         var before = PendingFiles();
         var deleted = 0;
+        var skipped = 0;
         long bytes = 0L;
         foreach (var path in before)
         {
@@ -234,13 +235,15 @@ public abstract class TempFileCleanupOptimization : IOptimization
                 deleted++;
                 bytes += length;
             }
-            catch { /* en uso o sin acceso: se omite y se cuenta lo logrado */ }
+            catch { skipped++; /* en uso o sin acceso: se omite y se cuenta lo logrado */ }
         }
 
+        var dirsRemoved = RemoveEmptyDirs();
+
         _lastDeleted = deleted;
-        return Task.FromResult(deleted > 0
-            ? OperationResult.Ok($"Limpieza completada: {deleted} fichero(s), {FormatSize(bytes)} liberados.")
-            : OperationResult.Ok("No quedaban ficheros antiguos para limpiar."));
+        return Task.FromResult(deleted > 0 || dirsRemoved > 0
+            ? OperationResult.Ok($"Limpieza completada: {deleted} fichero(s), {FormatSize(bytes)} liberados, {skipped} omitido(s) (en uso o sin acceso), {dirsRemoved} carpeta(s) vacía(s) eliminadas. Solo se borran ficheros antiguos; los recientes se conservan.")
+            : OperationResult.Ok("No quedaban ficheros antiguos para limpiar. Solo se borran ficheros antiguos; los recientes y los que están en uso se conservan."));
     }
 
     public Task<OperationResult> RevertAsync(OptimizationContext context, OptimizationSnapshot snapshot, CancellationToken ct = default) =>
@@ -270,6 +273,52 @@ public abstract class TempFileCleanupOptimization : IOptimization
         }
         return Task.FromResult(VerificationResult.Failed(OptimizationState.NotApplied,
             "No se pudo eliminar ningún fichero (en uso o sin acceso)."));
+    }
+
+    /// <summary>
+    /// Borra carpetas vacías bajo los objetivos, de la más profunda a la raíz.
+    /// Sin filtro de antigüedad: una carpeta vacía en un directorio temporal es
+    /// un resto por contrato (las apps la recrean al pedirla). Se omiten
+    /// junctions y puntos de reparse; lo que falle se deja, no se lanza.
+    /// </summary>
+    private int RemoveEmptyDirs()
+    {
+        var removed = 0;
+        var seenDirs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (directory, _, _) in Targets)
+        {
+            string dir;
+            try { dir = ExpandDir(directory); }
+            catch { continue; }
+            if (!seenDirs.Add(dir)) continue;
+            List<string> subdirs;
+            try
+            {
+                subdirs = Directory.EnumerateDirectories(dir, "*", new EnumerationOptions
+                {
+                    RecurseSubdirectories = true,
+                    IgnoreInaccessible = true,
+                    AttributesToSkip = FileAttributes.ReparsePoint,
+                }).OrderByDescending(d => d.Length).ToList();
+            }
+            catch { continue; }
+            foreach (var sub in subdirs)
+            {
+                try
+                {
+                    var info = new DirectoryInfo(sub);
+                    if (!info.Exists) continue;
+                    if ((info.Attributes & FileAttributes.ReparsePoint) != 0) continue;
+                    if (!info.EnumerateFileSystemInfos().Any())
+                    {
+                        info.Delete();
+                        removed++;
+                    }
+                }
+                catch { /* en uso o sin acceso: se deja y se sigue */ }
+            }
+        }
+        return removed;
     }
 
     private int? _lastDeleted;
