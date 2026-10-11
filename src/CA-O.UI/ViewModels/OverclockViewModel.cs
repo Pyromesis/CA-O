@@ -11,6 +11,7 @@ using CAO.UI.Helpers;
 using CAO.Infrastructure.Overclock;
 using CAO.Infrastructure.Overclock.Reporting;
 using CAO.Infrastructure.Persistence;
+using CAO.Shared;
 using System;
 using System.Collections.Generic;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -98,6 +99,13 @@ public sealed record OverclockDeltaRow(
     string Delta,
     string Verdict,
     string Reason);
+
+/// <summary>
+/// One entry of the profile picker. A record (value equality) so the
+/// ComboBox keeps the selection even if the list instance is rebuilt.
+/// Top-level like every other XAML-bound row: x:DataType cannot see nested types.
+/// </summary>
+public sealed record OverclockProfileChoice(OverclockProfile Profile, string Label);
 
 /// <summary>
 /// Read-only Overclock section. Phase F1: it reports what the hardware actually
@@ -1276,6 +1284,373 @@ public sealed partial class OverclockViewModel : ObservableObject
         }
     }
 
+    /// <summary>Outcome of a single knob write inside a profile apply.</summary>
+    public sealed record AppliedKnob(KnobId Knob, string BackendId, bool Success, string? FailureReasonKey);
+
+    /// <summary>One backend snapshot kept in memory for the in-page restore.</summary>
+    public sealed record BackendSnapshot(string BackendId, UnitSnapshot Snapshot);
+
+    /// <summary>Outcome of a whole profile apply run.</summary>
+    public sealed record ApplyOutcome(
+        Guid RunId,
+        OverclockProfile Profile,
+        IReadOnlyList<AppliedKnob> Applied,
+        IReadOnlyList<BackendSnapshot> Snapshots);
+
+    /// <summary>Outcome of a whole in-page restore run.</summary>
+    public sealed record RestoreRunOutcome(Guid RunId, int Restored, int Failed);
+
+    private sealed record ApplyWork(IOverclockBackend Backend, OverclockKnob Knob, KnobValue Value);
+
+    public ObservableCollection<OverclockProfileChoice> ProfileChoices => _profileChoices ??= BuildProfileChoices();
+
+    private ObservableCollection<OverclockProfileChoice>? _profileChoices;
+
+    [ObservableProperty]
+    private OverclockProfileChoice? _selectedChoice = ChoiceFor(OverclockProfile.Balanced);
+
+    [ObservableProperty]
+    private string _applySummary = string.Empty;
+
+    public string ApplyNote => Localizer.Get("overclock-profile-note");
+
+    public string ApplyButtonLabel => Localizer.Get("overclock-profile-apply");
+
+    public string RestoreButtonLabel => Localizer.Get("overclock-profile-restore");
+
+    private readonly Dictionary<string, UnitSnapshot> _appliedSnapshots = new(StringComparer.Ordinal);
+
+    private static ObservableCollection<OverclockProfileChoice> BuildProfileChoices() =>
+        new(new[]
+        {
+            ChoiceFor(OverclockProfile.Conservative),
+            ChoiceFor(OverclockProfile.Balanced),
+            ChoiceFor(OverclockProfile.Performance),
+        });
+
+    private static OverclockProfileChoice ChoiceFor(OverclockProfile profile) =>
+        new(profile, Localizer.Get(profile switch
+        {
+            OverclockProfile.Conservative => "overclock-profile-conservative",
+            OverclockProfile.Performance => "overclock-profile-performance",
+            _ => "overclock-profile-balanced",
+        }));
+
+    [RelayCommand]
+    private async Task ApplyProfileAsync(CancellationToken ct)
+    {
+        if (IsBusy)
+        {
+            return;
+        }
+
+        IsBusy = true;
+        var profile = SelectedChoice?.Profile ?? OverclockProfile.Balanced;
+        var runId = Guid.NewGuid();
+        StatusLine = Localizer.Get("overclock-profile-applying");
+        CrashLog.Step("refresh.apply-start");
+        try
+        {
+            var work = CollectApplyWork(profile);
+            if (work.Count == 0)
+            {
+                ApplySummary = Localizer.Get("overclock-profile-no-actionable");
+                StatusLine = ApplySummary;
+                CrashLog.Step("refresh.apply-done");
+                return;
+            }
+
+            var outcome = await Task.Run(() => ExecuteApplyAsync(profile, runId, work, ct), ct).ConfigureAwait(true);
+            await FinishApplyAsync(outcome, ct).ConfigureAwait(true);
+            CrashLog.Step("refresh.apply-done");
+        }
+        catch (OperationCanceledException)
+        {
+            StatusLine = Localizer.Get("overclock_cancelled");
+            CrashLog.Step("refresh.apply-cancelled");
+        }
+        catch (Exception ex)
+        {
+            StatusLine = Localizer.Get("overclock_probe_failed");
+            CrashLog.Step("refresh.apply-failed");
+            CrashLog.Write(ex);
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    private List<ApplyWork> CollectApplyWork(OverclockProfile profile)
+    {
+        var work = new List<ApplyWork>();
+        CollectFrom(CpuKnobs, work, profile);
+        CollectFrom(GpuKnobs, work, profile);
+        CollectFrom(MemoryKnobs, work, profile);
+        return work;
+    }
+
+    private void CollectFrom(IEnumerable<OverclockKnobRow> rows, List<ApplyWork> work, OverclockProfile profile)
+    {
+        foreach (var row in rows)
+        {
+            if (!row.IsActionable)
+            {
+                continue;
+            }
+
+            if (!_lastKnobs.TryGetValue(row.Id, out OverclockKnob? knob) || knob is null)
+            {
+                continue;
+            }
+
+            var backend = FindBackend(knob.BackendId);
+            if (backend is null)
+            {
+                continue;
+            }
+
+            if (knob.PresetValue(profile) is not KnobValue preset)
+            {
+                continue;
+            }
+
+            work.Add(new ApplyWork(backend, knob, preset));
+        }
+    }
+
+    private async Task<ApplyOutcome> ExecuteApplyAsync(
+        OverclockProfile profile, Guid runId, IReadOnlyList<ApplyWork> work, CancellationToken ct)
+    {
+        var journal = JournalFor(runId);
+        await journal.WriteAsync(TransactionPhase.OverclockStarted, $"run={runId} profile={profile}", ct).ConfigureAwait(false);
+
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        var snapshots = new List<BackendSnapshot>();
+        foreach (var item in work)
+        {
+            if (!seen.Add(item.Backend.Id))
+            {
+                continue;
+            }
+
+            var snapshot = await item.Backend.SnapshotAsync(ct).ConfigureAwait(false);
+            snapshots.Add(new BackendSnapshot(item.Backend.Id, snapshot));
+        }
+
+        var applied = new List<AppliedKnob>();
+        foreach (var item in work)
+        {
+            applied.Add(await ApplyOneAsync(item, journal, ct).ConfigureAwait(false));
+        }
+
+        return new ApplyOutcome(runId, profile, applied, snapshots);
+    }
+
+    private async Task<AppliedKnob> ApplyOneAsync(
+        ApplyWork item, IOverclockJournal journal, CancellationToken ct)
+    {
+        var knob = item.Knob;
+        var backend = item.Backend;
+        var checkpointId = Guid.NewGuid();
+        var lastGood = 0d;
+
+        try
+        {
+            var current = await backend.ReadAsync(knob.Id, ct).AsTask().WaitAsync(_rowTimeout, ct).ConfigureAwait(false);
+            lastGood = current.Success ? current.Value.Scalar : 0d;
+
+            await CheckpointStore.SaveAsync(new TuningCheckpoint
+            {
+                RunId = checkpointId,
+                BackendId = backend.Id,
+                Knob = knob.Id.Value,
+                Component = knob.Component.ToString(),
+                AppliedValue = lastGood,
+                LastKnownGoodValue = lastGood,
+                Phase = CheckpointPhase.Started,
+                UpdatedAtUtc = DateTimeOffset.UtcNow,
+            }, ct).ConfigureAwait(false);
+            await journal.WriteAsync(TransactionPhase.OverclockCheckpointTaken, $"knob={knob.Id.Value}", ct).ConfigureAwait(false);
+
+            var write = await backend.WriteAsync(knob.Id, item.Value, ct).AsTask().WaitAsync(_rowTimeout, ct).ConfigureAwait(false);
+            if (write.Success)
+            {
+                await journal.WriteAsync(TransactionPhase.OverclockStepApplied, $"knob={knob.Id.Value} value={FormatApplyValue(knob, item.Value)}", ct).ConfigureAwait(false);
+                await CheckpointStore.SaveAsync(new TuningCheckpoint
+                {
+                    RunId = checkpointId,
+                    BackendId = backend.Id,
+                    Knob = knob.Id.Value,
+                    Component = knob.Component.ToString(),
+                    AppliedValue = write.Applied?.Scalar ?? item.Value.Scalar,
+                    LastKnownGoodValue = lastGood,
+                    Phase = CheckpointPhase.Closed,
+                    UpdatedAtUtc = DateTimeOffset.UtcNow,
+            }, ct).ConfigureAwait(false);
+                return new AppliedKnob(knob.Id, backend.Id, true, null);
+            }
+
+            await journal.WriteAsync(TransactionPhase.OverclockStepRejected, $"knob={knob.Id.Value} reason={write.FailureReasonKey}", ct).ConfigureAwait(false);
+            await CheckpointStore.SaveAsync(new TuningCheckpoint
+            {
+                RunId = checkpointId,
+                BackendId = backend.Id,
+                Knob = knob.Id.Value,
+                Component = knob.Component.ToString(),
+                AppliedValue = lastGood,
+                LastKnownGoodValue = lastGood,
+                Phase = CheckpointPhase.Interrupted,
+                UpdatedAtUtc = DateTimeOffset.UtcNow,
+            }, ct).ConfigureAwait(false);
+            return new AppliedKnob(knob.Id, backend.Id, false, write.FailureReasonKey);
+        }
+        catch (TimeoutException)
+        {
+            await journal.WriteAsync(TransactionPhase.OverclockStepRejected, $"knob={knob.Id.Value} reason={RowTimedOutReasonKey}", ct).ConfigureAwait(false);
+            await CheckpointStore.SaveAsync(new TuningCheckpoint
+            {
+                RunId = checkpointId,
+                BackendId = backend.Id,
+                Knob = knob.Id.Value,
+                Component = knob.Component.ToString(),
+                AppliedValue = lastGood,
+                LastKnownGoodValue = lastGood,
+                Phase = CheckpointPhase.Interrupted,
+                UpdatedAtUtc = DateTimeOffset.UtcNow,
+            }, ct).ConfigureAwait(false);
+            return new AppliedKnob(knob.Id, backend.Id, false, RowTimedOutReasonKey);
+        }
+    }
+
+    private static string FormatApplyValue(OverclockKnob knob, KnobValue value) =>
+        knob.Range.Allowed is { Count: > 0 }
+            ? value.Index.ToString(CultureInfo.InvariantCulture)
+            : value.Scalar.ToString("0.##", CultureInfo.InvariantCulture);
+
+    private async Task FinishApplyAsync(ApplyOutcome outcome, CancellationToken ct)
+    {
+        _appliedSnapshots.Clear();
+        foreach (var snapshot in outcome.Snapshots)
+        {
+            _appliedSnapshots[snapshot.BackendId] = snapshot.Snapshot;
+        }
+
+        var ok = 0;
+        foreach (var knob in outcome.Applied)
+        {
+            if (knob.Success)
+            {
+                ok++;
+            }
+        }
+
+        ApplySummary = Localizer.Format("overclock-profile-summary", ok, outcome.Applied.Count - ok)
+            + " " + Localizer.Get("overclock-profile-note");
+        StatusLine = ApplySummary;
+
+        IsBusy = false;
+        await RefreshAsync(ct).ConfigureAwait(true);
+    }
+
+    [RelayCommand]
+    private async Task RestoreAppliedAsync(CancellationToken ct)
+    {
+        if (IsBusy)
+        {
+            return;
+        }
+
+        IsBusy = true;
+        StatusLine = Localizer.Get("overclock-profile-restoring");
+        CrashLog.Step("refresh.restore-start");
+        try
+        {
+            if (_appliedSnapshots.Count == 0)
+            {
+                ApplySummary = Localizer.Get("overclock-profile-nothing");
+                StatusLine = ApplySummary;
+                CrashLog.Step("refresh.restore-done");
+                return;
+            }
+
+            var snapshots = new List<BackendSnapshot>();
+            foreach (var entry in _appliedSnapshots)
+            {
+                snapshots.Add(new BackendSnapshot(entry.Key, entry.Value));
+            }
+
+            var runId = Guid.NewGuid();
+            var outcome = await Task.Run(() => ExecuteRestoreAsync(runId, snapshots, ct), ct).ConfigureAwait(true);
+            await FinishRestoreAsync(outcome, ct).ConfigureAwait(true);
+            CrashLog.Step("refresh.restore-done");
+        }
+        catch (OperationCanceledException)
+        {
+            StatusLine = Localizer.Get("overclock_cancelled");
+            CrashLog.Step("refresh.restore-cancelled");
+        }
+        catch (Exception ex)
+        {
+            StatusLine = Localizer.Get("overclock_probe_failed");
+            CrashLog.Step("refresh.restore-failed");
+            CrashLog.Write(ex);
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    private async Task<RestoreRunOutcome> ExecuteRestoreAsync(
+        Guid runId, IReadOnlyList<BackendSnapshot> snapshots, CancellationToken ct)
+    {
+        var journal = JournalFor(runId);
+        await journal.WriteAsync(TransactionPhase.OverclockStarted, $"run={runId} restore=true", ct).ConfigureAwait(false);
+
+        var restored = 0;
+        var failed = 0;
+        foreach (var item in snapshots)
+        {
+            var backend = FindBackend(item.BackendId);
+            if (backend is null)
+            {
+                failed++;
+                continue;
+            }
+
+            try
+            {
+                var outcome = await backend.RestoreAsync(item.Snapshot, ct).AsTask().WaitAsync(_rowTimeout, ct).ConfigureAwait(false);
+                if (outcome.Success)
+                {
+                    restored++;
+                    await journal.WriteAsync(TransactionPhase.OverclockStepApplied, $"restore backend={item.BackendId} restored={outcome.RestoredCount}", ct).ConfigureAwait(false);
+                }
+                else
+                {
+                    failed++;
+                    await journal.WriteAsync(TransactionPhase.OverclockStepRejected, $"restore backend={item.BackendId} reason={outcome.FailureReasonKey}", ct).ConfigureAwait(false);
+                }
+            }
+            catch (TimeoutException)
+            {
+                failed++;
+                await journal.WriteAsync(TransactionPhase.OverclockStepRejected, $"restore backend={item.BackendId} reason={RowTimedOutReasonKey}", ct).ConfigureAwait(false);
+            }
+        }
+
+        return new RestoreRunOutcome(runId, restored, failed);
+    }
+
+    private async Task FinishRestoreAsync(RestoreRunOutcome outcome, CancellationToken ct)
+    {
+        ApplySummary = Localizer.Format("overclock-profile-restored", outcome.Restored, outcome.Failed);
+        StatusLine = ApplySummary;
+
+        IsBusy = false;
+        await RefreshAsync(ct).ConfigureAwait(true);
+    }
     private static class OverclockCatalogBackendIds
     {
         public const string Cpu = "intel-policy";

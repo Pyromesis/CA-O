@@ -41,6 +41,41 @@
                      Margin="0,0,0,16"
                      Title="{x:Bind ViewModel.ResultSummary, Mode=OneWay}" />
 
+            <!-- 00 PERFIL -->
+            <Border Style="{StaticResource CaoCardStyle}" Margin="0,0,0,12">
+                <StackPanel>
+                    <TextBlock Style="{StaticResource CaoSectionTitleStyle}" Text="00  PERFIL" />
+                    <TextBlock Style="{StaticResource CaoSectionSubtitleStyle}"
+                               Text="{x:Bind ViewModel.ApplySummary, Mode=OneWay}" />
+                    <TextBlock Style="{StaticResource CaoListItemDetailStyle}"
+                               Text="{x:Bind ViewModel.ApplyNote, Mode=OneWay}" />
+                    <ComboBox x:Name="ProfileBox"
+                              Style="{StaticResource CaoComboBoxStyle}"
+                              MinWidth="220"
+                              Margin="0,12,0,0"
+                              ItemsSource="{x:Bind ViewModel.ProfileChoices}"
+                              SelectedItem="{x:Bind ViewModel.SelectedChoice, Mode=TwoWay}">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate x:DataType="vm:OverclockProfileChoice">
+                                <TextBlock Text="{x:Bind Label}" />
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+                    <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                        <Button x:Name="ApplyProfileButton"
+                                Content="{x:Bind ViewModel.ApplyButtonLabel, Mode=OneWay}"
+                                Style="{StaticResource CaoPrimaryButtonStyle}"
+                                Command="{x:Bind ViewModel.ApplyProfileCommand}" />
+                        <Button x:Name="RestoreAppliedButton"
+                                Content="{x:Bind ViewModel.RestoreButtonLabel, Mode=OneWay}"
+                                Style="{StaticResource CaoElevatedButtonStyle}"
+                                Margin="12,0,0,0"
+                                Command="{x:Bind ViewModel.RestoreAppliedCommand}" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- 00 PERFIL (fin) -->
             <!-- 01 PROCESADOR -->
             <Border Style="{StaticResource CaoCardStyle}" Margin="0,0,0,12">
                 <StackPanel>

@@ -3,6 +3,12 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
 ## [Unreleased]
+## [2.2.9] - 2026-10-11
+### Anadido
+- Tarjeta 00 PERFIL en Overclock: selector Conservador/Equilibrado/Rendimiento con Aplicar (escribe los presets a todos los controles disponibles, con snapshot previo, journal y checkpoints por ajuste) y Restaurar valores.
+### Probado
+- Suite 1710 passed, 0 failed (Security 274, Benchmark 17, Infrastructure 195, Core 930, UI 234, Integration 60).
+
 
 ## [2.2.8] - 2026-10-11
 
