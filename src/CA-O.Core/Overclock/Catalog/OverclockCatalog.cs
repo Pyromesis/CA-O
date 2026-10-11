@@ -42,26 +42,31 @@ public static class OverclockCatalog
             // Conservative; the ceiling is what the engine negotiates downward.
             dependsOn: [new KnobDependency("nvidia.gpu.powerLimit", DependencyKind.Requires)]),
 
+        // Every frequency in this catalog is Hertz, including the offsets. The
+        // vendor APIs report MHz, so the backend converts at the boundary: a
+        // -500_000_000..500_000_000 Hz range IS the classic -500..500 MHz core
+        // offset, and asking for a -500..500 *Hertz* shift would be a rounding
+        // error wide that made the tuning engine walk 34 identical points.
         Build(new KnobId("nvidia.gpu.coreClockOffset"), OverclockComponent.Gpu,
-            KnobRange.Scalar(-500, 500), 15, KnobUnit.Hertz, RiskLevel.High, EvidenceLevel.Vendor,
+            KnobRange.Scalar(-500_000_000d, 500_000_000d), 15_000_000d, KnobUnit.Hertz, RiskLevel.High, EvidenceLevel.Vendor,
             "knob_nvidia_core_offset", "knob_nvidia_core_offset_desc", requiresReboot: false,
             presets:
             [
                 (OverclockProfile.Conservative, 0),
-                (OverclockProfile.Balanced, 60),
-                (OverclockProfile.Performance, 120),
+                (OverclockProfile.Balanced, 60_000_000d),
+                (OverclockProfile.Performance, 120_000_000d),
             ],
             // A clock offset without power headroom is dead performance plus extra risk.
             dependsOn: [new KnobDependency("nvidia.gpu.powerLimit", DependencyKind.PairsWith)]),
 
         Build(new KnobId("nvidia.gpu.memoryClockOffset"), OverclockComponent.Gpu,
-            KnobRange.Scalar(-500, 1500), 25, KnobUnit.Hertz, RiskLevel.High, EvidenceLevel.Vendor,
+            KnobRange.Scalar(-500_000_000d, 1_500_000_000d), 25_000_000d, KnobUnit.Hertz, RiskLevel.High, EvidenceLevel.Vendor,
             "knob_nvidia_mem_offset", "knob_nvidia_mem_offset_desc", requiresReboot: false,
             presets:
             [
                 (OverclockProfile.Conservative, 0),
-                (OverclockProfile.Balanced, 250),
-                (OverclockProfile.Performance, 500),
+                (OverclockProfile.Balanced, 250_000_000d),
+                (OverclockProfile.Performance, 500_000_000d),
             ],
             dependsOn: [new KnobDependency("nvidia.gpu.powerLimit", DependencyKind.PairsWith)]),
 
@@ -78,7 +83,7 @@ public static class OverclockCatalog
         // Read-only reporting knob: CA-O measures the thermal ceiling and shows it,
         // it never invents it.
         Build(new KnobId("nvidia.gpu.clockReadout"), OverclockComponent.Gpu,
-            KnobRange.Scalar(0, 4000), 1, KnobUnit.Hertz, RiskLevel.Safe, EvidenceLevel.Vendor,
+            KnobRange.Scalar(0, 4_000_000_000d), 1_000_000d, KnobUnit.Hertz, RiskLevel.Safe, EvidenceLevel.Vendor,
             "knob_nvidia_clock_readout", "knob_nvidia_clock_readout_desc", requiresReboot: false,
             presets: []),
     ];
@@ -120,11 +125,11 @@ public static class OverclockCatalog
     public static IReadOnlyList<OverclockKnob> MemoryKnobs { get; } =
     [
         Build(new KnobId("memory.smbios.nominalSpeed"), OverclockComponent.Memory,
-            KnobRange.Scalar(0, 20000), 1, KnobUnit.Hertz, RiskLevel.Safe, EvidenceLevel.Official,
+            KnobRange.Scalar(0, 20_000_000_000d), 1_000_000d, KnobUnit.Hertz, RiskLevel.Safe, EvidenceLevel.Official,
             "knob_memory_nominal", "knob_memory_nominal_desc", requiresReboot: false, presets: []),
 
         Build(new KnobId("memory.smbios.configuredSpeed"), OverclockComponent.Memory,
-            KnobRange.Scalar(0, 20000), 1, KnobUnit.Hertz, RiskLevel.Safe, EvidenceLevel.Official,
+            KnobRange.Scalar(0, 20_000_000_000d), 1_000_000d, KnobUnit.Hertz, RiskLevel.Safe, EvidenceLevel.Official,
             "knob_memory_configured", "knob_memory_configured_desc", requiresReboot: false, presets: []),
     ];
 

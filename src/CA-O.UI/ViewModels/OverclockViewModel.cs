@@ -2,8 +2,10 @@ using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Text;
 using CAO.Core.Overclock;
+using CAO.Core.Overclock.Reporting;
 using CAO.Infrastructure.Gaming;
 using CAO.Infrastructure.Overclock;
+using CAO.Infrastructure.Overclock.Reporting;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
@@ -55,6 +57,19 @@ public sealed record OverclockReadingRow(string Label, string Value, string Evid
 public sealed record OverclockGameRow(string Name, string Executable, string Source, string State);
 
 /// <summary>
+/// One axis of the before/after comparison. There is no knob on it: the
+/// profile is measured as a package, because overclocking is not additive and
+/// splitting the delta per knob would be arithmetic dressed as measurement.
+/// </summary>
+public sealed record OverclockDeltaRow(
+    string Axis,
+    string Baseline,
+    string Candidate,
+    string Delta,
+    string Verdict,
+    string Reason);
+
+/// <summary>
 /// Read-only Overclock section. Phase F1: it reports what the hardware actually
 /// exposes through vendor APIs and states plainly which controls are not yet
 /// writable. It never claims a value it did not read.
@@ -65,6 +80,13 @@ public sealed partial class OverclockViewModel : ObservableObject
     private readonly IReadOnlyList<IOverclockBackend> _backends;
     private readonly GameDetectionProvider _games;
 
+    private IOverclockDeltaSource? _deltaSource;
+    private IOverclockDeltaStore? _store;
+    private DeltaSample? _baseline;
+    private DeltaSample? _candidate;
+    private OverclockDeltaReport? _report;
+    private OverclockDeltaReport? _storedReport;
+
     public OverclockViewModel()
         : this(OverclockReadOnlyRegistry.CreateDefault(), DefaultBackends(), new GameDetectionProvider())
     {
@@ -73,12 +95,26 @@ public sealed partial class OverclockViewModel : ObservableObject
     public OverclockViewModel(
         IOverclockBackendRegistry registry,
         IReadOnlyList<IOverclockBackend> backends,
-        GameDetectionProvider games)
+        GameDetectionProvider games,
+        IOverclockDeltaSource? deltaSource = null,
+        IOverclockDeltaStore? store = null)
     {
         _registry = registry;
         _backends = backends;
         _games = games;
+        _deltaSource = deltaSource;
+        _store = store;
     }
+
+    /// <summary>
+    /// Built on first use rather than in the constructor: the page must open
+    /// without paying for a measurement nobody asked for.
+    /// </summary>
+    private IOverclockDeltaSource DeltaSource =>
+        _deltaSource ??= new BenchmarkDeltaSource();
+
+    private IOverclockDeltaStore Store =>
+        _store ??= new FileOverclockDeltaStore();
 
     // Single source of truth: the registry decides the composition, the
     // ViewModel never re-lists the backends by hand (that divergence is
@@ -110,6 +146,9 @@ public sealed partial class OverclockViewModel : ObservableObject
     [ObservableProperty]
     private string _resultSummary = string.Empty;
 
+    [ObservableProperty]
+    private string _baselineSummary = string.Empty;
+
     public ObservableCollection<OverclockKnobRow> CpuKnobs { get; } = [];
 
     public ObservableCollection<OverclockKnobRow> GpuKnobs { get; } = [];
@@ -123,6 +162,8 @@ public sealed partial class OverclockViewModel : ObservableObject
     public ObservableCollection<OverclockReadingRow> MemoryReadings { get; } = [];
 
     public ObservableCollection<OverclockGameRow> Games { get; } = [];
+
+    public ObservableCollection<OverclockDeltaRow> DeltaRows { get; } = [];
 
     /// <summary>Reentrancy guard: a second probe while one is running is dropped, not queued.</summary>
     [RelayCommand]
@@ -171,6 +212,7 @@ public sealed partial class OverclockViewModel : ObservableObject
             await FillGamesAsync(ct).ConfigureAwait(true);
 
             Summarize(capabilities);
+            await LoadSavedDeltaAsync(ct).ConfigureAwait(true);
             StatusLine = Localizer.Format("overclock_probe_done", capabilities.Knobs.Count);
         }
         catch (OperationCanceledException)
@@ -186,6 +228,139 @@ public sealed partial class OverclockViewModel : ObservableObject
         {
             IsBusy = false;
         }
+    }
+
+    /// <summary>
+    /// Captures the "before" pass. Without one there is nothing to compare
+    /// against, and a delta against an imagined baseline is precisely the
+    /// number this section refuses to invent.
+    /// </summary>
+    [RelayCommand]
+    private async Task CaptureBaselineAsync(CancellationToken ct)
+    {
+        if (IsBusy)
+        {
+            return;
+        }
+
+        IsBusy = true;
+        try
+        {
+            StatusLine = Localizer.Get("overclock-delta-running");
+
+            // The trial set is the heaviest thing this page can ask for: it
+            // runs CPU, memory and disk passes several times. It never touches
+            // the UI thread, and its ceiling is announced before it starts.
+            _baseline = await DeltaSource.CaptureAsync(ct).ConfigureAwait(true);
+
+            // A new baseline invalidates every comparison made against the
+            // old one. Leaving the previous verdict on screen would attribute
+            // a candidate to a baseline the user can no longer reproduce.
+            _candidate = null;
+            _report = null;
+            DeltaRows.Clear();
+            BaselineSummary = Localizer.Format(
+                "overclock-delta-baseline-captured", FormatTime(_baseline.TakenAtUtc));
+            ResultSummary = Localizer.Get("overclock-result-pending");
+            StatusLine = Localizer.Get("overclock-delta-baseline-done");
+        }
+        catch (OperationCanceledException)
+        {
+            StatusLine = Localizer.Get("overclock_cancelled");
+        }
+        catch (Exception ex)
+        {
+            StatusLine = Localizer.Get("overclock-delta-failed");
+            App.WriteCrashLog(ex);
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    /// <summary>
+    /// Captures the "after" pass and grades it against the baseline. The
+    /// verdict is per axis and for the profile as a whole; it never splits the
+    /// delta across knobs, because the knobs are not independent.
+    /// </summary>
+    [RelayCommand]
+    private async Task CaptureCandidateAsync(CancellationToken ct)
+    {
+        if (IsBusy)
+        {
+            return;
+        }
+
+        if (_baseline is null)
+        {
+            StatusLine = Localizer.Get("overclock-delta-baseline-missing");
+            return;
+        }
+
+        IsBusy = true;
+        try
+        {
+            StatusLine = Localizer.Get("overclock-delta-running");
+            _candidate = await DeltaSource.CaptureAsync(ct).ConfigureAwait(true);
+
+            _report = OverclockDeltaBuilder.Build(_baseline, _candidate);
+            FillDeltaRows(_report);
+            ResultSummary = VerdictLabel(_report.Verdict);
+            StatusLine = Localizer.Get("overclock-delta-candidate-done");
+
+            await Store.SaveAsync(_report, ct).ConfigureAwait(true);
+            _storedReport = _report;
+        }
+        catch (OperationCanceledException)
+        {
+            StatusLine = Localizer.Get("overclock_cancelled");
+        }
+        catch (Exception ex)
+        {
+            // The report is already on screen by now: failing to cache it must
+            // not take the measurement down with it.
+            StatusLine = Localizer.Get("overclock-delta-save-failed");
+            App.WriteCrashLog(ex);
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    /// <summary>
+    /// Shows the last saved comparison when this session has not measured one
+    /// yet, so reopening the page does not make a real result vanish. A stored
+    /// report with no data is skipped: an empty table is not an improvement.
+    /// </summary>
+    private async Task LoadSavedDeltaAsync(CancellationToken ct)
+    {
+        if (_storedReport is null)
+        {
+            try
+            {
+                _storedReport = await Store.LoadAsync(ct).ConfigureAwait(true);
+            }
+            catch (Exception ex)
+            {
+                // A missing or unreadable cache is a normal state, not a
+                // reason to stop showing the hardware.
+                App.WriteCrashLog(ex);
+                return;
+            }
+        }
+
+        if (_storedReport is not { HasData: true })
+        {
+            return;
+        }
+
+        _report ??= _storedReport;
+        FillDeltaRows(_report);
+        ResultSummary = VerdictLabel(_report.Verdict);
+        BaselineSummary = Localizer.Format(
+            "overclock-delta-baseline-captured", FormatTime(_report.MeasuredAtUtc));
     }
 
     private async Task<OverclockKnobRow> BuildRowAsync(
@@ -223,7 +398,7 @@ public sealed partial class OverclockViewModel : ObservableObject
             Localizer.GetEvidenceLabel(knob.Evidence),
             state,
             StateLabel(state),
-            ReasonFor(state, availability, knob),
+            ReasonFor(state, availability, knob, backend),
             state == OverclockControlState.Available);
     }
 
@@ -263,7 +438,8 @@ public sealed partial class OverclockViewModel : ObservableObject
     private string ReasonFor(
         OverclockControlState state,
         BackendAvailability? availability,
-        OverclockKnob knob)
+        OverclockKnob knob,
+        IOverclockBackend? backend)
     {
         switch (state)
         {
@@ -278,7 +454,7 @@ public sealed partial class OverclockViewModel : ObservableObject
                     ? Localizer.Get("overclock_no_backend")
                     : Localizer.Get(availability.UnavailableReasonKey);
             default:
-                if (backendWriteReason(knob) is { } reason)
+                if (WriteBlockReason(backend, knob) is { } reason)
                 {
                     return Localizer.Get(reason);
                 }
@@ -288,13 +464,18 @@ public sealed partial class OverclockViewModel : ObservableObject
                     : Localizer.Get(availability.UnavailableReasonKey);
         }
 
-        static string? backendWriteReason(OverclockKnob k) => k.Component switch
-        {
-            OverclockComponent.Gpu => NvidiaNvapiBackend.ReadOnlyReasonKey,
-            OverclockComponent.Memory => SmbiosMemoryBackend.ReadOnlyReasonKey,
-            _ => "overclock-cpu-write-not-enabled",
-        };
     }
+
+    /// <summary>
+    /// Why a knob is not writable, asked of the backend that owns it.
+    ///
+    /// This used to be a switch on the component with the reason keys typed in
+    /// by hand, which is exactly how the GPU section ended up referencing a
+    /// constant that no longer existed. Only the backend can tell a missing DLL
+    /// from a missing device from a driver that does not implement the setter.
+    /// </summary>
+    private static string? WriteBlockReason(IOverclockBackend? backend, OverclockKnob knob) =>
+        backend is IOverclockWriteGate gate ? gate.BlockReasonKey(knob.Id) : null;
 
     private async Task FillReadingsAsync(CancellationToken ct)
     {
@@ -380,7 +561,12 @@ public sealed partial class OverclockViewModel : ObservableObject
             : Localizer.Get(mem?.UnavailableReasonKey ?? "overclock-memory-none");
 
         StabilitySummary = Localizer.Get("overclock-stability-pending");
-        ResultSummary = Localizer.Get("overclock-result-pending");
+
+        // A re-probe must not wipe a delta the user already paid a minute for;
+        // only a page that has never measured anything says "pending".
+        ResultSummary = _report is null
+            ? Localizer.Get("overclock-result-pending")
+            : VerdictLabel(_report.Verdict);
     }
 
     private IOverclockBackend? FindBackend(string backendId) =>
@@ -471,6 +657,61 @@ public sealed partial class OverclockViewModel : ObservableObject
 
         return builder.ToString();
     }
+
+    private void FillDeltaRows(OverclockDeltaReport report)
+    {
+        DeltaRows.Clear();
+        foreach (var axis in report.Axes)
+        {
+            DeltaRows.Add(new OverclockDeltaRow(
+                AxisLabel(axis.Axis),
+                FormatDeltaNumber(axis.Baseline, axis.Unit),
+                FormatDeltaNumber(axis.Candidate, axis.Unit),
+                axis.DeltaPercent is { } delta
+                    ? Localizer.Format(
+                        "overclock-delta-percent",
+                        delta.ToString("+0.##;-0.##;0", CultureInfo.InvariantCulture))
+                    : Localizer.Get("overclock-delta-unavailable"),
+                VerdictLabel(axis.Verdict),
+                string.IsNullOrEmpty(axis.ReasonKey) ? string.Empty : Localizer.Get(axis.ReasonKey)));
+        }
+    }
+
+    private static string AxisLabel(DeltaAxis axis) => Localizer.Get(axis switch
+    {
+        DeltaAxis.Cpu => "overclock-axis-cpu",
+        DeltaAxis.Memory => "overclock-axis-memory",
+        DeltaAxis.StorageRead => "overclock-axis-storage-read",
+        _ => "overclock-axis-storage-write",
+    });
+
+    private static string VerdictLabel(DeltaVerdict verdict) => Localizer.Get(verdict switch
+    {
+        DeltaVerdict.Improvement => "overclock-delta-verdict-improvement",
+        DeltaVerdict.NoMeasurableChange => "overclock-delta-verdict-no-change",
+        DeltaVerdict.Regression => "overclock-delta-verdict-regression",
+        _ => "overclock-delta-verdict-no-data",
+    });
+
+    private static string FormatDeltaNumber(double? value, string unitKey)
+    {
+        if (value is not { } number)
+        {
+            return Localizer.Get("overclock-delta-unavailable");
+        }
+
+        var unit = Localizer.Get(unitKey);
+        var text = number.ToString("0.##", CultureInfo.InvariantCulture);
+
+        // An untranslated unit key would otherwise be glued onto the number
+        // and read as part of it.
+        return unit.Length == 0 || string.Equals(unit, unitKey, StringComparison.Ordinal)
+            ? text
+            : string.Concat(text, " ", unit);
+    }
+
+    private static string FormatTime(DateTimeOffset at) =>
+        at.ToLocalTime().ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture);
 
     private static class OverclockCatalogBackendIds
     {

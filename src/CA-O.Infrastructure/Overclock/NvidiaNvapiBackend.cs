@@ -5,29 +5,68 @@ using CAO.Shared;
 namespace CAO.Infrastructure.Overclock;
 
 /// <summary>
-/// READ-ONLY NVIDIA backend (phase F1).
+/// NVIDIA backend: reads on NVAPI, writes on NVML.
 ///
-/// It answers what this machine has: how many GPUs, which driver, which clocks,
-/// which power limit, which fan. It refuses every write with an explicit
-/// reason, because the write path (F3) has not been proven on real silicon and
-/// an unproven setter that half-succeeds is worse than no setter.
+/// Why two libraries: NVIDIA's open-source <c>nvapi.h</c> ships the lite
+/// profile, which contains no overclocking entry point at all, so the setters
+/// are only reachable through NVML. The read path stayed on NVAPI because it is
+/// already proven and green; splitting reads across two DLLs for no reason is
+/// how interop layers rot (design 6.4, 6.18).
 ///
-/// Anti-cheat posture: pure P/Invoke into the vendor's own signed driver DLL.
-/// No kernel component, no overlay, no injection, no game directory is ever
-/// referenced (design 6.14).
+/// Anti-cheat posture: two P/Invokes into the vendor's own signed DLLs, shipped
+/// by the driver, invoked when present and never redistributed. No kernel
+/// component, no overlay, no injection, no game directory (design 6.14).
+///
+/// Units: the catalog speaks Hertz and percent; NVML speaks MHz and milliwatts.
+/// Every crossing of that boundary happens in this file, once, explicitly.
 /// </summary>
 public sealed class NvidiaNvapiBackend : IOverclockBackend, IOverclockDetailSource, IOverclockWriteGate
 {
-    /// <summary>Reason surfaced when a caller attempts a write in the read-only phase.</summary>
-    public const string ReadOnlyReasonKey = "overclock-gpu-write-readonly-phase";
-
     /// <summary>Reason surfaced when the caller asked for the single NVIDIA device and there is not exactly one.</summary>
     public const string NoSingleDeviceReasonKey = "overclock-gpu-no-single-device";
 
+    /// <summary>The knob has no public vendor setter at all. Honest, not a failure of CA-O.</summary>
+    public const string NoPublicSetterReasonKey = "overclock-gpu-no-public-setter";
+
+    /// <summary>The driver accepted the write but the value did not stick.</summary>
+    public const string VerifyFailedReasonKey = "overclock-gpu-write-verify-failed";
+
+    /// <summary>The driver refused because CA-O is not running elevated.</summary>
+    public const string NoPermissionReasonKey = "overclock-gpu-write-no-permission";
+
+    /// <summary>The driver refused for a reason CA-O does not classify.</summary>
+    public const string RejectedReasonKey = "overclock-gpu-write-rejected";
+
+    /// <summary>Power limit is a percentage, and CA-O could not find the reference it is a percentage OF.</summary>
+    public const string PowerAnchorUnavailableReasonKey = "overclock-gpu-power-anchor-unavailable";
+
+    /// <summary>Clock offset bounds are unreadable, so CA-O will not guess a safe value.</summary>
+    public const string OffsetBoundsUnavailableReasonKey = "overclock-gpu-offset-bounds-unavailable";
+
+    /// <summary>One or more snapshot values could not be put back.</summary>
+    public const string RestoreFailedReasonKey = "overclock-gpu-restore-failed";
+
+    /// <summary>MHz in one Hertz. The catalog is Hertz everywhere; NVML is MHz everywhere.</summary>
+    private const double HertzPerMegahertz = 1_000_000d;
+
+    private readonly INvidiaTuningApi _tuning;
     private readonly object _gate = new();
     private uint _handle;
     private bool _handleResolved;
     private string? _driverVersion;
+    private int? _lastWriteStatus;
+
+    /// <summary>Production instance: the real NVML-backed write surface.</summary>
+    public NvidiaNvapiBackend()
+        : this(NvmlTuningApi.Instance)
+    {
+    }
+
+    /// <summary>Test seam: injects the write surface so the backend can be exercised without a GPU.</summary>
+    internal NvidiaNvapiBackend(INvidiaTuningApi tuning)
+    {
+        _tuning = tuning;
+    }
 
     public string Id => OverclockCatalog.NvapiBackendId;
 
@@ -60,9 +99,6 @@ public sealed class NvidiaNvapiBackend : IOverclockBackend, IOverclockDetailSour
             DriverVersion: driverVersion,
             LastProbeEvidence: evidence);
 
-        // Read-only phase: only the readout knob reports a value the user can
-        // trust today. The writable ones are listed so the UI can explain WHY
-        // they are inert instead of hiding them.
         return new OverclockCapabilities(
             CpuBackendKind.PolicyOnly,
             GpuBackendKind.NvidiaNvapi,
@@ -72,65 +108,123 @@ public sealed class NvidiaNvapiBackend : IOverclockBackend, IOverclockDetailSour
     }
 
     /// <summary>
-    /// Reads one knob. Only <see cref="NvKnobs.ClockReadout"/> has an honest
-    /// answer in this phase; everything else reports
-    /// <c>overclock-gpu-readonly-phase</c> so the UI can say "not readable yet"
-    /// rather than draw a line at zero.
+    /// Reads one knob. Writable knobs report their live value through the write
+    /// path's own getter, so the number on screen is the number that would be
+    /// verified after a change. Knobs with no public setter still report a
+    /// truthful failure instead of drawing a line at zero.
     /// </summary>
     public ValueTask<KnobRead> ReadAsync(KnobId id, CancellationToken ct)
     {
-        if (id != NvKnobs.ClockReadout)
+        if (id == NvKnobs.ClockReadout)
         {
-            return ValueTask.FromResult(KnobRead.Fail("overclock-gpu-readonly-phase"));
+            if (!TryResolveHandle(out uint handle))
+            {
+                return ValueTask.FromResult(KnobRead.Fail(NoSingleDeviceReasonKey));
+            }
+
+            if (!NvInterop.TryGetClock(handle, NvInterop.ClockCurrent, out uint megahertz))
+            {
+                return ValueTask.FromResult(KnobRead.Fail("overclock-gpu-clock-unavailable"));
+            }
+
+            // Catalog unit is Hertz; NVAPI reports MHz.
+            return ValueTask.FromResult(KnobRead.Ok(KnobValue.FromScalar(megahertz * HertzPerMegahertz)));
         }
 
-        if (!TryResolveHandle(out uint handle))
+        if (id == NvKnobs.PowerLimit)
         {
-            return ValueTask.FromResult(KnobRead.Fail(NoSingleDeviceReasonKey));
+            return ValueTask.FromResult(ReadPowerLimitPercent());
         }
 
-        if (!NvInterop.TryGetClock(handle, NvInterop.ClockCurrent, out uint megahertz))
+        if (id == NvKnobs.CoreClockOffset)
         {
-            return ValueTask.FromResult(KnobRead.Fail("overclock-gpu-clock-unavailable"));
+            return ValueTask.FromResult(ReadOffset(NvidiaClockDomain.Graphics));
         }
 
-        // Catalog unit is Hertz; NVAPI reports MHz.
-        return ValueTask.FromResult(KnobRead.Ok(KnobValue.FromScalar(megahertz * 1_000d)));
+        if (id == NvKnobs.MemoryClockOffset)
+        {
+            return ValueTask.FromResult(ReadOffset(NvidiaClockDomain.Memory));
+        }
+
+        return ValueTask.FromResult(KnobRead.Fail(NoPublicSetterReasonKey));
     }
 
     /// <summary>
-    /// Always refuses. F1 is the inspection phase: the setters exist in NVAPI
-    /// but CA-O has not proven apply-then-verify-then-restore on real hardware
-    /// yet, and guessing here is how a user ends up with a bricked GPU.
+    /// Applies one knob, then reads it back. A write that does not stick is a
+    /// failure, never a success: reporting "applied" for a value the hardware
+    /// ignored is exactly the kind of lie this feature exists to remove.
     /// </summary>
-    public ValueTask<KnobWriteResult> WriteAsync(KnobId id, KnobValue value, CancellationToken ct) =>
-        ValueTask.FromResult(KnobWriteResult.Fail(ReadOnlyReasonKey));
+    public ValueTask<KnobWriteResult> WriteAsync(KnobId id, KnobValue value, CancellationToken ct)
+    {
+        if (!_tuning.IsAvailable)
+        {
+            return ValueTask.FromResult(KnobWriteResult.Fail(_tuning.UnavailableReasonKey ?? "overclock-nvml-missing"));
+        }
+
+        if (id == NvKnobs.PowerLimit)
+        {
+            return ValueTask.FromResult(WritePowerLimit(value));
+        }
+
+        if (id == NvKnobs.CoreClockOffset)
+        {
+            return ValueTask.FromResult(WriteOffset(id, value, NvidiaClockDomain.Graphics));
+        }
+
+        if (id == NvKnobs.MemoryClockOffset)
+        {
+            return ValueTask.FromResult(WriteOffset(id, value, NvidiaClockDomain.Memory));
+        }
+
+        return ValueTask.FromResult(KnobWriteResult.Fail(NoPublicSetterReasonKey));
+    }
 
     /// <summary>
-    /// Captures the current values so a later phase can restore them. Only
-    /// values NVAPI actually reports are captured; a knob with no getter is
-    /// absent from the snapshot rather than present as zero.
+    /// Captures the values a later restore needs. The power limit is stored in
+    /// MILLIWATTS, not in the catalog's percent: a percentage is only meaningful
+    /// relative to an anchor that can change between the snapshot and the
+    /// restore, and restoring to a slightly different wattage is worse than
+    /// storing the unit the driver actually takes.
     /// </summary>
     public ValueTask<UnitSnapshot> SnapshotAsync(CancellationToken ct)
     {
         var values = new List<KeyValuePair<KnobId, KnobValue>>();
 
-        if (TryResolveHandle(out uint handle))
+        if (TryResolveHandle(out uint handle)
+            && NvInterop.TryGetClock(handle, NvInterop.ClockCurrent, out uint current))
         {
-            if (NvInterop.TryGetClock(handle, NvInterop.ClockCurrent, out uint current))
-            {
-                values.Add(new KeyValuePair<KnobId, KnobValue>(NvKnobs.ClockReadout, KnobValue.FromScalar(current * 1_000d)));
-            }
+            values.Add(new KeyValuePair<KnobId, KnobValue>(
+                NvKnobs.ClockReadout,
+                KnobValue.FromScalar(current * HertzPerMegahertz)));
+        }
 
-            if (NvInterop.TryGetPowerLimit(handle, out uint milliwatts))
-            {
-                values.Add(new KeyValuePair<KnobId, KnobValue>(NvKnobs.PowerLimit, KnobValue.FromScalar(milliwatts)));
-            }
+        int? milliwatts = _tuning.ReadPowerLimitMilliwatts();
+        if (milliwatts is not null)
+        {
+            values.Add(new KeyValuePair<KnobId, KnobValue>(
+                NvKnobs.PowerLimit,
+                KnobValue.FromScalar(milliwatts.Value)));
+        }
 
-            if (NvInterop.TryGetFanSpeed(handle, out uint fan))
-            {
-                values.Add(new KeyValuePair<KnobId, KnobValue>(NvKnobs.FanTarget, KnobValue.FromScalar(fan)));
-            }
+        int? core = _tuning.ReadCoreOffsetMegahertz();
+        if (core is not null)
+        {
+            values.Add(new KeyValuePair<KnobId, KnobValue>(
+                NvKnobs.CoreClockOffset,
+                KnobValue.FromScalar(core.Value * HertzPerMegahertz)));
+        }
+
+        int? memory = _tuning.ReadMemoryOffsetMegahertz();
+        if (memory is not null)
+        {
+            values.Add(new KeyValuePair<KnobId, KnobValue>(
+                NvKnobs.MemoryClockOffset,
+                KnobValue.FromScalar(memory.Value * HertzPerMegahertz)));
+        }
+
+        if (TryResolveHandle(out uint fanHandle) && NvInterop.TryGetFanSpeed(fanHandle, out uint percent))
+        {
+            values.Add(new KeyValuePair<KnobId, KnobValue>(NvKnobs.FanTarget, KnobValue.FromScalar(percent)));
         }
 
         return ValueTask.FromResult(
@@ -138,9 +232,9 @@ public sealed class NvidiaNvapiBackend : IOverclockBackend, IOverclockDetailSour
     }
 
     /// <summary>
-    /// Nothing was changed, so there is nothing to restore. F1 verifies the
-    /// captured values match the live ones instead of claiming a restore it
-    /// never performed.
+    /// Puts every captured value back. A snapshot value that cannot be restored
+    /// does not abort the batch: one bad knob must not strand the others in a
+    /// half-tuned state (design 6.12).
     /// </summary>
     public ValueTask<RestoreOutcome> RestoreAsync(UnitSnapshot snapshot, CancellationToken ct)
     {
@@ -149,7 +243,26 @@ public sealed class NvidiaNvapiBackend : IOverclockBackend, IOverclockDetailSour
             return ValueTask.FromResult(RestoreOutcome.Ok(0, verified: true));
         }
 
-        return ValueTask.FromResult(RestoreOutcome.Fail("overclock-gpu-write-disabled"));
+        int restored = 0;
+        int failed = 0;
+
+        foreach (KeyValuePair<KnobId, KnobValue> entry in snapshot.Values)
+        {
+            KnobWriteResult result = RestoreOne(entry.Key, entry.Value);
+            if (result.Success)
+            {
+                restored++;
+            }
+            else
+            {
+                failed++;
+            }
+        }
+
+        return ValueTask.FromResult(
+            failed == 0
+                ? new RestoreOutcome(true, restored, true, null)
+                : new RestoreOutcome(false, restored, false, RestoreFailedReasonKey));
     }
 
     /// <summary>
@@ -168,7 +281,7 @@ public sealed class NvidiaNvapiBackend : IOverclockBackend, IOverclockDetailSour
             return new ValueTask<IReadOnlyList<OverclockReading>>(readings);
         }
 
-        if (!TryResolveHandle(out uint handle))
+        if (!TryResolveHandle(out _))
         {
             readings.Add(new OverclockReading("overclock_gpu_name", string.Empty, EvidenceLevel.Empirical, NoSingleDeviceReasonKey));
             return new ValueTask<IReadOnlyList<OverclockReading>>(readings);
@@ -180,15 +293,270 @@ public sealed class NvidiaNvapiBackend : IOverclockBackend, IOverclockDetailSour
         readings.Add(Fan());
         readings.Add(Power());
         readings.Add(Driver());
+        readings.Add(WriteLimits());
+        readings.Add(LastWriteStatus());
 
         return new ValueTask<IReadOnlyList<OverclockReading>>(readings);
     }
 
-    /// <summary>No knob is writable in the read-only phase.</summary>
-    public bool CanWrite(KnobId knob) => false;
+    /// <summary>True only for the three knobs with a public vendor setter, on a driver that has NVML.</summary>
+    public bool CanWrite(KnobId knob)
+    {
+        if (!_tuning.IsAvailable || !IsWritable(knob))
+        {
+            return false;
+        }
 
-    /// <summary>Always <see cref="ReadOnlyReasonKey"/> so the UI shows the real blocker.</summary>
-    public string? BlockReasonKey(KnobId knob) => ReadOnlyReasonKey;
+        return _tuning.TryDescribe(out _);
+    }
+
+    /// <summary>The real blocker, so the UI explains itself instead of showing a dead control.</summary>
+    public string? BlockReasonKey(KnobId knob)
+    {
+        if (!_tuning.IsAvailable)
+        {
+            return _tuning.UnavailableReasonKey ?? "overclock-nvml-missing";
+        }
+
+        if (!IsWritable(knob))
+        {
+            return NoPublicSetterReasonKey;
+        }
+
+        return _tuning.TryDescribe(out _) ? null : "overclock-nvml-device-unavailable";
+    }
+
+    private void RecordStatus(int status)
+    {
+        lock (_gate)
+        {
+            _lastWriteStatus = status;
+        }
+    }
+
+    private static bool IsWritable(KnobId knob) =>
+        knob == NvKnobs.PowerLimit
+        || knob == NvKnobs.CoreClockOffset
+        || knob == NvKnobs.MemoryClockOffset;
+
+    private KnobRead ReadOffset(NvidiaClockDomain domain)
+    {
+        int? megahertz = domain == NvidiaClockDomain.Graphics
+            ? _tuning.ReadCoreOffsetMegahertz()
+            : _tuning.ReadMemoryOffsetMegahertz();
+
+        return megahertz is null
+            ? KnobRead.Fail("overclock-gpu-offset-unavailable")
+            : KnobRead.Ok(KnobValue.FromScalar(megahertz.Value * HertzPerMegahertz));
+    }
+
+    private KnobRead ReadPowerLimitPercent()
+    {
+        int? milliwatts = _tuning.ReadPowerLimitMilliwatts();
+        if (milliwatts is null)
+        {
+            return KnobRead.Fail("overclock-gpu-power-unavailable");
+        }
+
+        if (!TryGetPowerAnchor(out int anchor))
+        {
+            return KnobRead.Fail(PowerAnchorUnavailableReasonKey);
+        }
+
+        return KnobRead.Ok(KnobValue.FromScalar(ToPercent(milliwatts.Value, anchor)));
+    }
+
+    private KnobWriteResult WritePowerLimit(KnobValue requested)
+    {
+        if (!TryGetPowerAnchor(out int anchor))
+        {
+            return KnobWriteResult.Fail(PowerAnchorUnavailableReasonKey);
+        }
+
+        if (!_tuning.TryDescribe(out NvidiaTuningDevice? described) || described is null)
+        {
+            return KnobWriteResult.Fail("overclock-nvml-device-unavailable");
+        }
+
+        int milliwatts = FromPercent((int)Math.Round(requested.Scalar), anchor);
+
+        // Clamp to what the hardware says it accepts rather than letting the
+        // driver reject a perfectly reasonable percentage.
+        if (described.MinPowerLimitMilliwatts is int min && milliwatts < min)
+        {
+            milliwatts = min;
+        }
+
+        if (described.MaxPowerLimitMilliwatts is int max && milliwatts > max)
+        {
+            milliwatts = max;
+        }
+
+        int status = _tuning.SetPowerLimitMilliwatts(milliwatts);
+        return FinishWrite(status, milliwatts, _tuning.ReadPowerLimitMilliwatts(), (int)ToPercent(milliwatts, anchor));
+    }
+
+    private KnobWriteResult WriteOffset(KnobId knob, KnobValue requested, NvidiaClockDomain domain)
+    {
+        if (!_tuning.TryDescribe(out NvidiaTuningDevice? described) || described is null)
+        {
+            return KnobWriteResult.Fail("overclock-nvml-device-unavailable");
+        }
+
+        int? low = domain == NvidiaClockDomain.Graphics ? described.CoreOffsetMinMegahertz : described.MemoryOffsetMinMegahertz;
+        int? high = domain == NvidiaClockDomain.Graphics ? described.CoreOffsetMaxMegahertz : described.MemoryOffsetMaxMegahertz;
+
+        if (low is null || high is null)
+        {
+            // Without the driver's own bounds, CA-O would be inventing the safe
+            // range. It does not.
+            return KnobWriteResult.Fail(OffsetBoundsUnavailableReasonKey);
+        }
+
+        int requestedMegahertz = (int)Math.Round(requested.Scalar / HertzPerMegahertz);
+        int target = Math.Clamp(requestedMegahertz, low.Value, high.Value);
+
+        int status = domain == NvidiaClockDomain.Graphics
+            ? _tuning.SetCoreOffsetMegahertz(target)
+            : _tuning.SetMemoryOffsetMegahertz(target);
+
+        int? readBack = domain == NvidiaClockDomain.Graphics
+            ? _tuning.ReadCoreOffsetMegahertz()
+            : _tuning.ReadMemoryOffsetMegahertz();
+
+        // The reported value is the one the driver actually got, not the one
+        // that was asked for: after a clamp those differ, and showing the
+        // request would be a number the hardware never ran at.
+        return FinishWrite(
+            status,
+            target,
+            readBack,
+            target,
+            observed => KnobValue.FromScalar(observed * HertzPerMegahertz));
+    }
+
+    private KnobWriteResult FinishWrite(int status, int target, int? readBack, int reportedValue)
+    {
+        RecordStatus(status);
+
+        switch (NvmlInterop.ClassifyWrite(status))
+        {
+            case NvidiaTuningWriteOutcome.DriverBlocked:
+                return KnobWriteResult.Blocked(BlockReasonKey(NvKnobs.PowerLimit) ?? "overclock-gpu-driver-blocked");
+
+            case NvidiaTuningWriteOutcome.NoPermission:
+                return KnobWriteResult.Fail(NoPermissionReasonKey);
+
+            case NvidiaTuningWriteOutcome.Rejected:
+                return KnobWriteResult.Fail(RejectedReasonKey);
+
+            default:
+                break;
+        }
+
+        // The driver said yes. Only a read-back decides whether it stuck, and a
+        // value that did not stick is a failure, not a blocked driver.
+        if (readBack is not int observed || observed != target)
+        {
+            return KnobWriteResult.Fail(VerifyFailedReasonKey);
+        }
+
+        return KnobWriteResult.Ok(KnobValue.FromScalar(reportedValue));
+    }
+
+    private KnobWriteResult FinishWrite(int status, int target, int? readBack, int reportedValue, Func<int, KnobValue> project)
+    {
+        RecordStatus(status);
+
+        switch (NvmlInterop.ClassifyWrite(status))
+        {
+            case NvidiaTuningWriteOutcome.DriverBlocked:
+                return KnobWriteResult.Blocked(BlockReasonKey(NvKnobs.CoreClockOffset) ?? "overclock-gpu-driver-blocked");
+
+            case NvidiaTuningWriteOutcome.NoPermission:
+                return KnobWriteResult.Fail(NoPermissionReasonKey);
+
+            case NvidiaTuningWriteOutcome.Rejected:
+                return KnobWriteResult.Fail(RejectedReasonKey);
+
+            default:
+                break;
+        }
+
+        if (readBack is not int observed || observed != target)
+        {
+            return KnobWriteResult.Fail(VerifyFailedReasonKey);
+        }
+
+        return KnobWriteResult.Ok(project(reportedValue));
+    }
+
+    private KnobWriteResult RestoreOne(KnobId knob, KnobValue stored)
+    {
+        if (knob == NvKnobs.PowerLimit)
+        {
+            // Stored in milliwatts: see SnapshotAsync.
+            int status = _tuning.SetPowerLimitMilliwatts((int)Math.Round(stored.Scalar));
+            RecordStatus(status);
+            return NvmlInterop.ClassifyWrite(status) == NvidiaTuningWriteOutcome.Applied
+                ? KnobWriteResult.Ok(stored)
+                : KnobWriteResult.Fail(RejectedReasonKey);
+        }
+
+        if (knob == NvKnobs.CoreClockOffset || knob == NvKnobs.MemoryClockOffset)
+        {
+            bool isCore = knob == NvKnobs.CoreClockOffset;
+            int target = (int)Math.Round(stored.Scalar / HertzPerMegahertz);
+            int status = isCore
+                ? _tuning.SetCoreOffsetMegahertz(target)
+                : _tuning.SetMemoryOffsetMegahertz(target);
+
+            RecordStatus(status);
+
+            int? readBack = isCore ? _tuning.ReadCoreOffsetMegahertz() : _tuning.ReadMemoryOffsetMegahertz();
+            return NvmlInterop.ClassifyWrite(status) == NvidiaTuningWriteOutcome.Applied && readBack == target
+                ? KnobWriteResult.Ok(stored)
+                : KnobWriteResult.Fail(VerifyFailedReasonKey);
+        }
+
+        // Clock readout and fan duty are not settings; there is nothing to put back.
+        return KnobWriteResult.Ok(stored);
+    }
+
+    /// <summary>
+    /// The wattage that means "100%". The factory limit, so the percentage is
+    /// stable across sessions; the hardware minimum only as a last resort. A
+    /// percentage with no anchor is a meaningless number, so when neither is
+    /// readable CA-O refuses instead of guessing.
+    /// </summary>
+    private bool TryGetPowerAnchor(out int milliwatts)
+    {
+        milliwatts = 0;
+        if (!_tuning.TryDescribe(out NvidiaTuningDevice? described) || described is null)
+        {
+            return false;
+        }
+
+        if (described.DefaultPowerLimitMilliwatts is int factory && factory > 0)
+        {
+            milliwatts = factory;
+            return true;
+        }
+
+        if (described.MinPowerLimitMilliwatts is int lowest && lowest > 0)
+        {
+            milliwatts = lowest;
+            return true;
+        }
+
+        return false;
+    }
+
+    private static int FromPercent(int percent, int anchorMilliwatts) =>
+        (int)Math.Round(anchorMilliwatts * (percent / 100d), MidpointRounding.AwayFromZero);
+
+    private static double ToPercent(int milliwatts, int anchorMilliwatts) =>
+        Math.Round(milliwatts * 100d / anchorMilliwatts, 2, MidpointRounding.AwayFromZero);
 
     private OverclockReading Clock(string labelKey, int clockType, string unit)
     {
@@ -239,6 +607,42 @@ public sealed class NvidiaNvapiBackend : IOverclockBackend, IOverclockDetailSour
             : new OverclockReading("overclock_gpu_driver", version, EvidenceLevel.Vendor);
     }
 
+    /// <summary>The ceilings the driver reports, so the UI can show what bounds the tuning.</summary>
+    private OverclockReading WriteLimits()
+    {
+        if (!_tuning.TryDescribe(out NvidiaTuningDevice? described) || described is null)
+        {
+            return new OverclockReading("overclock_gpu_write_limits", string.Empty, EvidenceLevel.Empirical, _tuning.UnavailableReasonKey ?? "overclock-nvml-missing");
+        }
+
+        if (described.MaxPowerLimitMilliwatts is not int max || described.MinPowerLimitMilliwatts is not int min)
+        {
+            return new OverclockReading("overclock_gpu_write_limits", string.Empty, EvidenceLevel.Empirical, "overclock-nvml-device-unavailable");
+        }
+
+        return new OverclockReading(
+            "overclock_gpu_write_limits",
+            FormattableString.Invariant($"{min / 1000d} W - {max / 1000d} W"),
+            EvidenceLevel.Vendor);
+    }
+
+    /// <summary>
+    /// The raw status of the last write. CA-O does not classify codes it does
+    /// not know, so the number itself is what the user gets (design 6.4).
+    /// </summary>
+    private OverclockReading LastWriteStatus()
+    {
+        lock (_gate)
+        {
+            return _lastWriteStatus is int status
+                ? new OverclockReading(
+                    "overclock_gpu_last_write_status",
+                    status.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                    EvidenceLevel.Vendor)
+                : new OverclockReading("overclock_gpu_last_write_status", string.Empty, EvidenceLevel.Empirical, "overclock-gpu-no-write-yet");
+        }
+    }
+
     private bool TryResolveHandle(out uint handle)
     {
         lock (_gate)
@@ -280,13 +684,26 @@ public sealed class NvidiaNvapiBackend : IOverclockBackend, IOverclockDetailSour
             }
 
             _ = TryResolveHandle(out uint handle);
-            if (handle == 0 || !NvInterop.TryGetDriverVersion(handle, out string version))
+            if (handle == 0)
             {
                 return null;
             }
 
-            _driverVersion = version;
-            return version;
+            // NVML knows the system driver version even when NVAPI cannot decode
+            // the packed token, so it is the fallback rather than a dead end.
+            if (NvInterop.TryGetDriverVersion(handle, out string version))
+            {
+                _driverVersion = version;
+                return version;
+            }
+
+            if (_tuning.TryDescribe(out NvidiaTuningDevice? device) && device?.DriverVersion is string fromNvml)
+            {
+                _driverVersion = fromNvml;
+                return fromNvml;
+            }
+
+            return null;
         }
     }
 

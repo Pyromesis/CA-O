@@ -224,13 +224,61 @@
             <Border Style="{StaticResource CaoCardStyle}" Margin="0,0,0,12">
                 <StackPanel>
                     <TextBlock Style="{StaticResource CaoSectionTitleStyle}" Text="06  RESULTADO" />
+                    <TextBlock Style="{StaticResource CaoSectionSubtitleStyle}"
+                               Text="{x:Bind ViewModel.BaselineSummary, Mode=OneWay}" />
                     <TextBlock Style="{StaticResource CaoResultTextStyle}"
                                Text="{x:Bind ViewModel.ResultSummary, Mode=OneWay}" />
+                    <TextBlock Style="{StaticResource CaoListItemDetailStyle}"
+                               Text="El overclock no es aditivo: el efecto se mide del perfil completo, nunca ajuste por ajuste." />
+                    <ItemsControl Margin="0,12,0,0"
+                                  ItemsSource="{x:Bind ViewModel.DeltaRows}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:OverclockDeltaRow">
+                                <Grid Padding="0,6" ColumnSpacing="12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="170" />
+                                        <ColumnDefinition Width="110" />
+                                        <ColumnDefinition Width="110" />
+                                        <ColumnDefinition Width="90" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0"
+                                               Style="{StaticResource CaoListItemTitleStyle}"
+                                               Text="{x:Bind Axis}" />
+                                    <TextBlock Grid.Column="1"
+                                               Style="{StaticResource CaoListItemDetailStyle}"
+                                               Text="{x:Bind Baseline}" />
+                                    <TextBlock Grid.Column="2"
+                                               Style="{StaticResource CaoListItemDetailStyle}"
+                                               Text="{x:Bind Candidate}" />
+                                    <TextBlock Grid.Column="3"
+                                               Style="{StaticResource CaoListItemDetailStyle}"
+                                               Text="{x:Bind Delta}" />
+                                    <StackPanel Grid.Column="4">
+                                        <TextBlock Style="{StaticResource CaoListItemTitleStyle}"
+                                                   Text="{x:Bind Verdict}" />
+                                        <TextBlock Style="{StaticResource CaoListItemDetailStyle}"
+                                                   Text="{x:Bind Reason}" />
+                                    </StackPanel>
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
                     <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
                         <Button x:Name="RefreshButton"
                                 Content="Detectar"
                                 Style="{StaticResource CaoPrimaryButtonStyle}"
                                 Command="{x:Bind ViewModel.RefreshCommand}" />
+                        <Button x:Name="BaselineButton"
+                                Margin="12,0,0,0"
+                                Content="Capturar linea base"
+                                Style="{StaticResource CaoElevatedButtonStyle}"
+                                Command="{x:Bind ViewModel.CaptureBaselineCommand}" />
+                        <Button x:Name="CandidateButton"
+                                Margin="12,0,0,0"
+                                Content="Medir con el perfil"
+                                Style="{StaticResource CaoElevatedButtonStyle}"
+                                Command="{x:Bind ViewModel.CaptureCandidateCommand}" />
                         <ProgressRing x:Name="Ring"
                                       Margin="12,0,0,0"
                                       Width="24"
