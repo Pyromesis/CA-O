@@ -1,0 +1,62 @@
+<UserControl
+    x:Class="CAO.UI.Tutorial.TourOverlay"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Visibility="Collapsed">
+
+    <Grid x:Name="Root" Background="Transparent">
+
+        <Canvas x:Name="DimLayer" IsHitTestVisible="False">
+            <Rectangle x:Name="DimTop" Fill="#B3000000" />
+            <Rectangle x:Name="DimRight" Fill="#B3000000" />
+            <Rectangle x:Name="DimBottom" Fill="#B3000000" />
+            <Rectangle x:Name="DimLeft" Fill="#B3000000" />
+            <Border
+                x:Name="Spotlight"
+                BorderBrush="#4CC2FF"
+                BorderThickness="3"
+                CornerRadius="6" />
+        </Canvas>
+
+        <Border
+            x:Name="Card"
+            MaxWidth="420"
+            Margin="32"
+            Padding="20"
+            VerticalAlignment="Bottom"
+            HorizontalAlignment="Left"
+            Background="#F22B2B2B"
+            BorderBrush="#4D4D4D"
+            BorderThickness="1"
+            CornerRadius="10">
+
+            <StackPanel Spacing="12">
+
+                <TextBlock x:Name="StepIndexText"
+                           FontSize="12"
+                           Opacity="0.7"
+                           Foreground="#B4FFFFFF" />
+
+                <TextBlock x:Name="TitleText"
+                           FontSize="22"
+                           FontWeight="SemiBold"
+                           TextWrapping="Wrap"
+                           Foreground="White" />
+
+                <TextBlock x:Name="BodyText"
+                           FontSize="14"
+                           TextWrapping="Wrap"
+                           Foreground="#E6FFFFFF" />
+
+                <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+                    <Button x:Name="SkipButton" Content="Saltar" Click="OnSkipClick" />
+                    <Button x:Name="BackButton" Content="Atrás" Click="OnBackClick" />
+                    <Button x:Name="NextButton" Content="Siguiente" Click="OnNextClick"
+                            Style="{StaticResource AccentButtonStyle}" />
+                </StackPanel>
+
+            </StackPanel>
+        </Border>
+
+    </Grid>
+</UserControl>

@@ -35,6 +35,20 @@ No "¿qué tweaks tiene Internet?". Cada decisión de diseño sirve a los cuatro
 
 Las versiones de paquetes se centralizan en `Directory.Packages.props`.
 
+### Guided tour (`CAO.UI.Tutorial`)
+
+| Type | Responsibility |
+|---|---|
+| `TourCatalog` | Pure data: the 5 tour steps and the 7 tutorial chapters. Single source of truth for all user-facing copy. |
+| `TourState` | Tour index and transitions (`Start` / `Next` / `Back` / `Skip` / `Complete`). Pure, unit-tested. |
+| `TourCoordinator` | Engine: navigates to each step's route, resolves the target by `x:Name`, hands the rect to the overlay. `Finish(bool dismissed)`: Skip marks dismissed, natural end marks completed. Never throws. |
+| `TourOverlay` | Dim + luminous hole + card, mounted as a sibling of `ContentFrame` inside the `NavigationView`. |
+| `TutorialPage` | Sidebar page (`tutorial` route) whose chapter list is generated from `TourCatalog`; its relaunch bullet points at the Tutorial page. |
+| `TourWelcome` | First-run welcome dialog, always routed through `UiDialogs`. `ShowAsync` returns `Task<bool?>`: true = Primary, false = presented-then-dismissed, null = never presented (gate busy, marks nothing, retries next launch). |
+| `TourProgress` | Flags `tour_completed` / `tour_dismissed` in `ui_settings` (`settings.json`, load-mutate-save). |
+
+Step 5 targets `NoteBar` (`SnapshotsList` collapses when empty on first run). Manual navigation interrupts the tour with a discreet notice that saves and restores the previous `TopBar.Child`, never leaving the top bar blank. While the tour runs, the initial-analysis gate in `MainWindow` is bypassed (`TourCoordinator.IsActive`) so the tour can reach Optimizar, Limpieza and Restaurar on a machine that has never been analysed.
+
 ## Motores
 
 | Motor | Ubicación | Notas |

@@ -8,6 +8,7 @@ using Microsoft.UI.Xaml.Media.Animation;
 using Microsoft.UI.Windowing;
 using Windows.Foundation;
 using CAO.Shared;
+using CAO.UI.Tutorial;
 using System.IO;
 
 namespace CAO.UI;
@@ -24,18 +25,75 @@ public sealed partial class MainWindow : Window
     private TrayIconManager? _tray;
     private ViewModels.UiState? _uiState;
     private bool _allowClose;
+    private bool _selectingRoute;
+    private Tutorial.TourCoordinator? _tour;
     public void SelectRoute(string tag)
     {
-        foreach (var item in EnumerateItems())
+        _selectingRoute = true;
+        try
         {
-            if (item is NavigationViewItem nvi && nvi.Tag is string t && t == tag)
+            foreach (var item in EnumerateItems())
             {
-                Nav.SelectedItem = nvi;
-                var pageType = Navigation.RouteTable.Resolve(tag);
-                if (pageType != null) ContentFrame.Navigate(pageType);
-                return;
+                if (item is NavigationViewItem nvi && nvi.Tag is string t && t == tag)
+                {
+                    Nav.SelectedItem = nvi;
+                    break;
+                }
             }
+
+            var pageType = Navigation.RouteTable.Resolve(tag);
+            if (pageType != null) ContentFrame.Navigate(pageType);
         }
+        finally
+        {
+            _selectingRoute = false;
+        }
+    }
+
+    public void StartTour()
+    {
+        _tour ??= new Tutorial.TourCoordinator(this);
+        _tour.Start();
+    }
+
+    public async Task ShowWelcomeIfNeededAsync()
+    {
+        try
+        {
+            if (TourProgress.IsCompleted() || TourProgress.IsDismissed()) return;
+            var start = await TourWelcome.ShowAsync(Content.XamlRoot);
+            if (start is true)
+            {
+                StartTour();
+            }
+            else if (start is false)
+            {
+                TourProgress.MarkDismissed();
+            }
+            // null = nunca presentada (gate ocupado): no marca nada, reintenta al próximo arranque.
+        }
+        catch (Exception ex)
+        {
+            App.WriteCrashLog(ex);
+        }
+    }
+
+    internal void ShowTourInterrupted()
+    {
+        var previous = TopBar.Child;
+        var info = new InfoBar
+        {
+            IsOpen = true,
+            IsClosable = true,
+            Severity = InfoBarSeverity.Informational,
+            Title = "Recorrido interrumpido",
+            Message = "Has salido del recorrido guiado. Puedes volver a lanzarlo desde Tutorial.",
+        };
+        info.Closed += (_, _) =>
+        {
+            if (TopBar.Child == info) TopBar.Child = previous;
+        };
+        TopBar.Child = info;
     }
 
     public MainWindow()
@@ -87,6 +145,7 @@ public sealed partial class MainWindow : Window
         // colapsar; el estado sigue visible en la barra superior.
         Nav.PaneOpening += (_, _) => RefreshPaneFooter();
         Nav.PaneClosing += (_, _) => RefreshPaneFooter();
+        ContentFrame.Navigated += (_, _) => _tour?.OnFrameNavigated();
         RefreshPaneFooter();
         // Kick off background service probe without blocking first frame (Fase 25).
         _ = ProbeServiceAsync();
@@ -168,6 +227,7 @@ public sealed partial class MainWindow : Window
             ("restore", "nav.restore"),
             ("history", "nav.history"),
             ("settings", "nav.settings"),
+            ("tutorial", "nav.tutorial"),
         };
 
         foreach (var item in EnumerateItems())
@@ -543,8 +603,18 @@ public sealed partial class MainWindow : Window
             return;
         }
 
+        if (_selectingRoute)
+        {
+            // Navigation originated from SelectRoute (tour, startup, deep links): the page is
+            // already being navigated, so do not navigate a second time.
+            _tour?.OnFrameNavigated();
+            return;
+        }
+
+        _tour?.OnUserNavigation(tag);
+
         // Puerta de entrada: sin primer análisis solo se puede estar en Panel o Analizar.
-        if (NeedsInitialAnalysis() && tag is not ("analyze" or "dashboard"))
+        if (!Tutorial.TourCoordinator.IsActive && NeedsInitialAnalysis() && tag is not ("analyze" or "dashboard"))
         {
             SelectRoute("analyze");
             _ = PromptInitialAnalysisAsync();

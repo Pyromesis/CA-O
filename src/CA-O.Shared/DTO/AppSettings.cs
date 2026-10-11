@@ -39,6 +39,12 @@ public sealed class UiSettings
 
     [JsonPropertyName("close_to_tray")]
     public bool CloseToTray { get; set; } = true;
+
+    [JsonPropertyName("tour_completed")]
+    public bool TourCompleted { get; set; }
+
+    [JsonPropertyName("tour_dismissed")]
+    public bool TourDismissed { get; set; }
 }
 
 /// <summary>Cached system information from the last scan.</summary>

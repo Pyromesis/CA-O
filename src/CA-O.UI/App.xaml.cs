@@ -76,6 +76,12 @@ public partial class App : Application
         _window = new MainWindow();
         BootMark("MainWindow construida");
         _window.Activate();
+        // Bienvenida del recorrido guiado (Task 8): sin await para no
+        // retrasar la ventana; el campo es Window y se convierte a MainWindow.
+        // La bienvenida gana la carrera del UiDialogs gate solo porque el
+        // aviso de análisis espera Task.Delay(600); si la pierde, el tri-estado
+        // (null = nunca presentada) evita marcar tour_dismissed y reintenta.
+        if (_window is MainWindow main) _ = main.ShowWelcomeIfNeededAsync();
         BootMark("Ventana activada");
         }
         catch (Exception ex)

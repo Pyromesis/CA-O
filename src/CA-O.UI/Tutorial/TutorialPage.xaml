@@ -1,0 +1,57 @@
+<Page
+    x:Class="CAO.UI.Tutorial.TutorialPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <ScrollViewer Padding="32">
+        <StackPanel Spacing="24" MaxWidth="760" HorizontalAlignment="Left">
+
+            <TextBlock Text="Tutorial" FontSize="30" FontWeight="SemiBold" />
+            <TextBlock
+                Text="Todo lo que necesitas saber para usar CA-O de principio a fin."
+                TextWrapping="Wrap"
+                Opacity="0.8" />
+
+            <Button x:Name="StartTourButton"
+                    Content="Empezar recorrido guiado"
+                    HorizontalAlignment="Left"
+                    Style="{StaticResource AccentButtonStyle}"
+                    Click="OnStartTourClick" />
+
+            <ItemsControl x:Name="ChaptersList">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border
+                            Margin="0,0,0,12"
+                            Padding="16"
+                            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                            BorderThickness="1"
+                            CornerRadius="8">
+                            <StackPanel Spacing="6">
+                                <TextBlock Text="{Binding Title}" FontSize="18" FontWeight="SemiBold" />
+                                <TextBlock Text="{Binding Summary}" TextWrapping="Wrap" Opacity="0.85" />
+                                <ItemsControl ItemsSource="{Binding Points}" Margin="0,4,0,0">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock
+                                                Text="{Binding}"
+                                                TextWrapping="Wrap"
+                                                Margin="0,0,0,4"
+                                                Opacity="0.75" />
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <Button Content="Ir a esta sección"
+                                        Margin="0,8,0,0"
+                                        Tag="{Binding Route}"
+                                        Click="OnChapterClick" />
+                            </StackPanel>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+        </StackPanel>
+    </ScrollViewer>
+</Page>
