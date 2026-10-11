@@ -272,9 +272,11 @@ public sealed partial class OverclockViewModel : ObservableObject
         {
             Headline = Localizer.Get("overclock_title");
             StatusLine = Localizer.Get("overclock_probing");
+            CrashLog.Step("refresh.probe-start");
 
             // Vendor P/Invoke and WMI both block; none of them belong on the UI thread.
             var capabilities = await Task.Run(() => _registry.ProbeAll(ct), ct).ConfigureAwait(true);
+            CrashLog.Step("refresh.probe-done");
 
             CpuKnobs.Clear();
             GpuKnobs.Clear();
@@ -313,15 +315,22 @@ public sealed partial class OverclockViewModel : ObservableObject
                 }
             }
 
+            CrashLog.Step("refresh.rows-done");
             await FillReadingsAsync(ct).ConfigureAwait(true);
+            CrashLog.Step("refresh.readings-done");
             await FillGamesAsync(ct).ConfigureAwait(true);
+            CrashLog.Step("refresh.games-done");
 
             Summarize(capabilities);
             await LoadSavedDeltaAsync(ct).ConfigureAwait(true);
+            CrashLog.Step("refresh.delta-done");
             await LoadCeilingsAsync(ct).ConfigureAwait(true);
+            CrashLog.Step("refresh.ceilings-done");
             await LoadPendingRecoveriesAsync(ct).ConfigureAwait(true);
+            CrashLog.Step("refresh.recoveries-done");
 
             StatusLine = Localizer.Format("overclock_probe_done", capabilities.Knobs.Count);
+            CrashLog.Step("refresh.done");
         }
         catch (OperationCanceledException)
         {
@@ -330,6 +339,7 @@ public sealed partial class OverclockViewModel : ObservableObject
         catch (Exception ex)
         {
             StatusLine = Localizer.Get("overclock_probe_failed");
+            CrashLog.Step("refresh.failed");
             CrashLog.Write(ex);
         }
         finally

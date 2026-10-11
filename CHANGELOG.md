@@ -4,6 +4,14 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
 ## [Unreleased]
 
+## [2.2.7] - 2026-10-11
+
+### Anadido
+- **Registrador black-box de pasos de Overclock.** `CrashLog.Step(stage)` escribe una marca por fase del sondeo (`refresh.probe-start`, `probe-done`, `rows-done`, `readings-done`, `games-done`, `delta-done`, `ceilings-done`, `recoveries-done`, `done`/`failed`) en el mismo `cao-ui-crash.log`. Si la pestana vuelve a fallar en un equipo, el log dice el paso exacto en vez de un crash mudo.
+
+### Probado
+- Suite completa en Release (2 CrashLogStepTests nuevos).
+
 ## [2.2.6] - 2026-10-11
 
 ### Corregido

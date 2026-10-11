@@ -18,15 +18,23 @@ internal static class CrashLog
     /// Appends an exception and its inner chain. Never throws: a logger that
     /// can crash the caller is a second bug wearing the first one's clothes.
     /// </summary>
+    /// <summary>Test seam: when set, the log goes here instead of LocalAppData. Production never sets it.</summary>
+    internal static string? LogPathOverride { get; set; }
+
+    private static string ResolvePath()
+    {
+        var path = LogPathOverride ?? Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "CA-O", "logs", "cao-ui-crash.log");
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        return path;
+    }
+
     public static void Write(Exception ex)
     {
         try
         {
-            var logDir = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "CA-O", "logs");
-            Directory.CreateDirectory(logDir);
-            var path = Path.Combine(logDir, "cao-ui-crash.log");
+            var path = ResolvePath();
             RotateIfNeeded(path);
 
             var sb = new StringBuilder()
@@ -75,6 +83,28 @@ internal static class CrashLog
             {
                 // Last resort: nothing left to write to and nothing left to say.
             }
+        }
+    }
+
+    /// <summary>
+    /// Appends a one-line breadcrumb. The Overclock refresh writes one per
+    /// phase so a native crash that leaves no managed exception behind still
+    /// leaves the exact step it died in. Same contract as Write: never throws.
+    /// </summary>
+    public static void Step(string stage)
+    {
+        try
+        {
+            var path = ResolvePath();
+            RotateIfNeeded(path);
+            File.AppendAllText(
+                path,
+                DateTime.UtcNow.ToString("o") + " step: " + stage + Environment.NewLine,
+                Encoding.UTF8);
+        }
+        catch
+        {
+            // Diagnostics must never break the page they observe.
         }
     }
 
