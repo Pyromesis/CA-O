@@ -224,6 +224,7 @@ public sealed partial class MainWindow : Window
             ("solucionar", "nav.solucionar"),
             ("drivers", "nav.drivers"),
             ("benchmark", "nav.benchmark"),
+            ("overclock", "nav.overclock"),
             ("restore", "nav.restore"),
             ("history", "nav.history"),
             ("settings", "nav.settings"),

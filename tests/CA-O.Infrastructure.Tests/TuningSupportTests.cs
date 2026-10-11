@@ -11,6 +11,8 @@ using Xunit;
 namespace CAO.Infrastructure.Tests.Overclock;
 
 /// <summary>F7 support: journal adapter, AMD ceilings, validated-profile game repository.</summary>
+// Same collection as TransactionJournalRetentionTests (same reason: the shared ParsePasses counter).
+[Collection("FileTransactionJournal")]
 public sealed class TuningSupportTests : IDisposable
 {
     private readonly string _directory;

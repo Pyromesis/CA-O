@@ -14,6 +14,10 @@ namespace CAO.Infrastructure.Tests;
 /// la unica consulta del journal es <c>Incomplete()</c>, que los descarta. Sin
 /// poda el directorio crece sin limite y el coste crece con el.
 /// </summary>
+// Same collection as TuningSupportTests: both touch FileTransactionJournal, whose
+// ParsePasses counter is process-wide. xUnit runs one collection at a time, so the
+// cache assertions below cannot observe another class's LoadAll.
+[Collection("FileTransactionJournal")]
 public sealed class TransactionJournalRetentionTests : IDisposable
 {
     private readonly string _dir = Path.Combine(

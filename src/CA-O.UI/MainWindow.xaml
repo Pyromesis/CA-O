@@ -128,6 +128,11 @@
                         <FontIcon Glyph="&#xE9D2;" />
                     </NavigationViewItem.Icon>
                 </NavigationViewItem>
+                <NavigationViewItem Content="Overclock" Tag="overclock" ToolTipService.ToolTip="Overclock — tuning honesto de CPU, GPU y memoria">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE9D4;" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
                 <NavigationViewItem Content="Restaurar" Tag="restore" Icon="Undo" ToolTipService.ToolTip="Restaurar — snapshots y recuperación"/>
                 <NavigationViewItem Content="Historial" Tag="history" ToolTipService.ToolTip="Historial — timeline auditable">
                     <NavigationViewItem.Icon>

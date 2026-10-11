@@ -4,6 +4,8 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
 ## [Unreleased]
 
+## [2.2.4] - 2026-10-11
+
 ### Anadido
 - **Pestana Overclock** (`OverclockPage`, ruta `overclock`; Benchmark intacto). 6 secciones: procesador, graficos, memoria, juegos, estabilidad, resultado. i18n es-ES/en-US.
 - **Catalogo declarativo de 11 knobs** (6 NVIDIA, 2 CPU por politica, 2 memoria solo lectura, 1 AMD) con riesgo, evidencia y dependencias; ningun knob con evidencia `Unknown`.
@@ -12,6 +14,7 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 - **Delta honesto**: solo total del perfil (mediana, suelo 3 %) + techo por eje; prohibido atribuir delta por knob.
 - **Puerta anti-cheat en perfiles de juego**: KernelLevel bloquea siempre; sin `LaunchOptions` ni `ProcessPriority` por construccion.
 - **Docs**: README, ARCHITECTURE, OPTIMIZATION-CATALOG y CHANGELOG documentan Overclock.
+- **Item Overclock en el menu lateral** (`MainWindow.xaml` + `navItems`): la ruta existia desde F1 pero el NavigationView hardcodeado no la mostraba.
 
 ### Probado
 - Suite completa: **1692 passed, 0 failed** en Release (referencia 2.2.3: 1278; Overclock aporta +414).
