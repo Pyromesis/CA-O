@@ -92,4 +92,15 @@ public enum TransactionPhase
     RecoveryRequired,
     RecoveryRunning,
     RecoveryCompleted,
+
+    // Overclock tuning phases. All NON-terminal: a tuning run always closes
+    // with one of the five existing terminal phases, so IsTerminal() and
+    // Incomplete() keep working unchanged.
+    OverclockStarted,
+    OverclockCheckpointTaken,
+    OverclockStepApplied,
+    OverclockStepRejected,
+    OverclockTestPassed,
+    OverclockTestFailed,
+    OverclockInterrupted,
 }

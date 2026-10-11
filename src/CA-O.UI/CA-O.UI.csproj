@@ -36,6 +36,7 @@
     <Page Include="AnalyzePage.xaml" />
     <Page Include="OptimizePage.xaml" />
     <Page Include="BenchmarkPage.xaml" />
+    <Page Include="OverclockPage.xaml" />
     <Page Include="RestorePage.xaml" />
     <Page Include="HistoryPage.xaml" />
     <Page Include="LimpiezaPage.xaml" />
@@ -43,6 +44,8 @@
     <Page Include="DriversPage.xaml" />
     <Page Include="SettingsPage.xaml" />
     <Page Include="Controls\CaoCat.xaml" />
+    <Page Include="Tutorial\TourOverlay.xaml" />
+    <Page Include="Tutorial\TutorialPage.xaml" />
     <Page Include="Resources\DesignTokens.xaml" />
   </ItemGroup>
 

@@ -260,7 +260,7 @@ public static partial class CommandPolicy
             SystemCommandKey.PowerCfgSetAcValueIndex when arguments.Count == 5 &&
                 arguments[0] == "/setacvalueindex" && arguments[1] == "SCHEME_CURRENT" &&
                 IsAllowedPowerSetting(arguments[2], arguments[3]) &&
-                (arguments[4] is "0" or "1" or "2") =>
+                IsAllowedPowerSettingValue(arguments[2], arguments[3], arguments[4]) =>
                 Path.Combine(system32, "powercfg.exe"),
 
             SystemCommandKey.PowerCfgQueryAcValueIndex when arguments.Count == 4 &&
@@ -443,8 +443,49 @@ public static partial class CommandPolicy
             ("501a4d13-42af-4429-9fd1-a8218c268e1d", "ee12f906-d277-4bcf-ad6c-e5a569d7c83d") => true,
             // Wireless adapter power saving: 0 = máximo rendimiento
             ("19cbb8fa-5279-450e-9fac-8a3d5fedd0c1", "12bbebe6-58d6-4636-95bb-3217ef867c1a") => true,
+            // SUB_PROCESSOR / PERFBOOSTMODE: política de turbo del firmware.
+            (ProcessorSubgroup, BoostModeSetting) => true,
+            // SUB_PROCESSOR / PROCTHROTTLEMAX: techo de frecuencia en %.
+            (ProcessorSubgroup, MaxProcessorStateSetting) => true,
             _ => false,
         };
+
+    /// <summary>
+    /// Grupo de processor y los dos ajustes que el motor de Overclock puede
+    /// tocar por <c>powercfg</c>. No es un overclock: es techo y modo turbo
+    /// declarados por el firmware. Duplicados aquí (y no referenciados desde
+    /// Core) porque <c>CAO.Shared</c> no depende de <c>CAO.Core</c>; los tests
+    /// de Core comprueban que ambas copias no divergen.
+    /// </summary>
+    private const string ProcessorSubgroup = "54533251-82be-4824-96c1-47b60b740d00";
+    private const string BoostModeSetting = "be337241-0d82-4146-a960-4f3749d470c3";
+    private const string MaxProcessorStateSetting = "bc5038f7-23e0-4960-96da-33abaf5935ec";
+
+    /// <summary>
+    /// Rango permitido por ajuste. El ajuste de turbo admite 0-2; el techo de
+    /// frecuencia admite 20-100, con 20 como suelo de producto (por debajo el
+    /// equipo parece roto). Un ajuste que no esté en la lista rechaza
+    /// cualquier valor, incluso 0.
+    /// </summary>
+    private static bool IsAllowedPowerSettingValue(string subgroup, string setting, string value)
+    {
+        if (string.Equals(subgroup, ProcessorSubgroup, StringComparison.OrdinalIgnoreCase))
+        {
+            if (string.Equals(setting, BoostModeSetting, StringComparison.OrdinalIgnoreCase))
+            {
+                return value is "0" or "1" or "2";
+            }
+
+            if (string.Equals(setting, MaxProcessorStateSetting, StringComparison.OrdinalIgnoreCase))
+            {
+                return int.TryParse(value, System.Globalization.NumberStyles.None,
+                    System.Globalization.CultureInfo.InvariantCulture, out int percent)
+                    && percent is >= 20 and <= 100;
+            }
+        }
+
+        return value is "0" or "1" or "2";
+    }
 
     private static bool IsValidTaskName(string name) =>
         !string.IsNullOrWhiteSpace(name) && name.Length <= 256 &&

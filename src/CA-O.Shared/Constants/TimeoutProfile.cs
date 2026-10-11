@@ -57,5 +57,7 @@ public static class TimeoutProfile
         "cleanup-browser-code-cache",
         "cleanup-gpu-shader-cache",
         "cleanup-nvidia-downloader-cache",
+        // Overclock tuning: bisection stability runs, up to DispatchHeavy.
+        "overclock-tune",
     };
 }

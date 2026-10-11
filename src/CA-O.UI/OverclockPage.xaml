@@ -1,0 +1,248 @@
+<Page
+    x:Class="CAO.UI.Pages.OverclockPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:CAO.UI.Controls"
+    xmlns:vm="using:CAO.UI.ViewModels"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+
+    <ScrollViewer Padding="{StaticResource CaoPagePadding}"
+                  VerticalScrollBarVisibility="Auto"
+                  HorizontalScrollBarVisibility="Disabled"
+                  Background="{ThemeResource SolidBackgroundFillColorBaseBrush}">
+        <StackPanel x:Name="PageContent" Style="{StaticResource CaoPageContainerStyle}">
+
+            <!-- Encabezado -->
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0">
+                    <TextBlock x:Name="HeadlineText"
+                               Style="{StaticResource CaoPageTitleStyle}"
+                               Text="Overclock" />
+                    <TextBlock x:Name="SubtitleText"
+                               Style="{StaticResource CaoSubtitleStyle}"
+                               Text="{x:Bind ViewModel.StatusLine, Mode=OneWay}" />
+                </StackPanel>
+                <controls:CaoCat x:Name="OverclockCat"
+                                 Grid.Column="1"
+                                 Width="64"
+                                 ShowCaption="False" />
+            </Grid>
+            <Rectangle Height="3"
+                       Margin="0,4,0,12"
+                       HorizontalAlignment="Left"
+                       Width="72"
+                       Style="{StaticResource CaoHeaderAccentBarStyle}" />
+
+            <InfoBar x:Name="ReadOnlyNotice"
+                     Severity="Informational"
+                     IsClosable="False"
+                     Margin="0,0,0,16"
+                     Title="{x:Bind ViewModel.ResultSummary, Mode=OneWay}" />
+
+            <!-- 01 PROCESADOR -->
+            <Border Style="{StaticResource CaoCardStyle}" Margin="0,0,0,12">
+                <StackPanel>
+                    <TextBlock Style="{StaticResource CaoSectionTitleStyle}" Text="01  PROCESADOR" />
+                    <TextBlock Style="{StaticResource CaoSectionSubtitleStyle}"
+                               Text="{x:Bind ViewModel.CpuSummary, Mode=OneWay}" />
+                    <ItemsControl ItemsSource="{x:Bind ViewModel.CpuKnobs}" Margin="0,8,0,0">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:OverclockKnobRow">
+                                <Border Margin="0,0,0,8" Style="{StaticResource CaoCardStyle}">
+                                    <StackPanel>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0"
+                                                       Style="{StaticResource CaoListItemTitleStyle}"
+                                                       Text="{x:Bind Label}" />
+                                            <TextBlock Grid.Column="1"
+                                                       Style="{StaticResource CaoListItemDetailStyle}"
+                                                       Text="{x:Bind StateLabel}" />
+                                        </Grid>
+                                        <TextBlock Style="{StaticResource CaoListItemDetailStyle}"
+                                                   Text="{x:Bind Description}" />
+                                        <TextBlock Style="{StaticResource CaoListItemDetailStyle}"
+                                                   Text="{x:Bind CurrentValue}" />
+                                        <TextBlock Style="{StaticResource CaoListItemDetailStyle}"
+                                                   Text="{x:Bind Reason}" />
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
+
+            <!-- 02 GRAFICOS -->
+            <Border Style="{StaticResource CaoCardStyle}" Margin="0,0,0,12">
+                <StackPanel>
+                    <TextBlock Style="{StaticResource CaoSectionTitleStyle}" Text="02  GRAFICOS" />
+                    <TextBlock Style="{StaticResource CaoSectionSubtitleStyle}"
+                               Text="{x:Bind ViewModel.GpuSummary, Mode=OneWay}" />
+                    <ItemsControl ItemsSource="{x:Bind ViewModel.GpuReadings}" Margin="0,8,0,0">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:OverclockReadingRow">
+                                <Grid Margin="0,0,0,4">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Style="{StaticResource CaoListItemTitleStyle}" Text="{x:Bind Label}" />
+                                    <TextBlock Grid.Column="1" Style="{StaticResource CaoListItemDetailStyle}" Text="{x:Bind Value}" />
+                                    <TextBlock Grid.Column="2" Style="{StaticResource CaoListItemDetailStyle}" Text="{x:Bind Evidence}" />
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <ItemsControl ItemsSource="{x:Bind ViewModel.GpuKnobs}" Margin="0,8,0,0">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:OverclockKnobRow">
+                                <Border Margin="0,0,0,8" Style="{StaticResource CaoCardStyle}">
+                                    <StackPanel>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0"
+                                                       Style="{StaticResource CaoListItemTitleStyle}"
+                                                       Text="{x:Bind Label}" />
+                                            <TextBlock Grid.Column="1"
+                                                       Style="{StaticResource CaoListItemDetailStyle}"
+                                                       Text="{x:Bind StateLabel}" />
+                                        </Grid>
+                                        <TextBlock Style="{StaticResource CaoListItemDetailStyle}"
+                                                   Text="{x:Bind Description}" />
+                                        <TextBlock Style="{StaticResource CaoListItemDetailStyle}"
+                                                   Text="{x:Bind CurrentValue}" />
+                                        <TextBlock Style="{StaticResource CaoListItemDetailStyle}"
+                                                   Text="{x:Bind Reason}" />
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
+
+            <!-- 03 MEMORIA -->
+            <Border Style="{StaticResource CaoCardStyle}" Margin="0,0,0,12">
+                <StackPanel>
+                    <TextBlock Style="{StaticResource CaoSectionTitleStyle}" Text="03  MEMORIA" />
+                    <TextBlock Style="{StaticResource CaoSectionSubtitleStyle}"
+                               Text="{x:Bind ViewModel.MemorySummary, Mode=OneWay}" />
+                    <ItemsControl ItemsSource="{x:Bind ViewModel.MemoryReadings}" Margin="0,8,0,0">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:OverclockReadingRow">
+                                <Grid Margin="0,0,0,4">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Style="{StaticResource CaoListItemTitleStyle}" Text="{x:Bind Label}" />
+                                    <TextBlock Grid.Column="1" Style="{StaticResource CaoListItemDetailStyle}" Text="{x:Bind Value}" />
+                                    <TextBlock Grid.Column="2" Style="{StaticResource CaoListItemDetailStyle}" Text="{x:Bind Evidence}" />
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <ItemsControl ItemsSource="{x:Bind ViewModel.MemoryKnobs}" Margin="0,8,0,0">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:OverclockKnobRow">
+                                <Border Margin="0,0,0,8" Style="{StaticResource CaoCardStyle}">
+                                    <StackPanel>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0"
+                                                       Style="{StaticResource CaoListItemTitleStyle}"
+                                                       Text="{x:Bind Label}" />
+                                            <TextBlock Grid.Column="1"
+                                                       Style="{StaticResource CaoListItemDetailStyle}"
+                                                       Text="{x:Bind StateLabel}" />
+                                        </Grid>
+                                        <TextBlock Style="{StaticResource CaoListItemDetailStyle}"
+                                                   Text="{x:Bind Description}" />
+                                        <TextBlock Style="{StaticResource CaoListItemDetailStyle}"
+                                                   Text="{x:Bind CurrentValue}" />
+                                        <TextBlock Style="{StaticResource CaoListItemDetailStyle}"
+                                                   Text="{x:Bind Reason}" />
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
+
+            <!-- 04 PERFILES DE JUEGO -->
+            <Border Style="{StaticResource CaoCardStyle}" Margin="0,0,0,12">
+                <StackPanel>
+                    <TextBlock Style="{StaticResource CaoSectionTitleStyle}" Text="04  PERFILES DE JUEGO" />
+                    <ItemsControl ItemsSource="{x:Bind ViewModel.Games}" Margin="0,8,0,0">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:OverclockGameRow">
+                                <Grid Margin="0,0,0,6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Style="{StaticResource CaoListItemTitleStyle}" Text="{x:Bind Name}" />
+                                    <TextBlock Grid.Column="1" Style="{StaticResource CaoListItemDetailStyle}" Text="{x:Bind Executable}" />
+                                    <TextBlock Grid.Column="2" Style="{StaticResource CaoListItemDetailStyle}" Text="{x:Bind State}" />
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
+
+            <!-- 05 ESTABILIDAD -->
+            <Border Style="{StaticResource CaoCardStyle}" Margin="0,0,0,12">
+                <StackPanel>
+                    <TextBlock Style="{StaticResource CaoSectionTitleStyle}" Text="05  ESTABILIDAD" />
+                    <TextBlock Style="{StaticResource CaoSectionSubtitleStyle}"
+                               Text="{x:Bind ViewModel.StabilitySummary, Mode=OneWay}" />
+                </StackPanel>
+            </Border>
+
+            <!-- 06 RESULTADO -->
+            <Border Style="{StaticResource CaoCardStyle}" Margin="0,0,0,12">
+                <StackPanel>
+                    <TextBlock Style="{StaticResource CaoSectionTitleStyle}" Text="06  RESULTADO" />
+                    <TextBlock Style="{StaticResource CaoResultTextStyle}"
+                               Text="{x:Bind ViewModel.ResultSummary, Mode=OneWay}" />
+                    <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                        <Button x:Name="RefreshButton"
+                                Content="Detectar"
+                                Style="{StaticResource CaoPrimaryButtonStyle}"
+                                Command="{x:Bind ViewModel.RefreshCommand}" />
+                        <ProgressRing x:Name="Ring"
+                                      Margin="12,0,0,0"
+                                      Width="24"
+                                      Height="24"
+                                      IsActive="{x:Bind ViewModel.IsBusy, Mode=OneWay}" />
+                    </StackPanel>
+                    <TextBlock Style="{StaticResource CaoListItemDetailStyle}"
+                               AutomationProperties.LiveSetting="Polite"
+                               Text="{x:Bind ViewModel.StatusLine, Mode=OneWay}" />
+                </StackPanel>
+            </Border>
+
+        </StackPanel>
+    </ScrollViewer>
+</Page>

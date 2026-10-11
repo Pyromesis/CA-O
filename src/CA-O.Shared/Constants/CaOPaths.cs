@@ -23,6 +23,13 @@ public static class CaOPaths
     public static string UiCrashLogFile => Path.Combine(UiLogsDirectory, "cao-ui-crash.log");
 
     public static string ServiceLogsDirectory => Path.Combine(ProgramDataRoot, "logs");
+
+    /// <summary>
+    /// Tuning checkpoints for the Overclock section. One JSON file per run,
+    /// written BEFORE any hardware state is mutated so a crash always leaves a
+    /// restorable record on disk (design D4).
+    /// </summary>
+    public static string OverclockRunsDirectory => Path.Combine(ProgramDataRoot, "overclock", "runs");
 }
 
 /// <summary>IPC constants shared by UI client and privileged service.</summary>

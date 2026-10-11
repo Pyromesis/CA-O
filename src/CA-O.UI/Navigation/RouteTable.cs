@@ -15,19 +15,21 @@ public static class RouteTable
             ["analyze"] = typeof(Pages.AnalyzePage),
             ["optimize"] = typeof(Pages.OptimizePage),
             ["benchmark"] = typeof(Pages.BenchmarkPage),
+            ["overclock"] = typeof(Pages.OverclockPage),
             ["restore"] = typeof(Pages.RestorePage),
             ["history"] = typeof(Pages.HistoryPage),
             ["cleanup"] = typeof(Pages.LimpiezaPage),
             ["solucionar"] = typeof(Pages.SolucionarPage),
             ["drivers"] = typeof(Pages.DriversPage),
             ["settings"] = typeof(Pages.SettingsPage),
+            ["tutorial"] = typeof(Tutorial.TutorialPage),
         };
 
     /// <summary>Ordered tags as shown in the NavigationView.</summary>
     public static readonly IReadOnlyList<string> Order = new[]
     {
         "dashboard", "analyze", "optimize", "cleanup", "solucionar", "drivers",
-        "benchmark", "restore", "history", "settings",
+        "benchmark", "overclock", "restore", "history", "settings", "tutorial",
     };
 
     public static Type? Resolve(string? tag) =>
