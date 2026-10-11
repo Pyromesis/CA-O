@@ -4,7 +4,8 @@ using System.Text;
 using CAO.Core.Overclock;
 using CAO.Core.Overclock.Reporting;
 using CAO.Core.Overclock.Recovery;
-using CAO.Infrastructure.Gaming;
+using CAO.Core.Overclock.Gaming;
+using CAO.Infrastructure.Overclock.Gaming;
 using CAO.UI.Helpers;
 using CAO.Infrastructure.Overclock;
 using CAO.Infrastructure.Overclock.Reporting;
@@ -57,7 +58,7 @@ public sealed record OverclockKnobRow(
 public sealed record OverclockReadingRow(string Label, string Value, string Evidence, string Reason);
 
 /// <summary>A detected game and what CA-O can offer it without touching its files.</summary>
-public sealed record OverclockGameRow(string Name, string Executable, string Source, string State);
+public sealed record OverclockGameRow(string Name, string Executable, string State, string Reason, bool IsActionable);
 
 /// <summary>
 /// A tuning run this machine restarted while it was open. The user picks what
@@ -101,8 +102,10 @@ public sealed partial class OverclockViewModel : ObservableObject
 {
     private readonly IOverclockBackendRegistry _registry;
     private readonly IReadOnlyList<IOverclockBackend> _backends;
-    private readonly GameDetectionProvider _games;
-    private readonly Func<CancellationToken, Task<IReadOnlyList<DetectedGame>>> _detectGames;
+    private IGameOverclockSource? _gameSource;
+
+    [ObservableProperty]
+    private string _gameSummary = string.Empty;
 
     private IOverclockDeltaSource? _deltaSource;
     private IOverclockDeltaStore? _store;
@@ -113,28 +116,26 @@ public sealed partial class OverclockViewModel : ObservableObject
     private OverclockRecoveryService? _recovery;
     private IOverclockCeilingSource? _ceilingSource;
     public OverclockViewModel()
-        : this(OverclockReadOnlyRegistry.CreateDefault(), DefaultBackends(), new GameDetectionProvider())
+        : this(OverclockReadOnlyRegistry.CreateDefault(), DefaultBackends())
     {
     }
 
     public OverclockViewModel(
         IOverclockBackendRegistry registry,
         IReadOnlyList<IOverclockBackend> backends,
-        GameDetectionProvider games,
         IOverclockDeltaSource? deltaSource = null,
         IOverclockDeltaStore? store = null,
         OverclockRecoveryService? recovery = null,
         IOverclockCeilingSource? ceilingSource = null,
-        Func<CancellationToken, Task<IReadOnlyList<DetectedGame>>>? detectGames = null)
+        IGameOverclockSource? gameSource = null)
     {
         _registry = registry;
         _backends = backends;
-        _games = games;
         _deltaSource = deltaSource;
         _store = store;
         _recovery = recovery;
         _ceilingSource = ceilingSource;
-        _detectGames = detectGames ?? games.DetectAsync;
+        _gameSource = gameSource;
     }
 
     /// <summary>
@@ -143,6 +144,13 @@ public sealed partial class OverclockViewModel : ObservableObject
     /// </summary>
     private IOverclockDeltaSource DeltaSource =>
         _deltaSource ??= new BenchmarkDeltaSource();
+
+    /// <summary>
+    /// Game profiles are read on demand for the same reason: opening the page must
+    /// not walk the process list before anyone asked for a row.
+    /// </summary>
+    private IGameOverclockSource GameSource =>
+        _gameSource ??= new SystemGameOverclockSource();
 
     private IOverclockDeltaStore Store =>
         _store ??= new FileOverclockDeltaStore();
@@ -267,7 +275,9 @@ public sealed partial class OverclockViewModel : ObservableObject
             Summarize(capabilities);
             await LoadSavedDeltaAsync(ct).ConfigureAwait(true);
             await LoadCeilingsAsync(ct).ConfigureAwait(true);
-            await LoadPendingRecoveriesAsync(ct).ConfigureAwait(true);            StatusLine = Localizer.Format("overclock_probe_done", capabilities.Knobs.Count);
+            await LoadPendingRecoveriesAsync(ct).ConfigureAwait(true);
+
+            StatusLine = Localizer.Format("overclock_probe_done", capabilities.Knobs.Count);
         }
         catch (OperationCanceledException)
         {
@@ -573,16 +583,54 @@ public sealed partial class OverclockViewModel : ObservableObject
 
     private async Task FillGamesAsync(CancellationToken ct)
     {
-        var detected = await _detectGames(ct).ConfigureAwait(true);
-        foreach (var game in detected)
+        GameOverclockSnapshot snapshot;
+        try
+        {
+            snapshot = await GameSource.ReadAsync(ct).ConfigureAwait(true);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            // One unreadable section must not take the rest of the page down, and an
+            // empty list here would read as "no games installed", which the scan
+            // never proved.
+            CrashLog.Write(ex);
+            GameSummary = Localizer.Get("overclock-games-scan-failed");
+            return;
+        }
+
+        foreach (var entry in snapshot.Entries)
         {
             Games.Add(new OverclockGameRow(
-                game.Name,
-                game.ExecutableName,
-                game.Source,
-                Localizer.Get("overclock-game-no-profile")));
+                entry.Candidate.DisplayName,
+                entry.Candidate.ExecutableName,
+                GameStateLabel(entry.Decision.State),
+                Localizer.Get(entry.Decision.ReasonKey),
+                entry.Decision.IsActionable));
         }
+
+        // An anti-cheat on the machine outranks the count of running games. It is a fact
+        // about the system, not about the process list, and hiding it behind "no games
+        // running" would report a clean machine while the thing that bans people sits
+        // installed in the service registry.
+        GameSummary = snapshot.DetectedAntiCheats.Count > 0
+            ? Localizer.Format("overclock-games-anti-cheats", string.Join(", ", snapshot.DetectedAntiCheats))
+            : snapshot.Entries.Count == 0
+                ? Localizer.Get("overclock-games-none")
+                : Localizer.Format("overclock-games-count", snapshot.Entries.Count);
     }
+
+    private static string GameStateLabel(GameProfileState state) => state switch
+    {
+        GameProfileState.Ready => Localizer.Get("overclock-state-available"),
+        GameProfileState.BlockedByAntiCheat => Localizer.Get("overclock-games-state-blocked"),
+        GameProfileState.NoValidatedProfile => Localizer.Get("overclock-games-state-no-profile"),
+        GameProfileState.UnknownGame => Localizer.Get("overclock-games-state-unknown"),
+        _ => Localizer.Get("overclock-games-state-unscanable"),
+    };
 
     private void Summarize(OverclockCapabilities capabilities)
     {

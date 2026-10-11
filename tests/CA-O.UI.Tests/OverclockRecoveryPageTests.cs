@@ -262,10 +262,8 @@ public sealed class OverclockRecoveryPageTests
         var vm = new OverclockViewModel(
             new OverclockReadOnlyRegistry(),
             [],
-            new GameDetectionProvider(),
             recovery: service,
-            ceilingSource: ceilings ?? new StubCeilingSource([]),
-            detectGames: _ => Task.FromResult<IReadOnlyList<DetectedGame>>([]));
+            ceilingSource: ceilings ?? new StubCeilingSource([]));
 
         return (vm, service, store);
     }

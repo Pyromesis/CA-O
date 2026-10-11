@@ -2,7 +2,8 @@ using CAO.Core.Overclock;
 using CAO.Core.Overclock.Recovery;
 using CAO.Core.Overclock.Reporting;
 using CAO.Core.Overclock.Stability;
-using CAO.Infrastructure.Gaming;
+using CAO.Core.Overclock.Gaming;
+using CAO.Infrastructure.Overclock.Gaming;
 using CAO.Infrastructure.Overclock;
 using CAO.Infrastructure.Overclock.Reporting;
 using CAO.UI.ViewModels;
@@ -28,6 +29,7 @@ internal static class OverclockTestHarness
     public static OverclockViewModel Create(
         IOverclockBackendRegistry registry,
         IReadOnlyList<IOverclockBackend> backends,
+        IGameOverclockSource? gameSource = null,
         IOverclockDeltaSource? deltaSource = null,
         IOverclockDeltaStore? store = null,
         IReadOnlyList<TuningCeiling>? ceilings = null,
@@ -45,17 +47,31 @@ internal static class OverclockTestHarness
         return new OverclockViewModel(
             registry,
             backends,
-            new GameDetectionProvider(),
-            deltaSource,
-            store,
-            recovery,
-            new HarnessCeilingSource(ceilings ?? []),
-            _ => Task.FromResult<IReadOnlyList<DetectedGame>>([]));
+            deltaSource: deltaSource,
+            store: store,
+            recovery: recovery,
+            ceilingSource: new HarnessCeilingSource(ceilings ?? []),
+            gameSource: gameSource ?? new HarnessGameSource());
     }
 
     /// <summary>Builds a view model over an empty registry: no knobs, no backends.</summary>
     public static OverclockViewModel Empty() =>
         Create(new OverclockReadOnlyRegistry(), []);
+
+    /// <summary>
+    /// Stands in for the game source. It exists because the real one walks the process
+    /// list and reads the service registry, and a test that lets it do that is testing
+    /// the machine instead of the page.
+    /// </summary>
+    private sealed class HarnessGameSource : IGameOverclockSource
+    {
+        public bool ScanSucceeded { get; init; } = true;
+
+        public IReadOnlyList<GameOverclockEntry> Entries { get; init; } = [];
+
+        public ValueTask<GameOverclockSnapshot> ReadAsync(CancellationToken ct) =>
+            new(new GameOverclockSnapshot(ScanSucceeded, [], Entries));
+    }
 
     private sealed class HarnessBootProbe : IBootHealthProbe
     {

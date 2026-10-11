@@ -192,18 +192,22 @@
             <Border Style="{StaticResource CaoCardStyle}" Margin="0,0,0,12">
                 <StackPanel>
                     <TextBlock Style="{StaticResource CaoSectionTitleStyle}" Text="04  PERFILES DE JUEGO" />
+                    <TextBlock Style="{StaticResource CaoSectionSubtitleStyle}"
+                               Text="{x:Bind ViewModel.GameSummary, Mode=OneWay}" />
                     <ItemsControl ItemsSource="{x:Bind ViewModel.Games}" Margin="0,8,0,0">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="vm:OverclockGameRow">
                                 <Grid Margin="0,0,0,6">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="200" />
+                                        <ColumnDefinition Width="180" />
+                                        <ColumnDefinition Width="*" />
                                     </Grid.ColumnDefinitions>
                                     <TextBlock Grid.Column="0" Style="{StaticResource CaoListItemTitleStyle}" Text="{x:Bind Name}" />
                                     <TextBlock Grid.Column="1" Style="{StaticResource CaoListItemDetailStyle}" Text="{x:Bind Executable}" />
                                     <TextBlock Grid.Column="2" Style="{StaticResource CaoListItemDetailStyle}" Text="{x:Bind State}" />
+                                    <TextBlock Grid.Column="3" Style="{StaticResource CaoListItemDetailStyle}" Text="{x:Bind Reason}" />
                                 </Grid>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>

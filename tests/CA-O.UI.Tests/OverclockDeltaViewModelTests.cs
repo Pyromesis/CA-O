@@ -235,8 +235,8 @@ public sealed class OverclockDeltaViewModelTests
         OverclockTestHarness.Create(
             new OverclockReadOnlyRegistry(),
             [],
-            source,
-            store ?? new InMemoryDeltaStore());
+            deltaSource: source,
+            store: store ?? new InMemoryDeltaStore());
 
     private static async Task Measure(OverclockViewModel viewModel)
     {

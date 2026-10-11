@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using CAO.Infrastructure.Overclock.Gaming;
 
 namespace CAO.Infrastructure.Gaming;
 
@@ -10,7 +11,7 @@ public sealed record DetectedGame(string Name, string ExecutableName, string Sou
 /// install roots (spec 93). Detection only informs per-game guidance; CA-O
 /// never modifies game files or anti-cheat binaries (spec 95).
 /// </summary>
-public sealed class GameDetectionProvider
+public sealed class GameDetectionProvider : IGameDetector
 {
     /// <summary>Known shipping executables → display name (§93 gaming matrix).</summary>
     private static readonly IReadOnlyDictionary<string, string> KnownExecutables =
