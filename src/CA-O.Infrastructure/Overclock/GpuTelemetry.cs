@@ -59,3 +59,9 @@ public static class NvKnobs
 
     public static readonly KnobId ClockReadout = "nvidia.gpu.clockReadout";
 }
+
+/// <summary>Catalog ids for the AMD knob set (power limit only).</summary>
+public static class AmdKnobs
+{
+    public static readonly KnobId PowerLimit = "amd.gpu.powerLimit";
+}

@@ -24,6 +24,14 @@ public sealed class OverclockDefaultCompositionTests
     }
 
     [Fact]
+    public void DefaultBackends_IncludeTheAmdAdlxBackend()
+    {
+        var backends = OverclockReadOnlyRegistry.DefaultBackends();
+
+        Assert.Contains(backends, b => b.Id == OverclockCatalog.AmdAdlxBackendId);
+    }
+
+    [Fact]
     public void DefaultBackends_IncludeGpuAndMemoryBackends()
     {
         var backends = OverclockReadOnlyRegistry.DefaultBackends();
@@ -66,7 +74,7 @@ public sealed class OverclockDefaultCompositionTests
     {
         var probe = OverclockReadOnlyRegistry.CreateDefault().ProbeAll(CancellationToken.None);
 
-        Assert.Equal(3, probe.Details.Count);
+        Assert.Equal(4, probe.Details.Count);
         Assert.All(probe.Details, d => Assert.False(string.IsNullOrWhiteSpace(d.BackendId)));
     }
 
@@ -84,6 +92,9 @@ public sealed class OverclockDefaultCompositionTests
             k => Assert.Contains(k, probe.Knobs));
         Assert.All(
             OverclockCatalog.CpuPolicyKnobs.Where(k => present.Contains(k.BackendId)),
+            k => Assert.Contains(k, probe.Knobs));
+        Assert.All(
+            OverclockCatalog.AmdGpuKnobs.Where(k => present.Contains(k.BackendId)),
             k => Assert.Contains(k, probe.Knobs));
         Assert.All(
             OverclockCatalog.MemoryKnobs.Where(k => present.Contains(k.BackendId)),

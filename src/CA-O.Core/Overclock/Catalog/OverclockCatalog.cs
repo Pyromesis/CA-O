@@ -15,6 +15,7 @@ public static class OverclockCatalog
     public const string NvapiBackendId = "nvidia-nvapi";
     public const string IntelPolicyBackendId = "intel-policy";
     public const string SmbiosMemoryBackendId = "smbios-memory";
+    public const string AmdAdlxBackendId = "amd-adlx";
 
     /// <summary>Knobs for NVIDIA GPUs, served by nvapi64.dll.</summary>
     public static IReadOnlyList<OverclockKnob> NvidiaGpuKnobs { get; } =
@@ -87,6 +88,27 @@ public static class OverclockCatalog
             "knob_nvidia_clock_readout", "knob_nvidia_clock_readout_desc", requiresReboot: false,
             presets: []),
     ];
+    /// <summary>
+    /// AMD knobs, served by amdadlx64.dll. Power limit only: ADLX reports it in
+    /// percent of TDP, which is exactly the catalog unit, so there is no anchor
+    /// to resolve and no conversion to get wrong. AMD clocks stay out on
+    /// purpose: from Navi4 up SetGPUMaxFrequency takes an offset, before that
+    /// an absolute frequency, and guessing which one a card expects is how a
+    /// number the hardware never meant gets written.
+    /// </summary>
+    public static IReadOnlyList<OverclockKnob> AmdGpuKnobs { get; } =
+    [
+        Build(new KnobId("amd.gpu.powerLimit"), OverclockComponent.Gpu,
+            KnobRange.Scalar(0, 100), 1, KnobUnit.Percent, RiskLevel.Moderate, EvidenceLevel.Vendor,
+            "knob_amd_power_limit", "knob_amd_power_limit_desc", requiresReboot: false,
+            presets:
+            [
+                (OverclockProfile.Conservative, 100),
+                (OverclockProfile.Balanced, 110),
+                (OverclockProfile.Performance, 120),
+            ],
+            backendId: AmdAdlxBackendId),
+    ];
 
     /// <summary>
     /// CPU policy knobs. These are Windows power-plan settings, not clock
@@ -145,14 +167,15 @@ public static class OverclockCatalog
         string descriptionKey,
         bool requiresReboot,
         (OverclockProfile Profile, KnobValue Value)[] presets,
-        IReadOnlyList<KnobDependency>? dependsOn = null)
+        IReadOnlyList<KnobDependency>? dependsOn = null,
+        string? backendId = null)
     {
-        string backendId = component switch
+        string resolvedBackendId = backendId ?? (component switch
         {
             OverclockComponent.Gpu => NvapiBackendId,
             OverclockComponent.Cpu => IntelPolicyBackendId,
             _ => SmbiosMemoryBackendId,
-        };
+        });
 
         return new OverclockKnob(
             id,
@@ -167,7 +190,7 @@ public static class OverclockCatalog
             descriptionKey,
             requiresReboot,
             KnobScope.Session,
-            backendId,
+            resolvedBackendId,
             presets.Select(p => new KnobPreset(p.Profile, p.Value, $"preset_{p.Profile.ToString().ToLowerInvariant()}")).ToArray(),
             dependsOn ?? []);
     }
