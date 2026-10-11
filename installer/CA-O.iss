@@ -3,7 +3,7 @@
 ; (lee la versión de BuildConstants.cs y firma con CAO_SIGN_THUMBPRINT si existe)
 
 #ifndef AppVersion
-  #define AppVersion "2.2.5"
+  #define AppVersion "2.2.6"
 #endif
 #ifndef RepoRoot
   #define RepoRoot ".."

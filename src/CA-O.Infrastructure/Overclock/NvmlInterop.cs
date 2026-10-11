@@ -53,10 +53,10 @@ public sealed record NvidiaTuningDevice(
 /// The NVIDIA WRITE surface, behind an interface so the backend can be tested
 /// without a GPU (design 6.15). <see cref="NvmlTuningApi"/> is the real one.
 ///
-/// Reads deliberately stay on NVAPI in <see cref="NvInterop"/>: that path is
-/// already proven and green, and splitting reads across two DLLs for no reason
-/// is how interop layers rot. Only the setters - which have no public NVAPI
-/// equivalent - come from NVML.
+/// Reads and writes both go through NVML: its signatures are documented in
+/// the public header and its export list was verified on real driver binaries,
+/// while the old hand-written layer guessed both. One interop layer means one
+/// place where the native boundary can be wrong.
 /// </summary>
 public interface INvidiaTuningApi
 {
@@ -132,7 +132,7 @@ public sealed class NvmlTuningApi : INvidiaTuningApi
     /// <inheritdoc />
     public int? ReadPowerLimitMilliwatts() =>
         NvmlInterop.TryInitialize()
-        && NvmlInterop.TryResolveHandle(out uint handle)
+        && NvmlInterop.TryResolveHandle(out IntPtr handle)
         && NvmlInterop.TryGetPowerLimit(handle, out uint milliwatts)
             ? checked((int)milliwatts)
             : null;
@@ -157,7 +157,7 @@ public sealed class NvmlTuningApi : INvidiaTuningApi
 
     private static int? ReadOffset(NvidiaClockDomain domain)
     {
-        if (!NvmlInterop.TryInitialize() || !NvmlInterop.TryResolveHandle(out uint handle))
+        if (!NvmlInterop.TryInitialize() || !NvmlInterop.TryResolveHandle(out IntPtr handle))
         {
             return null;
         }
@@ -172,9 +172,9 @@ public sealed class NvmlTuningApi : INvidiaTuningApi
     /// rather than thrown: the DLL loaded, but the installed driver predates
     /// this setter, which is demonstrable rather than a guess.
     /// </summary>
-    private static int Guarded(Func<uint, int> call)
+    private static int Guarded(Func<IntPtr, int> call)
     {
-        if (!NvmlInterop.TryInitialize() || !NvmlInterop.TryResolveHandle(out uint handle))
+        if (!NvmlInterop.TryInitialize() || !NvmlInterop.TryResolveHandle(out IntPtr handle))
         {
             return NvmlInterop.ErrorFunctionNotFound;
         }
@@ -199,7 +199,7 @@ public sealed class NvmlTuningApi : INvidiaTuningApi
 
     private static NvidiaTuningDevice? ReadDevice()
     {
-        if (!NvmlInterop.TryInitialize() || !NvmlInterop.TryResolveHandle(out uint handle))
+        if (!NvmlInterop.TryInitialize() || !NvmlInterop.TryResolveHandle(out IntPtr handle))
         {
             return null;
         }
@@ -229,7 +229,7 @@ public sealed class NvmlTuningApi : INvidiaTuningApi
             OffsetBound(handle, NvidiaClockDomain.Memory, lowest: false));
     }
 
-    private static int? OffsetBound(uint handle, NvidiaClockDomain domain, bool lowest) =>
+    private static int? OffsetBound(IntPtr handle, NvidiaClockDomain domain, bool lowest) =>
         NvmlInterop.TryGetClockOffset(handle, domain, out _, out int min, out int max)
             ? checked((int)(lowest ? min : max))
             : null;
@@ -275,7 +275,7 @@ internal static class NvmlInterop
     private static bool _attempted;
     private static bool _initialized;
     private static bool _handleResolved;
-    private static uint _handle;
+    private static IntPtr _handle;
     private static string? _failureKey;
 
     /// <summary>Localization key explaining why NVML is unusable, or null when it works.</summary>
@@ -323,22 +323,23 @@ internal static class NvmlInterop
     }
 
     /// <summary>
-    /// The primary adapter, as an opaque handle value. CA-O reads and writes the
-    /// first device only: multi-GPU systems report every card separately rather
-    /// than pretending one profile fits all (same rule as the read path).
+    /// The primary adapter, as an opaque handle value. CA-O tunes the first
+    /// device only: multi-GPU systems report every card separately rather than
+    /// pretending one profile fits all. Only success is cached, so a transient
+    /// driver hiccup retries on the next call instead of disabling the GPU
+    /// section for the rest of the session.
     /// </summary>
-    public static bool TryResolveHandle(out uint handle)
+    public static bool TryResolveHandle(out IntPtr handle)
     {
         lock (Gate)
         {
             if (_handleResolved)
             {
                 handle = _handle;
-                return _handle != 0;
+                return _handle != IntPtr.Zero;
             }
 
-            _handleResolved = true;
-            handle = 0;
+            handle = IntPtr.Zero;
 
             try
             {
@@ -354,8 +355,9 @@ internal static class NvmlInterop
                     return false;
                 }
 
-                _handle = unchecked((uint)device.ToInt64());
+                _handle = device;
                 handle = _handle;
+                _handleResolved = true;
                 return true;
             }
             catch (DllNotFoundException)
@@ -423,19 +425,164 @@ internal static class NvmlInterop
         }
     }
 
-    /// <summary>Power limit bounds the hardware accepts, in milliwatts.</summary>
-    public static bool TryGetPowerLimitConstraints(uint handle, out uint minMilliwatts, out uint maxMilliwatts)
+    /// <summary>Number of NVIDIA GPUs visible to the driver.</summary>
+    public static bool TryGetDeviceCount(out uint devices)
     {
-        minMilliwatts = 0;
-        maxMilliwatts = 0;
-        if (!TryInitialize() || handle == 0)
+        devices = 0;
+        if (!TryInitialize())
         {
             return false;
         }
 
         try
         {
-            return NvmlDeviceGetPowerManagementLimitConstraints(Ptr(handle), out minMilliwatts, out maxMilliwatts) == Success;
+            return NvmlDeviceGetCount(out devices) == Success;
+        }
+        catch (DllNotFoundException)
+        {
+            return false;
+        }
+        catch (EntryPointNotFoundException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>Current clock of one domain in MHz.</summary>
+    public static bool TryGetClockInfo(IntPtr handle, NvidiaClockDomain domain, out uint megahertz)
+    {
+        megahertz = 0;
+        if (!TryInitialize() || handle == IntPtr.Zero)
+        {
+            return false;
+        }
+
+        try
+        {
+            return NvmlDeviceGetClockInfo(handle, (uint)domain, out megahertz) == Success;
+        }
+        catch (DllNotFoundException)
+        {
+            return false;
+        }
+        catch (EntryPointNotFoundException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>Maximum clock of one domain in MHz.</summary>
+    public static bool TryGetMaxClockInfo(IntPtr handle, NvidiaClockDomain domain, out uint megahertz)
+    {
+        megahertz = 0;
+        if (!TryInitialize() || handle == IntPtr.Zero)
+        {
+            return false;
+        }
+
+        try
+        {
+            return NvmlDeviceGetMaxClockInfo(handle, (uint)domain, out megahertz) == Success;
+        }
+        catch (DllNotFoundException)
+        {
+            return false;
+        }
+        catch (EntryPointNotFoundException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>Fan duty cycle in percent. Not every board exposes a tachometer.</summary>
+    public static bool TryGetFanSpeed(IntPtr handle, out uint percent)
+    {
+        percent = 0;
+        if (!TryInitialize() || handle == IntPtr.Zero)
+        {
+            return false;
+        }
+
+        try
+        {
+            return NvmlDeviceGetFanSpeed(handle, out percent) == Success;
+        }
+        catch (DllNotFoundException)
+        {
+            return false;
+        }
+        catch (EntryPointNotFoundException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>Device marketing name. NVML only exposes the per-device one.</summary>
+    public static bool TryGetDeviceName(IntPtr handle, out string name)
+    {
+        name = string.Empty;
+        if (!TryInitialize() || handle == IntPtr.Zero)
+        {
+            return false;
+        }
+
+        IntPtr buffer = IntPtr.Zero;
+        try
+        {
+            const int Capacity = 64;
+            buffer = Marshal.AllocHGlobal(Capacity);
+            for (int i = 0; i < Capacity; i++)
+            {
+                Marshal.WriteByte(buffer, i, 0);
+            }
+
+            if (NvmlDeviceGetName(handle, buffer, Capacity) != Success)
+            {
+                return false;
+            }
+
+            var bytes = new byte[Capacity];
+            Marshal.Copy(buffer, bytes, 0, Capacity);
+            int length = Array.IndexOf(bytes, (byte)0);
+            if (length < 0)
+            {
+                length = Capacity;
+            }
+
+            name = Encoding.ASCII.GetString(bytes, 0, length).Trim();
+            return name.Length > 0;
+        }
+        catch (DllNotFoundException)
+        {
+            return false;
+        }
+        catch (EntryPointNotFoundException)
+        {
+            return false;
+        }
+        finally
+        {
+            if (buffer != IntPtr.Zero)
+            {
+                Marshal.FreeHGlobal(buffer);
+            }
+        }
+    }
+
+
+    /// <summary>Power limit bounds the hardware accepts, in milliwatts.</summary>
+    public static bool TryGetPowerLimitConstraints(IntPtr handle, out uint minMilliwatts, out uint maxMilliwatts)
+    {
+        minMilliwatts = 0;
+        maxMilliwatts = 0;
+        if (!TryInitialize() || handle == IntPtr.Zero)
+        {
+            return false;
+        }
+
+        try
+        {
+            return NvmlDeviceGetPowerManagementLimitConstraints(handle, out minMilliwatts, out maxMilliwatts) == Success;
         }
         catch (DllNotFoundException)
         {
@@ -448,17 +595,17 @@ internal static class NvmlInterop
     }
 
     /// <summary>Power limit the driver currently enforces, in milliwatts.</summary>
-    public static bool TryGetPowerLimit(uint handle, out uint milliwatts)
+    public static bool TryGetPowerLimit(IntPtr handle, out uint milliwatts)
     {
         milliwatts = 0;
-        if (!TryInitialize() || handle == 0)
+        if (!TryInitialize() || handle == IntPtr.Zero)
         {
             return false;
         }
 
         try
         {
-            return NvmlDeviceGetPowerManagementLimit(Ptr(handle), out milliwatts) == Success;
+            return NvmlDeviceGetPowerManagementLimit(handle, out milliwatts) == Success;
         }
         catch (DllNotFoundException)
         {
@@ -471,17 +618,17 @@ internal static class NvmlInterop
     }
 
     /// <summary>Factory power limit, in milliwatts.</summary>
-    public static bool TryGetDefaultPowerLimit(uint handle, out uint milliwatts)
+    public static bool TryGetDefaultPowerLimit(IntPtr handle, out uint milliwatts)
     {
         milliwatts = 0;
-        if (!TryInitialize() || handle == 0)
+        if (!TryInitialize() || handle == IntPtr.Zero)
         {
             return false;
         }
 
         try
         {
-            return NvmlDeviceGetPowerManagementDefaultLimit(Ptr(handle), out milliwatts) == Success;
+            return NvmlDeviceGetPowerManagementDefaultLimit(handle, out milliwatts) == Success;
         }
         catch (DllNotFoundException)
         {
@@ -494,17 +641,17 @@ internal static class NvmlInterop
     }
 
     /// <summary>Ceiling the hardware/DVFS actually enforces, in milliwatts.</summary>
-    public static bool TryGetEnforcedPowerLimit(uint handle, out uint milliwatts)
+    public static bool TryGetEnforcedPowerLimit(IntPtr handle, out uint milliwatts)
     {
         milliwatts = 0;
-        if (!TryInitialize() || handle == 0)
+        if (!TryInitialize() || handle == IntPtr.Zero)
         {
             return false;
         }
 
         try
         {
-            return NvmlDeviceGetEnforcedPowerLimit(Ptr(handle), out milliwatts) == Success;
+            return NvmlDeviceGetEnforcedPowerLimit(handle, out milliwatts) == Success;
         }
         catch (DllNotFoundException)
         {
@@ -520,12 +667,12 @@ internal static class NvmlInterop
     /// Reads a clock offset plus the range the driver permits for it. The getter
     /// takes the v2 struct because only that one carries the bounds.
     /// </summary>
-    public static bool TryGetClockOffset(uint handle, NvidiaClockDomain domain, out int offsetMegahertz, out int minMegahertz, out int maxMegahertz)
+    public static bool TryGetClockOffset(IntPtr handle, NvidiaClockDomain domain, out int offsetMegahertz, out int minMegahertz, out int maxMegahertz)
     {
         offsetMegahertz = 0;
         minMegahertz = 0;
         maxMegahertz = 0;
-        if (!TryInitialize() || handle == 0)
+        if (!TryInitialize() || handle == IntPtr.Zero)
         {
             return false;
         }
@@ -539,7 +686,7 @@ internal static class NvmlInterop
                 Pstate = BoostPstate,
             };
 
-            if (NvmlDeviceGetClockOffsets(Ptr(handle), ref request) != Success)
+            if (NvmlDeviceGetClockOffsets(handle, ref request) != Success)
             {
                 return false;
             }
@@ -560,16 +707,16 @@ internal static class NvmlInterop
     }
 
     /// <summary>Writes the power limit and returns the raw NVML status.</summary>
-    public static int SetPowerLimit(uint handle, uint milliwatts)
+    public static int SetPowerLimit(IntPtr handle, uint milliwatts)
     {
-        if (!TryInitialize() || handle == 0)
+        if (!TryInitialize() || handle == IntPtr.Zero)
         {
             return ErrorNotSupported;
         }
 
         try
         {
-            return NvmlDeviceSetPowerManagementLimit(Ptr(handle), milliwatts);
+            return NvmlDeviceSetPowerManagementLimit(handle, milliwatts);
         }
         catch (DllNotFoundException)
         {
@@ -586,9 +733,9 @@ internal static class NvmlInterop
     /// the v1 struct: the driver rejects a version word that does not match the
     /// struct it is handed, answering INVALID_ARGUMENT when it does not.
     /// </summary>
-    public static int SetClockOffset(uint handle, NvidiaClockDomain domain, int megahertz)
+    public static int SetClockOffset(IntPtr handle, NvidiaClockDomain domain, int megahertz)
     {
-        if (!TryInitialize() || handle == 0)
+        if (!TryInitialize() || handle == IntPtr.Zero)
         {
             return ErrorNotSupported;
         }
@@ -603,7 +750,7 @@ internal static class NvmlInterop
                 ClockOffsetMHz = megahertz,
             };
 
-            return NvmlDeviceSetClockOffsets(Ptr(handle), ref request);
+            return NvmlDeviceSetClockOffsets(handle, ref request);
         }
         catch (DllNotFoundException)
         {
@@ -629,7 +776,7 @@ internal static class NvmlInterop
         _ => NvidiaTuningWriteOutcome.Rejected,
     };
 
-    private static IntPtr Ptr(uint handle) => new((long)handle);
+
 
     /// <summary>
     /// <c>nvmlClockOffset_t</c>. The setter fills the first four fields; the
@@ -637,7 +784,7 @@ internal static class NvmlInterop
     /// all-primitive, so it marshals as plain memory.
     /// </summary>
     [StructLayout(LayoutKind.Sequential)]
-    private struct NvmlClockOffset
+    internal struct NvmlClockOffset
     {
         public uint Version;
         public uint Type;
@@ -649,9 +796,6 @@ internal static class NvmlInterop
 
     [DllImport(DllName, EntryPoint = "nvmlInit_v2", CallingConvention = CallingConvention.StdCall)]
     private static extern int NvmlInit();
-
-    [DllImport(DllName, EntryPoint = "nvmlDeviceGetCount_v2", CallingConvention = CallingConvention.StdCall)]
-    private static extern int NvmlDeviceGetCount(out uint count);
 
     [DllImport(DllName, EntryPoint = "nvmlDeviceGetHandleByIndex_v2", CallingConvention = CallingConvention.StdCall)]
     private static extern int NvmlDeviceGetHandleByIndex(uint index, out IntPtr device);
@@ -679,4 +823,19 @@ internal static class NvmlInterop
 
     [DllImport(DllName, EntryPoint = "nvmlDeviceSetClockOffsets", CallingConvention = CallingConvention.StdCall)]
     private static extern int NvmlDeviceSetClockOffsets(IntPtr device, ref NvmlClockOffset clockOffset);
+
+    [DllImport(DllName, EntryPoint = "nvmlDeviceGetCount_v2", CallingConvention = CallingConvention.StdCall)]
+    private static extern int NvmlDeviceGetCount(out uint count);
+
+    [DllImport(DllName, EntryPoint = "nvmlDeviceGetClockInfo", CallingConvention = CallingConvention.StdCall)]
+    private static extern int NvmlDeviceGetClockInfo(IntPtr device, uint clockType, out uint megahertz);
+
+    [DllImport(DllName, EntryPoint = "nvmlDeviceGetMaxClockInfo", CallingConvention = CallingConvention.StdCall)]
+    private static extern int NvmlDeviceGetMaxClockInfo(IntPtr device, uint clockType, out uint megahertz);
+
+    [DllImport(DllName, EntryPoint = "nvmlDeviceGetFanSpeed", CallingConvention = CallingConvention.StdCall)]
+    private static extern int NvmlDeviceGetFanSpeed(IntPtr device, out uint percent);
+
+    [DllImport(DllName, EntryPoint = "nvmlDeviceGetName", CallingConvention = CallingConvention.StdCall)]
+    private static extern int NvmlDeviceGetName(IntPtr device, IntPtr name, uint length);
 }

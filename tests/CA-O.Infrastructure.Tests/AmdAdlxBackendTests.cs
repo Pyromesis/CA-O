@@ -87,7 +87,7 @@ public sealed class AmdAdlxBackendTests
 
         Assert.False(result.Success);
         Assert.False(result.DriverBlocked);
-        Assert.Equal(NvidiaNvapiBackend.VerifyFailedReasonKey, result.FailureReasonKey);
+        Assert.Equal(NvidiaGpuBackend.VerifyFailedReasonKey, result.FailureReasonKey);
     }
 
     [Fact]
@@ -145,7 +145,7 @@ public sealed class AmdAdlxBackendTests
 
         Assert.False(result.Success);
         Assert.False(result.DriverBlocked);
-        Assert.Equal(NvidiaNvapiBackend.RejectedReasonKey, result.FailureReasonKey);
+        Assert.Equal(NvidiaGpuBackend.RejectedReasonKey, result.FailureReasonKey);
     }
 
     [Fact]
@@ -189,8 +189,8 @@ public sealed class AmdAdlxBackendTests
         // AMD clocks stay out on purpose: from Navi4 up the setter takes an
         // offset, before that an absolute frequency, and this module refuses to
         // guess which one a card expects.
-        Assert.Equal(NvidiaNvapiBackend.NoPublicSetterReasonKey, written.FailureReasonKey);
-        Assert.Equal(NvidiaNvapiBackend.NoPublicSetterReasonKey, read.FailureReasonKey);
+        Assert.Equal(NvidiaGpuBackend.NoPublicSetterReasonKey, written.FailureReasonKey);
+        Assert.Equal(NvidiaGpuBackend.NoPublicSetterReasonKey, read.FailureReasonKey);
     }
 
     [Fact]
@@ -226,7 +226,7 @@ public sealed class AmdAdlxBackendTests
         Assert.False(backend.CanWrite(new KnobId("amd.gpu.coreClockOffset")));
         Assert.Null(backend.BlockReasonKey(AmdKnobs.PowerLimit));
         Assert.Equal(
-            NvidiaNvapiBackend.NoPublicSetterReasonKey,
+            NvidiaGpuBackend.NoPublicSetterReasonKey,
             backend.BlockReasonKey(new KnobId("amd.gpu.coreClockOffset")));
     }
 

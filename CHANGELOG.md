@@ -4,6 +4,14 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
 ## [Unreleased]
 
+## [2.2.6] - 2026-10-11
+
+### Corregido
+- **Abrir Overclock crasheaba la app instalada (0xc0000005 durante el sondeo).** Dos defectos en el interop de GPU: las firmas NVAPI de `NvInterop.cs` estaban inventadas (handle de 4 bytes donde el driver escribe un struct de 64) y `NvmlInterop` truncaba el puntero del dispositivo a 32 bits, que en x64 apunta a memoria no mapeada. Borrados `NvInterop.cs` y `NvidiaNvapiBackend.cs`; nuevo `NvidiaGpuBackend.cs` solo-NVML con handle `IntPtr` de extremo a extremo (Id `nvidia-nvapi` sin cambios). Regresion cubierta por `NvmlInteropSafetyTests` (tamanos de struct, guard sin tokens NVAPI, probe real en hardware).
+
+### Probado
+- Suite completa: **1699 passed, 0 failed** en Release (2.2.5: 1695; +4 tests de seguridad del interop NVML). Probe real ejecutado en RTX 4060 Ti sin AV, dos verdes consecutivos.
+
 ## [2.2.5] - 2026-10-11
 
 ### Corregido

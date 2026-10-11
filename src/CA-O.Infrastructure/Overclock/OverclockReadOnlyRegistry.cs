@@ -46,7 +46,7 @@ public sealed class OverclockReadOnlyRegistry : IOverclockBackendRegistry
         new IntelPolicyBackend(
             new CAO.Infrastructure.Windows.Execution.SystemCommandGateway(),
             new SystemXtuProbe(new CAO.Infrastructure.Windows.SystemRegistry.RegistryAccessor())),
-        new NvidiaNvapiBackend(),
+        new NvidiaGpuBackend(),
         new AmdAdlxBackend(),
         new SmbiosMemoryBackend(),
     ];

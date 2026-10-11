@@ -38,12 +38,12 @@ public sealed class NvidiaGpuWriteTests
     {
         FakeTuningApi tuning = FakeTuningApi.Valid();
         tuning.CoreWriteSticks = false;
-        NvidiaNvapiBackend backend = new(tuning);
+        NvidiaGpuBackend backend = new(tuning);
 
         KnobWriteResult result = await backend.WriteAsync(CoreOffset, 60_000_000d, CancellationToken.None);
 
         Assert.False(result.Success);
-        Assert.Equal(NvidiaNvapiBackend.VerifyFailedReasonKey, result.FailureReasonKey);
+        Assert.Equal(NvidiaGpuBackend.VerifyFailedReasonKey, result.FailureReasonKey);
     }
 
     [Fact]
@@ -51,7 +51,7 @@ public sealed class NvidiaGpuWriteTests
     {
         FakeTuningApi tuning = FakeTuningApi.Valid();
         tuning.CoreWriteSticks = false;
-        NvidiaNvapiBackend backend = new(tuning);
+        NvidiaGpuBackend backend = new(tuning);
 
         KnobWriteResult result = await backend.WriteAsync(CoreOffset, 60_000_000d, CancellationToken.None);
 
@@ -70,7 +70,7 @@ public sealed class NvidiaGpuWriteTests
     {
         FakeTuningApi tuning = FakeTuningApi.Valid();
         tuning.CoreWriteStatus = status;
-        NvidiaNvapiBackend backend = new(tuning);
+        NvidiaGpuBackend backend = new(tuning);
 
         KnobWriteResult result = await backend.WriteAsync(CoreOffset, 60_000_000d, CancellationToken.None);
 
@@ -83,13 +83,13 @@ public sealed class NvidiaGpuWriteTests
     {
         FakeTuningApi tuning = FakeTuningApi.Valid();
         tuning.PowerWriteStatus = NoPermission;
-        NvidiaNvapiBackend backend = new(tuning);
+        NvidiaGpuBackend backend = new(tuning);
 
         KnobWriteResult result = await backend.WriteAsync(PowerLimit, 110d, CancellationToken.None);
 
         Assert.False(result.Success);
         Assert.False(result.DriverBlocked);
-        Assert.Equal(NvidiaNvapiBackend.NoPermissionReasonKey, result.FailureReasonKey);
+        Assert.Equal(NvidiaGpuBackend.NoPermissionReasonKey, result.FailureReasonKey);
     }
 
     [Fact]
@@ -97,13 +97,13 @@ public sealed class NvidiaGpuWriteTests
     {
         FakeTuningApi tuning = FakeTuningApi.Valid();
         tuning.MemoryWriteStatus = UnknownFailure;
-        NvidiaNvapiBackend backend = new(tuning);
+        NvidiaGpuBackend backend = new(tuning);
 
         KnobWriteResult result = await backend.WriteAsync(MemoryOffset, 250_000_000d, CancellationToken.None);
 
         Assert.False(result.Success);
         Assert.False(result.DriverBlocked);
-        Assert.Equal(NvidiaNvapiBackend.RejectedReasonKey, result.FailureReasonKey);
+        Assert.Equal(NvidiaGpuBackend.RejectedReasonKey, result.FailureReasonKey);
     }
 
     [Fact]
@@ -112,7 +112,7 @@ public sealed class NvidiaGpuWriteTests
         FakeTuningApi tuning = FakeTuningApi.Valid();
         tuning.IsAvailable = false;
         tuning.UnavailableReasonKey = "overclock-nvml-missing";
-        NvidiaNvapiBackend backend = new(tuning);
+        NvidiaGpuBackend backend = new(tuning);
 
         KnobWriteResult result = await backend.WriteAsync(CoreOffset, 60_000_000d, CancellationToken.None);
 
@@ -128,7 +128,7 @@ public sealed class NvidiaGpuWriteTests
     {
         FakeTuningApi tuning = FakeTuningApi.Valid();
         tuning.Device = tuning.Device! with { CoreOffsetMaxMegahertz = 300 };
-        NvidiaNvapiBackend backend = new(tuning);
+        NvidiaGpuBackend backend = new(tuning);
 
         // 900 MHz asked for, the driver allows 300.
         KnobWriteResult result = await backend.WriteAsync(CoreOffset, 900_000_000d, CancellationToken.None);
@@ -143,7 +143,7 @@ public sealed class NvidiaGpuWriteTests
     {
         FakeTuningApi tuning = FakeTuningApi.Valid();
         tuning.Device = tuning.Device! with { CoreOffsetMinMegahertz = -50 };
-        NvidiaNvapiBackend backend = new(tuning);
+        NvidiaGpuBackend backend = new(tuning);
 
         KnobWriteResult result = await backend.WriteAsync(CoreOffset, -400_000_000d, CancellationToken.None);
 
@@ -160,12 +160,12 @@ public sealed class NvidiaGpuWriteTests
             CoreOffsetMinMegahertz = null,
             CoreOffsetMaxMegahertz = null,
         };
-        NvidiaNvapiBackend backend = new(tuning);
+        NvidiaGpuBackend backend = new(tuning);
 
         KnobWriteResult result = await backend.WriteAsync(CoreOffset, 60_000_000d, CancellationToken.None);
 
         Assert.False(result.Success);
-        Assert.Equal(NvidiaNvapiBackend.OffsetBoundsUnavailableReasonKey, result.FailureReasonKey);
+        Assert.Equal(NvidiaGpuBackend.OffsetBoundsUnavailableReasonKey, result.FailureReasonKey);
         Assert.Empty(tuning.Writes);
     }
 
@@ -178,12 +178,12 @@ public sealed class NvidiaGpuWriteTests
             DefaultPowerLimitMilliwatts = null,
             MinPowerLimitMilliwatts = null,
         };
-        NvidiaNvapiBackend backend = new(tuning);
+        NvidiaGpuBackend backend = new(tuning);
 
         KnobWriteResult result = await backend.WriteAsync(PowerLimit, 110d, CancellationToken.None);
 
         Assert.False(result.Success);
-        Assert.Equal(NvidiaNvapiBackend.PowerAnchorUnavailableReasonKey, result.FailureReasonKey);
+        Assert.Equal(NvidiaGpuBackend.PowerAnchorUnavailableReasonKey, result.FailureReasonKey);
         Assert.Empty(tuning.Writes);
     }
 
@@ -192,7 +192,7 @@ public sealed class NvidiaGpuWriteTests
     {
         FakeTuningApi tuning = FakeTuningApi.Valid();
         tuning.Device = tuning.Device! with { MaxPowerLimitMilliwatts = 450_000 };
-        NvidiaNvapiBackend backend = new(tuning);
+        NvidiaGpuBackend backend = new(tuning);
 
         // 500% of the factory limit, clamped by the driver to 450 W = 150%.
         KnobWriteResult result = await backend.WriteAsync(PowerLimit, 500d, CancellationToken.None);
@@ -207,7 +207,7 @@ public sealed class NvidiaGpuWriteTests
     {
         FakeTuningApi tuning = FakeTuningApi.Valid();
         tuning.Device = tuning.Device! with { DefaultPowerLimitMilliwatts = null, MinPowerLimitMilliwatts = 200_000 };
-        NvidiaNvapiBackend backend = new(tuning);
+        NvidiaGpuBackend backend = new(tuning);
 
         KnobWriteResult result = await backend.WriteAsync(PowerLimit, 150d, CancellationToken.None);
 
@@ -223,18 +223,18 @@ public sealed class NvidiaGpuWriteTests
     [InlineData("nvidia.gpu.clockReadout")]
     public async Task Write_RefusesKnobsWithNoPublicVendorSetter(string knobId)
     {
-        NvidiaNvapiBackend backend = new(FakeTuningApi.Valid());
+        NvidiaGpuBackend backend = new(FakeTuningApi.Valid());
 
         KnobWriteResult result = await backend.WriteAsync(knobId, 90d, CancellationToken.None);
 
         Assert.False(result.Success);
-        Assert.Equal(NvidiaNvapiBackend.NoPublicSetterReasonKey, result.FailureReasonKey);
+        Assert.Equal(NvidiaGpuBackend.NoPublicSetterReasonKey, result.FailureReasonKey);
     }
 
     [Fact]
     public async Task CanWrite_IsTrue_OnlyForTheKnobsThatHaveAPublicSetter()
     {
-        NvidiaNvapiBackend backend = new(FakeTuningApi.Valid());
+        NvidiaGpuBackend backend = new(FakeTuningApi.Valid());
 
         Assert.True(backend.CanWrite(PowerLimit));
         Assert.True(backend.CanWrite(CoreOffset));
@@ -250,7 +250,7 @@ public sealed class NvidiaGpuWriteTests
     {
         FakeTuningApi tuning = FakeTuningApi.Valid();
         tuning.Device = null;
-        NvidiaNvapiBackend backend = new(tuning);
+        NvidiaGpuBackend backend = new(tuning);
 
         Assert.False(backend.CanWrite(CoreOffset));
         Assert.Equal("overclock-nvml-device-unavailable", backend.BlockReasonKey(CoreOffset));
@@ -259,10 +259,10 @@ public sealed class NvidiaGpuWriteTests
     [Fact]
     public async Task BlockReasonKey_ExplainsWhyAKnobIsInert_InsteadOfShowingADeadControl()
     {
-        NvidiaNvapiBackend backend = new(FakeTuningApi.Valid());
+        NvidiaGpuBackend backend = new(FakeTuningApi.Valid());
 
         Assert.Null(backend.BlockReasonKey(CoreOffset));
-        Assert.Equal(NvidiaNvapiBackend.NoPublicSetterReasonKey, backend.BlockReasonKey(FanTarget));
+        Assert.Equal(NvidiaGpuBackend.NoPublicSetterReasonKey, backend.BlockReasonKey(FanTarget));
     }
 
     // --- Reading back in the catalog's unit ----------------------------------
@@ -272,7 +272,7 @@ public sealed class NvidiaGpuWriteTests
     {
         FakeTuningApi tuning = FakeTuningApi.Valid();
         tuning.CoreOffsetMegahertz = 120;
-        NvidiaNvapiBackend backend = new(tuning);
+        NvidiaGpuBackend backend = new(tuning);
 
         KnobRead read = await backend.ReadAsync(CoreOffset, CancellationToken.None);
 
@@ -285,7 +285,7 @@ public sealed class NvidiaGpuWriteTests
     {
         FakeTuningApi tuning = FakeTuningApi.Valid();
         tuning.PowerLimitMilliwatts = 330_000;
-        NvidiaNvapiBackend backend = new(tuning);
+        NvidiaGpuBackend backend = new(tuning);
 
         KnobRead read = await backend.ReadAsync(PowerLimit, CancellationToken.None);
 
@@ -298,7 +298,7 @@ public sealed class NvidiaGpuWriteTests
     {
         FakeTuningApi tuning = FakeTuningApi.Valid();
         tuning.CoreOffsetMegahertz = null;
-        NvidiaNvapiBackend backend = new(tuning);
+        NvidiaGpuBackend backend = new(tuning);
 
         KnobRead read = await backend.ReadAsync(CoreOffset, CancellationToken.None);
 
@@ -313,7 +313,7 @@ public sealed class NvidiaGpuWriteTests
     {
         FakeTuningApi tuning = FakeTuningApi.Valid();
         tuning.PowerLimitMilliwatts = 330_000;
-        NvidiaNvapiBackend backend = new(tuning);
+        NvidiaGpuBackend backend = new(tuning);
 
         UnitSnapshot snapshot = await backend.SnapshotAsync(CancellationToken.None);
 
@@ -326,7 +326,7 @@ public sealed class NvidiaGpuWriteTests
     {
         FakeTuningApi tuning = FakeTuningApi.Valid();
         tuning.PowerWriteStatus = NoPermission;
-        NvidiaNvapiBackend backend = new(tuning);
+        NvidiaGpuBackend backend = new(tuning);
 
         UnitSnapshot snapshot = Snapshot(
             new KeyValuePair<KnobId, KnobValue>(PowerLimit, KnobValue.FromScalar(300_000d)),
@@ -337,7 +337,7 @@ public sealed class NvidiaGpuWriteTests
         Assert.False(outcome.Success);
         Assert.Equal(1, outcome.RestoredCount);
         Assert.False(outcome.Verified);
-        Assert.Equal(NvidiaNvapiBackend.RestoreFailedReasonKey, outcome.FailureReasonKey);
+        Assert.Equal(NvidiaGpuBackend.RestoreFailedReasonKey, outcome.FailureReasonKey);
 
         // The core offset still went back: one bad knob must not strand the rest
         // in a half-tuned state.
@@ -349,7 +349,7 @@ public sealed class NvidiaGpuWriteTests
     {
         FakeTuningApi tuning = FakeTuningApi.Valid();
         tuning.CoreWriteSticks = false;
-        NvidiaNvapiBackend backend = new(tuning);
+        NvidiaGpuBackend backend = new(tuning);
 
         UnitSnapshot snapshot = Snapshot(
             new KeyValuePair<KnobId, KnobValue>(CoreOffset, KnobValue.FromScalar(60_000_000d)));
@@ -364,7 +364,7 @@ public sealed class NvidiaGpuWriteTests
     public async Task Restore_VerifiesOnlyWhenEveryValueWentBack()
     {
         FakeTuningApi tuning = FakeTuningApi.Valid();
-        NvidiaNvapiBackend backend = new(tuning);
+        NvidiaGpuBackend backend = new(tuning);
 
         UnitSnapshot snapshot = Snapshot(
             new KeyValuePair<KnobId, KnobValue>(PowerLimit, KnobValue.FromScalar(300_000d)),
@@ -381,7 +381,7 @@ public sealed class NvidiaGpuWriteTests
     [Fact]
     public async Task Restore_OfAnEmptySnapshot_ChangesNothingAndClaimsSo()
     {
-        NvidiaNvapiBackend backend = new(FakeTuningApi.Valid());
+        NvidiaGpuBackend backend = new(FakeTuningApi.Valid());
 
         UnitSnapshot snapshot = Snapshot();
         RestoreOutcome outcome = await backend.RestoreAsync(snapshot, CancellationToken.None);
@@ -396,7 +396,7 @@ public sealed class NvidiaGpuWriteTests
     public async Task Read_ShowsTheCeilingTheDriverEnforces_SoTheProfileCannotPromiseMore()
     {
         FakeTuningApi tuning = FakeTuningApi.Valid();
-        NvidiaNvapiBackend backend = new(tuning);
+        NvidiaGpuBackend backend = new(tuning);
 
         KnobWriteResult result = await backend.WriteAsync(CoreOffset, 60_000_000d, CancellationToken.None);
 

@@ -5,22 +5,25 @@ using CAO.Shared;
 namespace CAO.Infrastructure.Overclock;
 
 /// <summary>
-/// NVIDIA backend: reads on NVAPI, writes on NVML.
+/// NVIDIA backend, entirely on NVML.
 ///
-/// Why two libraries: NVIDIA's open-source <c>nvapi.h</c> ships the lite
-/// profile, which contains no overclocking entry point at all, so the setters
-/// are only reachable through NVML. The read path stayed on NVAPI because it is
-/// already proven and green; splitting reads across two DLLs for no reason is
-/// how interop layers rot (design 6.4, 6.18).
+/// History this file must not repeat: reads used to go through NVAPI with
+/// hand-written signatures (a 32-bit handle where the driver writes a 64-byte
+/// struct), and the write path squeezed the NVML device pointer through a
+/// 32-bit integer. Both corrupt memory on x64; the second one crashed the
+/// installed 2.2.5 with 0xc0000005 mid-probe. NVML exposes every read CA-O
+/// needs (count, handle, name, clocks, fan, power, driver) with documented
+/// signatures, so the old layer is gone and the device pointer stays a
+/// pointer from the driver to every call.
 ///
-/// Anti-cheat posture: two P/Invokes into the vendor's own signed DLLs, shipped
-/// by the driver, invoked when present and never redistributed. No kernel
-/// component, no overlay, no injection, no game directory (design 6.14).
+/// Anti-cheat posture is unchanged: one P/Invoke into the vendor's own signed
+/// DLL, shipped by the driver, invoked when present and never redistributed.
+/// No kernel component, no overlay, no injection, no game directory.
 ///
 /// Units: the catalog speaks Hertz and percent; NVML speaks MHz and milliwatts.
 /// Every crossing of that boundary happens in this file, once, explicitly.
 /// </summary>
-public sealed class NvidiaNvapiBackend : IOverclockBackend, IOverclockDetailSource, IOverclockWriteGate
+public sealed class NvidiaGpuBackend : IOverclockBackend, IOverclockDetailSource, IOverclockWriteGate
 {
     /// <summary>Reason surfaced when the caller asked for the single NVIDIA device and there is not exactly one.</summary>
     public const string NoSingleDeviceReasonKey = "overclock-gpu-no-single-device";
@@ -51,23 +54,22 @@ public sealed class NvidiaNvapiBackend : IOverclockBackend, IOverclockDetailSour
 
     private readonly INvidiaTuningApi _tuning;
     private readonly object _gate = new();
-    private uint _handle;
-    private bool _handleResolved;
     private string? _driverVersion;
     private int? _lastWriteStatus;
 
-    /// <summary>Production instance: the real NVML-backed write surface.</summary>
-    public NvidiaNvapiBackend()
+    /// <summary>Production instance: the real NVML-backed surface for reads and writes.</summary>
+    public NvidiaGpuBackend()
         : this(NvmlTuningApi.Instance)
     {
     }
 
     /// <summary>Test seam: injects the write surface so the backend can be exercised without a GPU.</summary>
-    internal NvidiaNvapiBackend(INvidiaTuningApi tuning)
+    internal NvidiaGpuBackend(INvidiaTuningApi tuning)
     {
         _tuning = tuning;
     }
 
+    // Wire-stable id: checkpoints on disk already reference "nvidia-nvapi".
     public string Id => OverclockCatalog.NvapiBackendId;
 
     /// <summary>
@@ -77,14 +79,21 @@ public sealed class NvidiaNvapiBackend : IOverclockBackend, IOverclockDetailSour
     /// </summary>
     public OverclockCapabilities Probe(CancellationToken ct)
     {
-        if (!NvInterop.TryInitialize())
+        if (!NvmlInterop.TryInitialize())
         {
-            return Unavailable(NvInterop.FailureKey ?? "overclock-nvapi-missing", null, null);
+            return Unavailable(NvmlInterop.FailureKey ?? "overclock-nvml-missing", null, null);
         }
 
-        if (!NvInterop.TryGetDeviceCount(out uint devices) || devices == 0)
+        if (!NvmlInterop.TryGetDeviceCount(out uint devices) || devices == 0)
         {
             return Unavailable("overclock-gpu-none-detected", null, null);
+        }
+
+        // CA-O tunes the primary adapter only. Reporting Available on a
+        // multi-GPU box would offer a profile that fits no single card.
+        if (devices != 1)
+        {
+            return Unavailable(NoSingleDeviceReasonKey, null, null);
         }
 
         string? driverVersion = ResolveDriverVersion();
@@ -117,17 +126,17 @@ public sealed class NvidiaNvapiBackend : IOverclockBackend, IOverclockDetailSour
     {
         if (id == NvKnobs.ClockReadout)
         {
-            if (!TryResolveHandle(out uint handle))
+            if (!NvmlInterop.TryResolveHandle(out IntPtr handle))
             {
                 return ValueTask.FromResult(KnobRead.Fail(NoSingleDeviceReasonKey));
             }
 
-            if (!NvInterop.TryGetClock(handle, NvInterop.ClockCurrent, out uint megahertz))
+            if (!NvmlInterop.TryGetClockInfo(handle, NvidiaClockDomain.Graphics, out uint megahertz))
             {
                 return ValueTask.FromResult(KnobRead.Fail("overclock-gpu-clock-unavailable"));
             }
 
-            // Catalog unit is Hertz; NVAPI reports MHz.
+            // Catalog unit is Hertz; NVML reports MHz.
             return ValueTask.FromResult(KnobRead.Ok(KnobValue.FromScalar(megahertz * HertzPerMegahertz)));
         }
 
@@ -190,8 +199,8 @@ public sealed class NvidiaNvapiBackend : IOverclockBackend, IOverclockDetailSour
     {
         var values = new List<KeyValuePair<KnobId, KnobValue>>();
 
-        if (TryResolveHandle(out uint handle)
-            && NvInterop.TryGetClock(handle, NvInterop.ClockCurrent, out uint current))
+        if (NvmlInterop.TryResolveHandle(out IntPtr handle)
+            && NvmlInterop.TryGetClockInfo(handle, NvidiaClockDomain.Graphics, out uint current))
         {
             values.Add(new KeyValuePair<KnobId, KnobValue>(
                 NvKnobs.ClockReadout,
@@ -222,7 +231,7 @@ public sealed class NvidiaNvapiBackend : IOverclockBackend, IOverclockDetailSour
                 KnobValue.FromScalar(memory.Value * HertzPerMegahertz)));
         }
 
-        if (TryResolveHandle(out uint fanHandle) && NvInterop.TryGetFanSpeed(fanHandle, out uint percent))
+        if (NvmlInterop.TryResolveHandle(out IntPtr fanHandle) && NvmlInterop.TryGetFanSpeed(fanHandle, out uint percent))
         {
             values.Add(new KeyValuePair<KnobId, KnobValue>(NvKnobs.FanTarget, KnobValue.FromScalar(percent)));
         }
@@ -274,23 +283,24 @@ public sealed class NvidiaNvapiBackend : IOverclockBackend, IOverclockDetailSour
     {
         var readings = new List<OverclockReading>();
 
-        if (!NvInterop.TryInitialize())
+        if (!NvmlInterop.TryInitialize())
         {
-            string reason = NvInterop.FailureKey ?? "overclock-nvapi-missing";
+            string reason = NvmlInterop.FailureKey ?? "overclock-nvml-missing";
             readings.Add(new OverclockReading("overclock_gpu_name", string.Empty, EvidenceLevel.Empirical, reason));
             return new ValueTask<IReadOnlyList<OverclockReading>>(readings);
         }
 
-        if (!TryResolveHandle(out _))
+        if (!NvmlInterop.TryResolveHandle(out IntPtr handle))
         {
             readings.Add(new OverclockReading("overclock_gpu_name", string.Empty, EvidenceLevel.Empirical, NoSingleDeviceReasonKey));
             return new ValueTask<IReadOnlyList<OverclockReading>>(readings);
         }
 
-        readings.Add(Clock("overclock_gpu_clock_current", NvInterop.ClockCurrent, "MHz"));
-        readings.Add(Clock("overclock_gpu_clock_max", NvInterop.ClockMax, "MHz"));
-        readings.Add(Clock("overclock_gpu_clock_memory", NvInterop.ClockMemory, "MHz"));
-        readings.Add(Fan());
+        readings.Add(Name(handle));
+        readings.Add(Clock(handle, "overclock_gpu_clock_current", NvidiaClockDomain.Graphics, max: false));
+        readings.Add(Clock(handle, "overclock_gpu_clock_max", NvidiaClockDomain.Graphics, max: true));
+        readings.Add(Clock(handle, "overclock_gpu_clock_memory", NvidiaClockDomain.Memory, max: false));
+        readings.Add(Fan(handle));
         readings.Add(Power());
         readings.Add(Driver());
         readings.Add(WriteLimits());
@@ -558,22 +568,26 @@ public sealed class NvidiaNvapiBackend : IOverclockBackend, IOverclockDetailSour
     private static double ToPercent(int milliwatts, int anchorMilliwatts) =>
         Math.Round(milliwatts * 100d / anchorMilliwatts, 2, MidpointRounding.AwayFromZero);
 
-    private OverclockReading Clock(string labelKey, int clockType, string unit)
-    {
-        if (NvInterop.TryGetClock(_handle, clockType, out uint mhz))
-        {
-            return new OverclockReading(
-                labelKey,
-                FormattableString.Invariant($"{mhz} {unit}"),
-                EvidenceLevel.Vendor);
-        }
+    private static OverclockReading Name(IntPtr handle) =>
+        NvmlInterop.TryGetDeviceName(handle, out string name)
+            ? new OverclockReading("overclock_gpu_name", name, EvidenceLevel.Vendor)
+            : new OverclockReading("overclock_gpu_name", string.Empty, EvidenceLevel.Empirical, "overclock-nvml-device-unavailable");
 
-        return new OverclockReading(labelKey, string.Empty, EvidenceLevel.Empirical, "overclock-gpu-clock-unavailable");
+    private static OverclockReading Clock(IntPtr handle, string labelKey, NvidiaClockDomain domain, bool max)
+    {
+        uint mhz = 0;
+        bool ok = max
+            ? NvmlInterop.TryGetMaxClockInfo(handle, domain, out mhz)
+            : NvmlInterop.TryGetClockInfo(handle, domain, out mhz);
+
+        return ok
+            ? new OverclockReading(labelKey, FormattableString.Invariant($"{mhz} MHz"), EvidenceLevel.Vendor)
+            : new OverclockReading(labelKey, string.Empty, EvidenceLevel.Empirical, "overclock-gpu-clock-unavailable");
     }
 
-    private OverclockReading Fan()
+    private static OverclockReading Fan(IntPtr handle)
     {
-        if (NvInterop.TryGetFanSpeed(_handle, out uint percent))
+        if (NvmlInterop.TryGetFanSpeed(handle, out uint percent))
         {
             return new OverclockReading(
                 "overclock_gpu_fan",
@@ -588,15 +602,13 @@ public sealed class NvidiaNvapiBackend : IOverclockBackend, IOverclockDetailSour
 
     private OverclockReading Power()
     {
-        if (NvInterop.TryGetPowerLimit(_handle, out uint milliwatts))
-        {
-            return new OverclockReading(
+        int? milliwatts = _tuning.ReadPowerLimitMilliwatts();
+        return milliwatts is int mw
+            ? new OverclockReading(
                 "overclock_gpu_power_limit",
-                FormattableString.Invariant($"{milliwatts / 1000d} W"),
-                EvidenceLevel.Vendor);
-        }
-
-        return new OverclockReading("overclock_gpu_power_limit", string.Empty, EvidenceLevel.Empirical, "overclock-gpu-power-unavailable");
+                FormattableString.Invariant($"{mw / 1000d} W"),
+                EvidenceLevel.Vendor)
+            : new OverclockReading("overclock_gpu_power_limit", string.Empty, EvidenceLevel.Empirical, "overclock-gpu-power-unavailable");
     }
 
     private OverclockReading Driver()
@@ -643,37 +655,6 @@ public sealed class NvidiaNvapiBackend : IOverclockBackend, IOverclockDetailSour
         }
     }
 
-    private bool TryResolveHandle(out uint handle)
-    {
-        lock (_gate)
-        {
-            if (_handleResolved)
-            {
-                handle = _handle;
-                return _handle != 0;
-            }
-
-            handle = 0;
-
-            if (!NvInterop.TryGetDeviceCount(out uint devices))
-            {
-                return false;
-            }
-
-            // CA-O reads the primary adapter only. Multi-GPU systems report
-            // every card separately rather than pretending one profile fits all.
-            if (devices != 1 || !NvInterop.TryGetDeviceHandle(0, out uint resolved))
-            {
-                return false;
-            }
-
-            _handle = resolved;
-            _handleResolved = true;
-            handle = resolved;
-            return true;
-        }
-    }
-
     private string? ResolveDriverVersion()
     {
         lock (_gate)
@@ -683,24 +664,10 @@ public sealed class NvidiaNvapiBackend : IOverclockBackend, IOverclockDetailSour
                 return _driverVersion;
             }
 
-            _ = TryResolveHandle(out uint handle);
-            if (handle == 0)
-            {
-                return null;
-            }
-
-            // NVML knows the system driver version even when NVAPI cannot decode
-            // the packed token, so it is the fallback rather than a dead end.
-            if (NvInterop.TryGetDriverVersion(handle, out string version))
+            if (NvmlInterop.TryGetSystemDriverVersion(out string version))
             {
                 _driverVersion = version;
                 return version;
-            }
-
-            if (_tuning.TryDescribe(out NvidiaTuningDevice? device) && device?.DriverVersion is string fromNvml)
-            {
-                _driverVersion = fromNvml;
-                return fromNvml;
             }
 
             return null;

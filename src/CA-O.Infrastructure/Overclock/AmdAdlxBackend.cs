@@ -12,7 +12,7 @@ namespace CAO.Infrastructure.Overclock;
 /// get wrong. AMD clocks stay out on purpose: from Navi4 up
 /// <c>SetGPUMaxFrequency</c> takes an offset from base frequency, before that
 /// an absolute frequency, and this module refuses to guess which one a card
-/// expects. Knobs without a public setter report <see cref="NvidiaNvapiBackend.NoPublicSetterReasonKey"/>,
+/// expects. Knobs without a public setter report <see cref="NvidiaGpuBackend.NoPublicSetterReasonKey"/>,
 /// the same generic key the NVIDIA backend uses: one Localizer entry, one meaning.
 ///
 /// Anti-cheat posture: P/Invoke into the vendor's own signed DLL, shipped by
@@ -102,7 +102,7 @@ public sealed class AmdAdlxBackend : IOverclockBackend, IOverclockDetailSource, 
     {
         if (id != AmdKnobs.PowerLimit)
         {
-            return ValueTask.FromResult(KnobRead.Fail(NvidiaNvapiBackend.NoPublicSetterReasonKey));
+            return ValueTask.FromResult(KnobRead.Fail(NvidiaGpuBackend.NoPublicSetterReasonKey));
         }
 
         int? percent = _tuning.ReadPowerLimitPercent();
@@ -126,7 +126,7 @@ public sealed class AmdAdlxBackend : IOverclockBackend, IOverclockDetailSource, 
 
         if (id != AmdKnobs.PowerLimit)
         {
-            return ValueTask.FromResult(KnobWriteResult.Fail(NvidiaNvapiBackend.NoPublicSetterReasonKey));
+            return ValueTask.FromResult(KnobWriteResult.Fail(NvidiaGpuBackend.NoPublicSetterReasonKey));
         }
 
         return ValueTask.FromResult(WritePowerLimit(value));
@@ -230,7 +230,7 @@ public sealed class AmdAdlxBackend : IOverclockBackend, IOverclockDetailSource, 
 
         if (knob != AmdKnobs.PowerLimit)
         {
-            return NvidiaNvapiBackend.NoPublicSetterReasonKey;
+            return NvidiaGpuBackend.NoPublicSetterReasonKey;
         }
 
         return _tuning.TryDescribe(out _) ? null : "overclock-adlx-device-unavailable";
@@ -278,7 +278,7 @@ public sealed class AmdAdlxBackend : IOverclockBackend, IOverclockDetailSource, 
                 return KnobWriteResult.Fail(GpuInUseReasonKey);
 
             case AmdTuningWriteOutcome.Rejected:
-                return KnobWriteResult.Fail(NvidiaNvapiBackend.RejectedReasonKey);
+                return KnobWriteResult.Fail(NvidiaGpuBackend.RejectedReasonKey);
 
             default:
                 break;
@@ -291,7 +291,7 @@ public sealed class AmdAdlxBackend : IOverclockBackend, IOverclockDetailSource, 
         int? readBack = _tuning.ReadPowerLimitPercent();
         return readBack == target
             ? KnobWriteResult.Ok(KnobValue.FromScalar(target))
-            : KnobWriteResult.Fail(NvidiaNvapiBackend.VerifyFailedReasonKey);
+            : KnobWriteResult.Fail(NvidiaGpuBackend.VerifyFailedReasonKey);
     }
 
     private KnobWriteResult RestoreOne(KnobId knob, KnobValue stored)
@@ -302,7 +302,7 @@ public sealed class AmdAdlxBackend : IOverclockBackend, IOverclockDetailSource, 
             RecordStatus(status);
             return AmdAdlxInterop.ClassifyWrite(status) == AmdTuningWriteOutcome.Applied
                 ? KnobWriteResult.Ok(stored)
-                : KnobWriteResult.Fail(NvidiaNvapiBackend.RejectedReasonKey);
+                : KnobWriteResult.Fail(NvidiaGpuBackend.RejectedReasonKey);
         }
 
         // Anything else was never a setting; there is nothing to put back.

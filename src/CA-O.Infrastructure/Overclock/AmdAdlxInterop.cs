@@ -506,7 +506,7 @@ internal static class AmdAdlxInterop
         Marshal.ReadIntPtr(Marshal.ReadIntPtr(iface), index * IntPtr.Size);
 
     [StructLayout(LayoutKind.Sequential)]
-    private struct AdlxIntRange
+    internal struct AdlxIntRange
     {
         public int MinValue;
         public int MaxValue;
