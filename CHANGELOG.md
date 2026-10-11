@@ -4,6 +4,14 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
 ## [Unreleased]
 
+## [2.2.5] - 2026-10-11
+
+### Corregido
+- **La pestana Overclock no abria (XamlParseException al navegar).** `OverclockPage.xaml` aplicaba el estilo `CaoHeaderAccentBarStyle` (TargetType Border) a un `Rectangle`; el compilador XAML no detecta el desajuste y la pagina reventaba en `InitializeComponent`, dejando el frame en la pagina anterior. Ahora usa `Border` como las otras 10 paginas. Regresion cubierta por `XamlStyleTargetTests` (3 tests que comparan cada Style usado contra el TargetType de DesignTokens).
+
+### Probado
+- Suite completa: **1695 passed, 0 failed** en Release (2.2.4: 1692; +3 tests de estilos XAML).
+
 ## [2.2.4] - 2026-10-11
 
 ### Anadido

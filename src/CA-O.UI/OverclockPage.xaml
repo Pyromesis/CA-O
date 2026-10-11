@@ -33,11 +33,7 @@
                                  Width="64"
                                  ShowCaption="False" />
             </Grid>
-            <Rectangle Height="3"
-                       Margin="0,4,0,12"
-                       HorizontalAlignment="Left"
-                       Width="72"
-                       Style="{StaticResource CaoHeaderAccentBarStyle}" />
+            <Border Style="{StaticResource CaoHeaderAccentBarStyle}" />
 
             <InfoBar x:Name="ReadOnlyNotice"
                      Severity="Informational"
