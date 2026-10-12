@@ -3,6 +3,14 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
 ## [Unreleased]
+## [2.2.10] - 2026-10-12
+### Anadido
+- Filas de tuning de Overclock con descripcion: cada control muestra que hace el ajuste (`OverclockTuningRow.Description`, template `x:Bind`).
+- Mascota durante el tuning: `Working` al empezar, `Celebrate` al validar, `Idle` al terminar/fallar (mapeo puro `MoodForTuning`, escritura que nunca lanza).
+### Corregido
+- **Aplicar perfil ya no miente cuando el driver trae el valor de fabrica.** Si el valor actual coincide con el preset (`SameValue`, epsilon relativo), el ajuste se cuenta como "Ya estaba" en vez de "aplicado": el resumen pasa a 3 vias `Aplicados / Ya estaban / No se pudo` (es/en).
+### Probado
+- Suite 1721 passed, 0 failed (Security 274, Benchmark 17, Infrastructure 199, Core 930, UI 241, Integration 60).
 ## [2.2.9] - 2026-10-11
 ### Anadido
 - Tarjeta 00 PERFIL en Overclock: selector Conservador/Equilibrado/Rendimiento con Aplicar (escribe los presets a todos los controles disponibles, con snapshot previo, journal y checkpoints por ajuste) y Restaurar valores.

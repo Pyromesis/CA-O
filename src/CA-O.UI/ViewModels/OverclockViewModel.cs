@@ -86,7 +86,7 @@ public sealed record OverclockRecoveryRow(
 /// </summary>
 public sealed record OverclockCeilingRow(string Knob, string Range, string Reason);
 /// <summary>One writable knob with its tune button. The command travels with the row because inside a DataTemplate an x:Bind cannot reach the page ViewModel.</summary>
-public sealed record OverclockTuningRow(string KnobId, string Label, string Detail, ICommand TuneCommand);
+public sealed record OverclockTuningRow(string KnobId, string Label, string Detail, ICommand TuneCommand, string Description = "");
 /// <summary>
 /// One axis of the before/after comparison. There is no knob on it: the
 /// profile is measured as a package, because overclocking is not additive and
@@ -334,7 +334,7 @@ public sealed partial class OverclockViewModel : ObservableObject
                 if (row.IsActionable)
                 {
                     TuningTargets.Add(new OverclockTuningRow(
-                        knob.Id.Value, row.Label, row.Range, StartTuningCommand));
+                        knob.Id.Value, row.Label, row.Range, StartTuningCommand, row.Description));
                 }
             }
 
@@ -1120,6 +1120,29 @@ public sealed partial class OverclockViewModel : ObservableObject
     /// the only thing that unlocks game rows: nothing else is allowed to.
     /// The announced ceiling is the catalog Performance preset for the knob.
     /// </summary>
+    /// <summary>
+    /// Maps tuning progress to the global mascot mood. Pure mapping so the branches are unit-testable; the UiState write itself stays at the call sites (testhost has no DI container).
+    /// </summary>
+    public static string MoodForTuning(bool running, bool? validated) =>
+        running ? "Working" : validated == true ? "Celebrate" : "Idle";
+
+    /// <summary>
+    /// Writes the global mascot mood, never throwing: testhost has no DI container and a cosmetic indicator must not break a tuning run.
+    /// </summary>
+    private static void SetMood(string mood)
+    {
+        try
+        {
+            AppHost.Resolve<UiState>().MascotMood = mood;
+        }
+        catch (InvalidOperationException)
+        {
+        }
+        catch (NullReferenceException)
+        {
+        }
+    }
+
     [RelayCommand]
     private async Task StartTuningAsync(string knobId, CancellationToken ct)
     {
@@ -1138,6 +1161,7 @@ public sealed partial class OverclockViewModel : ObservableObject
         try
         {
             StatusLine = Localizer.Get("overclock-tuning-running");
+            SetMood(MoodForTuning(true, null));
             var progress = new Progress<TuningProgress>(p =>
                 StabilitySummary = Localizer.Format(
                     "overclock-tuning-point",
@@ -1158,6 +1182,7 @@ public sealed partial class OverclockViewModel : ObservableObject
         catch (Exception ex)
         {
             StatusLine = Localizer.Get("overclock-tuning-failed");
+            SetMood(MoodForTuning(false, null));
             CrashLog.Write(ex);
         }
         finally
@@ -1242,6 +1267,7 @@ public sealed partial class OverclockViewModel : ObservableObject
         if (outcome.Result is null)
         {
             StatusLine = Localizer.Get(outcome.FailureReasonKey ?? "overclock-tuning-failed");
+            SetMood(MoodForTuning(false, null));
             return;
         }
 
@@ -1272,6 +1298,7 @@ public sealed partial class OverclockViewModel : ObservableObject
                 result.Points.Count), ct).ConfigureAwait(true);
 
             StatusLine = Localizer.Get("overclock-tuning-validated");
+            SetMood(MoodForTuning(false, true));
             StabilitySummary = Localizer.Format("overclock-tuning-points", result.Points.Count);
             await FillGamesAsync(ct).ConfigureAwait(true);
             await LoadCeilingsAsync(ct).ConfigureAwait(true);
@@ -1281,11 +1308,12 @@ public sealed partial class OverclockViewModel : ObservableObject
             StatusLine = Localizer.Get(result.Status == TuningStatus.Rejected
                 ? "overclock-tuning-rejected"
                 : "overclock-tuning-interrupted");
+                SetMood(MoodForTuning(false, null));
         }
     }
 
     /// <summary>Outcome of a single knob write inside a profile apply.</summary>
-    public sealed record AppliedKnob(KnobId Knob, string BackendId, bool Success, string? FailureReasonKey);
+    public sealed record AppliedKnob(KnobId Knob, string BackendId, bool Success, string? FailureReasonKey, bool Unchanged = false);
 
     /// <summary>One backend snapshot kept in memory for the in-page restore.</summary>
     public sealed record BackendSnapshot(string BackendId, UnitSnapshot Snapshot);
@@ -1447,6 +1475,13 @@ public sealed partial class OverclockViewModel : ObservableObject
         return new ApplyOutcome(runId, profile, applied, snapshots);
     }
 
+    /// <summary>
+    /// True when the driver already reports the preset value: same discrete index and scalar within a relative epsilon. Writing it again would succeed without changing anything and lie in the report.
+    /// </summary>
+    public static bool SameValue(CAO.Core.Overclock.KnobValue preset, CAO.Core.Overclock.KnobValue current) =>
+        preset.Index == current.Index
+        && System.Math.Abs(preset.Scalar - current.Scalar) <= 1e-6 * System.Math.Max(1.0, System.Math.Max(System.Math.Abs(preset.Scalar), System.Math.Abs(current.Scalar)));
+
     private async Task<AppliedKnob> ApplyOneAsync(
         ApplyWork item, IOverclockJournal journal, CancellationToken ct)
     {
@@ -1459,6 +1494,10 @@ public sealed partial class OverclockViewModel : ObservableObject
         {
             var current = await backend.ReadAsync(knob.Id, ct).AsTask().WaitAsync(_rowTimeout, ct).ConfigureAwait(false);
             lastGood = current.Success ? current.Value.Scalar : 0d;
+            if (current.Success && SameValue(item.Value, current.Value))
+            {
+                return new AppliedKnob(knob.Id, backend.Id, false, null, Unchanged: true);
+            }
 
             await CheckpointStore.SaveAsync(new TuningCheckpoint
             {
@@ -1537,16 +1576,24 @@ public sealed partial class OverclockViewModel : ObservableObject
         }
 
         var ok = 0;
+        var unchanged = 0;
         foreach (var knob in outcome.Applied)
         {
-            if (knob.Success)
+            if (knob.Unchanged)
+            {
+                unchanged++;
+            }
+            else if (knob.Success)
             {
                 ok++;
+                }
             }
-        }
 
-        ApplySummary = Localizer.Format("overclock-profile-summary", ok, outcome.Applied.Count - ok)
-            + " " + Localizer.Get("overclock-profile-note");
+        ApplySummary = Localizer.Format(
+            "overclock-profile-summary",
+            ok,
+            unchanged,
+            outcome.Applied.Count - ok - unchanged);
         StatusLine = ApplySummary;
 
         IsBusy = false;

@@ -44,6 +44,7 @@ benchmarks/
 # Tools temp
 /opencode/
 .opencode/
+.playwright-mcp/
 .superpowers/
 docs/superpowers/
 .claude/
