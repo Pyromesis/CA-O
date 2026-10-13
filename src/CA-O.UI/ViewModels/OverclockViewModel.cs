@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Text;
+using CAO.Core.Abstractions;
 using CAO.Core.Overclock;
 using CAO.Core.Overclock.Reporting;
 using CAO.Core.Overclock.Stability;
@@ -11,6 +12,7 @@ using CAO.UI.Helpers;
 using CAO.Infrastructure.Overclock;
 using CAO.Infrastructure.Overclock.Reporting;
 using CAO.Infrastructure.Persistence;
+using CAO.Infrastructure.SystemInterop;
 using CAO.Shared;
 using System;
 using System.Collections.Generic;
@@ -133,6 +135,7 @@ public sealed partial class OverclockViewModel : ObservableObject
     private IValidatedProfileStore? _profileStore;
     private ITuningCheckpointStore? _checkpointStore;
     private IOverclockJournal? _journal;
+    private IRestorePointService? _restorePointService;
     internal static readonly TimeSpan DefaultRowTimeout = TimeSpan.FromSeconds(30);
 
     internal const string RowTimedOutReasonKey = "overclock-row-timed-out";
@@ -158,7 +161,8 @@ public sealed partial class OverclockViewModel : ObservableObject
         IValidatedProfileStore? profileStore = null,
         ITuningCheckpointStore? checkpointStore = null,
         IOverclockJournal? journal = null,
-        TimeSpan? rowTimeout = null)
+        TimeSpan? rowTimeout = null,
+        IRestorePointService? restorePointService = null)
     {
         _registry = registry;
         _backends = backends;
@@ -172,6 +176,7 @@ public sealed partial class OverclockViewModel : ObservableObject
         _profileStore = profileStore;
         _checkpointStore = checkpointStore;
         _journal = journal;
+        _restorePointService = restorePointService;
     }
 
     /// <summary>
@@ -217,6 +222,59 @@ public sealed partial class OverclockViewModel : ObservableObject
 
     private IOverclockJournal JournalFor(Guid runId) =>
         _journal ?? new TransactionOverclockJournal(new FileTransactionJournal(), runId);
+
+    /// <summary>
+    /// The real WMI service, built on first use like every other hardware door:
+    /// constructing the page must never pay for a restore point nobody asked
+    /// for. Injectable so tests drive the gate without touching WMI.
+    /// </summary>
+    private IRestorePointService RestorePoints =>
+        _restorePointService ??= new WmiRestorePointService();
+
+    /// <summary>
+    /// Puerta única de escritura: sin punto de restauración no se escribe nada.
+    /// Orden del operador: crear SÍ O SÍ el punto antes de cualquier escritura
+    /// de overclock; si no se puede crear, las tres vías (perfil, knob, auto)
+    /// vuelven con mensaje y cero escrituras. Un timeout o una cancelación es
+    /// un fallo, no un permiso: también bloquea.
+    /// </summary>
+    internal async Task<bool> EnsureRestorePointAsync(CancellationToken ct)
+    {
+        StatusLine = Localizer.Get("overclock-restore-point-creating");
+        CrashLog.Step("overclock.restore-point-start");
+        try
+        {
+            var (success, reason) = await RestorePoints
+                .CreateAsync("CA-O overclock: punto previo a escritura", ct)
+                .ConfigureAwait(true);
+            if (success)
+            {
+                CrashLog.Step("overclock.restore-point-done");
+                return true;
+            }
+
+            StatusLine = Localizer.Format("overclock-restore-point-blocked", reason);
+            CrashLog.Step("overclock.restore-point-blocked");
+            return false;
+        }
+        catch (OperationCanceledException)
+        {
+            StatusLine = Localizer.Format(
+                "overclock-restore-point-blocked", Localizer.Get("overclock_cancelled"));
+            CrashLog.Step("overclock.restore-point-cancelled");
+            return false;
+        }
+        catch (Exception ex)
+        {
+            // El servicio real ya traga sus internals WMI; si algo llega aquí
+            // es plomería, y su mensaje no sale al usuario.
+            CrashLog.Write(ex);
+            StatusLine = Localizer.Format(
+                "overclock-restore-point-blocked", Localizer.Get("overclock_probe_failed"));
+            CrashLog.Step("overclock.restore-point-failed");
+            return false;
+        }
+    }
 
     // Single source of truth: the registry decides the composition, the
     // ViewModel never re-lists the backends by hand (that divergence is
@@ -1169,6 +1227,15 @@ public sealed partial class OverclockViewModel : ObservableObject
         IsBusy = true;
         try
         {
+            // Sin punto no hay bisección: el motor escribe checkpoints, journal
+            // y valores del driver desde el primer punto.
+            if (!await EnsureRestorePointAsync(ct).ConfigureAwait(true))
+            {
+                SetMood(MoodForTuning(false, null));
+                CrashLog.Step("tuning.blocked-no-restore-point");
+                return;
+            }
+
             StatusLine = Localizer.Get("overclock-tuning-running");
             SetMood(MoodForTuning(true, null));
             var progress = new Progress<TuningProgress>(p =>
@@ -1402,6 +1469,17 @@ public sealed partial class OverclockViewModel : ObservableObject
                 return;
             }
 
+            // Después de las puertas locales (recovery, anti-cheat, accionables):
+            // crear un punto para una pasada que ya está bloqueada sería pagar
+            // minutos de WMI para no escribir nada. Sigue garantizando cero
+            // escrituras si falla, porque ningún write corre antes de aquí.
+            if (!await EnsureRestorePointAsync(ct).ConfigureAwait(true))
+            {
+                ApplySummary = StatusLine;
+                CrashLog.Step("auto.blocked-no-restore-point");
+                return;
+            }
+
             StatusLine = Localizer.Get("overclock-auto-running");
             SetMood(MoodForTuning(true, null));
             CrashLog.Step("auto.start");
@@ -1587,6 +1665,15 @@ public sealed partial class OverclockViewModel : ObservableObject
         CrashLog.Step("refresh.apply-start");
         try
         {
+            // Sin punto no hay apply: ExecuteApplyAsync abre el journal, guarda
+            // checkpoints y escribe en el driver desde el primer knob.
+            if (!await EnsureRestorePointAsync(ct).ConfigureAwait(true))
+            {
+                ApplySummary = StatusLine;
+                CrashLog.Step("refresh.apply-blocked-no-restore-point");
+                return;
+            }
+
             var work = CollectApplyWork(profile);
             if (work.Count == 0)
             {

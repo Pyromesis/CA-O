@@ -3,6 +3,11 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
 ## [Unreleased]
+## [2.2.14] - 2026-10-13
+### Anadido
+- **Punto de restauracion obligatorio antes de overclock.** Las tres vias de escritura (perfil, tuning por knob, automatico) crean si o si un punto de restauracion del sistema (`SystemRestore` por WMI) antes de tocar nada; si no se puede crear, no se escribe (ni journal, ni checkpoints, ni driver). Vale tambien ante cancelacion o error.
+### Probado
+- Suite 1860 passed, 0 failed (Security 274, Benchmark 17, Infrastructure 202, Core 931, UI 376, Integration 60). 6 tests nuevos de la puerta.
 ## [2.2.13] - 2026-10-13
 ### Anadido
 - **Overclock automatico con propuesta.** Boton en la tarjeta 00 PERFIL que recorre cada control escribible con biseccion hasta su techo (mismo `TuningEngine`, checkpoints, recovery D4 y puerta anti-cheat; se detiene si hay anti-cheat o ajustes pendientes). Al terminar PROPONE el perfil validado y el usuario pulsa Aplicar: nunca muta silicio sin confirmacion.

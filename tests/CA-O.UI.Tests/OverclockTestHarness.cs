@@ -1,3 +1,4 @@
+using CAO.Core.Abstractions;
 using CAO.Core.Overclock;
 using CAO.Core.Overclock.Recovery;
 using CAO.Core.Overclock.Reporting;
@@ -39,7 +40,8 @@ internal static class OverclockTestHarness
         IValidatedProfileStore? profileStore = null,
         ITuningCheckpointStore? checkpointStore = null,
         IOverclockJournal? journal = null,
-        TimeSpan? rowTimeout = null)
+        TimeSpan? rowTimeout = null,
+        IRestorePointService? restorePointService = null)
     {
         target ??= new HarnessTarget();
         var checkpoints = new HarnessCheckpointStore(openRuns ?? []);
@@ -61,7 +63,22 @@ internal static class OverclockTestHarness
             profileStore: profileStore,
             checkpointStore: checkpointStore,
             journal: journal,
-            rowTimeout: rowTimeout);
+            rowTimeout: rowTimeout,
+            restorePointService: restorePointService ?? new AllowRestorePoints());
+    }
+
+    /// <summary>
+    /// Puerta de punto de restauración siempre abierta: ningún test existente
+    /// debe pagar (ni tocar) el WMI real. Los tests de la puerta inyectan su
+    /// propio falso para cerrarla.
+    /// </summary>
+    private sealed class AllowRestorePoints : IRestorePointService
+    {
+        public Task<(bool Success, string ReasonEs)> CreateAsync(string description, CancellationToken ct = default) =>
+            Task.FromResult((true, "harness"));
+
+        public Task<IReadOnlyList<RestorePointInfo>> ListAsync(CancellationToken ct = default) =>
+            Task.FromResult<IReadOnlyList<RestorePointInfo>>([]);
     }
 
     /// <summary>Builds a view model over an empty registry: no knobs, no backends.</summary>
