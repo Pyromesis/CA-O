@@ -274,6 +274,13 @@ public sealed partial class OverclockViewModel : ObservableObject
     public ObservableCollection<OverclockCeilingRow> Ceilings { get; } = [];
 
     public ObservableCollection<OverclockTuningRow> TuningTargets { get; } = [];
+
+    /// <summary>
+    /// The profile card lists writable controls only. It is fed from the same
+    /// rows as the per-component sections but filtered to actionable ones, so a
+    /// read-only telemetry row can never leak into the card that offers Aplicar.
+    /// </summary>
+    public ObservableCollection<OverclockKnobRow> ProfileKnobs { get; } = [];
     /// <summary>Reentrancy guard: a second probe while one is running is dropped, not queued.</summary>
     [RelayCommand]
     private async Task RefreshAsync(CancellationToken ct)
@@ -304,6 +311,7 @@ public sealed partial class OverclockViewModel : ObservableObject
             PendingRecoveries.Clear();
             Ceilings.Clear();
             TuningTargets.Clear();
+            ProfileKnobs.Clear();
             _lastKnobs.Clear();
             _lastDriverVersions.Clear();
 
@@ -335,6 +343,7 @@ public sealed partial class OverclockViewModel : ObservableObject
                 {
                     TuningTargets.Add(new OverclockTuningRow(
                         knob.Id.Value, row.Label, row.Range, StartTuningCommand, row.Description));
+                    ProfileKnobs.Add(row);
                 }
             }
 
@@ -1312,6 +1321,201 @@ public sealed partial class OverclockViewModel : ObservableObject
         }
     }
 
+    /// <summary>
+    /// Automatic overclock: walks every actionable knob through the same bisection
+    /// <see cref="StartTuningAsync"/> runs (same engine, same checkpoints, no new
+    /// machinery), then PROPOSES the result instead of applying a preset.
+    ///
+    /// Pressing the button authorizes the guided probe writes, exactly like pressing
+    /// each per-knob Ajustar would. What it never does is silently apply a profile:
+    /// the outcome is a summary plus the existing Aplicar button left to the user.
+    /// Progress follows H7 (OptimizePage): the bar stays indeterminate while IsBusy
+    /// and the ceiling is announced per knob, so a long silent bisection reads as
+    /// expected instead of hung. Blocked by pending D4 recoveries and by the
+    /// anti-cheat gate before any write. A per-knob failure skips that knob and
+    /// continues with the rest; cancel stops cleanly between knobs.
+    /// </summary>
+    [RelayCommand]
+    private async Task StartAutoTuningAsync(CancellationToken ct)
+    {
+        if (IsBusy)
+        {
+            return;
+        }
+
+        IsBusy = true;
+        try
+        {
+            // D4: an open run outranks any new write. The scan also refreshes the
+            // recovery section so the block explains itself on screen.
+            await LoadPendingRecoveriesAsync(ct).ConfigureAwait(true);
+            if (PendingRecoveries.Count > 0)
+            {
+                ApplySummary = Localizer.Get("overclock-auto-blocked-recovery");
+                StatusLine = ApplySummary;
+                CrashLog.Step("auto.blocked-recovery");
+                return;
+            }
+
+            // Anti-cheat gate: the same policy as the game section, checked before
+            // any write. A scan that cannot prove the machine clean blocks, because
+            // an empty list after a denied registry read is not a clean machine.
+            GameOverclockSnapshot games;
+            try
+            {
+                games = await Task.Run(() => GameSource.ReadAsync(ct).AsTask(), ct).ConfigureAwait(true);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                ApplySummary = Localizer.Get("overclock-game-anticheat-scan-unavailable");
+                StatusLine = ApplySummary;
+                CrashLog.Write(ex);
+                return;
+            }
+
+            if (!games.AntiCheatScanSucceeded)
+            {
+                ApplySummary = Localizer.Get("overclock-game-anticheat-scan-unavailable");
+                StatusLine = ApplySummary;
+                CrashLog.Step("auto.blocked-anticheat-scan");
+                return;
+            }
+
+            if (games.DetectedAntiCheats.Count > 0)
+            {
+                ApplySummary = Localizer.Get("overclock-auto-blocked-anticheat");
+                StatusLine = ApplySummary;
+                CrashLog.Step("auto.blocked-anticheat");
+                return;
+            }
+
+            var targets = CollectAutoTargets();
+            if (targets.Count == 0)
+            {
+                ApplySummary = Localizer.Get("overclock-profile-no-actionable");
+                StatusLine = ApplySummary;
+                CrashLog.Step("auto.no-actionable");
+                return;
+            }
+
+            StatusLine = Localizer.Get("overclock-auto-running");
+            SetMood(MoodForTuning(true, null));
+            CrashLog.Step("auto.start");
+
+            var validated = 0;
+            var skipped = 0;
+            foreach (var (knob, backend) in targets)
+            {
+                ct.ThrowIfCancellationRequested();
+
+                var ceiling = AutoCeilingText(knob);
+                StabilitySummary = Localizer.Format(
+                    "overclock-auto-tuning-knob", Localizer.Get(knob.LabelKey), ceiling);
+                StatusLine = StabilitySummary;
+
+                var progress = new Progress<TuningProgress>(p =>
+                    StabilitySummary = Localizer.Format(
+                        "overclock-tuning-point",
+                        p.PointIndex,
+                        p.EstimatedPoints,
+                        p.Value.Scalar.ToString("0.##", CultureInfo.InvariantCulture)));
+
+                TuningOutcome outcome;
+                try
+                {
+                    // Driver P/Invoke, WMI and file I/O: none of it on the UI thread.
+                    outcome = await Task.Run(
+                        () => ExecuteTuningAsync(knob, backend, progress, ct), ct).ConfigureAwait(true);
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    // One knob failing must not cancel the knobs that never ran.
+                    CrashLog.Write(ex);
+                    skipped++;
+                    continue;
+                }
+
+                await FinishTuningAsync(knob, backend, outcome, ct).ConfigureAwait(true);
+                if (outcome.Result is { Status: TuningStatus.CeilingReached or TuningStatus.StabilityCeilingFound })
+                {
+                    validated++;
+                }
+                else
+                {
+                    skipped++;
+                }
+            }
+
+            ApplySummary = Localizer.Format("overclock-auto-proposal", validated, skipped);
+            StatusLine = ApplySummary;
+            SetMood(MoodForTuning(false, validated > 0));
+            CrashLog.Step("auto.done");
+        }
+        catch (OperationCanceledException)
+        {
+            StatusLine = Localizer.Get("overclock_cancelled");
+            SetMood(MoodForTuning(false, null));
+            CrashLog.Step("auto.cancelled");
+        }
+        catch (Exception ex)
+        {
+            StatusLine = Localizer.Get("overclock-tuning-failed");
+            SetMood(MoodForTuning(false, null));
+            CrashLog.Write(ex);
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    private List<(OverclockKnob Knob, IOverclockBackend Backend)> CollectAutoTargets()
+    {
+        var targets = new List<(OverclockKnob, IOverclockBackend)>();
+        CollectAutoFrom(CpuKnobs, targets);
+        CollectAutoFrom(GpuKnobs, targets);
+        CollectAutoFrom(MemoryKnobs, targets);
+        return targets;
+    }
+
+    private void CollectAutoFrom(
+        IEnumerable<OverclockKnobRow> rows,
+        List<(OverclockKnob Knob, IOverclockBackend Backend)> targets)
+    {
+        foreach (var row in rows)
+        {
+            if (!row.IsActionable)
+            {
+                continue;
+            }
+
+            if (!_lastKnobs.TryGetValue(row.Id, out var knob) || knob is null)
+            {
+                continue;
+            }
+
+            if (FindBackend(knob.BackendId) is not { } backend)
+            {
+                continue;
+            }
+
+            targets.Add((knob, backend));
+        }
+    }
+
+    private static string AutoCeilingText(OverclockKnob knob) =>
+        knob.PresetValue(OverclockProfile.Performance) is { } preset
+            ? preset.Scalar.ToString("0.##", CultureInfo.InvariantCulture)
+            : Localizer.Get("overclock-ceiling-unavailable");
+
     /// <summary>Outcome of a single knob write inside a profile apply.</summary>
     public sealed record AppliedKnob(KnobId Knob, string BackendId, bool Success, string? FailureReasonKey, bool Unchanged = false);
 
@@ -1343,6 +1547,10 @@ public sealed partial class OverclockViewModel : ObservableObject
     public string ApplyNote => Localizer.Get("overclock-profile-note");
 
     public string ApplyButtonLabel => Localizer.Get("overclock-profile-apply");
+
+    public string AutoTuneButtonLabel => Localizer.Get("overclock-auto-apply");
+
+    public string TelemetryHeader => Localizer.Get("overclock-telemetry-header");
 
     public string RestoreButtonLabel => Localizer.Get("overclock-profile-restore");
 

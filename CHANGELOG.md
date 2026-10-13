@@ -3,6 +3,12 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
 ## [Unreleased]
+## [2.2.13] - 2026-10-13
+### Anadido
+- **Overclock automatico con propuesta.** Boton en la tarjeta 00 PERFIL que recorre cada control escribible con biseccion hasta su techo (mismo `TuningEngine`, checkpoints, recovery D4 y puerta anti-cheat; se detiene si hay anti-cheat o ajustes pendientes). Al terminar PROPONE el perfil validado y el usuario pulsa Aplicar: nunca muta silicio sin confirmacion.
+- **Tarjeta de perfil solo-accionable.** La telemetria de solo lectura vive en su Expander plegado fuera de la tarjeta; la tarjeta lista solo controles escribibles con su motivo visible.
+### Probado
+- Suite 1854 passed, 0 failed (Security 274, Benchmark 17, Infrastructure 202, Core 931, UI 370, Integration 60). 7 tests nuevos de auto-tuning.
 ## [2.2.12] - 2026-10-13
 ### Anadido
 - **Tour guiado en cada pagina.** Boton "Tour de esta pagina" en la cabecera de las 11 paginas (83 pasos detallados en total: cada seccion y control explicados, ES/EN, con overlay, Siguiente/Atras/Omitir). Reutiliza el motor del tour general sin tocarlo (`TourCoordinator.StartWith`, `PageTourCatalog`); el tour general y sus flags siguen intactos.
