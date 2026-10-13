@@ -30,7 +30,25 @@ public sealed partial class HistoryPage : Page
 
     private void ApplyTexts()
     {
+        ApplyPageTourText();
         try { LocalizationHelper.LocalizeTree(this.Content as DependencyObject ?? this); } catch { }
+    }
+
+    /// <summary>Boton del tour de esta pagina: texto localizado y lanzamiento con guarda. Nunca lanza.</summary>
+    private void ApplyPageTourText()
+    {
+        try
+        {
+            PageTourButton.Content = Localizer.Get("tour.page.button");
+            ToolTipService.SetToolTip(PageTourButton, Localizer.Get("tour.page.tip"));
+        }
+        catch { }
+    }
+
+    private void OnPageTourClick(object sender, RoutedEventArgs e)
+    {
+        if (Tutorial.TourCoordinator.IsActive) return;
+        MainWindow.Current?.StartPageTour("history");
     }
 
     protected override void OnNavigatedTo(Microsoft.UI.Xaml.Navigation.NavigationEventArgs e)

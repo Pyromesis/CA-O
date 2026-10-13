@@ -10,6 +10,12 @@
                 <TextBlock Text="Organizados por categorías. Sin listas infinitas." TextAlignment="Center" Style="{StaticResource CaoSubtitleStyle}"/>
                 <Border Style="{StaticResource CaoHeaderAccentBarStyle}"/>
             </StackPanel>
+            <Button x:Name="PageTourButton"
+                    Click="OnPageTourClick"
+                    Style="{StaticResource CaoElevatedButtonStyle}"
+                    HorizontalAlignment="Right"
+                    FontSize="12"
+                    Margin="0,4,0,8" />
 
             <!-- General / Appearance -->
             <Border Style="{StaticResource CaoCardStyle}">

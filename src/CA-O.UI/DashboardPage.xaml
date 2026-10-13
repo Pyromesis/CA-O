@@ -7,6 +7,12 @@
     <Grid Background="{ThemeResource SolidBackgroundFillColorBaseBrush}">
         <ScrollViewer Padding="{StaticResource CaoPagePadding}" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
         <StackPanel x:Name="PageContent" Style="{StaticResource CaoPageContainerStyle}">
+            <Button x:Name="PageTourButton"
+                    Click="OnPageTourClick"
+                    Style="{StaticResource CaoElevatedButtonStyle}"
+                    HorizontalAlignment="Right"
+                    FontSize="12"
+                    Margin="0,4,0,8" />
             <!-- Avisos globales -->
             <StackPanel x:Name="AlertBars" Spacing="8">
                 <InfoBar x:Name="RecoveryBar" IsOpen="False" Visibility="Collapsed" Severity="Warning" IsClosable="True"

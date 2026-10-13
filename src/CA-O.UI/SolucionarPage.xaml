@@ -17,6 +17,12 @@
                 <TextBlock Text="Soluciones directas para fallos comunes. Cada una actúa de verdad y confirma antes de cambios delicados." TextAlignment="Center" Style="{StaticResource CaoSubtitleStyle}"/>
                 <Border Style="{StaticResource CaoHeaderAccentBarStyle}"/>
             </StackPanel>
+            <Button x:Name="PageTourButton"
+                    Click="OnPageTourClick"
+                    Style="{StaticResource CaoElevatedButtonStyle}"
+                    HorizontalAlignment="Right"
+                    FontSize="12"
+                    Margin="0,4,0,8" />
 
             <!-- Progreso movido al overlay ApplyOverlay (centrado + bloqueante) -->
 

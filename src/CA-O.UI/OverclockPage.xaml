@@ -34,6 +34,12 @@
                                  ShowCaption="False" />
             </Grid>
             <Border Style="{StaticResource CaoHeaderAccentBarStyle}" />
+            <Button x:Name="PageTourButton"
+                    Click="OnPageTourClick"
+                    Style="{StaticResource CaoElevatedButtonStyle}"
+                    HorizontalAlignment="Right"
+                    FontSize="12"
+                    Margin="0,4,0,8" />
 
             <InfoBar x:Name="ReadOnlyNotice"
                      Severity="Informational"

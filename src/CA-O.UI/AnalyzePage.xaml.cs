@@ -50,6 +50,23 @@ public sealed partial class AnalyzePage : Page
         ApplyTexts();
     }
 
+    /// <summary>Boton del tour de esta pagina: texto localizado y lanzamiento con guarda. Nunca lanza.</summary>
+    private void ApplyPageTourText()
+    {
+        try
+        {
+            PageTourButton.Content = Localizer.Get("tour.page.button");
+            ToolTipService.SetToolTip(PageTourButton, Localizer.Get("tour.page.tip"));
+        }
+        catch { }
+    }
+
+    private void OnPageTourClick(object sender, RoutedEventArgs e)
+    {
+        if (Tutorial.TourCoordinator.IsActive) return;
+        MainWindow.Current?.StartPageTour("analyze");
+    }
+
     private void ApplyTexts()
     {
         // Localized static texts via Localizer
@@ -58,6 +75,7 @@ public sealed partial class AnalyzePage : Page
         try { RunButton.Content = Localizer.Get("analyze.runFull"); AutomationProperties.SetName(RunButton, Localizer.Get("analyze.runFull")); } catch { }
         try { CancelButton.Content = Localizer.Get("common.cancel"); AutomationProperties.SetName(CancelButton, Localizer.Get("common.cancel")); } catch { }
         try { DnsActionButton.Content = Localizer.Get("analyze.applyDns"); } catch { }
+        try { ApplyPageTourText(); } catch { }
         try { Helpers.LocalizationHelper.LocalizeTree(this.Content as Microsoft.UI.Xaml.DependencyObject ?? this); } catch { }
         if (_viewModel != null)
         {

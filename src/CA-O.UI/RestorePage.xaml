@@ -11,6 +11,12 @@
                 <TextBlock Text="Centro de restauración — snapshots por TransactionId, no por OptimizationId. Cada reversión se verifica exactamente." TextAlignment="Center" Style="{StaticResource CaoSubtitleStyle}"/>
                 <Border Style="{StaticResource CaoHeaderAccentBarStyle}"/>
             </StackPanel>
+            <Button x:Name="PageTourButton"
+                    Click="OnPageTourClick"
+                    Style="{StaticResource CaoElevatedButtonStyle}"
+                    HorizontalAlignment="Right"
+                    FontSize="12"
+                    Margin="0,4,0,8" />
             <InfoBar x:Name="NoteBar" IsOpen="True" Severity="Informational" IsClosable="False"
                      Title="Reversibilidad garantizada"
                      Message="CA-O crea snapshots propios antes de cada cambio; el punto de restauración de Windows se solicita una vez por sesión cuando el sistema lo permite. Irreversibles se marcan explícitamente."/>

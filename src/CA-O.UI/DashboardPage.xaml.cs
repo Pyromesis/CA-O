@@ -109,9 +109,27 @@ public sealed partial class DashboardPage : Page
         catch { /* la mascota nunca rompe la página */ }
     }
 
+    /// <summary>Boton del tour de esta pagina: texto localizado y lanzamiento con guarda. Nunca lanza.</summary>
+    private void ApplyPageTourText()
+    {
+        try
+        {
+            PageTourButton.Content = Localizer.Get("tour.page.button");
+            ToolTipService.SetToolTip(PageTourButton, Localizer.Get("tour.page.tip"));
+        }
+        catch { }
+    }
+
+    private void OnPageTourClick(object sender, RoutedEventArgs e)
+    {
+        if (Tutorial.TourCoordinator.IsActive) return;
+        MainWindow.Current?.StartPageTour("dashboard");
+    }
+
     private void ApplyTexts()
     {
         AnalyzeButton.Content = Localizer.Get("dashboard.analyze");
+        ApplyPageTourText();
         var uiState = AppHost.Resolve<ViewModels.UiState>();
         var when = uiState.LastAnalysisUtc?.ToLocalTime().ToString("g") ?? Localizer.Get("dashboard.never");
         LastAnalysisText.Text = $"{Localizer.Get("dashboard.lastAnalysis")}: {when}";

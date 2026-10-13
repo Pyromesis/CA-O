@@ -56,6 +56,19 @@ public sealed partial class MainWindow : Window
         _tour.Start();
     }
 
+    /// <summary>
+    /// Launches the guided tour of a single page. Never starts while another tour
+    /// is active; unknown routes and the tutorial hub resolve to no steps.
+    /// </summary>
+    public void StartPageTour(string route)
+    {
+        if (Tutorial.TourCoordinator.IsActive) return;
+        var steps = Tutorial.PageTourCatalog.ForRoute(route);
+        if (steps.Count == 0) return;
+        _tour ??= new Tutorial.TourCoordinator(this);
+        _tour.StartWith(steps);
+    }
+
     public async Task ShowWelcomeIfNeededAsync()
     {
         try

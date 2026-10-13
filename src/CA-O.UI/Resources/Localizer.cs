@@ -450,6 +450,9 @@ public static class Localizer
         ["common.details"] = "Detalles",
         ["common.apply"] = "Aplicar",
         ["common.revert"] = "Revertir",
+        // Tour de pagina (boton de cabecera)
+        ["tour.page.button"] = "Tour de esta página",
+        ["tour.page.tip"] = "Recorrido guiado de esta página",
     };
 
     private static readonly Dictionary<string, string> English = new()
@@ -887,6 +890,9 @@ public static class Localizer
         ["common.details"] = "Details",
         ["common.apply"] = "Apply",
         ["common.revert"] = "Revert",
+        // Page tour (header button)
+        ["tour.page.button"] = "Tour this page",
+        ["tour.page.tip"] = "Guided tour of this page",
     };
 
     private static Dictionary<string, string> Current { get; set; } = Spanish;

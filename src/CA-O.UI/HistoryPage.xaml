@@ -10,6 +10,12 @@
                 <TextBlock Text="Timeline auditable con TransactionId, operación, verificación y cadena hash. La corrupción genera alerta explícita." TextAlignment="Center" Style="{StaticResource CaoSubtitleStyle}"/>
                 <Border Style="{StaticResource CaoHeaderAccentBarStyle}"/>
             </StackPanel>
+            <Button x:Name="PageTourButton"
+                    Click="OnPageTourClick"
+                    Style="{StaticResource CaoElevatedButtonStyle}"
+                    HorizontalAlignment="Right"
+                    FontSize="12"
+                    Margin="0,4,0,8" />
             <Border Style="{StaticResource CaoActionCardStyle}">
                 <Grid ColumnSpacing="12">
                     <Grid.ColumnDefinitions>

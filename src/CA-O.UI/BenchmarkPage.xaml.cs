@@ -36,11 +36,29 @@ public sealed partial class BenchmarkPage : Page
         };
     }
 
+    /// <summary>Boton del tour de esta pagina: texto localizado y lanzamiento con guarda. Nunca lanza.</summary>
+    private void ApplyPageTourText()
+    {
+        try
+        {
+            PageTourButton.Content = Localizer.Get("tour.page.button");
+            ToolTipService.SetToolTip(PageTourButton, Localizer.Get("tour.page.tip"));
+        }
+        catch { }
+    }
+
+    private void OnPageTourClick(object sender, RoutedEventArgs e)
+    {
+        if (Tutorial.TourCoordinator.IsActive) return;
+        MainWindow.Current?.StartPageTour("benchmark");
+    }
+
     private void ApplyTexts()
     {
         BaselineButton.Content = Localizer.Get("benchmark.baseline");
         AfterButton.Content = Localizer.Get("benchmark.after");
         ExportCsvButton.Content = Localizer.Get("benchmark.exportCsv");
+        ApplyPageTourText();
         DnsTitleText.Text = Localizer.Get("benchmark.dnsTitle");
         BootTitleText.Text = Localizer.Get("benchmark.bootTitle");
         FluencyTitleText.Text = Localizer.Get("benchmark.fluencyTitle");

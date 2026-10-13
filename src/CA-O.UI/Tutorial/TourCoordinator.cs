@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using CAO.UI.Controls;
 using Microsoft.UI.Xaml;
@@ -16,6 +17,7 @@ public sealed class TourCoordinator
     private readonly MainWindow _window;
     private readonly TourState _state = new();
     private string? _expectedRoute;
+    private bool _isPageTour;
 
     public TourCoordinator(MainWindow window)
     {
@@ -26,21 +28,34 @@ public sealed class TourCoordinator
 
     public TourStep? Current => _state.Current;
 
+    /// <summary>
+    /// Pure navigation decision, unit-testable: only navigate when the step's route
+    /// differs from the page already on screen. Unknown current pages always navigate.
+    /// </summary>
+    public static bool NeedsNavigation(string? currentRouteTag, string stepRoute) =>
+        !string.Equals(currentRouteTag, stepRoute, StringComparison.Ordinal);
+
+    /// <summary>Reverse lookup of <c>RouteTable.Routes</c>: page type to route tag.</summary>
+    public static string? CurrentRouteTagFor(Type? pageType)
+    {
+        if (pageType is null) return null;
+        foreach (var entry in CAO.UI.Navigation.RouteTable.Routes)
+        {
+            if (entry.Value == pageType) return entry.Key;
+        }
+
+        return null;
+    }
+
     public void Start()
     {
         try
         {
             _state.Reset();
             _state.Start();
+            _isPageTour = false;
             IsActive = true;
-            _window.TourOverlay.Visibility = Visibility.Visible;
-            _window.TourOverlay.SetStepPosition(1, _state.Count);
-            _window.TourOverlay.NextRequested -= OnNextRequested;
-            _window.TourOverlay.BackRequested -= OnBackRequested;
-            _window.TourOverlay.SkipRequested -= OnSkipRequested;
-            _window.TourOverlay.NextRequested += OnNextRequested;
-            _window.TourOverlay.BackRequested += OnBackRequested;
-            _window.TourOverlay.SkipRequested += OnSkipRequested;
+            AttachOverlay();
             ShowCurrent();
         }
         catch (Exception ex)
@@ -48,6 +63,44 @@ public sealed class TourCoordinator
             App.WriteCrashLog(ex);
             Skip();
         }
+    }
+
+    /// <summary>
+    /// Starts a page tour over an arbitrary step list with the same overlay, back, next
+    /// and skip behavior. Never launches while another tour is active, never starts over
+    /// an empty list, and never touches the general tour's <c>TourProgress</c> flags.
+    /// </summary>
+    public void StartWith(IReadOnlyList<TourStep> steps)
+    {
+        try
+        {
+            if (IsActive) return;
+            if (steps is null || steps.Count == 0) return;
+            _state.Reset();
+            _state.StartWith(steps);
+            if (!_state.IsRunning) return;
+            _isPageTour = true;
+            IsActive = true;
+            AttachOverlay();
+            ShowCurrent();
+        }
+        catch (Exception ex)
+        {
+            App.WriteCrashLog(ex);
+            Skip();
+        }
+    }
+
+    private void AttachOverlay()
+    {
+        _window.TourOverlay.Visibility = Visibility.Visible;
+        _window.TourOverlay.SetStepPosition(1, _state.Count);
+        _window.TourOverlay.NextRequested -= OnNextRequested;
+        _window.TourOverlay.BackRequested -= OnBackRequested;
+        _window.TourOverlay.SkipRequested -= OnSkipRequested;
+        _window.TourOverlay.NextRequested += OnNextRequested;
+        _window.TourOverlay.BackRequested += OnBackRequested;
+        _window.TourOverlay.SkipRequested += OnSkipRequested;
     }
 
     public void Next()
@@ -143,7 +196,14 @@ public sealed class TourCoordinator
         _window.TourOverlay.SetStepPosition(_state.Index + 1, _state.Count);
         _window.TourOverlay.BackButtonIsEnabled = _state.CanGoBack;
         _window.TourOverlay.NextButtonText = _state.Index == _state.Count - 1 ? "Finalizar" : "Siguiente";
-        _window.SelectRoute(step.Route);
+        var currentTag = CurrentRouteTagFor(_window.ContentFrame.Content?.GetType());
+        if (NeedsNavigation(currentTag, step.Route))
+        {
+            _window.SelectRoute(step.Route);
+        }
+        // Else already on the step's page (the common page-tour case): painting is enough,
+        // no navigation churn, no re-entrant Navigated events.
+
         _ = PaintWhenReadyAsync(step);
     }
 
@@ -199,10 +259,13 @@ public sealed class TourCoordinator
     {
         IsActive = false;
         _expectedRoute = null;
+        var wasPageTour = _isPageTour;
+        _isPageTour = false;
         _window.TourOverlay.NextRequested -= OnNextRequested;
         _window.TourOverlay.BackRequested -= OnBackRequested;
         _window.TourOverlay.SkipRequested -= OnSkipRequested;
         _window.TourOverlay.Hide();
+        if (wasPageTour) return;
         if (dismissed) TourProgress.MarkDismissed();
         else if (_state.IsFinished) TourProgress.MarkCompleted();
     }

@@ -83,6 +83,23 @@ public sealed partial class SettingsPage : Page
         }
     }
 
+    /// <summary>Boton del tour de esta pagina: texto localizado y lanzamiento con guarda. Nunca lanza.</summary>
+    private void ApplyPageTourText()
+    {
+        try
+        {
+            PageTourButton.Content = Localizer.Get("tour.page.button");
+            ToolTipService.SetToolTip(PageTourButton, Localizer.Get("tour.page.tip"));
+        }
+        catch { }
+    }
+
+    private void OnPageTourClick(object sender, RoutedEventArgs e)
+    {
+        if (Tutorial.TourCoordinator.IsActive) return;
+        MainWindow.Current?.StartPageTour("settings");
+    }
+
     private void ApplyTexts()
     {
         try
@@ -98,6 +115,7 @@ public sealed partial class SettingsPage : Page
             if (CloseToTrayDescText != null) CloseToTrayDescText.Text = Localizer.Get("settings.closeToTrayDesc") ?? "Al cerrar con la X, la app se oculta en la bandeja en vez de salir.";
             if (ExpertWarnBar != null) ExpertWarnBar.Message = Localizer.Get("optimize.expertWarning") ?? "Modo Expert habilitado";
             if (ServiceInstallButton != null) ServiceInstallButton.Content = Localizer.Get("settings.serviceInstall") ?? "Instalar ahora";
+            ApplyPageTourText();
             if (ServiceExplanationBar != null)
             {
                 ServiceExplanationBar.Title = Localizer.Get("settings.serviceExplanationTitle") ?? "¿Por qué instalar el servicio privilegiado?";

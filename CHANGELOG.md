@@ -3,6 +3,11 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
 ## [Unreleased]
+## [2.2.12] - 2026-10-13
+### Anadido
+- **Tour guiado en cada pagina.** Boton "Tour de esta pagina" en la cabecera de las 11 paginas (83 pasos detallados en total: cada seccion y control explicados, ES/EN, con overlay, Siguiente/Atras/Omitir). Reutiliza el motor del tour general sin tocarlo (`TourCoordinator.StartWith`, `PageTourCatalog`); el tour general y sus flags siguen intactos.
+### Probado
+- Suite 1847 passed, 0 failed (Security 274, Benchmark 17, Infrastructure 202, Core 931, UI 363, Integration 60). 122 tests nuevos de tours por pagina.
 ## [2.2.11] - 2026-10-13
 ### Corregido
 - **Aplicar perfil de Overclock ya cambia hardware de verdad en esta maquina.** Tres defectos encadenados lo dejaban en nada visible: el gate NVML marcaba escribibles los offsets de reloj GeForce que el driver rechaza sin bounds publicos (la fila prometia y el apply fallaba por eje); la lectura de CPU tomaba el Minimum de `powercfg` (0 %) en vez del indice AC actual y su verify fallaba siempre aunque el valor se hubiera aplicado; el gate de power limit aceptaba anchor 0/0 que read/write rechazan. Ahora el gate y el write path comparten la misma fuente de verdad: lo no escribible sale como `Bloqueado por driver` con motivo en la fila y no se encola.

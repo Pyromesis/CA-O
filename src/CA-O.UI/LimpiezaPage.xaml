@@ -49,6 +49,12 @@
                 <TextBlock Text="Acciones rápidas y seguras: temporales, papelera, DNS y timer. Cada limpieza usa snapshots donde aplica." TextAlignment="Center" Style="{StaticResource CaoSubtitleStyle}"/>
                 <Border Style="{StaticResource CaoHeaderAccentBarStyle}"/>
             </StackPanel>
+            <Button x:Name="PageTourButton"
+                    Click="OnPageTourClick"
+                    Style="{StaticResource CaoElevatedButtonStyle}"
+                    HorizontalAlignment="Right"
+                    FontSize="12"
+                    Margin="0,4,0,8" />
 
             <!-- Progreso movido al overlay ApplyOverlay (centrado + bloqueante) -->
 

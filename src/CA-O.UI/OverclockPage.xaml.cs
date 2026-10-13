@@ -7,10 +7,28 @@ namespace CAO.UI.Pages;
 
 public sealed partial class OverclockPage : Page
 {
+    /// <summary>Boton del tour de esta pagina: texto localizado y lanzamiento con guarda. Nunca lanza.</summary>
+    private void ApplyPageTourText()
+    {
+        try
+        {
+            PageTourButton.Content = Localizer.Get("tour.page.button");
+            ToolTipService.SetToolTip(PageTourButton, Localizer.Get("tour.page.tip"));
+        }
+        catch { }
+    }
+
+    private void OnPageTourClick(object sender, RoutedEventArgs e)
+    {
+        if (Tutorial.TourCoordinator.IsActive) return;
+        MainWindow.Current?.StartPageTour("overclock");
+    }
+
     public OverclockPage()
     {
         ViewModel = new OverclockViewModel();
         InitializeComponent();
+        ApplyPageTourText();
     }
 
     public OverclockViewModel ViewModel { get; }
@@ -18,6 +36,7 @@ public sealed partial class OverclockPage : Page
     protected override async void OnNavigatedTo(NavigationEventArgs e)
     {
         base.OnNavigatedTo(e);
+        ApplyPageTourText();
         try
         {
             await ViewModel.RefreshCommand.ExecuteAsync(null);

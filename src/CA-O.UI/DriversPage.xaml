@@ -22,6 +22,12 @@
                 <TextBlock Text="Inventario total, conflictos, limpieza de fantasmas y actualización vía Windows Update." TextAlignment="Center" Style="{StaticResource CaoSubtitleStyle}"/>
                 <Border Style="{StaticResource CaoHeaderAccentBarStyle}"/>
             </StackPanel>
+            <Button x:Name="PageTourButton"
+                    Click="OnPageTourClick"
+                    Style="{StaticResource CaoElevatedButtonStyle}"
+                    HorizontalAlignment="Right"
+                    FontSize="12"
+                    Margin="0,4,0,8" />
             <InfoBar IsOpen="True" Severity="Informational" IsClosable="False"
                      Title="Diagnóstico + acción"
                      Message="Detecta TODOS los dispositivos (presentes y ocultos). Corregir, limpiar fantasmas o actualizar pide confirmación y se verifica; nada se hace solo."/>
