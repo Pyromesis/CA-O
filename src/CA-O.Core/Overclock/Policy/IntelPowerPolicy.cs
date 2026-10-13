@@ -149,11 +149,14 @@ public static partial class IntelPowerPolicy
     /// Extracts the AC setting index from <c>powercfg /q</c> output.
     ///
     /// The output is localized, so matching on "Power Setting Index" would
-    /// break on any non-English machine. Instead the parser looks for the
-    /// first hexadecimal literal, which is locale-independent: GUIDs in this
-    /// output are brace-delimited, never bare hex. Returns null when no
-    /// literal is present, which callers must treat as "could not inspect",
-    /// never as a default value.
+    /// break on any non-English machine. Instead the parser takes the
+    /// penultimate hexadecimal literal (AC) and the last one (DC), which is
+    /// locale-independent: GUIDs in this output are brace-delimited, never
+    /// bare hex. A real PROCTHROTTLEMAX block emits Minimum/Maximum/
+    /// Increment before the current indices, so taking the first literal
+    /// would read Minimum (0x00000000) instead of the current AC value.
+    /// Returns null when no literal is present, which callers must treat as
+    /// "could not inspect", never as a default value.
     /// </summary>
     public static int? ParseAcSettingIndex(string? stdout)
     {
@@ -162,11 +165,17 @@ public static partial class IntelPowerPolicy
             return null;
         }
 
-        Match match = HexIndexPattern().Match(stdout);
-        return match.Success ? int.Parse(match.Value.AsSpan(2), NumberStyles.HexNumber, CultureInfo.InvariantCulture) : null;
+        MatchCollection matches = HexIndexPattern().Matches(stdout);
+        if (matches.Count == 0)
+        {
+            return null;
+        }
+
+        string value = matches.Count == 1 ? matches[0].Value : matches[matches.Count - 2].Value;
+        return int.Parse(value.AsSpan(2), NumberStyles.HexNumber, CultureInfo.InvariantCulture);
     }
 
-    /// <summary>Same as <see cref="ParseAcSettingIndex"/> for the DC index.</summary>
+    /// <summary>Same as <see cref="ParseAcSettingIndex"/> for the DC index (last literal).</summary>
     public static int? ParseDcSettingIndex(string? stdout)
     {
         if (string.IsNullOrWhiteSpace(stdout))
@@ -176,7 +185,7 @@ public static partial class IntelPowerPolicy
 
         MatchCollection matches = HexIndexPattern().Matches(stdout);
         return matches.Count >= 2
-            ? int.Parse(matches[1].Value.AsSpan(2), NumberStyles.HexNumber, CultureInfo.InvariantCulture)
+            ? int.Parse(matches[matches.Count - 1].Value.AsSpan(2), NumberStyles.HexNumber, CultureInfo.InvariantCulture)
             : null;
     }
 

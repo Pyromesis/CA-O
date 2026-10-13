@@ -257,6 +257,63 @@ public sealed class NvidiaGpuWriteTests
     }
 
     [Fact]
+    public void CanWrite_ClosesTheOffsets_WhenTheDriverExposesNoBounds_GeForce()
+    {
+        // RTX 4060 Ti via NVML: power limits readable, offset bounds null.
+        // The write path already refuses this with OffsetBoundsUnavailable;
+        // the gate must agree BEFORE the row looks applicable, or CollectFrom
+        // queues work the driver will reject after journal and checkpoint.
+        FakeTuningApi tuning = FakeTuningApi.Valid();
+        tuning.Device = tuning.Device! with
+        {
+            CoreOffsetMinMegahertz = null,
+            CoreOffsetMaxMegahertz = null,
+            MemoryOffsetMinMegahertz = null,
+            MemoryOffsetMaxMegahertz = null,
+        };
+        NvidiaGpuBackend backend = new(tuning);
+
+        Assert.False(backend.CanWrite(CoreOffset));
+        Assert.False(backend.CanWrite(MemoryOffset));
+        Assert.Equal(NvidiaGpuBackend.OffsetBoundsUnavailableReasonKey, backend.BlockReasonKey(CoreOffset));
+        Assert.Equal(NvidiaGpuBackend.OffsetBoundsUnavailableReasonKey, backend.BlockReasonKey(MemoryOffset));
+
+        // Power keeps its honest axis: limits readable, anchor present.
+        Assert.True(backend.CanWrite(PowerLimit));
+        Assert.Null(backend.BlockReasonKey(PowerLimit));
+    }
+
+    [Fact]
+    public void CanWrite_ClosesThePowerLimit_WhenThereIsNoAnchor()
+    {
+        FakeTuningApi tuning = FakeTuningApi.Valid();
+        tuning.Device = tuning.Device! with
+        {
+            DefaultPowerLimitMilliwatts = null,
+            MinPowerLimitMilliwatts = null,
+        };
+        NvidiaGpuBackend backend = new(tuning);
+
+        Assert.False(backend.CanWrite(PowerLimit));
+        Assert.Equal(NvidiaGpuBackend.PowerAnchorUnavailableReasonKey, backend.BlockReasonKey(PowerLimit));
+    }
+
+    [Fact]
+    public void CanWrite_ClosesThePowerLimit_WhenAnchorIsZero()
+    {
+        FakeTuningApi tuning = FakeTuningApi.Valid();
+        tuning.Device = tuning.Device! with
+        {
+            DefaultPowerLimitMilliwatts = 0,
+            MinPowerLimitMilliwatts = 0,
+        };
+        NvidiaGpuBackend backend = new(tuning);
+
+        Assert.False(backend.CanWrite(PowerLimit));
+        Assert.Equal(NvidiaGpuBackend.PowerAnchorUnavailableReasonKey, backend.BlockReasonKey(PowerLimit));
+    }
+
+    [Fact]
     public async Task BlockReasonKey_ExplainsWhyAKnobIsInert_InsteadOfShowingADeadControl()
     {
         NvidiaGpuBackend backend = new(FakeTuningApi.Valid());

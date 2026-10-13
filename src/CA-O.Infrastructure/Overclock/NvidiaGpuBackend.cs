@@ -309,16 +309,16 @@ public sealed class NvidiaGpuBackend : IOverclockBackend, IOverclockDetailSource
         return new ValueTask<IReadOnlyList<OverclockReading>>(readings);
     }
 
-    /// <summary>True only for the three knobs with a public vendor setter, on a driver that has NVML.</summary>
-    public bool CanWrite(KnobId knob)
-    {
-        if (!_tuning.IsAvailable || !IsWritable(knob))
-        {
-            return false;
-        }
-
-        return _tuning.TryDescribe(out _);
-    }
+    /// <summary>
+    /// True only for the knobs the driver can actually take on this machine.
+    /// A GeForce exposes power limits through NVML but no offset bounds, so the
+    /// offsets stay closed here with <see cref="OffsetBoundsUnavailableReasonKey"/>:
+    /// the write path already refuses them for the same reason, and a gate that
+    /// disagrees with it is how a row looks applicable until the apply fails it
+    /// after journal and checkpoint. Single source of truth with
+    /// <see cref="BlockReasonKey"/>: the two can never disagree again.
+    /// </summary>
+    public bool CanWrite(KnobId knob) => BlockReasonKey(knob) is null;
 
     /// <summary>The real blocker, so the UI explains itself instead of showing a dead control.</summary>
     public string? BlockReasonKey(KnobId knob)
@@ -333,7 +333,30 @@ public sealed class NvidiaGpuBackend : IOverclockBackend, IOverclockDetailSource
             return NoPublicSetterReasonKey;
         }
 
-        return _tuning.TryDescribe(out _) ? null : "overclock-nvml-device-unavailable";
+        if (!_tuning.TryDescribe(out NvidiaTuningDevice? described) || described is null)
+        {
+            return "overclock-nvml-device-unavailable";
+        }
+
+        if (knob == NvKnobs.CoreClockOffset
+            && (described.CoreOffsetMinMegahertz is null || described.CoreOffsetMaxMegahertz is null))
+        {
+            return OffsetBoundsUnavailableReasonKey;
+        }
+
+        if (knob == NvKnobs.MemoryClockOffset
+            && (described.MemoryOffsetMinMegahertz is null || described.MemoryOffsetMaxMegahertz is null))
+        {
+            return OffsetBoundsUnavailableReasonKey;
+        }
+
+        if (knob == NvKnobs.PowerLimit
+            && !TryGetPowerAnchor(out _))
+        {
+            return PowerAnchorUnavailableReasonKey;
+        }
+
+        return null;
     }
 
     private void RecordStatus(int status)

@@ -143,6 +143,29 @@ public sealed class IntelPowerPolicyTests
     }
 
     [Fact]
+    public void ParseAcSettingIndex_SkipsMinimumMaximumAndReadsCurrentAc()
+    {
+        // Repro del bug: en un esquema real powercfg /q emite Min/Max antes
+        // del indice actual. El parser tomaba el primer literal (Minimum =
+        // 0x00000000) y la fila CPU mostraba "0 %" siendo 100, con lo que
+        // el verify tras escribir 100 fallaba siempre (lee 0 != 100).
+        const string realistic = """
+            Power Scheme GUID: 381b4222-f694-41f0-9685-ff5bb260df2e  (Balanced)
+              Subgroup GUID: 54533251-82be-4824-96c1-47b60b740d00  (Processor power management)
+                Power Setting GUID: bc5038f7-23e0-4960-96da-33abaf5935ec  (Maximum processor state)
+                  Minimum Possible Setting: 0x00000000
+                  Maximum Possible Setting: 0x00000064
+                  Possible Setting Increment: 0x00000001
+                  Possible Setting Units: %
+                  Current AC Power Setting Index: 0x00000064
+                  Current DC Power Setting Index: 0x0000005a
+            """;
+
+        Assert.Equal(100, IntelPowerPolicy.ParseAcSettingIndex(realistic));
+        Assert.Equal(90, IntelPowerPolicy.ParseDcSettingIndex(realistic));
+    }
+
+    [Fact]
     public void ParseAcSettingIndex_ReadsTheFirstHexLiteral_InEnglishAndSpanish()
     {
         Assert.Equal(2, IntelPowerPolicy.ParseAcSettingIndex(EnglishOutput));
