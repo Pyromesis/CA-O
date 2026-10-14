@@ -583,6 +583,8 @@ catch (Exception ex)
                     requested = timer.Resolution100Ns,
                     applied = actual,
                     appliedMs = TimerResolution.FormatMs(actual),
+                    globalMode = TimerResolution.IsGlobalModeEnabled(),
+                    persisted = timer.Resolution100Ns < TimerResolution.Default100Ns,
                 }, JsonOptions));
             }
 

@@ -2,7 +2,16 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
-## [Unreleased]
+## [2.2.19] - 2026-10-14
+### Añadido
+- **Página Red gaming.** Ping, jitter y pérdida reales a 21 regiones de AWS (donde alojan Fortnite, PUBG y muchos más), medidos por conexión TCP para que funcione aunque el destino bloquee ping; monitor en vivo una vez por segundo con gráfica, mediana, p95 y picos (acepta la IP:puerto del servidor del juego); traceroute con diagnóstico que dice si el lag nace en tu Wi-Fi/router, en tu proveedor o en la distancia, sin culpar a routers que solo limitan ICMP; y botón para aplicar los ajustes de red seleccionados. Sin promesas: la página explica que las rutas por servidores propios tipo ExitLag necesitan una red de servidores que CA-O no tiene.
+- **7 optimizaciones nuevas (catálogo 93 → 100).** Input lag: `enable-global-timer-resolution`, `mmcss-games-task-priority`, `disable-accessibility-hotkeys`, `keyboard-fast-repeat`. Red: `prioritize-game-traffic-qos` (QoS DSCP 46 por ejecutable de 15 juegos online), `disable-network-throttling`, `disable-energy-efficient-ethernet`. Todas registro con snapshot y revert exacto, riesgo Safe/Low, sin tocar juegos ni anti-cheat.
+### Corregido
+- **El timer resolution no llegaba a los juegos en Windows 11.** Desde Windows 10 2004 la petición solo afecta al proceso que la hace y el servicio no tiene ventana: sin `GlobalTimerResolutionRequests` el botón de 0,5/1,0 ms no hacía nada para el juego. La tarjeta ahora lo detecta y ofrece activarlo.
+- **El timer se perdía al reiniciar** y "Predeterminado" no liberaba la petición (fijaba 15,625 ms con set=TRUE). El servicio guarda la resolución elegida y la re-aplica al arrancar (`TimerResolutionKeeper`); "Predeterminado" la libera de verdad y borra lo guardado.
+- **Los tests escribían en el crash log real del usuario** (~2 MB de excepciones simuladas en `%LOCALAPPDATA%\CA-O\logs\cao-ui-crash.log` tapando los crashes reales). La suite UI redirige el log a una ruta temporal desde un `ModuleInitializer`.
+### Probado
+- Suite 1986 passed, 0 failed (Security 274, Benchmark 17, Infrastructure 215, Core 1030, UI 390, Integration 60). Sonda de red verificada en real: regiones por TCP, traceroute y veredicto.
 ## [2.2.18] - 2026-10-14
 ### Corregido
 - **Overclock compatible con anti-cheat: ya no se bloquea todo.** Tener Vanguard o EasyAntiCheat instalado cerraba cualquier escritura y en un equipo de Valorant/Fortnite no se podia hacer overclock. Nueva puerta `OverclockAntiCheatGate` por mecanismo: solo un driver de kernel propio cierra la fila; la API oficial del driver de la GPU (NVML/ADLX) y el plan de energia de Windows siguen abiertos y la fila dice por que es seguro.

@@ -1,4 +1,4 @@
-using CAO.Core.Abstractions;
+﻿using CAO.Core.Abstractions;
 using CAO.Core.Optimizations;
 using CAO.Core.Optimizations.Gaming;
 using CAO.Core.Optimizations.Network;
@@ -94,6 +94,12 @@ public static class OptimizationCatalog
     public static readonly MouseDriverQueueTrim MouseDriverQueueTrim = new();
     public static readonly MmcssSystemResponsiveness MmcssSystemResponsiveness = new();
 
+    // Input lag (2.2.19)
+    public static readonly EnableGlobalTimerResolution EnableGlobalTimerResolution = new();
+    public static readonly MmcssGamesTaskPriority MmcssGamesTaskPriority = new();
+    public static readonly DisableAccessibilityHotkeys DisableAccessibilityHotkeys = new();
+    public static readonly KeyboardFastRepeat KeyboardFastRepeat = new();
+
     // Historical entries retained only for traceability (AllLegacy + LegacyIds);
     // optimize-hdd-media-aware, set-best-performance-ac y disk-cleanup-system-files
     // están retirados de All (duplicados exactos). Auditoría 2026-09-29:
@@ -168,6 +174,11 @@ public static class OptimizationCatalog
     public static readonly DisableNagleTcpAcks DisableNagleTcpAcks = new();
     public static readonly DisableWifiBackgroundScan DisableWifiBackgroundScan = new();
 
+    // Red para juegos (2.2.19)
+    public static readonly PrioritizeGameTrafficQos PrioritizeGameTrafficQos = new();
+    public static readonly DisableNetworkThrottling DisableNetworkThrottling = new();
+    public static readonly DisableEnergyEfficientEthernet DisableEnergyEfficientEthernet = new();
+
     // Startup (new)
     public static readonly DisableUnnecessaryStartupApps DisableUnnecessaryStartupApps = new();
     public static readonly DisableHeavyStartupApps DisableHeavyStartupApps = new();
@@ -198,7 +209,7 @@ public static class OptimizationCatalog
     public static readonly RestartWindowsExplorer RestartWindowsExplorer = new();
     public static readonly RecoverWindowsExplorer RecoverWindowsExplorer = new();
 
-    /// <summary>Production catalog: 93 verified optimizations. All optimizations are now in production.</summary>
+    /// <summary>Production catalog: 100 verified optimizations. All optimizations are now in production.</summary>
     public static IReadOnlyList<IOptimization> All { get; } = new IOptimization[]
     {
         DisableBackgroundApps,
@@ -275,6 +286,14 @@ public static class OptimizationCatalog
         DeliveryOptimizationBandwidthProfile,
         DisableNagleTcpAcks,
         DisableWifiBackgroundScan,
+        // Input lag + red para juegos (2.2.19)
+        EnableGlobalTimerResolution,
+        MmcssGamesTaskPriority,
+        DisableAccessibilityHotkeys,
+        KeyboardFastRepeat,
+        PrioritizeGameTrafficQos,
+        DisableNetworkThrottling,
+        DisableEnergyEfficientEthernet,
         // Startup Phase 5: promoted from legacy
         DisableUnnecessaryStartupApps,
         DisableHeavyStartupApps,

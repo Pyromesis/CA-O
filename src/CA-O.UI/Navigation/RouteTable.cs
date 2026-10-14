@@ -20,6 +20,7 @@ public static class RouteTable
             ["history"] = typeof(Pages.HistoryPage),
             ["cleanup"] = typeof(Pages.LimpiezaPage),
             ["solucionar"] = typeof(Pages.SolucionarPage),
+            ["network"] = typeof(Pages.NetworkPage),
             ["drivers"] = typeof(Pages.DriversPage),
             ["settings"] = typeof(Pages.SettingsPage),
             ["tutorial"] = typeof(Tutorial.TutorialPage),
@@ -28,7 +29,7 @@ public static class RouteTable
     /// <summary>Ordered tags as shown in the NavigationView.</summary>
     public static readonly IReadOnlyList<string> Order = new[]
     {
-        "dashboard", "analyze", "optimize", "cleanup", "solucionar", "drivers",
+        "dashboard", "analyze", "optimize", "cleanup", "network", "solucionar", "drivers",
         "benchmark", "overclock", "restore", "history", "settings", "tutorial",
     };
 

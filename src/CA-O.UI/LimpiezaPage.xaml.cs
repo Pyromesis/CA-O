@@ -91,6 +91,57 @@ public sealed partial class LimpiezaPage : Page
                 TimerCurrentText.Text = "Actual: desconocido";
         }
         catch { TimerCurrentText.Text = "Actual: desconocido"; }
+
+        var global = ReadGlobalTimerMode();
+        TimerGlobalText.Text = global switch
+        {
+            GlobalTimerMode.Enabled => "Modo global: activo. El timer llega a los juegos y se mantiene tras reiniciar.",
+            GlobalTimerMode.NotNeeded => "Modo global: no hace falta en esta versión de Windows.",
+            _ => "Modo global: inactivo. En Windows 11 el timer no llega a los juegos hasta activarlo.",
+        };
+        TimerGlobalButton.Visibility = global == GlobalTimerMode.Disabled ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private enum GlobalTimerMode { Enabled, Disabled, NotNeeded }
+
+    /// <summary>
+    /// GlobalTimerResolutionRequests solo existe desde la build 20348; antes el
+    /// timer ya era global. Lectura de HKLM sin privilegios.
+    /// </summary>
+    private static GlobalTimerMode ReadGlobalTimerMode()
+    {
+        if (Environment.OSVersion.Version.Build < 20348) return GlobalTimerMode.NotNeeded;
+        try
+        {
+            using var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(
+                @"SYSTEM\CurrentControlSet\Control\Session Manager\kernel");
+            return key?.GetValue("GlobalTimerResolutionRequests") is int value && value == 1
+                ? GlobalTimerMode.Enabled
+                : GlobalTimerMode.Disabled;
+        }
+        catch
+        {
+            return GlobalTimerMode.Disabled;
+        }
+    }
+
+    private async void OnTimerGlobalClick(object sender, RoutedEventArgs e)
+    {
+        var dialog = new ContentDialog
+        {
+            Title = "Timer resolution global",
+            Content = "Activa GlobalTimerResolutionRequests para que el timer que fija CA-O llegue a los juegos. Se guarda un snapshot y es reversible desde Restaurar. Requiere reiniciar el equipo. ¿Continuar?",
+            PrimaryButtonText = "Activar",
+            CloseButtonText = "Cancelar",
+            DefaultButton = ContentDialogButton.Close,
+            XamlRoot = Content.XamlRoot,
+        };
+        if (await UiDialogs.ShowAsync(dialog) != ContentDialogResult.Primary) return;
+        var message = await RunCleanupAsync("enable-global-timer-resolution", TimerStatusText, null);
+        TimerStatusText.Text = message?.StartsWith('✓') == true
+            ? message + " Reinicia para que tenga efecto."
+            : message ?? string.Empty;
+        RefreshTimerDisplay();
     }
 
     private async void OnCleanClick(object sender, RoutedEventArgs e)
@@ -376,7 +427,9 @@ public sealed partial class LimpiezaPage : Page
         var dialog = new ContentDialog
         {
             Title = "Cambiar timer resolution",
-            Content = $"Se fijará el timer del sistema a {label} mientras el servicio privilegiado corra. ¿Continuar?",
+            Content = resolution >= 156250
+                ? "Se libera el timer que mantiene CA-O y Windows vuelve a su valor normal. ¿Continuar?"
+                : $"Se fijará el timer del sistema a {label}. CA-O lo mantiene activo y lo vuelve a aplicar tras reiniciar. ¿Continuar?",
             PrimaryButtonText = "Aplicar",
             CloseButtonText = "Cancelar",
             DefaultButton = ContentDialogButton.Close,

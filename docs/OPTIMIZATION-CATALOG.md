@@ -1,13 +1,13 @@
 # CA-O Optimization Catalog
 
-Calidad sobre cantidad. **93 optimizaciones verificadas en producción. 12 optimizaciones históricas retiradas del catálogo de producción; no se incluyen en `OptimizationCatalog.All` y quedan en `AllLegacy` solo para trazabilidad.** Cada entrada responde qué cambia, por qué, con qué evidencia, qué riesgo y seguridad afecta, si es reversible y cómo se verifica.
+Calidad sobre cantidad. **100 optimizaciones verificadas en producción. 12 optimizaciones históricas retiradas del catálogo de producción; no se incluyen en `OptimizationCatalog.All` y quedan en `AllLegacy` solo para trazabilidad.** Cada entrada responde qué cambia, por qué, con qué evidencia, qué riesgo y seguridad afecta, si es reversible y cómo se verifica.
 
 ## Summary
 
 Existing optimizations: 18 (histórico)
 New optimizations: 50 (histórico)
 Total histórico: 68
-**Producción verificada: 93** (ninguna entrada parcial; 12 históricas retiradas y excluidas)
+**Producción verificada: 100** (ninguna entrada parcial; 12 históricas retiradas y excluidas)
 **Históricas retiradas: 12** (permanecen en `AllLegacy` solo para trazabilidad)
 
 ## Evidence model
@@ -31,7 +31,7 @@ Total histórico: 68
 
 Nunca se deshabilita silenciosamente Secure Boot/TPM/VBS/HVCI/Defender/firewall. VBS/HVCI requiere Expert + confirmacion.
 
-## Catalogo Overclock (separado del de 93)
+## Catalogo Overclock (separado del de 100)
 
 Los ajustes de overclock NO son entradas de `OptimizationCatalog` y no aparecen en la tabla de arriba: viven en su propio catalogo declarativo (`src/CA-O.Core/Overclock/Catalog/OverclockCatalog.cs`), con 11 knobs servidos por 4 backends (`src/CA-O.Infrastructure/Overclock/`):
 
@@ -52,9 +52,9 @@ Reglas que comparte con este catalogo: ninguna entrada con evidencia `Unknown`, 
 - `SecuritySensitive` — `SecurityTradeoff`/`ReducedProtection` (p. ej. `disable-vbs` con anticheat activo).
 - `NotApplicable` — precondiciones no cumplidas (p. ej. Gaming sin Windows 11) o ids legacy.
 
-La columna `Batch` indica si la optimización entra en `CatalogProjections.BatchDefault` (65 de 93): los sets `Repair` (15), `Diagnostic` (4) y `Restore` (9) se excluyen del lote automático y viven en sus propias vistas (Solucionar, diagnósticos, restauración).
+La columna `Batch` indica si la optimización entra en `CatalogProjections.BatchDefault` (72 de 100): los sets `Repair` (15), `Diagnostic` (4) y `Restore` (9) se excluyen del lote automático y viven en sus propias vistas (Solucionar, diagnósticos, restauración).
 
-## Optimization registry — Producción verificada (93)
+## Optimization registry — Producción verificada (100)
 
 | Id | Categoria | Impacto | Evidencia | Riesgo | Compatibilidad | Reversible | Flags | Batch |
 |---|---|---|---|---|---|---|---|---|
@@ -80,6 +80,8 @@ La columna `Batch` indica si la optimización entra en `CatalogProjections.Batch
 | defragment-hdd-only | Storage | Small | Official | Low | Compatible | No | NotReversible | Sí |
 | delay-safe-third-party-service-start | Performance | Small | Empirical | Low | Compatible | Sí | — | Sí |
 | delivery-optimization-bandwidth-profile | Network | Tiny | Official | Low | Compatible | Sí | — | Sí |
+| disable-accessibility-hotkeys | Gaming | Tiny | Official | Safe | Compatible | Sí | — | Sí |
+| disable-energy-efficient-ethernet | Network | Small | Vendor | Low | Conditional | Sí | RequiresReboot | Sí |
 | disable-background-apps | Performance | Small | Official | Low | Compatible | Sí | — | Sí |
 | disable-background-game-captures | Gaming | Small | Vendor | Low | Compatible | Sí | — | Sí |
 | disable-bluetooth-absolute-volume | Performance | Tiny | Official | Low | Conditional | Sí | — | No |
@@ -90,6 +92,7 @@ La columna `Batch` indica si la optimización entra en `CatalogProjections.Batch
 | disable-game-bar-dvr | Gaming | WorkloadDependent | Vendor | Low | Compatible | Sí | — | Sí |
 | disable-heavy-startup-apps | Performance | Small | Empirical | Moderate | Compatible | Sí | — | Sí |
 | disable-hibernate | Storage | None | Official | Moderate | Compatible | Sí | — | Sí |
+| disable-network-throttling | Network | Small | Empirical | Low | Compatible | Sí | — | Sí |
 | disable-nagle-tcp-acks | Network | Small | Official | Moderate | Conditional | Sí | RequiresReboot | Sí |
 | disable-nic-power-saving-ac | Network | Small | Empirical | Low | Conditional | Sí | — | Sí |
 | disable-onedrive-autostart | PrivacySecurity | Tiny | Official | Low | Conditional | Sí | ExpertOnly | Sí |
@@ -107,6 +110,7 @@ La columna `Batch` indica si la optimización entra en `CatalogProjections.Batch
 | disable-widgets | PrivacySecurity | Tiny | Official | Low | Compatible | Sí | — | Sí |
 | disable-wifi-background-scan | Network | Small | Official | Moderate | Conditional | Sí | ExpertOnly | Sí |
 | enable-auto-hdr | Gaming | None | Official | Safe | Conditional | Sí | — | Sí |
+| enable-global-timer-resolution | Gaming | Small | Empirical | Low | Conditional | Sí | RequiresReboot | Sí |
 | enable-game-mode | Gaming | WorkloadDependent | Official | Low | Compatible | Sí | — | Sí |
 | enable-gpu-scheduling | Gaming | WorkloadDependent | Vendor | Moderate | Conditional | Sí | RequiresReboot | Sí |
 | enable-rss | Network | Small | Vendor | Low | Conditional | Sí | — | Sí |
@@ -117,7 +121,9 @@ La columna `Batch` indica si la optimización entra en `CatalogProjections.Batch
 | fix-microphone-access | Performance | Tiny | Official | Low | Compatible | Sí | — | No |
 | flush-dns-cache | Network | Tiny | Official | Low | Compatible | Sí | OneShot | No |
 | free-low-storage-space | Storage | DiagnosticOnly | Official | Safe | Compatible | Sí | — | No |
+| keyboard-fast-repeat | Gaming | Tiny | Official | Safe | Compatible | Sí | — | Sí |
 | maximum-power-plan | Performance | Small | Official | Low | Compatible | Sí | — | Sí |
+| mmcss-games-task-priority | Gaming | Small | Empirical | Low | Compatible | Sí | — | Sí |
 | mmcss-system-responsiveness | Gaming | Small | Empirical | Low | Compatible | Sí | — | Sí |
 | mouse-driver-queue-trim | Gaming | Tiny | Empirical | Moderate | Conditional | Sí | RequiresReboot | Sí |
 | normalize-tcp-autotuning | Network | WorkloadDependent | Official | Low | Conditional | Sí | — | Sí |
@@ -125,6 +131,7 @@ La columna `Batch` indica si la optimización entra en `CatalogProjections.Batch
 | optimize-startup-recovery-state | Storage | DiagnosticOnly | Official | Safe | Compatible | Sí | — | No |
 | optimize-system-drive | Storage | None | Official | Low | Compatible | No | NotReversible | Sí |
 | pending-reboot-maintenance | Storage | DiagnosticOnly | Official | Safe | Compatible | Sí | — | No |
+| prioritize-game-traffic-qos | Network | WorkloadDependent | Official | Low | Conditional | Sí | RequiresReboot | Sí |
 | recover-windows-explorer | Performance | Small | Official | Low | Compatible | No | NotReversible | No |
 | remove-unused-custom-power-plans | Performance | Tiny | Official | Low | Compatible | No | NotReversible | Sí |
 | repair-windows-update | Performance | Small | Official | Moderate | Compatible | Sí | — | No |
@@ -172,6 +179,21 @@ La columna `Batch` indica si la optimización entra en `CatalogProjections.Batch
 - `storage-sense-recycle-bin-policy` (fusionada en `configure-storage-sense`; alias en `RetiredAliases`)
 
 ## Detailed definitions
+
+### enable-global-timer-resolution
+Desde Windows 10 2004 la petición de timer de un proceso solo le afecta a él, y Windows 11 la ignora si el proceso no tiene ventana visible: el timer que mantiene el servicio no llegaba a los juegos. `GlobalTimerResolutionRequests=1` (build 20348+) devuelve el comportamiento global. El servicio persiste la resolución elegida en `%ProgramData%\CA-O\timer-resolution.txt` y la re-aplica al arrancar; "Predeterminado" la libera (`NtSetTimerResolution(..., FALSE)`) y borra el fichero.
+
+### prioritize-game-traffic-qos
+Policy-based QoS (`HKLM\SOFTWARE\Policies\Microsoft\Windows\QoS\CA-O Game <exe>`): DSCP 46 sin límite (`Throttle Rate=-1`) para 15 ejecutables de juego online, más `Tcpip\QoS\Do not use NLA=1` para que aplique fuera de dominio. En Wi-Fi, WMM mapea DSCP 46 a la cola de voz; un router con QoS/SQM también lo respeta. No toca el juego ni su anti-cheat. Revert borra los valores (una política sin `Version` se ignora).
+
+### disable-network-throttling
+`SystemProfile\NetworkThrottlingIndex=0xFFFFFFFF`: quita el límite de 10 paquetes/ms que MMCSS aplica al tráfico no multimedia mientras suena audio.
+
+### disable-energy-efficient-ethernet
+`*EEE`, `EEE`, `AdvancedEEE`, `EnableGreenEthernet`, `GreenEthernet`, `EEELinkAdvertisement` = 0 solo en adaptadores físicos que ya exponen la propiedad (base `NicAdvancedPropertyOptimization`).
+
+### mmcss-games-task-priority / disable-accessibility-hotkeys / keyboard-fast-repeat
+Tarea MMCSS `Games` a prioridad 6 y categoría High; atajos de Teclas especiales/filtro/alternancia fuera (Flags 506/122/58); repetición de teclado al extremo del panel (0/31). Todas registro puro, reversibles exactas.
 
 ### disable-pointer-precision
 Ratón 1:1 sin aceleración

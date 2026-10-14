@@ -50,6 +50,10 @@ public abstract class RegistryOptimizationBase : IOptimization
         return snapshot;
     }
 
+    /// <summary>Sin precondiciones por defecto; las subclases con requisitos de build/hardware la sobrescriben.</summary>
+    public virtual Task<PreconditionResult> CheckPreconditionsAsync(SystemContext context, CancellationToken ct = default) =>
+        Task.FromResult(PreconditionResult.Ok("Sin precondiciones específicas de esta optimización."));
+
     public abstract Task<OperationResult> ApplyAsync(OptimizationContext context, CancellationToken ct = default);
 
     public virtual Task<OperationResult> RevertAsync(OptimizationContext context, OptimizationSnapshot snapshot, CancellationToken ct = default)

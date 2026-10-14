@@ -1,0 +1,247 @@
+<Page
+    x:Class="CAO.UI.Pages.NetworkPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:CAO.UI.Controls">
+    <Page.Resources>
+        <Style x:Key="NetworkActionButtonStyle" TargetType="Button" BasedOn="{StaticResource CaoActionButtonStyle}">
+            <Setter Property="MinWidth" Value="180"/>
+        </Style>
+        <Style x:Key="NetworkStatValueStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="22"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+        </Style>
+    </Page.Resources>
+    <Grid>
+    <ScrollViewer Padding="{StaticResource CaoPagePadding}" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Background="{ThemeResource SolidBackgroundFillColorBaseBrush}">
+        <StackPanel x:Name="PageContent" Style="{StaticResource CaoPageContainerStyle}">
+            <StackPanel Style="{StaticResource CaoPageHeaderStyle}">
+                <TextBlock Text="Red gaming" TextAlignment="Center" Style="{StaticResource CaoPageTitleStyle}"/>
+                <TextBlock Text="Mide tu ruta real a los servidores de juego, vigila el ping en vivo y prioriza el tráfico del juego. Todo medido, nada inventado." TextAlignment="Center" TextWrapping="Wrap" Style="{StaticResource CaoSubtitleStyle}"/>
+                <Border Style="{StaticResource CaoHeaderAccentBarStyle}"/>
+            </StackPanel>
+            <Button x:Name="PageTourButton"
+                    Click="OnPageTourClick"
+                    Style="{StaticResource CaoElevatedButtonStyle}"
+                    HorizontalAlignment="Right"
+                    FontSize="12"
+                    Margin="0,4,0,8" />
+
+            <!-- Conexión activa -->
+            <Border x:Name="ConnectionCard" Style="{StaticResource CaoCardStyle}">
+                <StackPanel Spacing="8">
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <controls:CaoCat x:Name="NetworkCat" Width="48" ShowCaption="False" VerticalAlignment="Center"
+                                         AutomationProperties.Name="Mascota de CA-O"/>
+                        <Border Style="{StaticResource CaoCardIconStyle}" Background="{StaticResource CaoCyanSoftBrush}">
+                            <FontIcon Glyph="&#xE774;" FontSize="16" Foreground="{StaticResource CaoCyanSolidBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <StackPanel Spacing="2" VerticalAlignment="Center">
+                            <TextBlock Text="Tu conexión" Style="{StaticResource CaoCardTitleStyle}"/>
+                            <TextBlock x:Name="ConnectionText" Text="Comprobando…" Style="{StaticResource CaoSectionSubtitleStyle}"/>
+                        </StackPanel>
+                    </StackPanel>
+                    <TextBlock x:Name="WifiWarningText" Visibility="Collapsed" TextWrapping="Wrap" Style="{StaticResource CaoListItemDetailStyle}"
+                               Text="Estás por Wi-Fi: es la causa más común de picos de ping y pérdida. Un cable Ethernet suele arreglar más que cualquier ajuste."/>
+                </StackPanel>
+            </Border>
+
+            <!-- Regiones -->
+            <Border x:Name="RegionsCard" Style="{StaticResource CaoCardStyle}">
+                <StackPanel Spacing="12">
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <Border Style="{StaticResource CaoCardIconStyle}" Background="{StaticResource CaoBlueSoftBrush}">
+                            <FontIcon Glyph="&#xE909;" FontSize="16" Foreground="{StaticResource CaoBlueSolidBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <StackPanel Spacing="2" VerticalAlignment="Center">
+                            <TextBlock Text="Ping a regiones de juego" Style="{StaticResource CaoCardTitleStyle}"/>
+                            <TextBlock Text="Regiones de AWS, donde alojan servidores Fortnite, PUBG y muchos más. Elige la más baja en el juego." TextWrapping="Wrap" Style="{StaticResource CaoSectionSubtitleStyle}"/>
+                        </StackPanel>
+                    </StackPanel>
+                    <Border Style="{StaticResource CaoDividerStyle}"/>
+                    <StackPanel Orientation="Horizontal" Spacing="12">
+                        <ComboBox x:Name="AreaCombo" MinWidth="200" SelectionChanged="OnAreaChanged" AutomationProperties.Name="Zona de regiones"/>
+                        <Button x:Name="MeasureRegionsButton" Content="Medir regiones" Click="OnMeasureRegionsClick" Style="{StaticResource NetworkActionButtonStyle}"
+                                AutomationProperties.Name="Medir ping a las regiones"
+                                ToolTipService.ToolTip="10 conexiones TCP por región. Mide ping, jitter y pérdida reales. No cambia nada."/>
+                    </StackPanel>
+                    <ProgressBar x:Name="RegionsProgress" Minimum="0" Maximum="100" Value="0" Visibility="Collapsed"/>
+                    <ListView x:Name="RegionsList" SelectionMode="Single" SelectionChanged="OnRegionSelected" MaxHeight="420">
+                        <ListView.ItemContainerStyle>
+                            <Style TargetType="ListViewItem">
+                                <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                            </Style>
+                        </ListView.ItemContainerStyle>
+                        <ListView.ItemTemplate>
+                            <DataTemplate>
+                                <Grid ColumnSpacing="12" Padding="0,6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="80"/>
+                                        <ColumnDefinition Width="90"/>
+                                        <ColumnDefinition Width="80"/>
+                                        <ColumnDefinition Width="100"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Spacing="2">
+                                        <TextBlock Text="{Binding Name}" Style="{StaticResource CaoListItemTitleStyle}"/>
+                                        <TextBlock Text="{Binding Area}" Style="{StaticResource CaoListItemDetailStyle}"/>
+                                    </StackPanel>
+                                    <TextBlock Grid.Column="1" Text="{Binding PingText}" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                    <TextBlock Grid.Column="2" Text="{Binding JitterText}" Opacity="0.8" VerticalAlignment="Center"/>
+                                    <TextBlock Grid.Column="3" Text="{Binding LossText}" Opacity="0.8" VerticalAlignment="Center"/>
+                                    <Border Grid.Column="4" Background="{Binding GradeBrush}" Style="{StaticResource CaoBadgeStyle}" VerticalAlignment="Center" HorizontalAlignment="Left">
+                                        <TextBlock Text="{Binding GradeText}" FontSize="11" Foreground="{ThemeResource TextOnAccentFillColorSelectedTextBrush}"/>
+                                    </Border>
+                                </Grid>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
+                    <TextBlock x:Name="RegionsStatusText" TextWrapping="Wrap" Style="{StaticResource CaoSectionSubtitleStyle}" AutomationProperties.LiveSetting="Polite"
+                               Text="Pulsa Medir regiones. Selecciona una fila para vigilarla en vivo o analizar su ruta."/>
+                </StackPanel>
+            </Border>
+
+            <!-- Monitor en vivo -->
+            <Border x:Name="LiveCard" Style="{StaticResource CaoCardStyle}">
+                <StackPanel Spacing="12">
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <Border Style="{StaticResource CaoCardIconStyle}" Background="{StaticResource CaoGreenSoftBrush}">
+                            <FontIcon Glyph="&#xE9D9;" FontSize="16" Foreground="{StaticResource CaoGreenSolidBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <StackPanel Spacing="2" VerticalAlignment="Center">
+                            <TextBlock Text="Monitor de ping en vivo" Style="{StaticResource CaoCardTitleStyle}"/>
+                            <TextBlock Text="Una medición por segundo mientras juegas. Detecta picos y pérdida en el momento." TextWrapping="Wrap" Style="{StaticResource CaoSectionSubtitleStyle}"/>
+                        </StackPanel>
+                    </StackPanel>
+                    <Border Style="{StaticResource CaoDividerStyle}"/>
+                    <Grid ColumnSpacing="12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBox x:Name="TargetBox" PlaceholderText="Destino: región seleccionada, o IP/host del servidor (p. ej. 1.2.3.4:7000)"
+                                 AutomationProperties.Name="Destino a medir" MaxLength="260"/>
+                        <Button x:Name="LiveToggleButton" Grid.Column="1" Content="Iniciar" Click="OnLiveToggleClick" Style="{StaticResource NetworkActionButtonStyle}"
+                                AutomationProperties.Name="Iniciar o detener el monitor en vivo"/>
+                    </Grid>
+                    <Grid ColumnSpacing="12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock Text="Ping" Style="{StaticResource CaoStatLabelStyle}"/>
+                            <TextBlock x:Name="LivePingText" Text="—" Style="{StaticResource NetworkStatValueStyle}"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Jitter" Style="{StaticResource CaoStatLabelStyle}"/>
+                            <TextBlock x:Name="LiveJitterText" Text="—" Style="{StaticResource NetworkStatValueStyle}"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Text="Pérdida" Style="{StaticResource CaoStatLabelStyle}"/>
+                            <TextBlock x:Name="LiveLossText" Text="—" Style="{StaticResource NetworkStatValueStyle}"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="3">
+                            <TextBlock Text="Calidad" Style="{StaticResource CaoStatLabelStyle}"/>
+                            <TextBlock x:Name="LiveGradeText" Text="—" Style="{StaticResource NetworkStatValueStyle}"/>
+                        </StackPanel>
+                    </Grid>
+                    <Border Height="140" CornerRadius="8" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" Padding="8">
+                        <Canvas x:Name="LiveChartCanvas" SizeChanged="OnChartSizeChanged">
+                            <Polyline x:Name="LiveChartLine" Stroke="{StaticResource CaoCyanSolidBrush}" StrokeThickness="2"/>
+                        </Canvas>
+                    </Border>
+                    <TextBlock x:Name="LiveStatusText" TextWrapping="Wrap" Style="{StaticResource CaoSectionSubtitleStyle}" AutomationProperties.LiveSetting="Polite"/>
+                </StackPanel>
+            </Border>
+
+            <!-- Análisis de ruta -->
+            <Border x:Name="RouteCard" Style="{StaticResource CaoCardStyle}">
+                <StackPanel Spacing="12">
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <Border Style="{StaticResource CaoCardIconStyle}" Background="{StaticResource CaoPurpleSoftBrush}">
+                            <FontIcon Glyph="&#xE81E;" FontSize="16" Foreground="{StaticResource CaoPurpleSolidBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <StackPanel Spacing="2" VerticalAlignment="Center">
+                            <TextBlock Text="Análisis de ruta" Style="{StaticResource CaoCardTitleStyle}"/>
+                            <TextBlock Text="Salto a salto hasta el destino: dice si el lag nace en tu Wi-Fi/router, en tu proveedor o en la distancia." TextWrapping="Wrap" Style="{StaticResource CaoSectionSubtitleStyle}"/>
+                        </StackPanel>
+                    </StackPanel>
+                    <Border Style="{StaticResource CaoDividerStyle}"/>
+                    <Button x:Name="TraceButton" Content="Analizar ruta" Click="OnTraceClick" Style="{StaticResource NetworkActionButtonStyle}"
+                            AutomationProperties.Name="Analizar la ruta al destino"
+                            ToolTipService.ToolTip="Traceroute con 3 sondas por salto (hasta 24 saltos). Usa el destino del monitor en vivo."/>
+                    <ListView x:Name="HopsList" SelectionMode="None" MaxHeight="420">
+                        <ListView.ItemContainerStyle>
+                            <Style TargetType="ListViewItem">
+                                <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                <Setter Property="MinHeight" Value="28"/>
+                            </Style>
+                        </ListView.ItemContainerStyle>
+                        <ListView.ItemTemplate>
+                            <DataTemplate>
+                                <Grid ColumnSpacing="12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="40"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="90"/>
+                                        <ColumnDefinition Width="90"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="{Binding TtlText}" Opacity="0.7"/>
+                                    <TextBlock Grid.Column="1" Text="{Binding AddressText}" FontFamily="Consolas"/>
+                                    <TextBlock Grid.Column="2" Text="{Binding PingText}" FontWeight="SemiBold"/>
+                                    <TextBlock Grid.Column="3" Text="{Binding LossText}" Opacity="0.8"/>
+                                </Grid>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
+                    <TextBlock x:Name="RouteVerdictText" TextWrapping="Wrap" Style="{StaticResource CaoListItemTitleStyle}" AutomationProperties.LiveSetting="Polite"/>
+                </StackPanel>
+            </Border>
+
+            <!-- Optimizar red -->
+            <Border x:Name="BoostCard" Style="{StaticResource CaoCardStyle}">
+                <StackPanel Spacing="10">
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <Border Style="{StaticResource CaoCardIconStyle}" Background="{StaticResource CaoAmberSoftBrush}">
+                            <FontIcon Glyph="&#xE945;" FontSize="16" Foreground="{StaticResource CaoAmberSolidBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <StackPanel Spacing="2" VerticalAlignment="Center">
+                            <TextBlock Text="Optimizar red para juegos" Style="{StaticResource CaoCardTitleStyle}"/>
+                            <TextBlock Text="Cada ajuste pasa por snapshot y se puede revertir en Restaurar." TextWrapping="Wrap" Style="{StaticResource CaoSectionSubtitleStyle}"/>
+                        </StackPanel>
+                    </StackPanel>
+                    <Border Style="{StaticResource CaoDividerStyle}"/>
+                    <StackPanel x:Name="BoostOptionsPanel" Spacing="2">
+                        <CheckBox Tag="prioritize-game-traffic-qos" IsChecked="True" Content="Prioridad QoS (DSCP 46) para el tráfico de los juegos" ToolTipService.ToolTip="Valorant, CS2, Fortnite, Apex, LoL, R6, CoD, PUBG, Dota 2, Rocket League… salen antes que descargas y streams. Requiere reinicio."/>
+                        <CheckBox Tag="disable-network-throttling" IsChecked="True" Content="Sin límite de red con audio de fondo (Discord, música)"/>
+                        <CheckBox Tag="disable-nagle-tcp-acks" IsChecked="True" Content="Desactivar Nagle / ACK retardado (TCP inmediato)" ToolTipService.ToolTip="Requiere reinicio."/>
+                        <CheckBox Tag="disable-energy-efficient-ethernet" IsChecked="True" Content="Ethernet sin ahorro de energía (EEE / Green Ethernet)"/>
+                        <CheckBox Tag="disable-nic-power-saving-ac" IsChecked="True" Content="Tarjeta de red sin suspensión en AC"/>
+                        <CheckBox Tag="set-wireless-adapter-max-performance-ac" IsChecked="True" Content="Wi-Fi a máximo rendimiento en AC"/>
+                        <CheckBox Tag="enable-rss" IsChecked="True" Content="Repartir la red entre núcleos (RSS)"/>
+                        <CheckBox Tag="configure-interrupt-moderation-for-low-latency" IsChecked="False" Content="Sin moderación de interrupciones (menos latencia, más CPU)" ToolTipService.ToolTip="Riesgo moderado: sube el uso de CPU con mucho tráfico. Solo para equipos competitivos."/>
+                        <CheckBox Tag="flush-dns-cache" IsChecked="True" Content="Vaciar caché DNS"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Spacing="12">
+                        <Button x:Name="BoostApplyButton" Content="Aplicar seleccionadas" Click="OnBoostApplyClick" Style="{StaticResource CaoAccentButtonStyle}"
+                                AutomationProperties.Name="Aplicar las optimizaciones de red seleccionadas"/>
+                        <Button Content="Buscar DNS más rápido" Click="OnOpenBenchmarkClick" Style="{StaticResource CaoElevatedButtonStyle}"
+                                ToolTipService.ToolTip="Abre Benchmark, que mide los DNS públicos y aplica el par más rápido del mismo proveedor."/>
+                    </StackPanel>
+                    <ProgressBar x:Name="BoostProgress" Minimum="0" Maximum="100" Value="0" Visibility="Collapsed"/>
+                    <TextBlock x:Name="BoostStatusText" TextWrapping="Wrap" Style="{StaticResource CaoSectionSubtitleStyle}" AutomationProperties.LiveSetting="Polite"/>
+                </StackPanel>
+            </Border>
+
+            <!-- Honestidad: qué no se hace -->
+            <Border x:Name="HonestyCard" Style="{StaticResource CaoCardStyle}">
+                <StackPanel Spacing="6">
+                    <TextBlock Text="¿Y la ruta alternativa tipo ExitLag?" Style="{StaticResource CaoCardTitleStyle}"/>
+                    <TextBlock TextWrapping="Wrap" Style="{StaticResource CaoListItemDetailStyle}"
+                               Text="ExitLag y similares desvían tu tráfico por su propia red de servidores (multipath) y cobran por ello. Eso solo funciona con servidores intermedios repartidos por el mundo, que CA-O no tiene: prometerlo sería mentir. Lo que sí hace CA-O es lo que se puede medir y cambiar en tu PC: ver qué región y qué ruta te van mejor, decir dónde nace el lag, priorizar el tráfico del juego y quitar latencia local. Si el análisis de ruta culpa a tu proveedor o a la distancia, ahí es donde un servicio de ese tipo podría ayudar."/>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+    </Grid>
+</Page>

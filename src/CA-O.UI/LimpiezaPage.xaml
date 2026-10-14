@@ -254,6 +254,11 @@
                         </StackPanel>
                         <StackPanel Grid.Row="1" Spacing="0">
                             <TextBlock x:Name="TimerCurrentText" FontSize="13" FontWeight="SemiBold" Text="Actual: —" Margin="0,0,0,4"/>
+                            <Grid ColumnSpacing="12" Padding="0,4,0,4">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                <TextBlock x:Name="TimerGlobalText" Style="{StaticResource CaoListItemDetailStyle}" TextWrapping="Wrap" VerticalAlignment="Center" Text="Modo global: comprobando…"/>
+                                <Button x:Name="TimerGlobalButton" Grid.Column="1" Content="Activar" Visibility="Collapsed" Click="OnTimerGlobalClick" Style="{StaticResource LimpiezaActionButtonStyle}" VerticalAlignment="Center" AutomationProperties.Name="Activar timer resolution global" ToolTipService.ToolTip="Windows 11 solo aplica el timer al proceso que lo pide. Esto hace que llegue a los juegos. Requiere reinicio."/>
+                            </Grid>
                             <Grid ColumnSpacing="12" Padding="0,8,0,8">
                                 <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                                 <StackPanel Spacing="2" VerticalAlignment="Center">

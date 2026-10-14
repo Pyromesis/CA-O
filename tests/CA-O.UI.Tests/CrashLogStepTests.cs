@@ -19,7 +19,7 @@ public sealed class CrashLogStepTests
         }
         finally
         {
-            CrashLog.LogPathOverride = null;
+            CrashLog.LogPathOverride = TestLogIsolation.CrashLogPath;
         }
 
         File.Delete(path);

@@ -17,7 +17,7 @@ public sealed class PageTourCatalogTests
 {
     private static readonly string[] ExpectedRoutes =
     {
-        "dashboard", "analyze", "optimize", "cleanup", "solucionar", "drivers",
+        "dashboard", "analyze", "optimize", "cleanup", "network", "solucionar", "drivers",
         "benchmark", "overclock", "restore", "history", "settings",
     };
 
@@ -200,7 +200,7 @@ public sealed class PageTourXamlTests
             .ThenBy(p => p.TargetName, StringComparer.Ordinal)
             .ToArray();
 
-        Assert.Equal(84, expected.Length);
+        Assert.Equal(92, expected.Length); // 84 + 8 de la pagina Red gaming (2.2.19)
         Assert.All(expected, p => Assert.NotEqual("tutorial", p.Route));
     }
 }

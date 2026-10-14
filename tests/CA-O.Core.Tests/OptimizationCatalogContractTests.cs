@@ -50,7 +50,7 @@ public sealed class OptimizationCatalogContractTests
     public void IdsAreUnique()
     {
         var ids = OptimizationCatalog.All.Select(o => o.Definition.Id).ToList();
-        Assert.Equal(93, ids.Count); // 92 −3 eliminadas −1 fusión gaming-power −1 fusión minidump −2 fusión Sense (3→1) +8 nuevas +1 Sense unificada = 93
+        Assert.Equal(100, ids.Count); // 92 −3 eliminadas −1 fusión gaming-power −1 fusión minidump −2 fusión Sense (3→1) +8 nuevas +1 Sense unificada = 93; 2.2.19: +4 input lag +3 red para juegos = 100
         Assert.Equal(ids.Count, ids.Distinct(StringComparer.Ordinal).Count());
     }
 

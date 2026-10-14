@@ -207,6 +207,55 @@ public static class PageTourCatalog
                     "Resultado",
                     "Cada limpieza informa aqui archivos y KB liberados. Sin esta linea, no se da por hecha.",
                     "Celebrate")),
+            ["network"] = List(
+                new TourStep(
+                    "network",
+                    "ConnectionCard",
+                    "Tu conexion",
+                    "Cable o Wi-Fi y el adaptador activo. Por Wi-Fi, un cable suele arreglar mas picos de ping que cualquier ajuste.",
+                    "Idle"),
+                new TourStep(
+                    "network",
+                    "MeasureRegionsButton",
+                    "Ping a regiones",
+                    "Mide ping, jitter y perdida reales contra las regiones de nube donde se alojan muchos juegos. No cambia nada.",
+                    "Working"),
+                new TourStep(
+                    "network",
+                    "RegionsList",
+                    "La mejor region",
+                    "Ordenadas de menor a mayor ping. Elige en el juego la mejor; selecciona una fila para vigilarla en vivo.",
+                    "Idle"),
+                new TourStep(
+                    "network",
+                    "LiveToggleButton",
+                    "Monitor en vivo",
+                    "Una medicion por segundo mientras juegas: ping, jitter, perdida y picos. Acepta la IP del servidor del juego.",
+                    "Working"),
+                new TourStep(
+                    "network",
+                    "LiveChartCanvas",
+                    "Grafica de ping",
+                    "El ultimo minuto de mediciones. Una perdida se dibuja arriba del todo para que no pase desapercibida.",
+                    "Idle"),
+                new TourStep(
+                    "network",
+                    "TraceButton",
+                    "Donde nace el lag",
+                    "Traceroute salto a salto con diagnostico: tu Wi-Fi/router, tu proveedor o la distancia.",
+                    "Idle"),
+                new TourStep(
+                    "network",
+                    "BoostApplyButton",
+                    "Optimizar la red",
+                    "Prioridad QoS para juegos, sin limite con audio, TCP inmediato y tarjeta sin ahorro. Todo reversible.",
+                    "Working"),
+                new TourStep(
+                    "network",
+                    "HonestyCard",
+                    "Lo que no se promete",
+                    "Las rutas alternativas por servidores propios necesitan una red de servidores que CA-O no tiene. Aqui solo lo medible.",
+                    "Celebrate")),
             ["solucionar"] = List(
                 new TourStep(
                     "solucionar",

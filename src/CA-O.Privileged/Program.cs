@@ -67,6 +67,7 @@ internal static class Program
         // detalle en el registro del servicio. Se registra ANTES del pipe para que
         // la revisión empiece antes de aceptar peticiones.
         builder.Services.AddHostedService<RecoveryStartupReporter>();
+        builder.Services.AddHostedService<TimerResolutionKeeper>();
         builder.Services.AddHostedService<PrivilegedPipeService>();
         builder.Services.AddWindowsService(options => options.ServiceName = BuildConstants.ServiceName);
         return builder.Build().RunAsync();
