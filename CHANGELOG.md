@@ -3,6 +3,13 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
 ## [Unreleased]
+## [2.2.18] - 2026-10-14
+### Corregido
+- **Overclock compatible con anti-cheat: ya no se bloquea todo.** Tener Vanguard o EasyAntiCheat instalado cerraba cualquier escritura y en un equipo de Valorant/Fortnite no se podia hacer overclock. Nueva puerta `OverclockAntiCheatGate` por mecanismo: solo un driver de kernel propio cierra la fila; la API oficial del driver de la GPU (NVML/ADLX) y el plan de energia de Windows siguen abiertos y la fila dice por que es seguro.
+- **Automatico y perfiles filtran por backend en vez de parar en seco.** El auto antes se detenia entero al ver anti-cheat; ahora omite solo los backends de kernel, aplica lo compatible y lo cuenta como omitido con nota de compatibilidad. El tuning por knob comprueba la puerta antes del restore point.
+- **Textos honestos.** Resumen, cabecera de juegos y tarjeta de auto dicen que CA-O no carga drivers ni toca el proceso ni los archivos del juego; la pagina de Overclock lo explica con ejemplos (practicas de Valorant, Creativo de Fortnite, evitar clasificatorias durante la prueba).
+### Probado
+- Suite 1905 passed, 0 failed (Security 274, Benchmark 17, Infrastructure 215, Core 959, UI 380, Integration 60). 13 tests nuevos de la puerta (Valorant/Fortnite listos con Vanguard+EAC, scan fallido no cierra API vendor, backends clasificados, filtro solo-kernel).
 ## [2.2.17] - 2026-10-14
 ### Corregido
 - **Perfil Rendimiento ya no apaga el turbo.** `KnobValue.FromIndex` dejaba `Scalar` a 0 y el preset agresivo (indice 2) escribia `PERFBOOSTMODE=0`: turbo apagado reportado como exito. El indice se refleja en `Scalar` y Conservador pasa a indice 1 (fabrica), nunca 0.

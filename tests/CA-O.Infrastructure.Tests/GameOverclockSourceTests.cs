@@ -71,30 +71,31 @@ public sealed class GameOverclockSourceTests
     }
 
     [Fact]
-    public async Task AKernelTitle_StaysBlocked_EvenWithACleanScanAndAValidatedProfile()
+    public async Task AKernelTitle_WithAValidatedProfile_IsReady_AndSaysWhyItIsAntiCheatSafe()
     {
-        var source = Source([Detected(KernelExecutable)], profiles: [Profile("valorant")]);
+        // Los perfiles van por la API del driver de la GPU: Vanguard no lo ve.
+        var source = Source([Detected(KernelExecutable)], antiCheats: [AntiCheatKind.Vanguard], profiles: [Profile("valorant")]);
 
         var entry = Assert.Single((await Read(source)).Entries);
 
-        Assert.Equal(GameProfileState.BlockedByAntiCheat, entry.Decision.State);
-        Assert.Equal(GameOverclockPolicy.ReasonKernelAntiCheat, entry.Decision.ReasonKey);
-        Assert.False(entry.Decision.IsActionable);
+        Assert.Equal(GameProfileState.Ready, entry.Decision.State);
+        Assert.Equal(GameOverclockPolicy.ReasonReadyAntiCheatSafe, entry.Decision.ReasonKey);
+        Assert.True(entry.Decision.IsActionable);
     }
 
     [Fact]
-    public async Task AnAntiCheatThatIsActuallyFound_ClosesTheRow()
+    public async Task AnAntiCheatThatIsActuallyFound_IsReported_ButDoesNotCloseAVendorApiRow()
     {
         var source = Source([Detected(UserModeExecutable)], antiCheats: [AntiCheatKind.BattlEye], profiles: [Profile("fortnite")]);
 
         var snapshot = await Read(source);
 
-        Assert.Equal(GameProfileState.BlockedByAntiCheat, Assert.Single(snapshot.Entries).Decision.State);
+        Assert.Equal(GameProfileState.Ready, Assert.Single(snapshot.Entries).Decision.State);
         Assert.Equal(["BattlEye"], snapshot.DetectedAntiCheats);
     }
 
     [Fact]
-    public async Task AFailedScan_ClosesEveryRow_EvenThoughTheListOfFindingsIsEmpty()
+    public async Task AFailedScan_IsReported_ButOnlyMattersForKernelDriverProfiles()
     {
         var source = Source([Detected(UserModeExecutable)], scanSucceeded: false, profiles: [Profile("fortnite")]);
 
@@ -102,7 +103,7 @@ public sealed class GameOverclockSourceTests
 
         Assert.False(snapshot.AntiCheatScanSucceeded);
         Assert.Empty(snapshot.DetectedAntiCheats);
-        Assert.Equal(GameProfileState.ScanUnavailable, Assert.Single(snapshot.Entries).Decision.State);
+        Assert.Equal(GameProfileState.Ready, Assert.Single(snapshot.Entries).Decision.State);
     }
 
     [Fact]

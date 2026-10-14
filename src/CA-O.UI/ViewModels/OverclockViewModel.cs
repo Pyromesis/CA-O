@@ -858,7 +858,7 @@ public sealed partial class OverclockViewModel : ObservableObject
         // running" would report a clean machine while the thing that bans people sits
         // installed in the service registry.
         GameSummary = snapshot.DetectedAntiCheats.Count > 0
-            ? Localizer.Format("overclock-games-anti-cheats", string.Join(", ", snapshot.DetectedAntiCheats))
+            ? Localizer.Format("overclock-games-anti-cheats-compatible", string.Join(", ", snapshot.DetectedAntiCheats))
             : snapshot.Entries.Count == 0
                 ? Localizer.Get("overclock-games-none")
                 : Localizer.Format("overclock-games-count", snapshot.Entries.Count);
@@ -1303,6 +1303,13 @@ public sealed partial class OverclockViewModel : ObservableObject
         IsBusy = true;
         try
         {
+            var (scanOk, antiCheats) = await ScanAntiCheatsAsync(ct).ConfigureAwait(true);
+            if (FilterByAntiCheat([(knob, backend)], scanOk, antiCheats).Blocked is { Count: > 0 } refused)
+            {
+                StatusLine = Localizer.Format("overclock-auto-blocked-anticheat", string.Join(", ", refused));
+                return;
+            }
+
             // Sin punto no hay bisección: el motor escribe checkpoints, journal
             // y valores del driver desde el primer punto.
             if (!await EnsureRestorePointAsync(ct).ConfigureAwait(true))
@@ -1528,48 +1535,20 @@ public sealed partial class OverclockViewModel : ObservableObject
                 return;
             }
 
-            // Anti-cheat gate: the same policy as the game section, checked before
-            // any write. A scan that cannot prove the machine clean blocks, because
-            // an empty list after a denied registry read is not a clean machine.
-            GameOverclockSnapshot games;
-            try
-            {
-                games = await Task.Run(() => GameSource.ReadAsync(ct).AsTask(), ct).ConfigureAwait(true);
-            }
-            catch (OperationCanceledException)
-            {
-                throw;
-            }
-            catch (Exception ex)
-            {
-                ApplySummary = Localizer.Get("overclock-game-anticheat-scan-unavailable");
-                StatusLine = ApplySummary;
-                CrashLog.Write(ex);
-                return;
-            }
-
-            if (!games.AntiCheatScanSucceeded)
-            {
-                ApplySummary = Localizer.Get("overclock-game-anticheat-scan-unavailable");
-                StatusLine = ApplySummary;
-                CrashLog.Step("auto.blocked-anticheat-scan");
-                return;
-            }
-
-            if (games.DetectedAntiCheats.Count > 0)
-            {
-                ApplySummary = Localizer.Get("overclock-auto-blocked-anticheat");
-                StatusLine = ApplySummary;
-                CrashLog.Step("auto.blocked-anticheat");
-                return;
-            }
-
-            var targets = CollectAutoTargets();
+            // Anti-cheat gate, per backend. Having Vanguard or EasyAntiCheat installed
+            // used to stop the whole run, which on a Valorant/Fortnite machine meant no
+            // overclock at all. What actually conflicts with an anti-cheat is a kernel
+            // driver of CA-O's own; the vendor GPU API and the Windows power plan do not
+            // touch anything they watch. So only kernel-driver backends are skipped.
+            var (scanOk, antiCheats) = await ScanAntiCheatsAsync(ct).ConfigureAwait(true);
+            var (targets, blocked) = FilterByAntiCheat(CollectAutoTargets(), scanOk, antiCheats);
             if (targets.Count == 0)
             {
-                ApplySummary = Localizer.Get("overclock-profile-no-actionable");
+                ApplySummary = blocked.Count > 0
+                    ? Localizer.Format("overclock-auto-blocked-anticheat", string.Join(", ", blocked))
+                    : Localizer.Get("overclock-profile-no-actionable");
                 StatusLine = ApplySummary;
-                CrashLog.Step("auto.no-actionable");
+                CrashLog.Step(blocked.Count > 0 ? "auto.blocked-anticheat" : "auto.no-actionable");
                 return;
             }
 
@@ -1677,7 +1656,8 @@ public sealed partial class OverclockViewModel : ObservableObject
                 }
             }
 
-            ApplySummary = Localizer.Format("overclock-auto-proposal", applied, validated, skipped);
+            ApplySummary = Localizer.Format("overclock-auto-proposal", applied, validated, skipped + blocked.Count)
+                + AntiCheatNote(antiCheats, blocked);
             StatusLine = ApplySummary;
             SetMood(MoodForTuning(false, applied + validated > 0));
             CrashLog.Step("auto.done");
@@ -1698,6 +1678,67 @@ public sealed partial class OverclockViewModel : ObservableObject
         {
             IsBusy = false;
         }
+    }
+
+    /// <summary>
+    /// Reads the anti-cheat registry. A failed read is not a reason to stop: it only
+    /// matters for kernel-driver backends, which the gate closes on its own.
+    /// </summary>
+    private async Task<(bool ScanOk, IReadOnlyList<string> AntiCheats)> ScanAntiCheatsAsync(CancellationToken ct)
+    {
+        try
+        {
+            var games = await Task.Run(() => GameSource.ReadAsync(ct).AsTask(), ct).ConfigureAwait(true);
+            return (games.AntiCheatScanSucceeded, games.DetectedAntiCheats);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            CrashLog.Write(ex);
+            return (false, []);
+        }
+    }
+
+    /// <summary>Splits the targets into the ones the anti-cheat gate allows and the labels of the ones it blocks.</summary>
+    internal static (List<(OverclockKnob Knob, IOverclockBackend Backend)> Allowed, List<string> Blocked) FilterByAntiCheat(
+        IEnumerable<(OverclockKnob Knob, IOverclockBackend Backend)> targets,
+        bool scanOk,
+        IReadOnlyList<string> antiCheats)
+    {
+        var allowed = new List<(OverclockKnob, IOverclockBackend)>();
+        var blocked = new List<string>();
+        foreach (var target in targets)
+        {
+            var decision = OverclockAntiCheatGate.Decide(
+                OverclockAntiCheatGate.MechanismFor(target.Backend.Id), scanOk, antiCheats);
+            if (decision.Allowed)
+            {
+                allowed.Add(target);
+            }
+            else
+            {
+                blocked.Add(Localizer.Get(target.Knob.LabelKey));
+            }
+        }
+
+        return (allowed, blocked);
+    }
+
+    /// <summary>Says out loud why the run was safe with the anti-cheats on this machine.</summary>
+    private static string AntiCheatNote(IReadOnlyList<string> antiCheats, IReadOnlyList<string> blocked)
+    {
+        if (antiCheats.Count == 0)
+        {
+            return string.Empty;
+        }
+
+        var note = " " + Localizer.Format("overclock-anticheat-compatible-note", string.Join(", ", antiCheats));
+        return blocked.Count == 0
+            ? note
+            : note + " " + Localizer.Format("overclock-anticheat-skipped-note", string.Join(", ", blocked));
     }
 
     /// <summary>One snapshot per backend the automatic run is about to touch.</summary>
@@ -1845,10 +1886,16 @@ public sealed partial class OverclockViewModel : ObservableObject
                 return;
             }
 
-            var work = CollectApplyWork(profile);
+            var (scanOk, antiCheats) = await ScanAntiCheatsAsync(ct).ConfigureAwait(true);
+            var collected = CollectApplyWork(profile);
+            var (allowed, blocked) = FilterByAntiCheat(
+                collected.Select(w => (w.Knob, w.Backend)), scanOk, antiCheats);
+            var work = collected.Where(w => allowed.Any(a => a.Knob.Id == w.Knob.Id)).ToList();
             if (work.Count == 0)
             {
-                ApplySummary = Localizer.Get("overclock-profile-no-actionable");
+                ApplySummary = blocked.Count > 0
+                    ? Localizer.Format("overclock-auto-blocked-anticheat", string.Join(", ", blocked))
+                    : Localizer.Get("overclock-profile-no-actionable");
                 StatusLine = ApplySummary;
                 CrashLog.Step("refresh.apply-done");
                 return;

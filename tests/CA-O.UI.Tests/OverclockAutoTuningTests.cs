@@ -68,8 +68,10 @@ public sealed class OverclockAutoTuningTests
     }
 
     [Fact]
-    public async Task AutoTuning_BlockedByAntiCheat_WritesNothing()
+    public async Task AutoTuning_WithVanguardAndEacInstalled_StillRuns_AndSaysWhyItIsSafe()
     {
+        // Antes: con cualquier anti-cheat instalado no se tocaba nada. Ahora solo se
+        // cierra lo que va por driver de kernel; la API del driver de la GPU sigue.
         var backend = new TuningBackend(writable: true);
         var stores = new TuningStores();
         var vm = OverclockTestHarness.Create(
@@ -84,10 +86,30 @@ public sealed class OverclockAutoTuningTests
         await vm.RefreshCommand.ExecuteAsync(null);
         await vm.StartAutoTuningCommand.ExecuteAsync(null);
 
-        Assert.Empty(stores.Profiles);
-        Assert.Empty(stores.Journal.Phases);
-        Assert.NotEqual("overclock-auto-blocked-anticheat", vm.ApplySummary);
+        Assert.Contains(stores.Journal.Details, d => d is not null && d.StartsWith("knob=amd.gpu.powerLimit", StringComparison.Ordinal));
+        Assert.Contains("EasyAntiCheat", vm.ApplySummary, StringComparison.Ordinal);
+        Assert.Contains("Vanguard", vm.ApplySummary, StringComparison.Ordinal);
         Assert.False(vm.IsBusy);
+    }
+
+    [Fact]
+    public void AntiCheatFilter_OnlyDropsKernelDriverBackends()
+    {
+        var api = new TuningBackend(writable: true);
+        var kernel = new UnclassifiedBackend();
+        var knob = OverclockCatalog.AmdGpuKnobs[0];
+
+        var (allowed, blocked) = OverclockViewModel.FilterByAntiCheat(
+            [(knob, api), (knob, kernel)], scanOk: true, ["Vanguard"]);
+
+        Assert.Single(allowed);
+        Assert.Same(api, allowed[0].Backend);
+        Assert.Single(blocked);
+
+        var (cleanAllowed, cleanBlocked) = OverclockViewModel.FilterByAntiCheat(
+            [(knob, api), (knob, kernel)], scanOk: true, []);
+        Assert.Equal(2, cleanAllowed.Count);
+        Assert.Empty(cleanBlocked);
     }
 
     [Fact]
@@ -342,7 +364,7 @@ public sealed class OverclockAutoTuningTests
     private sealed class AntiCheatGameSource : IGameOverclockSource
     {
         public ValueTask<GameOverclockSnapshot> ReadAsync(CancellationToken ct) =>
-            new(new GameOverclockSnapshot(true, ["EAC"], []));
+            new(new GameOverclockSnapshot(true, ["Vanguard", "EasyAntiCheat"], []));
     }
 
     private sealed class TuningBackend(bool writable) : IOverclockBackend, IOverclockDetailSource, IOverclockWriteGate
@@ -459,6 +481,23 @@ public sealed class OverclockAutoTuningTests
 
         public string? BlockReasonKey(KnobId knob) =>
             CanWrite(knob) ? null : "overclock-fake-write-blocked";
+    }
+
+    /// <summary>Un backend que nadie clasificó: la puerta lo trata como driver de kernel.</summary>
+    private sealed class UnclassifiedBackend : IOverclockBackend
+    {
+        public string Id => "msr-signed";
+
+        public OverclockCapabilities Probe(CancellationToken ct) => OverclockCapabilities.Empty;
+
+        public ValueTask<KnobRead> ReadAsync(KnobId id, CancellationToken ct) => new(KnobRead.Fail("x"));
+
+        public ValueTask<KnobWriteResult> WriteAsync(KnobId id, KnobValue value, CancellationToken ct) => new(KnobWriteResult.Fail("x"));
+
+        public ValueTask<UnitSnapshot> SnapshotAsync(CancellationToken ct) =>
+            new(new UnitSnapshot(OverclockComponent.Cpu, [], DateTimeOffset.UnixEpoch, null));
+
+        public ValueTask<RestoreOutcome> RestoreAsync(UnitSnapshot snapshot, CancellationToken ct) => new(RestoreOutcome.Ok(0, true));
     }
 
     /// <summary>CPU deliberadamente no escribible: da filas no accionables al test de la tarjeta.</summary>

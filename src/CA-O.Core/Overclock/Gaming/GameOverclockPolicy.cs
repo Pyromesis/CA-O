@@ -15,8 +15,8 @@ public enum GameProfileState
     Ready,
 
     /// <summary>
-    /// The catalog documents a kernel-level anti-cheat for this title, or an anti-cheat
-    /// was found installed. CA-O does not touch a machine that a game protects this way.
+    /// The profile would need a kernel driver of CA-O's own on a machine an anti-cheat
+    /// protects. Vendor-API and power-policy profiles never land here.
     /// </summary>
     BlockedByAntiCheat,
 
@@ -30,8 +30,8 @@ public enum GameProfileState
     UnknownGame,
 
     /// <summary>
-    /// The anti-cheat services registry could not be read, so the absence of an
-    /// anti-cheat cannot be claimed and the row stays closed.
+    /// The profile needs a kernel driver and the anti-cheat registry could not be read,
+    /// so the absence of an anti-cheat cannot be claimed and the row stays closed.
     /// </summary>
     ScanUnavailable,
 }
@@ -89,6 +89,7 @@ public sealed record GameProfileDecision(
 public static class GameOverclockPolicy
 {
     public const string ReasonReady = "overclock-game-ready";
+    public const string ReasonReadyAntiCheatSafe = "overclock-game-ready-anticheat-safe";
     public const string ReasonUnknownGame = "overclock-game-unknown";
     public const string ReasonNoProfile = "overclock-game-no-profile";
     public const string ReasonKernelAntiCheat = "overclock-game-anticheat-kernel";
@@ -105,11 +106,17 @@ public static class GameOverclockPolicy
     /// </param>
     /// <param name="detectedAntiCheats">Names of the anti-cheats found, empty when none were.</param>
     /// <param name="profile">The validated profile for this title, or null when there is none.</param>
+    /// <param name="mechanism">
+    /// How the profile reaches the hardware. Every backend CA-O ships is a vendor API
+    /// or a power policy, which anti-cheats do not watch; only a kernel driver closes
+    /// the row (see <see cref="OverclockAntiCheatGate"/>).
+    /// </param>
     public static GameProfileDecision Decide(
         GameCandidate candidate,
         bool antiCheatScanSucceeded,
         IReadOnlyList<string> detectedAntiCheats,
-        GameOverclockProfile? profile)
+        GameOverclockProfile? profile,
+        TuningMechanism mechanism = TuningMechanism.VendorDriverApi)
     {
         ArgumentNullException.ThrowIfNull(candidate);
         ArgumentNullException.ThrowIfNull(detectedAntiCheats);
@@ -124,22 +131,26 @@ public static class GameOverclockPolicy
             return Closed(GameProfileState.NoValidatedProfile, ReasonNoProfile);
         }
 
-        if (candidate.AntiCheatPolicy == GameAntiCheatPolicy.KernelLevel)
+        if (mechanism == TuningMechanism.KernelDriver && candidate.AntiCheatPolicy == GameAntiCheatPolicy.KernelLevel)
         {
             // The catalog documents this title as kernel protected. That is a vendor
             // statement about the game, not a reading of this machine, so it holds even
-            // when the scan came back clean.
+            // when the scan came back clean - but only against a kernel driver.
             return Closed(GameProfileState.BlockedByAntiCheat, ReasonKernelAntiCheat, profile);
         }
 
-        if (!antiCheatScanSucceeded)
+        var gate = OverclockAntiCheatGate.Decide(mechanism, antiCheatScanSucceeded, detectedAntiCheats);
+        if (!gate.Allowed)
         {
-            return Closed(GameProfileState.ScanUnavailable, ReasonScanUnavailable, profile);
+            return gate.ReasonKey == OverclockAntiCheatGate.ReasonKernelDriverScanUnavailable
+                ? Closed(GameProfileState.ScanUnavailable, ReasonScanUnavailable, profile)
+                : Closed(GameProfileState.BlockedByAntiCheat, ReasonAntiCheatDetected, profile);
         }
 
-        if (detectedAntiCheats.Count > 0)
+        if (detectedAntiCheats.Count > 0 || candidate.AntiCheatPolicy == GameAntiCheatPolicy.KernelLevel)
         {
-            return Closed(GameProfileState.BlockedByAntiCheat, ReasonAntiCheatDetected, profile);
+            // Open, and the row says why it is safe instead of leaving the user to guess.
+            return new GameProfileDecision(GameProfileState.Ready, ReasonReadyAntiCheatSafe, IsActionable: true, profile.GuidanceEs);
         }
 
         return new GameProfileDecision(GameProfileState.Ready, ReasonReady, IsActionable: true, profile.GuidanceEs);

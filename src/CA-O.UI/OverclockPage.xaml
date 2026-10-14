@@ -184,6 +184,8 @@
                         <StackPanel Grid.Column="1" Spacing="6">
                             <TextBlock Style="{StaticResource CaoListItemDetailStyle}"
                                        Text="Sube el límite de potencia y el turbo, y después prueba los relojes de la GPU paso a paso bajo carga. Deja un juego o un benchmark abierto mientras dura (unos minutos): sin carga, un paso no cuenta como estable." />
+                            <TextBlock Style="{StaticResource CaoListItemDetailStyle}"
+                                       Text="Compatible con Vanguard (Valorant) y Easy Anti-Cheat (Fortnite): solo se usa la API oficial del driver de la GPU y el plan de energía de Windows, sin drivers propios ni acceso al juego. Para cargar la GPU sirve el campo de prácticas de Valorant o el modo Creativo de Fortnite; evita partidas clasificatorias mientras dura la prueba, porque un paso inestable puede cerrar el juego." />
                             <ProgressBar x:Name="AutoTuneProgress"
                                          HorizontalAlignment="Stretch"
                                          IsIndeterminate="{x:Bind ViewModel.IsBusy, Mode=OneWay}"

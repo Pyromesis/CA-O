@@ -14,13 +14,14 @@ public sealed class GameOverclockPolicyTests
     private const string FortniteId = "fortnite";
 
     [Fact]
-    public void AKernelProtectedTitle_IsBlocked_EvenWhenTheScanComesBackClean()
+    public void AKernelProtectedTitle_IsBlocked_ForAKernelDriverProfile_EvenWhenTheScanComesBackClean()
     {
         var decision = GameOverclockPolicy.Decide(
             KernelTitle(),
             antiCheatScanSucceeded: true,
             detectedAntiCheats: [],
-            profile: Profile(ValorantId));
+            profile: Profile(ValorantId),
+            mechanism: TuningMechanism.KernelDriver);
 
         Assert.Equal(GameProfileState.BlockedByAntiCheat, decision.State);
         Assert.Equal(GameOverclockPolicy.ReasonKernelAntiCheat, decision.ReasonKey);
@@ -28,13 +29,14 @@ public sealed class GameOverclockPolicyTests
     }
 
     [Fact]
-    public void AUserModeTitle_IsBlocked_WhenAnAntiCheatIsActuallyFound()
+    public void AKernelDriverProfile_IsBlocked_WhenAnAntiCheatIsActuallyFound()
     {
         var decision = GameOverclockPolicy.Decide(
             UserModeTitle(),
             antiCheatScanSucceeded: true,
             detectedAntiCheats: ["Vanguard"],
-            profile: Profile(FortniteId));
+            profile: Profile(FortniteId),
+            mechanism: TuningMechanism.KernelDriver);
 
         Assert.Equal(GameProfileState.BlockedByAntiCheat, decision.State);
         Assert.Equal(GameOverclockPolicy.ReasonAntiCheatDetected, decision.ReasonKey);
@@ -42,7 +44,7 @@ public sealed class GameOverclockPolicyTests
     }
 
     [Fact]
-    public void AFailedScan_ClosesTheRow_EvenThoughTheListIsEmpty()
+    public void AFailedScan_ClosesAKernelDriverRow_EvenThoughTheListIsEmpty()
     {
         // This is the whole reason the scan reports whether it managed to look. An
         // empty list here means "not allowed to check", not "nothing installed".
@@ -50,7 +52,8 @@ public sealed class GameOverclockPolicyTests
             UserModeTitle(),
             antiCheatScanSucceeded: false,
             detectedAntiCheats: [],
-            profile: Profile(FortniteId));
+            profile: Profile(FortniteId),
+            mechanism: TuningMechanism.KernelDriver);
 
         Assert.Equal(GameProfileState.ScanUnavailable, decision.State);
         Assert.Equal(GameOverclockPolicy.ReasonScanUnavailable, decision.ReasonKey);
@@ -60,8 +63,8 @@ public sealed class GameOverclockPolicyTests
     [Fact]
     public void AnEmptyScanResult_WithAFailedScan_NeverReadsAsACleanMachine()
     {
-        var closed = GameOverclockPolicy.Decide(UserModeTitle(), false, [], Profile(FortniteId));
-        var open = GameOverclockPolicy.Decide(UserModeTitle(), true, [], Profile(FortniteId));
+        var closed = GameOverclockPolicy.Decide(UserModeTitle(), false, [], Profile(FortniteId), TuningMechanism.KernelDriver);
+        var open = GameOverclockPolicy.Decide(UserModeTitle(), true, [], Profile(FortniteId), TuningMechanism.KernelDriver);
 
         Assert.NotEqual(closed.State, open.State);
         Assert.Equal(GameProfileState.Ready, open.State);
@@ -136,10 +139,11 @@ public sealed class GameOverclockPolicyTests
     {
         var rows = new[]
         {
-            GameOverclockPolicy.Decide(KernelTitle(), true, [], Profile(ValorantId)),
+            GameOverclockPolicy.Decide(KernelTitle(), true, [], Profile(ValorantId), TuningMechanism.KernelDriver),
             GameOverclockPolicy.Decide(KernelTitle(), true, [], null),
-            GameOverclockPolicy.Decide(UserModeTitle(), false, [], Profile(FortniteId)),
-            GameOverclockPolicy.Decide(UserModeTitle(), true, ["BattlEye"], Profile(FortniteId)),
+            GameOverclockPolicy.Decide(UserModeTitle(), false, [], Profile(FortniteId), TuningMechanism.KernelDriver),
+            GameOverclockPolicy.Decide(UserModeTitle(), true, ["BattlEye"], Profile(FortniteId), TuningMechanism.KernelDriver),
+            GameOverclockPolicy.Decide(KernelTitle(), true, ["Vanguard"], Profile(ValorantId)),
             GameOverclockPolicy.Decide(GameCandidate.Unknown("x.exe"), true, [], null),
             GameOverclockPolicy.Decide(UserModeTitle(), true, [], Profile(FortniteId)),
         };
@@ -171,24 +175,68 @@ public sealed class GameOverclockPolicyTests
     public void OnlyReadyCarriesAnActionableFlag_AndEveryOtherStateIsReachable()
     {
         var profile = Profile(FortniteId);
-        var cases = new (GameCandidate Candidate, bool ScanOk, string[] Found, GameOverclockProfile? Profile, GameProfileState Expected)[]
+        const TuningMechanism api = TuningMechanism.VendorDriverApi;
+        const TuningMechanism kernel = TuningMechanism.KernelDriver;
+        var cases = new (GameCandidate Candidate, bool ScanOk, string[] Found, GameOverclockProfile? Profile, TuningMechanism Mechanism, GameProfileState Expected)[]
         {
-            (UserModeTitle(), true, [], profile, GameProfileState.Ready),
-            (UserModeTitle(), true, [], null, GameProfileState.NoValidatedProfile),
-            (UserModeTitle(), true, ["Vanguard"], profile, GameProfileState.BlockedByAntiCheat),
-            (KernelTitle(), true, [], profile, GameProfileState.BlockedByAntiCheat),
-            (UserModeTitle(), false, [], profile, GameProfileState.ScanUnavailable),
-            (GameCandidate.Unknown("mystery.exe"), true, [], profile, GameProfileState.UnknownGame),
+            (UserModeTitle(), true, [], profile, api, GameProfileState.Ready),
+            (UserModeTitle(), true, [], null, api, GameProfileState.NoValidatedProfile),
+            (UserModeTitle(), true, ["Vanguard"], profile, kernel, GameProfileState.BlockedByAntiCheat),
+            (KernelTitle(), true, [], profile, kernel, GameProfileState.BlockedByAntiCheat),
+            (UserModeTitle(), false, [], profile, kernel, GameProfileState.ScanUnavailable),
+            (GameCandidate.Unknown("mystery.exe"), true, [], profile, api, GameProfileState.UnknownGame),
         };
 
-        foreach (var (candidate, scanOk, found, candidateProfile, expected) in cases)
+        foreach (var (candidate, scanOk, found, candidateProfile, mechanism, expected) in cases)
         {
-            var decision = GameOverclockPolicy.Decide(candidate, scanOk, found, candidateProfile);
+            var decision = GameOverclockPolicy.Decide(candidate, scanOk, found, candidateProfile, mechanism);
 
             Assert.Equal(expected, decision.State);
             Assert.Equal(expected == GameProfileState.Ready, decision.IsActionable);
         }
     }
+
+    [Fact]
+    public void ValorantAndFortnite_WithVanguardAndEac_AreReady_ForVendorApiProfiles()
+    {
+        // Lo que CA-O hace de verdad: API del driver de NVIDIA/AMD y plan de energia.
+        // Ni driver propio, ni acceso al proceso del juego: el anti-cheat no lo ve.
+        foreach (var title in new[] { KernelTitle(), UserModeTitle() })
+        {
+            var decision = GameOverclockPolicy.Decide(
+                title, antiCheatScanSucceeded: true, ["Vanguard", "EasyAntiCheat"], Profile(title.GameId));
+
+            Assert.Equal(GameProfileState.Ready, decision.State);
+            Assert.Equal(GameOverclockPolicy.ReasonReadyAntiCheatSafe, decision.ReasonKey);
+            Assert.True(decision.IsActionable);
+        }
+    }
+
+    [Fact]
+    public void AFailedScan_DoesNotCloseAVendorApiProfile()
+    {
+        var decision = GameOverclockPolicy.Decide(UserModeTitle(), antiCheatScanSucceeded: false, [], Profile(FortniteId));
+
+        Assert.Equal(GameProfileState.Ready, decision.State);
+    }
+
+    [Theory]
+    [InlineData("nvidia-nvapi", TuningMechanism.VendorDriverApi)]
+    [InlineData("amd-adlx", TuningMechanism.VendorDriverApi)]
+    [InlineData("intel-policy", TuningMechanism.WindowsPowerPolicy)]
+    [InlineData("smbios-memory", TuningMechanism.FirmwareReadOnly)]
+    [InlineData("msr-signed", TuningMechanism.KernelDriver)]
+    [InlineData("something-new", TuningMechanism.KernelDriver)]
+    public void EveryShippedBackend_IsClassified_AndUnknownOnesAreTreatedAsKernel(string backendId, TuningMechanism expected) =>
+        Assert.Equal(expected, OverclockAntiCheatGate.MechanismFor(backendId));
+
+    [Theory]
+    [InlineData(TuningMechanism.VendorDriverApi, true)]
+    [InlineData(TuningMechanism.WindowsPowerPolicy, true)]
+    [InlineData(TuningMechanism.FirmwareReadOnly, true)]
+    [InlineData(TuningMechanism.KernelDriver, false)]
+    public void WithVanguardInstalled_OnlyAKernelDriverIsBlocked(TuningMechanism mechanism, bool allowed) =>
+        Assert.Equal(allowed, OverclockAntiCheatGate.Decide(mechanism, true, ["Vanguard"]).Allowed);
 
     private static GameCandidate KernelTitle() =>
         new(ValorantId, "VALORANT", "valorant-win64-shipping.exe", GameAntiCheatPolicy.KernelLevel);
