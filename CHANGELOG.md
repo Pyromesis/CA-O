@@ -3,6 +3,11 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
 ## [Unreleased]
+## [2.2.16] - 2026-10-13
+### Corregido
+- **El aviso de ajustes pendientes ya dice cuales y como resolverlos.** Nombra cada ajuste pendiente, cuantos son y manda a la seccion 05 ESTABILIDAD con Revertir/Mantener/Descartar, en vez del generico "Resuelvelos primero".
+### Probado
+- Suite 1873 passed, 0 failed (Security 274, Benchmark 17, Infrastructure 202, Core 943, UI 377, Integration 60).
 ## [2.2.15] - 2026-10-13
 ### Cambiado
 - **Temporales: cae todo lo de hace mas de 10 minutos.** Windows Temp, Delivery Optimization, Windows Update, caches de app, CodeCache de navegadores, shaders de GPU y descargador NVIDIA borran con retencion de 10 min (antes 1 dia, y 4 ni miraban la edad). Conservan su umbral con motivo: Outlook 7d, CBS/dumps 30d, Prefetch 30d (vaciarlo empeora el arranque).

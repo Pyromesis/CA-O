@@ -6,6 +6,7 @@ using CAO.Core.Overclock.Stability;
 using CAO.Infrastructure.Overclock;
 using CAO.Infrastructure.Overclock.Gaming;
 using CAO.Shared;
+using CAO.UI;
 using CAO.UI.ViewModels;
 using Xunit;
 
@@ -118,6 +119,41 @@ public sealed class OverclockAutoTuningTests
     }
 
     [Fact]
+    public async Task AutoTuning_BlockedByPendingRecovery_NamesThem_AndTellsHowToResolve()
+    {
+        var backend = new TuningBackend(writable: true);
+        var stores = new TuningStores();
+        var vm = OverclockTestHarness.Create(
+            new OverclockReadOnlyRegistry(backend),
+            [backend],
+            openRuns: [OpenRun("amd.gpu.powerLimit"), OpenRun("amd.gpu.memoryClock")],
+            probe: new ScriptedProbe(),
+            profileStore: stores.ProfileStore,
+            checkpointStore: stores.CheckpointStore,
+            journal: stores.Journal);
+
+        await vm.RefreshCommand.ExecuteAsync(null);
+        Assert.Equal(2, vm.PendingRecoveries.Count);
+
+        await vm.StartAutoTuningCommand.ExecuteAsync(null);
+
+        Assert.Empty(stores.Profiles);
+        Assert.Empty(stores.Journal.Phases);
+        Assert.Equal(vm.ApplySummary, vm.StatusLine);
+        foreach (var row in vm.PendingRecoveries)
+        {
+            Assert.Contains(row.Knob, vm.ApplySummary, StringComparison.Ordinal);
+        }
+
+        Assert.Contains("05", vm.ApplySummary, StringComparison.Ordinal);
+        Assert.Contains("ESTABILIDAD", vm.ApplySummary, StringComparison.Ordinal);
+        Assert.Contains(Localizer.Get("overclock-recovery-revert"), vm.ApplySummary, StringComparison.Ordinal);
+        Assert.Contains(Localizer.Get("overclock-recovery-keep"), vm.ApplySummary, StringComparison.Ordinal);
+        Assert.Contains(Localizer.Get("overclock-recovery-discard"), vm.ApplySummary, StringComparison.Ordinal);
+        Assert.False(vm.IsBusy);
+    }
+
+    [Fact]
     public async Task AutoTuning_Cancel_LeavesCleanState_AndResumes()
     {
         var backend = new BlockingTuningBackend();
@@ -211,6 +247,18 @@ public sealed class OverclockAutoTuningTests
             journal: stores.Journal);
         return (vm, stores);
     }
+
+    private static TuningCheckpoint OpenRun(string knob) => new()
+    {
+        RunId = Guid.NewGuid(),
+        BackendId = "ghost-backend",
+        Knob = knob,
+        Component = nameof(OverclockComponent.Gpu),
+        AppliedValue = 110d,
+        LastKnownGoodValue = 100d,
+        Phase = CheckpointPhase.Started,
+        UpdatedAtUtc = DateTimeOffset.UtcNow.AddHours(-1),
+    };
 
     private sealed class TuningStores
     {

@@ -1389,6 +1389,22 @@ public sealed partial class OverclockViewModel : ObservableObject
     }
 
     /// <summary>
+    /// Names the open runs that block a new write, in the same words the 05
+    /// ESTABILIDAD section shows them (row.Knob), plus how to clear them.
+    /// The button labels come from their own keys so no language hardcodes
+    /// Revertir/Mantener/Descartar here. Any future caller gated on
+    /// PendingRecoveries must reuse this instead of Get(key).
+    /// </summary>
+    private string BuildBlockedRecoveryMessage() =>
+        Localizer.Format(
+            "overclock-auto-blocked-recovery",
+            PendingRecoveries.Count,
+            string.Join(", ", PendingRecoveries.Select(r => r.Knob)),
+            Localizer.Get("overclock-recovery-revert"),
+            Localizer.Get("overclock-recovery-keep"),
+            Localizer.Get("overclock-recovery-discard"));
+
+    /// <summary>
     /// Automatic overclock: walks every actionable knob through the same bisection
     /// <see cref="StartTuningAsync"/> runs (same engine, same checkpoints, no new
     /// machinery), then PROPOSES the result instead of applying a preset.
@@ -1418,7 +1434,7 @@ public sealed partial class OverclockViewModel : ObservableObject
             await LoadPendingRecoveriesAsync(ct).ConfigureAwait(true);
             if (PendingRecoveries.Count > 0)
             {
-                ApplySummary = Localizer.Get("overclock-auto-blocked-recovery");
+                ApplySummary = BuildBlockedRecoveryMessage();
                 StatusLine = ApplySummary;
                 CrashLog.Step("auto.blocked-recovery");
                 return;
