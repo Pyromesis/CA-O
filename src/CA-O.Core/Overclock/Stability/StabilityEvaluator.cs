@@ -62,6 +62,7 @@ public static class StabilityEvaluator
         ProbeEvidence.KernelBugcheck => true,
         ProbeEvidence.ClockStall c => c.StallRatio > thresholds.MaxClockStallRatio,
         ProbeEvidence.ThermalLimitReached t => thresholds.ThermalLimitIsFault,
+        ProbeEvidence.DeviceLost => true,
         ProbeEvidence.SensorUnavailable => thresholds.SensorUnavailableIsFault,
         _ => false,
     };

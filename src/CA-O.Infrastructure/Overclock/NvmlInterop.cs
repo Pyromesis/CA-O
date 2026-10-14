@@ -262,11 +262,22 @@ internal static class NvmlInterop
     /// <summary>nvmlReturn_t.NVML_ERROR_FUNCTION_NOT_FOUND: "Local version of NVML doesn't implement this function."</summary>
     public const int ErrorFunctionNotFound = 13;
 
-    /// <summary>sizeof(nvmlClockOffset_v1_t) | (1 &lt;&lt; 24). Only the first four fields are sent by the setter.</summary>
-    private const uint ClockOffsetVersionV1 = 16 | (1u << 24);
+    /// <summary>
+    /// <c>nvmlClockOffset_v1</c> = sizeof(nvmlClockOffset_v1_t) | (1 &lt;&lt; 24).
+    /// nvml.h declares ONE version of this struct, with six 32-bit fields
+    /// (24 bytes), and both the getter and the setter take it. The previous
+    /// constants (16|1&lt;&lt;24 for the setter, 24|2&lt;&lt;24 for the getter)
+    /// described structs that do not exist: the driver answered
+    /// NVML_ERROR_ARGUMENT_VERSION_MISMATCH, so the offsets never had bounds
+    /// and the core/memory overclock was silently unavailable on every card.
+    /// </summary>
+    internal const uint ClockOffsetVersion = 24 | (1u << 24);
 
-    /// <summary>sizeof(nvmlClockOffset_v2_t) | (2 &lt;&lt; 24). The getter needs the bounds the v1 struct does not carry.</summary>
-    private const uint ClockOffsetVersionV2 = 24 | (2u << 24);
+    /// <summary>nvmlTemperatureSensors_t.NVML_TEMPERATURE_GPU.</summary>
+    private const uint TemperatureSensorGpu = 0;
+
+    /// <summary>nvmlTemperatureThresholds_t.NVML_TEMPERATURE_THRESHOLD_SLOWDOWN.</summary>
+    private const uint TemperatureThresholdSlowdown = 1;
 
     /// <summary>Performance state that owns the boost clock.</summary>
     private const uint BoostPstate = 0;
@@ -517,6 +528,85 @@ internal static class NvmlInterop
         }
     }
 
+    /// <summary>GPU core utilization in percent over the driver's last sample period.</summary>
+    public static bool TryGetUtilization(IntPtr handle, out uint gpuPercent)
+    {
+        gpuPercent = 0;
+        if (!TryInitialize() || handle == IntPtr.Zero)
+        {
+            return false;
+        }
+
+        try
+        {
+            if (NvmlDeviceGetUtilizationRates(handle, out NvmlUtilization rates) != Success)
+            {
+                return false;
+            }
+
+            gpuPercent = rates.Gpu;
+            return true;
+        }
+        catch (DllNotFoundException)
+        {
+            return false;
+        }
+        catch (EntryPointNotFoundException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>Die temperature in Celsius (NVML_TEMPERATURE_GPU).</summary>
+    public static bool TryGetTemperature(IntPtr handle, out uint celsius)
+    {
+        celsius = 0;
+        if (!TryInitialize() || handle == IntPtr.Zero)
+        {
+            return false;
+        }
+
+        try
+        {
+            return NvmlDeviceGetTemperature(handle, TemperatureSensorGpu, out celsius) == Success;
+        }
+        catch (DllNotFoundException)
+        {
+            return false;
+        }
+        catch (EntryPointNotFoundException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Temperature at which the driver starts slowing the GPU down
+    /// (NVML_TEMPERATURE_THRESHOLD_SLOWDOWN). Reaching it during a stability
+    /// window means the step was graded on a throttled card.
+    /// </summary>
+    public static bool TryGetSlowdownTemperature(IntPtr handle, out uint celsius)
+    {
+        celsius = 0;
+        if (!TryInitialize() || handle == IntPtr.Zero)
+        {
+            return false;
+        }
+
+        try
+        {
+            return NvmlDeviceGetTemperatureThreshold(handle, TemperatureThresholdSlowdown, out celsius) == Success;
+        }
+        catch (DllNotFoundException)
+        {
+            return false;
+        }
+        catch (EntryPointNotFoundException)
+        {
+            return false;
+        }
+    }
+
     /// <summary>Device marketing name. NVML only exposes the per-device one.</summary>
     public static bool TryGetDeviceName(IntPtr handle, out string name)
     {
@@ -665,7 +755,7 @@ internal static class NvmlInterop
 
     /// <summary>
     /// Reads a clock offset plus the range the driver permits for it. The getter
-    /// takes the v2 struct because only that one carries the bounds.
+    /// fills the same v1 struct the setter takes, bounds included.
     /// </summary>
     public static bool TryGetClockOffset(IntPtr handle, NvidiaClockDomain domain, out int offsetMegahertz, out int minMegahertz, out int maxMegahertz)
     {
@@ -681,7 +771,7 @@ internal static class NvmlInterop
         {
             var request = new NvmlClockOffset
             {
-                Version = ClockOffsetVersionV2,
+                Version = ClockOffsetVersion,
                 Type = (uint)domain,
                 Pstate = BoostPstate,
             };
@@ -729,9 +819,9 @@ internal static class NvmlInterop
     }
 
     /// <summary>
-    /// Writes a clock offset and returns the raw NVML status. The setter takes
-    /// the v1 struct: the driver rejects a version word that does not match the
-    /// struct it is handed, answering INVALID_ARGUMENT when it does not.
+    /// Writes a clock offset and returns the raw NVML status. The driver rejects
+    /// a version word that does not match the struct it is handed, so the full
+    /// 24-byte v1 struct travels even though only the offset is read.
     /// </summary>
     public static int SetClockOffset(IntPtr handle, NvidiaClockDomain domain, int megahertz)
     {
@@ -744,7 +834,7 @@ internal static class NvmlInterop
         {
             var request = new NvmlClockOffset
             {
-                Version = ClockOffsetVersionV1,
+                Version = ClockOffsetVersion,
                 Type = (uint)domain,
                 Pstate = BoostPstate,
                 ClockOffsetMHz = megahertz,
@@ -779,7 +869,7 @@ internal static class NvmlInterop
 
 
     /// <summary>
-    /// <c>nvmlClockOffset_t</c>. The setter fills the first four fields; the
+    /// <c>nvmlClockOffset_v1_t</c>. The setter fills the first four fields; the
     /// getter additionally reads the bounds from the last two. Sequential and
     /// all-primitive, so it marshals as plain memory.
     /// </summary>
@@ -793,6 +883,23 @@ internal static class NvmlInterop
         public int MinClockOffsetMHz;
         public int MaxClockOffsetMHz;
     }
+
+    /// <summary><c>nvmlUtilization_t</c>: two unsigned ints, GPU then memory.</summary>
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct NvmlUtilization
+    {
+        public uint Gpu;
+        public uint Memory;
+    }
+
+    [DllImport(DllName, EntryPoint = "nvmlDeviceGetUtilizationRates", CallingConvention = CallingConvention.StdCall)]
+    private static extern int NvmlDeviceGetUtilizationRates(IntPtr device, out NvmlUtilization utilization);
+
+    [DllImport(DllName, EntryPoint = "nvmlDeviceGetTemperature", CallingConvention = CallingConvention.StdCall)]
+    private static extern int NvmlDeviceGetTemperature(IntPtr device, uint sensorType, out uint celsius);
+
+    [DllImport(DllName, EntryPoint = "nvmlDeviceGetTemperatureThreshold", CallingConvention = CallingConvention.StdCall)]
+    private static extern int NvmlDeviceGetTemperatureThreshold(IntPtr device, uint thresholdType, out uint celsius);
 
     [DllImport(DllName, EntryPoint = "nvmlInit_v2", CallingConvention = CallingConvention.StdCall)]
     private static extern int NvmlInit();

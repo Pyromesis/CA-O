@@ -30,7 +30,13 @@ public readonly record struct KnobValue
 
     public static KnobValue FromScalar(double value) => new(value, 0);
 
-    public static KnobValue FromIndex(int index) => new(0d, index);
+    /// <summary>
+    /// A discrete value. The index is mirrored into <see cref="Scalar"/> on
+    /// purpose: backends write the setting as a number (powercfg takes the raw
+    /// index), and a discrete preset whose Scalar stayed 0 made the Performance
+    /// profile write PERFBOOSTMODE=0, turning turbo OFF while reporting success.
+    /// </summary>
+    public static KnobValue FromIndex(int index) => new(index, index);
 
     /// <summary>Scalar values are the common case in the catalog, so literals convert implicitly.</summary>
     public static implicit operator KnobValue(double value) => FromScalar(value);

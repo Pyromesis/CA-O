@@ -48,11 +48,12 @@ public sealed class AmdTuningCeilingSource : IOverclockCeilingSource
             return new ValueTask<IReadOnlyList<TuningCeiling>>([noRange]);
         }
 
+        // Same scale as the knob: % of stock, whatever ADLX's own unit is.
         TuningCeiling ceiling = new(
             AmdKnobs.PowerLimit,
             NvidiaTuningCeilingSource.PercentUnitKey,
-            min,
-            max,
+            AmdAdlxBackend.ToCatalogPercent(min, device),
+            AmdAdlxBackend.ToCatalogPercent(max, device),
             null);
         return new ValueTask<IReadOnlyList<TuningCeiling>>([ceiling]);
     }

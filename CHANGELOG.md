@@ -3,6 +3,16 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
 ## [Unreleased]
+## [2.2.17] - 2026-10-14
+### Corregido
+- **Perfil Rendimiento ya no apaga el turbo.** `KnobValue.FromIndex` dejaba `Scalar` a 0 y el preset agresivo (indice 2) escribia `PERFBOOSTMODE=0`: turbo apagado reportado como exito. El indice se refleja en `Scalar` y Conservador pasa a indice 1 (fabrica), nunca 0.
+- **Conservador AMD ya no pone la tarjeta al maximo.** ADLX habla en offset (-10..+15) y el catalogo en % de fabrica (100 = fabrica): escribir 100 directo lo recortaba al maximo. Nueva conversion `ToCatalog/ToDriverPercent` con stock del driver o inferido del rango.
+- **Offsets de reloj NVIDIA por fin disponibles.** Las versiones `16|1<<24` y `24|2<<24` no existen en `nvml.h` (una sola `v1` de 24 bytes): el driver devolvia `VERSION_MISMATCH` y los offsets nunca tenian bounds. Unificada a `24|1<<24`.
+- **Tuning sin veredicto ya no cuenta como aprobado.** Nueva sonda `NvmlGpuStabilityProbe` (reloj/utilizacion/temperatura/slowdown, 1 Hz): TDR/device-lost es fallo, ventana sin 70 % de carga media es `Pending` -> estado `Unverified` con restore al ultimo bueno. Si el driver recorta al mismo valor, el recorrido corta en `CeilingReached` con el valor real.
+- **Registry ya no mezcla vendors.** `AllCatalogKnobs` incluye AMD, una vez que hay GPU se ocultan los knobs de la contraria, `CompositeCeilingSource` concatena techos por vendor, y el rank de CPU deja de usar el orden del enum (PolicyOnly pisaba XTU).
+- **Textos honestos.** CPU deja de decir "sin MSR no hay OC": dice que ajusta turbo/frecuencia maxima del plan. Perfiles advierten que son valores fijos sin prueba; el auto avisa que necesita juego/benchmark con carga. Tour de Overclock actualizado.
+### Probado
+- Suite 1892 passed, 0 failed (Security 274, Benchmark 17, Infrastructure 215, Core 947, UI 379, Integration 60). 19 tests nuevos de correctness (turbo, Pending-no-pass, clamp, NVML version, AMD % stock, sonda GPU, rank CPU).
 ## [2.2.16] - 2026-10-13
 ### Corregido
 - **El aviso de ajustes pendientes ya dice cuales y como resolverlos.** Nombra cada ajuste pendiente, cuantos son y manda a la seccion 05 ESTABILIDAD con Revertir/Mantener/Descartar, en vez del generico "Resuelvelos primero".

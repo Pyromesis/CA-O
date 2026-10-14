@@ -7,9 +7,9 @@ namespace CAO.Infrastructure.Overclock;
 /// <summary>
 /// AMD backend: power limit only, through ADLX (<c>amdadlx64.dll</c>).
 ///
-/// Why power limit only: ADLX reports it in percent of TDP, which is exactly
-/// the catalog's unit, so there is no anchor to resolve and no conversion to
-/// get wrong. AMD clocks stay out on purpose: from Navi4 up
+/// Why power limit only: it is the one tuning control whose unit is
+/// unambiguous once the driver's stock value is known (see
+/// <see cref="DriverStockPercent"/>). AMD clocks stay out on purpose: from Navi4 up
 /// <c>SetGPUMaxFrequency</c> takes an offset from base frequency, before that
 /// an absolute frequency, and this module refuses to guess which one a card
 /// expects. Knobs without a public setter report <see cref="NvidiaGpuBackend.NoPublicSetterReasonKey"/>,
@@ -106,11 +106,46 @@ public sealed class AmdAdlxBackend : IOverclockBackend, IOverclockDetailSource, 
         }
 
         int? percent = _tuning.ReadPowerLimitPercent();
-        return ValueTask.FromResult(
-            percent is null
-                ? KnobRead.Fail("overclock-gpu-power-unavailable")
-                : KnobRead.Ok(KnobValue.FromScalar(percent.Value)));
+        if (percent is null)
+        {
+            return ValueTask.FromResult(KnobRead.Fail("overclock-gpu-power-unavailable"));
+        }
+
+        if (!_tuning.TryDescribe(out AmdTuningDevice? device) || device is null)
+        {
+            return ValueTask.FromResult(KnobRead.Fail(RangeUnavailableReasonKey));
+        }
+
+        return ValueTask.FromResult(KnobRead.Ok(KnobValue.FromScalar(ToCatalogPercent(percent.Value, device))));
     }
+
+    /// <summary>
+    /// The value ADLX reports for "stock". Uses the driver's own default when
+    /// IADLXManualPowerTuning1 answers; otherwise infers it from the range: a
+    /// range that dips below zero or tops out at a small number is an offset
+    /// around 0 (Adrenalin's "-10 % .. +15 %"), anything else is absolute % of TDP.
+    /// </summary>
+    internal static int DriverStockPercent(AmdTuningDevice device)
+    {
+        if (device.DefaultPowerLimitPercent is int stock)
+        {
+            return stock;
+        }
+
+        bool isOffset = device.MinPowerLimitPercent is < 0 || device.MaxPowerLimitPercent is <= 50;
+        return isOffset ? 0 : 100;
+    }
+
+    /// <summary>
+    /// The catalog speaks "% of stock" (100 = factory). ADLX may speak an offset
+    /// around 0 instead; writing the catalog's 100 into an offset range would be
+    /// clamped to the maximum, so the Conservative profile maxed the card out.
+    /// </summary>
+    internal static double ToCatalogPercent(int driverValue, AmdTuningDevice device) =>
+        100 + (driverValue - DriverStockPercent(device));
+
+    internal static int ToDriverPercent(double catalogValue, AmdTuningDevice device) =>
+        (int)Math.Round(catalogValue) - 100 + DriverStockPercent(device);
 
     /// <summary>
     /// Applies the power limit, then reads it back. A write that does not stick
@@ -133,8 +168,9 @@ public sealed class AmdAdlxBackend : IOverclockBackend, IOverclockDetailSource, 
     }
 
     /// <summary>
-    /// Captures the power limit in percent: unlike the NVIDIA path, no anchor
-    /// can shift under it, because ADLX already speaks the catalog's unit.
+    /// Captures the power limit in the DRIVER's own unit (raw ADLX value), the
+    /// same way the NVIDIA path stores milliwatts: the restore hands it straight
+    /// back to the driver with no conversion that could drift in between.
     /// </summary>
     public ValueTask<UnitSnapshot> SnapshotAsync(CancellationToken ct)
     {
@@ -259,7 +295,7 @@ public sealed class AmdAdlxBackend : IOverclockBackend, IOverclockDetailSource, 
         }
 
         int target = Math.Clamp(
-            (int)Math.Round(requested.Scalar),
+            ToDriverPercent(requested.Scalar, described),
             described.MinPowerLimitPercent.Value,
             described.MaxPowerLimitPercent.Value);
 
@@ -290,7 +326,7 @@ public sealed class AmdAdlxBackend : IOverclockBackend, IOverclockDetailSource, 
         // that was asked for: after a clamp those differ.
         int? readBack = _tuning.ReadPowerLimitPercent();
         return readBack == target
-            ? KnobWriteResult.Ok(KnobValue.FromScalar(target))
+            ? KnobWriteResult.Ok(KnobValue.FromScalar(ToCatalogPercent(target, described)))
             : KnobWriteResult.Fail(NvidiaGpuBackend.VerifyFailedReasonKey);
     }
 
@@ -312,12 +348,18 @@ public sealed class AmdAdlxBackend : IOverclockBackend, IOverclockDetailSource, 
     private OverclockReading Power()
     {
         int? percent = _tuning.ReadPowerLimitPercent();
-        return percent is null
-            ? new OverclockReading("overclock_gpu_power_limit", string.Empty, EvidenceLevel.Empirical, "overclock-gpu-power-unavailable")
-            : new OverclockReading(
-                "overclock_gpu_power_limit",
-                FormattableString.Invariant($"{percent.Value} %"),
-                EvidenceLevel.Empirical);
+        if (percent is null)
+        {
+            return new OverclockReading("overclock_gpu_power_limit", string.Empty, EvidenceLevel.Empirical, "overclock-gpu-power-unavailable");
+        }
+
+        double shown = _tuning.TryDescribe(out AmdTuningDevice? device) && device is not null
+            ? ToCatalogPercent(percent.Value, device)
+            : percent.Value;
+        return new OverclockReading(
+            "overclock_gpu_power_limit",
+            FormattableString.Invariant($"{shown} %"),
+            EvidenceLevel.Empirical);
     }
 
     private OverclockReading WriteLimits()
@@ -334,7 +376,7 @@ public sealed class AmdAdlxBackend : IOverclockBackend, IOverclockDetailSource, 
 
         return new OverclockReading(
             "overclock_gpu_write_limits",
-            FormattableString.Invariant($"{min} % - {max} %"),
+            FormattableString.Invariant($"{ToCatalogPercent(min, described)} % - {ToCatalogPercent(max, described)} %"),
             EvidenceLevel.Empirical);
     }
 

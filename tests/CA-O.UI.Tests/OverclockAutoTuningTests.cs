@@ -13,35 +13,42 @@ using Xunit;
 namespace CAO.UI.Tests;
 
 /// <summary>
-/// Overclock automático con propuesta y tarjeta de perfil solo-accionable: el auto
-/// recorre cada knob accionable con el mismo motor de bisección del ajuste manual,
-/// guarda los perfiles validados y PROPONE (resumen + botón Aplicar al usuario,
-/// nunca un apply silencioso). La tarjeta 00 PERFIL solo lista escribibles.
+/// Overclock automático en dos fases y tarjeta de perfil solo-accionable: primero el
+/// margen (potencia, turbo) va directo al preset de Rendimiento con checkpoint; después
+/// cada offset de reloj recorre la bisección bajo la sonda de estabilidad. Todo lo
+/// escrito se deshace con «Restaurar valores». La tarjeta 00 PERFIL solo lista escribibles.
 /// Fakes inyectados en el ViewModel real vía harness.
 /// </summary>
 public sealed class OverclockAutoTuningTests
 {
     [Fact]
-    public async Task AutoTuning_ProposesWithoutApplying_PresetApplyNeverRuns()
+    public async Task AutoTuning_AppliesPowerHeadroomDirectly_AndOnlyWalksClocks()
     {
         var (vm, stores) = BuildAuto(writable: true);
 
         await vm.RefreshCommand.ExecuteAsync(null);
         await vm.StartAutoTuningCommand.ExecuteAsync(null);
 
-        var profile = Assert.Single(stores.Profiles);
-        Assert.Equal(new KnobId("amd.gpu.powerLimit"), profile.Knob);
+        // El límite de potencia es margen, no reloj: va directo al preset de
+        // Rendimiento por la vía con checkpoint (detalle "knob=..."), sin bisección.
+        // Por eso no hay perfil "validado": nadie probó estabilidad de un margen.
+        Assert.Empty(stores.Profiles);
         Assert.Contains(stores.Journal.Phases, p => p == TransactionPhase.OverclockStarted);
         Assert.Contains(stores.Journal.Phases, p => p == TransactionPhase.OverclockStepApplied);
-
-        // La vía de presets (ApplyOneAsync) es la única que registra detalles
-        // "knob=...": el motor escribe "id=valor". Si aparece un detalle knob=,
-        // el auto aplicó en silencio y el test debe caer.
-        Assert.DoesNotContain(stores.Journal.Details, d => d is not null && d.StartsWith("knob=", StringComparison.Ordinal));
+        Assert.Contains(stores.Journal.Details, d => d is not null && d.StartsWith("knob=amd.gpu.powerLimit value=120", StringComparison.Ordinal));
 
         Assert.NotEqual("overclock-auto-proposal", vm.ApplySummary);
         Assert.Equal(vm.ApplySummary, vm.StatusLine);
         Assert.False(vm.IsBusy);
+    }
+
+    [Fact]
+    public void OnlyClockOffsets_GoThroughTheStabilityWalk()
+    {
+        Assert.All(OverclockCatalog.NvidiaGpuKnobs.Where(k => k.Unit == KnobUnit.Hertz && k.Kind == KnobKind.Scalar),
+            k => Assert.True(OverclockViewModel.NeedsStabilityWalk(k)));
+        Assert.False(OverclockViewModel.NeedsStabilityWalk(OverclockCatalog.AmdGpuKnobs[0]));
+        Assert.All(OverclockCatalog.CpuPolicyKnobs, k => Assert.False(OverclockViewModel.NeedsStabilityWalk(k)));
     }
 
     [Fact]
@@ -180,7 +187,8 @@ public sealed class OverclockAutoTuningTests
         backend.Release = true;
         await vm.StartAutoTuningCommand.ExecuteAsync(null);
 
-        Assert.Single(stores.Profiles);
+        Assert.Empty(stores.Profiles);
+        Assert.Contains(stores.Journal.Details, d => d is not null && d.StartsWith("knob=amd.gpu.powerLimit", StringComparison.Ordinal));
         Assert.NotEqual("overclock-auto-proposal", vm.ApplySummary);
         Assert.False(vm.IsBusy);
     }

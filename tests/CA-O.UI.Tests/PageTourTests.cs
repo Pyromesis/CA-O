@@ -200,7 +200,7 @@ public sealed class PageTourXamlTests
             .ThenBy(p => p.TargetName, StringComparer.Ordinal)
             .ToArray();
 
-        Assert.Equal(83, expected.Length);
+        Assert.Equal(84, expected.Length);
         Assert.All(expected, p => Assert.NotEqual("tutorial", p.Route));
     }
 }

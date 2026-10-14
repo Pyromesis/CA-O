@@ -89,9 +89,8 @@ public static class OverclockCatalog
             presets: []),
     ];
     /// <summary>
-    /// AMD knobs, served by amdadlx64.dll. Power limit only: ADLX reports it in
-    /// percent of TDP, which is exactly the catalog unit, so there is no anchor
-    /// to resolve and no conversion to get wrong. AMD clocks stay out on
+    /// AMD knobs, served by amdadlx64.dll. Power limit only, in % of stock like
+    /// the NVIDIA one; the backend converts from ADLX's offset-around-0 range. AMD clocks stay out on
     /// purpose: from Navi4 up SetGPUMaxFrequency takes an offset, before that
     /// an absolute frequency, and guessing which one a card expects is how a
     /// number the hardware never meant gets written.
@@ -123,7 +122,10 @@ public static class OverclockCatalog
             "knob_cpu_boost_mode", "knob_cpu_boost_mode_desc", requiresReboot: false,
             presets:
             [
-                (OverclockProfile.Conservative, KnobValue.FromIndex(0)),
+                // 0 = turbo off, 1 = turbo normal, 2 = turbo agresivo. Ningun perfil
+                // apaga el turbo: "Conservador" en una pestana de overclock es el
+                // comportamiento de fabrica, no un procesador mas lento.
+                (OverclockProfile.Conservative, KnobValue.FromIndex(1)),
                 (OverclockProfile.Balanced, KnobValue.FromIndex(2)),
                 (OverclockProfile.Performance, KnobValue.FromIndex(2)),
             ]),

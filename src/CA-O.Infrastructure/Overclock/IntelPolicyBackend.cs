@@ -92,7 +92,7 @@ public sealed class IntelPolicyBackend : IOverclockBackend, IOverclockDetailSour
 
         int? value = IntelPowerPolicy.ParseAcSettingIndex(result.StdOut);
         return value.HasValue
-            ? KnobRead.Ok(KnobValue.FromScalar(value.Value))
+            ? KnobRead.Ok(ToKnobValue(id, value.Value))
             : KnobRead.Fail(ReadFailedReasonKey);
     }
 
@@ -134,8 +134,16 @@ public sealed class IntelPolicyBackend : IOverclockBackend, IOverclockDetailSour
             return KnobWriteResult.Fail(VerifyFailedReasonKey);
         }
 
-        return KnobWriteResult.Ok(KnobValue.FromScalar(readBack.Value));
+        return KnobWriteResult.Ok(ToKnobValue(id, readBack.Value));
     }
+
+    /// <summary>
+    /// Boost mode is a discrete setting: it is reported as an index so a preset
+    /// and a read compare equal, and so "already set" is detected instead of
+    /// rewriting the same value on every apply.
+    /// </summary>
+    private static KnobValue ToKnobValue(KnobId id, int raw) =>
+        id == IntelPowerPolicy.BoostModeKnob ? KnobValue.FromIndex(raw) : KnobValue.FromScalar(raw);
 
     public ValueTask<UnitSnapshot> SnapshotAsync(CancellationToken ct) => new(SnapshotCoreAsync(ct));
 

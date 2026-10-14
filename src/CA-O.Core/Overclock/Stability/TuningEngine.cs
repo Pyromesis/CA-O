@@ -53,6 +53,12 @@ public enum TuningStatus
 
     /// <summary>El backend no pudo ni aplicar el primer valor. No se abrió nada.</summary>
     Rejected,
+
+    /// <summary>
+    /// La sonda no pudo dar veredicto (sin carga, sin telemetría). Un punto sin
+    /// veredicto NO es un aprobado: se vuelve al último valor bueno y se cierra.
+    /// </summary>
+    Unverified,
 }
 
 public sealed record TuningRequest(
@@ -125,6 +131,7 @@ public sealed class TuningEngine
             cancellationToken.ThrowIfCancellationRequested();
 
             var proposed = KnobValue.FromScalar(value);
+
             var applied = await request.Target
                 .ApplyAsync(knob.Id, proposed, cancellationToken)
                 .ConfigureAwait(false);
@@ -134,6 +141,17 @@ public sealed class TuningEngine
                 await WriteAsync(TransactionPhase.OverclockStepRejected, applied.FailureReasonKey, cancellationToken).ConfigureAwait(false);
                 return Build(request, TuningStatus.Rejected, lastGoodValue, null, points, applied.FailureReasonKey, null);
             }
+
+            // El driver recorta contra su propio techo. Si lo que de verdad recibió no
+            // pasa del último valor bueno, seguir subiendo solo repetiría el mismo punto:
+            // el techo del hardware está alcanzado y se dice con el valor real.
+            var actual = applied.Applied?.Scalar ?? value;
+            if (points.Count > 0 && actual <= lastGoodValue.Scalar + (request.Step * 1e-6))
+            {
+                return Build(request, TuningStatus.CeilingReached, lastGoodValue, lastGoodValue.Scalar, points, null, null);
+            }
+
+            proposed = KnobValue.FromScalar(actual);
 
             await WriteAsync(TransactionPhase.OverclockStepApplied, knob.Id.Value, cancellationToken).ConfigureAwait(false);
             await WriteAsync(TransactionPhase.OverclockCheckpointTaken, $"{knob.Id}={Format(proposed)}", cancellationToken).ConfigureAwait(false);
@@ -168,6 +186,16 @@ public sealed class TuningEngine
 
                 var ceiling = Math.Max(request.StartingValue, value - request.Step);
                 return Build(request, TuningStatus.StabilityCeilingFound, lastGoodValue, ceiling, points, null, null);
+            }
+
+            if (verdict == StabilityVerdict.Pending)
+            {
+                // Sin veredicto no hay aprobado: una ventana sin carga o sin telemetría
+                // no demuestra nada. Se vuelve al último valor bueno y se cierra.
+                await RestoreAsync(request, lastGoodSnapshot, cancellationToken).ConfigureAwait(false);
+                var reason = run.AbortReasonKey ?? "overclock-tuning-no-verdict";
+                await WriteAsync(TransactionPhase.OverclockStepRejected, reason, cancellationToken).ConfigureAwait(false);
+                return Build(request, TuningStatus.Unverified, lastGoodValue, null, points, reason, null);
             }
 
             await WriteAsync(TransactionPhase.OverclockTestPassed, knob.Id.Value, cancellationToken).ConfigureAwait(false);

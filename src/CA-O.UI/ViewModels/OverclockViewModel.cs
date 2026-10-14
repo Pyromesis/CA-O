@@ -86,7 +86,7 @@ public sealed record OverclockRecoveryRow(
 /// The bound the hardware actually imposes on a setting. Naming the setting
 /// here is a fact about the setting, not a share of the measured result.
 /// </summary>
-public sealed record OverclockCeilingRow(string Knob, string Range, string Reason);
+public sealed record OverclockCeilingRow(string Knob, string Range, string Reason, string Label = "");
 /// <summary>One writable knob with its tune button. The command travels with the row because inside a DataTemplate an x:Bind cannot reach the page ViewModel.</summary>
 public sealed record OverclockTuningRow(string KnobId, string Label, string Detail, ICommand TuneCommand, string Description = "");
 /// <summary>
@@ -209,10 +209,37 @@ public sealed partial class OverclockViewModel : ObservableObject
             new BackendTuningTargetResolver(DefaultBackends()));
 
     private IOverclockCeilingSource CeilingSource =>
-        _ceilingSource ??= new NvidiaTuningCeilingSource(NvmlTuningApi.Instance);
+        _ceilingSource ??= new CompositeCeilingSource(
+            new NvidiaTuningCeilingSource(NvmlTuningApi.Instance),
+            new AmdTuningCeilingSource(AdlxTuningApi.Instance));
 
-    private IStabilityProbe TuningProbe =>
-        _tuningProbe ??= new WmiClockStallProbe();
+    /// <summary>
+    /// The probe that can actually see the component being tuned. GPU offsets
+    /// used to be graded by the CPU clock probe, which passes on an idle GPU,
+    /// so every offset "validated" without the card ever running at it. An
+    /// injected probe (tests) wins for every component.
+    /// </summary>
+    private IStabilityProbe ProbeFor(OverclockKnob knob) =>
+        _tuningProbe ?? (knob.Component == OverclockComponent.Gpu
+            ? _gpuProbe ??= new NvmlGpuStabilityProbe()
+            : _cpuProbe ??= new WmiClockStallProbe());
+
+    private static IReadOnlyList<ProbeMetric> MetricsFor(OverclockKnob knob) =>
+        knob.Component == OverclockComponent.Gpu
+            ? [ProbeMetric.GpuDeviceLost, ProbeMetric.GpuThermalLimit]
+            : [ProbeMetric.EffectiveClockStall];
+
+    private IStabilityProbe? _gpuProbe;
+    private IStabilityProbe? _cpuProbe;
+
+    /// <summary>
+    /// Only clock offsets go through the stability bisection. Power limits and
+    /// Windows power policy are headroom, not clocks: raising them cannot make
+    /// the silicon unstable by itself, so walking them point by point was
+    /// minutes of probing that proved nothing.
+    /// </summary>
+    internal static bool NeedsStabilityWalk(OverclockKnob knob) =>
+        knob.Kind == KnobKind.Scalar && knob.Unit == KnobUnit.Hertz;
 
     private IValidatedProfileStore ProfileStore =>
         _profileStore ??= new FileValidatedProfileStore();
@@ -311,6 +338,10 @@ public sealed partial class OverclockViewModel : ObservableObject
 
     [ObservableProperty]
     private string _recoverySummary = string.Empty;
+
+    /// <summary>Opens the 05 ESTABILIDAD block by itself when a run is waiting for a decision.</summary>
+    [ObservableProperty]
+    private bool _hasPendingRecoveries;
     public ObservableCollection<OverclockKnobRow> CpuKnobs { get; } = [];
 
     public ObservableCollection<OverclockKnobRow> GpuKnobs { get; } = [];
@@ -682,9 +713,11 @@ public sealed partial class OverclockViewModel : ObservableObject
                 return OverclockControlState.Available;
             }
 
-            var blocked = gate.BlockReasonKey(knob.Id);
-            return blocked is null
-                ? OverclockControlState.DriverBlocked
+            // A setting the vendor never exposed is read-only by nature, not a
+            // driver that blocked CA-O: saying "blocked by the driver" sends the
+            // user to update a driver that will never add the setter.
+            return gate.BlockReasonKey(knob.Id) == NvidiaGpuBackend.NoPublicSetterReasonKey
+                ? OverclockControlState.Unsupported
                 : OverclockControlState.DriverBlocked;
         }
 
@@ -705,7 +738,7 @@ public sealed partial class OverclockViewModel : ObservableObject
             case OverclockControlState.Unsupported:
                 return knob.Component == OverclockComponent.Memory
                     ? Localizer.Get("overclock-memory-readonly-spd")
-                    : Localizer.Get("overclock_read_failed");
+                    : Localizer.Get(WriteBlockReason(backend, knob) ?? "overclock_read_failed");
             case OverclockControlState.DependencyMissing:
                 return availability is null
                     ? Localizer.Get("overclock_no_backend")
@@ -734,8 +767,11 @@ public sealed partial class OverclockViewModel : ObservableObject
     private static string? WriteBlockReason(IOverclockBackend? backend, OverclockKnob knob) =>
         backend is IOverclockWriteGate gate ? gate.BlockReasonKey(knob.Id) : null;
 
+    private bool? _memoryProfileActive;
+
     private async Task FillReadingsAsync(CancellationToken ct)
     {
+        _memoryProfileActive = null;
         foreach (var backend in _backends)
         {
             if (backend is not IOverclockDetailSource source)
@@ -759,15 +795,27 @@ public sealed partial class OverclockViewModel : ObservableObject
                 readings = [new OverclockReading(backend.Id, "-", Shared.EvidenceLevel.Unknown, "overclock-readings-failed")];
             }
 
-            var sink = backend.Id == OverclockCatalogBackendIds.Memory
-                ? MemoryReadings
-                : GpuReadings;
+            // CPU readings used to land in the GPU list: the telemetry showed the
+            // turbo mode under "graphics".
+            var sink = backend.Id switch
+            {
+                OverclockCatalogBackendIds.Memory => MemoryReadings,
+                OverclockCatalogBackendIds.Cpu => CpuReadings,
+                _ => GpuReadings,
+            };
 
             foreach (var reading in readings)
             {
+                if (reading.LabelKey == "overclock_memory_profile" && reading.UnavailableReasonKey is null)
+                {
+                    _memoryProfileActive = reading.Value == "overclock_memory_profile_active";
+                }
+
                 sink.Add(new OverclockReadingRow(
                     Label(reading.LabelKey),
-                    reading.Value,
+                    // Some readings carry a verdict key as their value (the XMP
+                    // inference); it used to reach the screen untranslated.
+                    Localizer.Get(reading.Value),
                     Localizer.GetEvidenceLabel(reading.Evidence),
                     reading.UnavailableReasonKey is null ? string.Empty : Localizer.Get(reading.UnavailableReasonKey)));
             }
@@ -851,9 +899,16 @@ public sealed partial class OverclockViewModel : ObservableObject
             _ => Localizer.Get(gpu?.UnavailableReasonKey ?? "overclock-gpu-none"),
         };
 
-        MemorySummary = capabilities.Memory == MemoryBackendKind.SmbiosReportOnly
-            ? Localizer.Get("overclock-memory-smbios")
-            : Localizer.Get(mem?.UnavailableReasonKey ?? "overclock-memory-none");
+        // RAM cannot be overclocked from Windows: the only lever is XMP/EXPO in
+        // the BIOS. Say which side of it this machine is on instead of a generic note.
+        MemorySummary = capabilities.Memory != MemoryBackendKind.SmbiosReportOnly
+            ? Localizer.Get(mem?.UnavailableReasonKey ?? "overclock-memory-none")
+            : _memoryProfileActive switch
+            {
+                true => Localizer.Get("overclock-memory-xmp-active"),
+                false => Localizer.Get("overclock-memory-xmp-hint"),
+                _ => Localizer.Get("overclock-memory-smbios"),
+            };
 
         StabilitySummary = Localizer.Get("overclock-stability-pending");
 
@@ -887,11 +942,13 @@ public sealed partial class OverclockViewModel : ObservableObject
 
     private static string FormatValue(OverclockKnob knob, KnobValue value)
     {
-        if (knob.Kind == KnobKind.Enum && knob.Range.Allowed is { Count: > 0 } allowed)
+        if (knob.Kind == KnobKind.Enum && knob.Range.Allowed is { Count: > 0 })
         {
-            return value.Index >= 0 && value.Index < allowed.Count
-                ? value.Index.ToString(CultureInfo.InvariantCulture)
-                : value.ToString();
+            // Turbo mode reads as words, not as "2".
+            var named = Localizer.Get(string.Concat("overclock-boost-", value.Index.ToString(CultureInfo.InvariantCulture)));
+            return knob.Id == CAO.Core.Overclock.Policy.IntelPowerPolicy.BoostModeKnob && !named.StartsWith("overclock-", StringComparison.Ordinal)
+                ? named
+                : value.Index.ToString(CultureInfo.InvariantCulture);
         }
 
         var unit = knob.Unit switch
@@ -899,16 +956,22 @@ public sealed partial class OverclockViewModel : ObservableObject
             KnobUnit.Hertz => Localizer.Get("overclock-unit-hertz"),
             KnobUnit.Percent => "%",
             KnobUnit.Celsius => "°C",
-            KnobUnit.Enumerated => string.Empty,
             _ => string.Empty,
         };
 
-        var number = knob.Unit == KnobUnit.Hertz && value.Scalar >= 1_000_000d
-            ? (value.Scalar / 1_000_000d).ToString("0.##", CultureInfo.InvariantCulture)
-            : value.Scalar.ToString("0.##", CultureInfo.InvariantCulture);
-
+        var number = FormatNumber(knob.Unit, value.Scalar);
         return unit.Length == 0 ? number : string.Concat(number, " ", unit);
     }
+
+    /// <summary>
+    /// Every frequency in the catalog is Hertz; people read MHz. Offsets are
+    /// negative too, so the conversion keys on the magnitude, not on the sign
+    /// (a -500 MHz bound used to print as "-500000000").
+    /// </summary>
+    private static string FormatNumber(KnobUnit unit, double value) =>
+        unit == KnobUnit.Hertz
+            ? (value / 1_000_000d).ToString("0.##", CultureInfo.InvariantCulture)
+            : value.ToString("0.##", CultureInfo.InvariantCulture);
 
     private static string DescribeRange(OverclockKnob knob)
     {
@@ -917,9 +980,16 @@ public sealed partial class OverclockViewModel : ObservableObject
             return string.Empty;
         }
 
-        var min = knob.Range.Min.ToString("0.##", CultureInfo.InvariantCulture);
-        var max = knob.Range.Max.ToString("0.##", CultureInfo.InvariantCulture);
-        return string.Concat(min, " - ", max);
+        var min = FormatNumber(knob.Unit, knob.Range.Min);
+        var max = FormatNumber(knob.Unit, knob.Range.Max);
+        var unit = knob.Unit switch
+        {
+            KnobUnit.Hertz => " " + Localizer.Get("overclock-unit-hertz"),
+            KnobUnit.Percent => " %",
+            KnobUnit.Celsius => " °C",
+            _ => string.Empty,
+        };
+        return string.Concat(min, " - ", max, unit);
     }
 
     /// <summary>
@@ -1053,6 +1123,7 @@ public sealed partial class OverclockViewModel : ObservableObject
             }
         }
 
+        HasPendingRecoveries = PendingRecoveries.Count > 0;
         RecoverySummary = PendingRecoveries.Count == 0
             ? Localizer.Get("overclock-recovery-none")
             : Localizer.Format("overclock-recovery-pending", PendingRecoveries.Count);
@@ -1163,24 +1234,29 @@ public sealed partial class OverclockViewModel : ObservableObject
         }
     }
 
-    private static OverclockCeilingRow ToCeilingRow(TuningCeiling ceiling)
+    private OverclockCeilingRow ToCeilingRow(TuningCeiling ceiling)
     {
+        var hertz = string.Equals(ceiling.Unit, NvidiaTuningCeilingSource.HertzUnitKey, StringComparison.Ordinal);
         var range = ceiling.Min is { } min && ceiling.Max is { } max
             ? Localizer.Format(
                 "overclock-ceiling-range",
-                CeilingNumber(min),
-                CeilingNumber(max),
+                FormatNumber(hertz ? KnobUnit.Hertz : KnobUnit.Percent, min),
+                FormatNumber(hertz ? KnobUnit.Hertz : KnobUnit.Percent, max),
                 Localizer.Get(ceiling.Unit))
             : string.Empty;
+
+        // The id stays in Knob (it is what the recovery and the tests key on);
+        // the screen shows the same words as the control row.
+        var label = _lastKnobs.TryGetValue(ceiling.Knob.Value, out var knob)
+            ? Localizer.Get(knob.LabelKey)
+            : ceiling.Knob.Value;
 
         return new(
             ceiling.Knob.Value,
             range,
-            ceiling.ReasonKey is null ? string.Empty : Localizer.Get(ceiling.ReasonKey));
+            ceiling.ReasonKey is null ? string.Empty : Localizer.Get(ceiling.ReasonKey),
+            label);
     }
-
-    private static string CeilingNumber(double value) =>
-        value.ToString("0.##", CultureInfo.InvariantCulture);
     /// <summary>
     /// Runs the stability bisection on one knob, then keeps the answer. A run that
     /// reaches its ceiling without a fault becomes a validated profile, which is
@@ -1243,7 +1319,7 @@ public sealed partial class OverclockViewModel : ObservableObject
                     "overclock-tuning-point",
                     p.PointIndex,
                     p.EstimatedPoints,
-                    p.Value.Scalar.ToString("0.##", CultureInfo.InvariantCulture)));
+                    FormatValue(knob, p.Value)));
 
             // Driver P/Invoke, WMI and file I/O: none of it belongs on the UI thread.
             var outcome = await Task.Run(
@@ -1266,6 +1342,9 @@ public sealed partial class OverclockViewModel : ObservableObject
             IsBusy = false;
         }
     }
+
+    /// <summary>Window per tuning point: long enough for a driver reset to show up under load.</summary>
+    internal static readonly TimeSpan StepDuration = TimeSpan.FromSeconds(15);
 
     private sealed record TuningOutcome(
         TuningRunResult? Result,
@@ -1319,12 +1398,12 @@ public sealed partial class OverclockViewModel : ObservableObject
             runId,
             knob,
             target,
-            TuningProbe,
+            ProbeFor(knob),
             ProposedCeiling: ceiling,
             Step: knob.Step,
-            StepDuration: TimeSpan.FromSeconds(10),
+            StepDuration: StepDuration,
             Thresholds: StabilityThresholds.Default,
-            Metrics: [ProbeMetric.EffectiveClockStall])
+            Metrics: MetricsFor(knob))
         {
             StartingValue = read.Value.Scalar,
             Ceiling = ceiling,
@@ -1358,7 +1437,11 @@ public sealed partial class OverclockViewModel : ObservableObject
             AppliedValue = result.AppliedValue.Scalar,
             LastKnownGoodValue = result.AppliedValue.Scalar,
             StableCeiling = result.StableCeiling,
-            Phase = validated ? CheckpointPhase.Closed : CheckpointPhase.Interrupted,
+            // Unverified already put the last good value back: nothing is left in
+            // the air, so it must not show up as a pending run after a restart.
+            Phase = validated || result.Status == TuningStatus.Unverified
+                ? CheckpointPhase.Closed
+                : CheckpointPhase.Interrupted,
             UpdatedAtUtc = DateTimeOffset.UtcNow,
         }, ct).ConfigureAwait(true);
 
@@ -1381,10 +1464,15 @@ public sealed partial class OverclockViewModel : ObservableObject
         }
         else
         {
-            StatusLine = Localizer.Get(result.Status == TuningStatus.Rejected
-                ? "overclock-tuning-rejected"
-                : "overclock-tuning-interrupted");
-                SetMood(MoodForTuning(false, null));
+            StatusLine = result.Status switch
+            {
+                TuningStatus.Rejected => Localizer.Get("overclock-tuning-rejected"),
+                TuningStatus.Unverified => Localizer.Format(
+                    "overclock-tuning-unverified",
+                    Localizer.Get(result.ReasonKey ?? "overclock-tuning-no-verdict")),
+                _ => Localizer.Get("overclock-tuning-interrupted"),
+            };
+            SetMood(MoodForTuning(false, null));
         }
     }
 
@@ -1500,9 +1588,50 @@ public sealed partial class OverclockViewModel : ObservableObject
             SetMood(MoodForTuning(true, null));
             CrashLog.Step("auto.start");
 
+            // Snapshot every backend the run can touch BEFORE the first write, so
+            // "Restaurar valores" undoes the whole automatic run in one click.
+            await CaptureAutoSnapshotsAsync(targets, ct).ConfigureAwait(true);
+
+            // Phase 1: headroom. Power limits and the Windows turbo policy go
+            // straight to the Performance preset (the backend clamps to what the
+            // driver allows). They must land before the clock walk: an offset
+            // tested without power headroom is graded on a throttled card.
+            var applied = 0;
             var validated = 0;
             var skipped = 0;
-            foreach (var (knob, backend) in targets)
+            var runId = Guid.NewGuid();
+            var journal = JournalFor(runId);
+            var headroom = targets.Where(t => !NeedsStabilityWalk(t.Knob)).ToList();
+            if (headroom.Count > 0)
+            {
+                await journal.WriteAsync(TransactionPhase.OverclockStarted, $"run={runId} auto=headroom", ct).ConfigureAwait(true);
+            }
+
+            foreach (var (knob, backend) in headroom)
+            {
+                ct.ThrowIfCancellationRequested();
+                if (knob.PresetValue(OverclockProfile.Performance) is not { } preset)
+                {
+                    skipped++;
+                    continue;
+                }
+
+                StatusLine = Localizer.Format("overclock-auto-headroom-knob", Localizer.Get(knob.LabelKey));
+                var result = await Task.Run(
+                    () => ApplyOneAsync(new ApplyWork(backend, knob, preset), journal, ct), ct).ConfigureAwait(true);
+                if (result.Success || result.Unchanged)
+                {
+                    applied++;
+                }
+                else
+                {
+                    skipped++;
+                }
+            }
+
+            // Phase 2: clocks. Each offset is walked step by step under the probe
+            // that watches the GPU itself; a step without load is not a pass.
+            foreach (var (knob, backend) in targets.Where(t => NeedsStabilityWalk(t.Knob)))
             {
                 ct.ThrowIfCancellationRequested();
 
@@ -1516,7 +1645,7 @@ public sealed partial class OverclockViewModel : ObservableObject
                         "overclock-tuning-point",
                         p.PointIndex,
                         p.EstimatedPoints,
-                        p.Value.Scalar.ToString("0.##", CultureInfo.InvariantCulture)));
+                        FormatValue(knob, p.Value)));
 
                 TuningOutcome outcome;
                 try
@@ -1548,9 +1677,9 @@ public sealed partial class OverclockViewModel : ObservableObject
                 }
             }
 
-            ApplySummary = Localizer.Format("overclock-auto-proposal", validated, skipped);
+            ApplySummary = Localizer.Format("overclock-auto-proposal", applied, validated, skipped);
             StatusLine = ApplySummary;
-            SetMood(MoodForTuning(false, validated > 0));
+            SetMood(MoodForTuning(false, applied + validated > 0));
             CrashLog.Step("auto.done");
         }
         catch (OperationCanceledException)
@@ -1568,6 +1697,32 @@ public sealed partial class OverclockViewModel : ObservableObject
         finally
         {
             IsBusy = false;
+        }
+    }
+
+    /// <summary>One snapshot per backend the automatic run is about to touch.</summary>
+    private async Task CaptureAutoSnapshotsAsync(
+        IReadOnlyList<(OverclockKnob Knob, IOverclockBackend Backend)> targets,
+        CancellationToken ct)
+    {
+        _appliedSnapshots.Clear();
+        foreach (var backend in targets.Select(t => t.Backend).DistinctBy(b => b.Id))
+        {
+            try
+            {
+                _appliedSnapshots[backend.Id] = await Task.Run(
+                    () => backend.SnapshotAsync(ct).AsTask(), ct).ConfigureAwait(true);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                // No snapshot means no one-click restore for this backend; the
+                // per-knob checkpoints still exist. Never a reason to stop.
+                CrashLog.Write(ex);
+            }
         }
     }
 
@@ -1607,7 +1762,7 @@ public sealed partial class OverclockViewModel : ObservableObject
 
     private static string AutoCeilingText(OverclockKnob knob) =>
         knob.PresetValue(OverclockProfile.Performance) is { } preset
-            ? preset.Scalar.ToString("0.##", CultureInfo.InvariantCulture)
+            ? FormatValue(knob, preset)
             : Localizer.Get("overclock-ceiling-unavailable");
 
     /// <summary>Outcome of a single knob write inside a profile apply.</summary>

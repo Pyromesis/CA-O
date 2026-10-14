@@ -10,6 +10,9 @@ public enum ProbeMetric
     KernelBugcheck,
     EffectiveClockStall,
     GpuThermalLimit,
+
+    /// <summary>The GPU stopped answering mid-window (driver reset / TDR).</summary>
+    GpuDeviceLost,
     Composite,
 }
 
@@ -72,6 +75,17 @@ public abstract record ProbeEvidence
     }
 
     /// <summary>
+    /// La GPU dejó de responder durante la ventana: el driver se reinició (TDR) o el
+    /// dispositivo se perdió. Es la firma clásica de un offset de reloj inestable.
+    /// </summary>
+    public sealed record DeviceLost(string DeviceName, string ReasonKey) : ProbeEvidence
+    {
+        public override ProbeMetric Metric => ProbeMetric.GpuDeviceLost;
+
+        public bool IsFault => true;
+    }
+
+    /// <summary>
     /// Un sensor que no se pudo leer. Se registra para que la UI pueda decir "sin datos"
     /// en lugar de dar a entender que todo va bien.
     /// </summary>
@@ -109,6 +123,7 @@ public sealed record ProbeSample(DateTimeOffset TakenAt, IReadOnlyList<ProbeEvid
         ProbeEvidence.KernelBugcheck b => b.IsFault,
         ProbeEvidence.ClockStall c => c.IsFault,
         ProbeEvidence.ThermalLimitReached t => t.IsFault,
+        ProbeEvidence.DeviceLost d => d.IsFault,
         _ => false,
     };
 }

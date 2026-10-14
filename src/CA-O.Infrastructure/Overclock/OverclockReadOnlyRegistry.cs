@@ -115,9 +115,17 @@ public sealed class OverclockReadOnlyRegistry : IOverclockBackendRegistry
 
         // Knobs whose backend did not answer are still listed: the UI shows them
         // as unavailable WITH the backend's reason, which is far more useful
-        // than a section that simply has no controls in it.
+        // than a section that simply has no controls in it. One exception: once
+        // a GPU vendor answered, the other vendor's knobs are noise (an NVIDIA
+        // machine does not need six "AMD driver missing" rows, nor the reverse).
+        bool gpuAnswered = gpu != GpuBackendKind.None;
         foreach (OverclockKnob knob in AllCatalogKnobs())
         {
+            if (gpuAnswered && knob.Component == OverclockComponent.Gpu)
+            {
+                continue;
+            }
+
             if (seen.Add(knob.Id.Value))
             {
                 knobs.Add(knob);
@@ -131,6 +139,7 @@ public sealed class OverclockReadOnlyRegistry : IOverclockBackendRegistry
     public static IReadOnlyList<OverclockKnob> AllCatalogKnobs() =>
     [
         .. OverclockCatalog.NvidiaGpuKnobs,
+        .. OverclockCatalog.AmdGpuKnobs,
         .. OverclockCatalog.CpuPolicyKnobs,
         .. OverclockCatalog.MemoryKnobs,
     ];
@@ -233,7 +242,20 @@ public sealed class OverclockReadOnlyRegistry : IOverclockBackendRegistry
     /// declared weakest-first.
     /// </summary>
     private static CpuBackendKind Stronger(CpuBackendKind current, CpuBackendKind candidate) =>
-        (int)candidate > (int)current ? candidate : current;
+        CpuRank(candidate) > CpuRank(current) ? candidate : current;
+
+    /// <summary>
+    /// Explicit rank, NOT the enum order: the enum declares XtuGuided before
+    /// PolicyOnly, so comparing the raw ints let the GPU backends' PolicyOnly
+    /// answer overwrite a detected XTU and the summary never mentioned it.
+    /// </summary>
+    private static int CpuRank(CpuBackendKind kind) => kind switch
+    {
+        CpuBackendKind.PolicyOnly => 1,
+        CpuBackendKind.XtuGuided => 2,
+        CpuBackendKind.MsrSigned => 3,
+        _ => 0,
+    };
 
     private static GpuBackendKind Stronger(GpuBackendKind current, GpuBackendKind candidate) =>
         (int)candidate > (int)current ? candidate : current;
