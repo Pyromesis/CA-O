@@ -31,8 +31,8 @@ public sealed class CleanupGpuShaderCache : IOptimization
         Id = "cleanup-gpu-shader-cache",
         NameEs = "Limpiar caché de shaders GPU",
         NameEn = "Clean GPU shader cache",
-        DescriptionEs = "Borra shaders compilados de NVIDIA, AMD e Intel (se regeneran al jugar).",
-        DescriptionEn = "Deletes compiled NVIDIA, AMD and Intel shaders (regenerated when gaming).",
+        DescriptionEs = "Borra shaders compilados de NVIDIA, AMD e Intel de más de 10 minutos (se regeneran al jugar).",
+        DescriptionEn = "Deletes compiled NVIDIA, AMD and Intel shaders older than 10 minutes (regenerated when gaming).",
         TooltipEs = "Solo ficheros en DXCache/GLCache/DxCache/ShaderCache. Nunca drivers ni configuración. A partir de 50 MB. Mantenimiento no reversible.",
         Category = OptimizationCategory.Storage,
         ExpectedImpact = PerformanceImpact.Small,
@@ -70,11 +70,33 @@ public sealed class CleanupGpuShaderCache : IOptimization
         return found;
     }
 
+    /// <summary>Retención de temporales reales (10 minutos): fuente única en
+    /// <see cref="TempFileCleanupOptimization.RealTempRetentionMinutes"/>.</summary>
+    internal static readonly TimeSpan Retention =
+        TimeSpan.FromMinutes(TempFileCleanupOptimization.RealTempRetentionMinutes);
+
+    internal static long CacheBytesIn(string dir)
+    {
+        long bytes = 0;
+        // Solo candidatos: lo reciente (en tránsito) no cuenta como pendiente.
+        foreach (var path in SafeFileEnumeration.Files(dir))
+        {
+            try
+            {
+                if (!SafeFileEnumeration.IsOlderThan(path, Retention))
+                    continue;
+                bytes += new FileInfo(path).Length;
+            }
+            catch { }
+        }
+        return bytes;
+    }
+
     internal static long CacheBytes()
     {
         long bytes = 0;
         foreach (var dir in ExistingDirs())
-            bytes += SafeFileEnumeration.BytesIn(dir);
+            bytes += CacheBytesIn(dir);
         return bytes;
     }
 
@@ -101,6 +123,8 @@ public sealed class CleanupGpuShaderCache : IOptimization
             foreach (var path in SafeFileEnumeration.Files(dir))
             {
                 ct.ThrowIfCancellationRequested();
+                if (!SafeFileEnumeration.IsOlderThan(path, Retention))
+                    continue; // reciente (en tránsito): se conserva, no es "omitido"
                 try
                 {
                     var file = new FileInfo(path);
@@ -157,7 +181,7 @@ public sealed class CleanupGpuShaderCache : IOptimization
         var lines = new List<PreviewLine>();
         foreach (var dir in ExistingDirs())
         {
-            var ownBytes = SafeFileEnumeration.BytesIn(dir);
+            var ownBytes = CacheBytesIn(dir);
             lines.Add(new PreviewLine
             {
                 Kind = "Cleanup",

@@ -3,6 +3,11 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
 ## [Unreleased]
+## [2.2.15] - 2026-10-13
+### Cambiado
+- **Temporales: cae todo lo de hace mas de 10 minutos.** Windows Temp, Delivery Optimization, Windows Update, caches de app, CodeCache de navegadores, shaders de GPU y descargador NVIDIA borran con retencion de 10 min (antes 1 dia, y 4 ni miraban la edad). Conservan su umbral con motivo: Outlook 7d, CBS/dumps 30d, Prefetch 30d (vaciarlo empeora el arranque).
+### Probado
+- Suite 1872 passed, 0 failed (Security 274, Benchmark 17, Infrastructure 202, Core 943, UI 376, Integration 60). 12 tests nuevos de retencion (frontera 11 cae / 9 se respeta).
 ## [2.2.14] - 2026-10-13
 ### Anadido
 - **Punto de restauracion obligatorio antes de overclock.** Las tres vias de escritura (perfil, tuning por knob, automatico) crean si o si un punto de restauracion del sistema (`SystemRestore` por WMI) antes de tocar nada; si no se puede crear, no se escribe (ni journal, ni checkpoints, ni driver). Vale tambien ante cancelacion o error.

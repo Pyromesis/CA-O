@@ -31,11 +31,18 @@ public sealed class AppCacheCleanupTests
     private static string MakeProfile(params (string Sub, int Files, int BytesEach)[] entries)
     {
         var root = Path.Combine(Path.GetTempPath(), "CA-O-Test-" + Guid.NewGuid().ToString("N"));
+        // Retención de 10 minutos: los ficheros de prueba nacen con 11 min
+        // para ser candidatos (los frescos se respetan por contrato).
+        var stamp = DateTime.UtcNow.AddMinutes(-11);
         foreach (var (sub, files, bytesEach) in entries)
         {
             var dir = Directory.CreateDirectory(Path.Combine(root, sub));
             for (int i = 0; i < files; i++)
-                File.WriteAllBytes(Path.Combine(dir.FullName, $"f{i}.bin"), new byte[bytesEach]);
+            {
+                var path = Path.Combine(dir.FullName, $"f{i}.bin");
+                File.WriteAllBytes(path, new byte[bytesEach]);
+                File.SetLastWriteTimeUtc(path, stamp);
+            }
         }
         return root;
     }

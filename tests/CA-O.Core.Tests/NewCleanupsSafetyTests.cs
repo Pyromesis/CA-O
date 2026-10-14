@@ -27,7 +27,7 @@ public sealed class NewCleanupsSafetyTests
         var preview = await new CleanupCrashDumpsExtended()
             .PreviewAsync(new MemoryRegistry(), CancellationToken.None);
         Assert.NotEmpty(preview.Lines);
-        // Contains (no EndsWith): PreviewLine.Target lleva sufijo " (>Nd)".
+        // Contains (no EndsWith): PreviewLine.Target lleva sufijo de retención " (>…)"
         foreach (var line in preview.Lines)
             Assert.True(line.Target.Contains("*.dmp", StringComparison.OrdinalIgnoreCase)
                 || line.Target.Contains("MEMORY.DMP", StringComparison.OrdinalIgnoreCase),

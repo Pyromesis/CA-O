@@ -49,8 +49,8 @@ public sealed class CleanupAppCaches : IOptimization
         Id = "cleanup-app-caches",
         NameEs = "Limpiar cachés de apps",
         NameEn = "Clean app caches",
-        DescriptionEs = "Vacía cachés de Discord, Spotify y Slack (GB de medios vistos).",
-        DescriptionEn = "Empties Discord, Spotify and Slack caches (GBs of seen media).",
+        DescriptionEs = "Vacía cachés de Discord, Spotify y Slack de más de 10 minutos (GB de medios vistos).",
+        DescriptionEn = "Empties Discord, Spotify and Slack caches older than 10 minutes (GBs of seen media).",
         TooltipEs = "Solo carpetas Cache/Code Cache/GPUCache (+Browser en Spotify). No toca sesiones ni música offline. Cierra cada app primero; si está abierta se omite. Mantenimiento no reversible.",
         Category = OptimizationCategory.Storage,
         ExpectedImpact = PerformanceImpact.Small,
@@ -70,6 +70,11 @@ public sealed class CleanupAppCaches : IOptimization
         catch { return string.Empty; }
     }
 
+    /// <summary>Retención de temporales reales (10 minutos): fuente única en
+    /// <see cref="TempFileCleanupOptimization.RealTempRetentionMinutes"/>.</summary>
+    internal static readonly TimeSpan Retention =
+        TimeSpan.FromMinutes(TempFileCleanupOptimization.RealTempRetentionMinutes);
+
     internal static long CacheBytesFor(string baseDir, IReadOnlyList<string> subdirs)
     {
         long bytes = 0;
@@ -82,7 +87,16 @@ public sealed class CleanupAppCaches : IOptimization
                 if (!Directory.Exists(path)) continue;
                 // CAO-BUG-2026-10-06: la enumeracion cruda abortaba la cuenta de
                 // la aplicacion entera en cuanto una subcarpeta denyaba el acceso.
-                bytes += SafeFileEnumeration.BytesIn(path);
+                foreach (var file in SafeFileEnumeration.Files(path))
+                {
+                    try
+                    {
+                        if (!SafeFileEnumeration.IsOlderThan(file, Retention))
+                            continue; // reciente: no es candidato, no cuenta
+                        bytes += new FileInfo(file).Length;
+                    }
+                    catch { }
+                }
             }
             catch { }
         }
@@ -106,6 +120,8 @@ public sealed class CleanupAppCaches : IOptimization
                 foreach (var file in SafeFileEnumeration.Files(path))
                 {
                     ct.ThrowIfCancellationRequested();
+                    if (!SafeFileEnumeration.IsOlderThan(file, Retention))
+                        continue; // reciente: se conserva, no es "omitido"
                     try
                     {
                         bytes += new FileInfo(file).Length;

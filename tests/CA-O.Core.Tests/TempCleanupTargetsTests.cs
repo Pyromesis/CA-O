@@ -15,12 +15,14 @@ namespace CAO.Core.Tests;
 /// tambien los chunks que Delivery Optimization esta descargando en ese
 /// instante. Como esta limpieza (a diferencia de CleanupWindowsUpdateCache) no
 /// detiene el servicio antes de borrar, podia eliminar contenido a medio
-/// escribir. El margen minimo de la familia es 1 dia: lo que se esta
-/// reescribiendo queda fuera del corte.
+/// escribir. El margen minimo de la familia de temporales REALES es 10
+/// minutos: lo que se esta reescribiendo queda fuera del corte sin acumular
+/// basura de dias. Lo forense/diagnóstico (Outlook 7d, CBS/prefetch/dumps 30d)
+/// conserva sus dias expresados en minutos y queda fuera de este contrato.
 /// </summary>
 public sealed class TempCleanupTargetsTests
 {
-    private static IEnumerable<(Type Type, string Directory, string Pattern, int OlderThanDays)> Targets()
+    private static IEnumerable<(Type Type, string Directory, string Pattern, int OlderThanMinutes)> Targets()
     {
         var property = typeof(TempFileCleanupOptimization)
             .GetProperty("Targets", BindingFlags.Instance | BindingFlags.NonPublic)
@@ -37,24 +39,24 @@ public sealed class TempCleanupTargetsTests
             if (Activator.CreateInstance(type) is not object instance)
                 continue;
 
-            var targets = (IEnumerable<(string Directory, string Pattern, int OlderThanDays)>)
+            var targets = (IEnumerable<(string Directory, string Pattern, int OlderThanMinutes)>)
                 property.GetValue(instance)!;
-            foreach (var (directory, pattern, olderThanDays) in targets)
-                yield return (type, directory, pattern, olderThanDays);
+            foreach (var (directory, pattern, olderThanMinutes) in targets)
+                yield return (type, directory, pattern, olderThanMinutes);
         }
     }
 
     [Fact]
-    public void NoTarget_UsesAZeroDayCutoff()
+    public void NoTarget_UsesLessThanTenMinuteCutoff()
     {
         var offenders = Targets()
-            .Where(t => t.OlderThanDays < 1)
-            .Select(t => $"{t.Type.Name}: {t.Directory} (patron '{t.Pattern}', {t.OlderThanDays} dias)")
+            .Where(t => t.OlderThanMinutes < TempFileCleanupOptimization.RealTempRetentionMinutes)
+            .Select(t => $"{t.Type.Name}: {t.Directory} (patron '{t.Pattern}', {t.OlderThanMinutes} min)")
             .ToList();
 
         Assert.True(
             offenders.Count == 0,
-            "Un corte de 0 dias borra tambien el contenido en transito:" +
+            "Un corte por debajo de 10 minutos borra tambien el contenido en transito:" +
             Environment.NewLine + string.Join(Environment.NewLine, offenders));
     }
 

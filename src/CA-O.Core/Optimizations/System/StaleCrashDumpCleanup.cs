@@ -6,9 +6,12 @@ namespace CAO.Core.Optimizations.System;
 /// <summary>Deletes crash dumps older than 30 days from the system Minidump folder.</summary>
 public sealed class StaleCrashDumpCleanup : TempFileCleanupOptimization
 {
-    protected override IReadOnlyList<(string Directory, string Pattern, int OlderThanDays)> Targets { get; } =
+    // CONSERVA 30 días (no entra en la retención de 10 minutos): minidumps
+    // forenses para depurar fallos pasados (entrada histórica; la activa es
+    // cleanup-crash-dumps-extended).
+    protected override IReadOnlyList<(string Directory, string Pattern, int OlderThanMinutes)> Targets { get; } =
     [
-        (@"%SystemRoot%\Minidump", "*.dmp", 30),
+        (@"%SystemRoot%\Minidump", "*.dmp", 30 * MinutesPerDay),
     ];
 
     public override OptimizationDefinition Definition => new()

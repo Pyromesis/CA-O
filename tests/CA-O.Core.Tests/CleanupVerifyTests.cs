@@ -10,6 +10,7 @@ namespace CAO.Core.Tests;
 /// Verify honesto de limpiadores: el sistema regenera ficheros y hay
 /// bloqueados en uso. Éxito = progreso real o nada pendiente; solo falla
 /// si no se movió nada (antes: cualquier resto => CAO-TXN-003).
+/// Retención de la familia: 10 minutos (frontera 11 cae / 9 se respeta).
 /// </summary>
 public sealed class CleanupVerifyTests : IDisposable
 {
@@ -44,9 +45,9 @@ public sealed class CleanupVerifyTests : IDisposable
             SecurityImpact = SecurityImpact.None,
         };
 
-        protected override IReadOnlyList<(string Directory, string Pattern, int OlderThanDays)> Targets { get; } =
+        protected override IReadOnlyList<(string Directory, string Pattern, int OlderThanMinutes)> Targets { get; } =
         [
-            (dir, "*.*", 1),
+            (dir, "*.*", 10),
         ];
     }
 
@@ -67,17 +68,17 @@ public sealed class CleanupVerifyTests : IDisposable
             SecurityImpact = SecurityImpact.None,
         };
 
-        protected override IReadOnlyList<(string Directory, string Pattern, int OlderThanDays)> Targets { get; } =
+        protected override IReadOnlyList<(string Directory, string Pattern, int OlderThanMinutes)> Targets { get; } =
         [
-            (dir, name, 1),
+            (dir, name, 10),
         ];
     }
 
-    private string WriteFile(string name, int ageDays, bool lockExclusive = false)
+    private string WriteFile(string name, int ageMinutes, bool lockExclusive = false)
     {
         var path = Path.Combine(_dir, name);
         File.WriteAllText(path, "x");
-        File.SetLastWriteTimeUtc(path, DateTime.UtcNow.AddDays(-ageDays));
+        File.SetLastWriteTimeUtc(path, DateTime.UtcNow.AddMinutes(-ageMinutes));
         if (lockExclusive)
         {
             _locks.Add(new FileStream(path, FileMode.Open, FileAccess.ReadWrite, FileShare.None));
@@ -88,12 +89,34 @@ public sealed class CleanupVerifyTests : IDisposable
     private static OptimizationContext Context(MemoryRegistry registry) =>
         new() { Registry = registry };
 
+    /// <summary>Frontera de retención (10 min) por las tres vías: Detect ve el
+    /// fichero de 11 min como pendiente, Apply lo borra y Verify pasa; el de
+    /// 9 min no es pendiente en ninguna vía y sobrevive al Apply.</summary>
+    [Fact]
+    public async Task ElevenMinutes_Falls_NineMinutes_Survives_OnEveryPath()
+    {
+        WriteFile("eleven.txt", 11);
+        WriteFile("nine.txt", 9);
+        var opt = new ScratchCleanup(_dir);
+
+        Assert.Equal(OptimizationState.NotApplied, opt.Detect(new MemoryRegistry()));
+
+        var apply = await opt.ApplyAsync(Context(new MemoryRegistry()));
+        Assert.True(apply.Success);
+        Assert.False(File.Exists(Path.Combine(_dir, "eleven.txt")), "11 min >= corte: debe caer.");
+        Assert.True(File.Exists(Path.Combine(_dir, "nine.txt")), "9 min < corte: debe respetarse.");
+
+        Assert.Equal(OptimizationState.AppliedByCao, opt.Detect(new MemoryRegistry()));
+        var verify = await opt.VerifyAsync(Context(new MemoryRegistry()));
+        Assert.Equal(VerificationStatus.Passed, verify.Status);
+    }
+
     [Fact]
     public async Task PartialDelete_Passes_WithRemainingNote()
     {
-        WriteFile("old1.txt", 2);
-        WriteFile("old2.txt", 2);
-        WriteFile("locked.txt", 2, lockExclusive: true);
+        WriteFile("old1.txt", 120);
+        WriteFile("old2.txt", 120);
+        WriteFile("locked.txt", 120, lockExclusive: true);
         WriteFile("fresh.txt", 0);
         var opt = new ScratchCleanup(_dir);
 
@@ -108,7 +131,7 @@ public sealed class CleanupVerifyTests : IDisposable
     [Fact]
     public async Task NothingDeletable_Fails_Honestly()
     {
-        WriteFile("locked.txt", 2, lockExclusive: true);
+        WriteFile("locked.txt", 120, lockExclusive: true);
         var opt = new ScratchCleanup(_dir);
 
         var apply = await opt.ApplyAsync(Context(new MemoryRegistry()));
@@ -140,10 +163,10 @@ public sealed class CleanupVerifyTests : IDisposable
         // incluido) cuatro o cinco veces por cada apply.
         var nested = Path.Combine(_dir, "nested");
         Directory.CreateDirectory(nested);
-        var rootFile = WriteFile("MEMORY.DMP", 2);
+        var rootFile = WriteFile("MEMORY.DMP", 120);
         var nestedFile = Path.Combine(nested, "MEMORY.DMP");
         File.WriteAllText(nestedFile, "x");
-        File.SetLastWriteTimeUtc(nestedFile, DateTime.UtcNow.AddDays(-2));
+        File.SetLastWriteTimeUtc(nestedFile, DateTime.UtcNow.AddMinutes(-120));
         var opt = new ExactNameCleanup(_dir, "MEMORY.DMP");
 
         var apply = await opt.ApplyAsync(Context(new MemoryRegistry()));
@@ -162,7 +185,7 @@ public sealed class CleanupVerifyTests : IDisposable
         Directory.CreateDirectory(emptied);
         var inner = Path.Combine(emptied, "old.txt");
         File.WriteAllText(inner, "x");
-        File.SetLastWriteTimeUtc(inner, DateTime.UtcNow.AddDays(-2));
+        File.SetLastWriteTimeUtc(inner, DateTime.UtcNow.AddMinutes(-120));
         var alreadyEmpty = Path.Combine(_dir, "already-empty");
         Directory.CreateDirectory(alreadyEmpty);
         WriteFile("fresh.txt", 0);

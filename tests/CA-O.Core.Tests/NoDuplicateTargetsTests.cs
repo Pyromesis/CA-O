@@ -34,7 +34,7 @@ public sealed class NoDuplicateTargetsTests
             foreach (var item in targets)
             {
                 // DESVIACIÓN del verbatim del brief (nota del brief incorrecta):
-                // (Directory, Pattern, OlderThanDays) es ValueTuple: los nombres
+                // (Directory, Pattern, OlderThanMinutes) es ValueTuple: los nombres
                 // son solo metadata de compilación; en runtime son campos Item1..Item3.
                 // GetProperty("Directory") devuelve null → NRE. Se lee Item1 (Directory).
                 var dirField = item.GetType().GetField("Item1");

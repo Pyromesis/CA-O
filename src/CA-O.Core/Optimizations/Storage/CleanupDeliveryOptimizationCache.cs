@@ -9,12 +9,12 @@ public sealed class CleanupDeliveryOptimizationCache : TempFileCleanupOptimizati
     // filtro age <= cutoff admitia TAMBIEN los chunks que el servicio Delivery
     // Optimization estaba descargando en ese instante. A diferencia de
     // CleanupWindowsUpdateCache, esta limpieza no detiene el servicio antes de
-    // borrar, de modo que podia eliminar un chunk a medio escribir. Se usa 1 dia,
-    // el mismo margen que el resto de la familia de temporales: el contenido en
-    // transito se esta reescribiendo y por tanto queda fuera del corte.
-    protected override IReadOnlyList<(string Directory, string Pattern, int OlderThanDays)> Targets { get; } =
+    // borrar, de modo que podia eliminar un chunk a medio escribir. Se usan
+    // 10 minutos, la retención de temporales reales: el contenido en tránsito
+    // se está reescribiendo y por tanto queda fuera del corte.
+    protected override IReadOnlyList<(string Directory, string Pattern, int OlderThanMinutes)> Targets { get; } =
     [
-        (@"%SystemRoot%\SoftwareDistribution\DeliveryOptimization\Cache", "*.*", 1),
+        (@"%SystemRoot%\SoftwareDistribution\DeliveryOptimization\Cache", "*.*", RealTempRetentionMinutes),
     ];
 
     public override OptimizationDefinition Definition => new()

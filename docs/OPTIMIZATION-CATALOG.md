@@ -322,19 +322,19 @@ defrag /O segun medio
 Storage Sense completo (6 valores de una vez)
 
 ### cleanup-windows-temp
-Temporales Windows
+Temporales Windows (+10 min)
 
 ### cleanup-delivery-optimization-cache
-Cache DO
+Cache DO (+10 min)
 
 ### defragment-hdd-only
 Desfragmenta HDD, jamás SSD
 
 ### cleanup-windows-update-cache
-Caché WU (para + borra + arranca)
+Caché WU (para + borra + arranca, +10 min)
 
 ### cleanup-app-caches
-Cachés Discord/Spotify/Slack (nunca sesiones)
+Cachés Discord/Spotify/Slack (+10 min, nunca sesiones)
 
 ### cleanup-prefetch-stale
 Prefetch *.pf +30d (solo espacio)
@@ -346,16 +346,16 @@ CBS *.log +30d (solo espacio)
 Minidump + LiveKernelReports + MEMORY.DMP + CrashDumps por usuario (+30d)
 
 ### cleanup-gpu-shader-cache
-Shaders NVIDIA/AMD/Intel (+50 MB, nunca drivers)
+Shaders NVIDIA/AMD/Intel (+10 min, +50 MB, nunca drivers)
 
 ### cleanup-nvidia-downloader-cache
-Instaladores viejos de GeForce Experience
+Instaladores viejos de GeForce Experience (+10 min)
 
 ### cleanup-outlook-cache
 Adjuntos temp Outlook Content.Outlook +7d
 
 ### cleanup-browser-code-cache
-Cachés regenerables Chrome/Edge/Teams (nunca sesiones)
+Cachés regenerables Chrome/Edge/Teams (+10 min, nunca sesiones)
 
 ### cleanup-memory-ram
 EmptyWorkingSet por proceso + purga standby en SYSTEM (efecto temporal, no acelera)

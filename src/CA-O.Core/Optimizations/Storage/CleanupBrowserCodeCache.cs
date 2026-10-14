@@ -11,7 +11,7 @@ public sealed class CleanupBrowserCodeCache : TempFileCleanupOptimization
     private static readonly string[] SafeSubdirs = ["Cache", "Code Cache", "GPUCache", "ShaderCache"];
     private static readonly string[] TeamsSubdirs = ["Cache", "Code Cache", "GPUCache"];
 
-    protected override IReadOnlyList<(string Directory, string Pattern, int OlderThanDays)> Targets => BuildTargets();
+    protected override IReadOnlyList<(string Directory, string Pattern, int OlderThanMinutes)> Targets => BuildTargets();
 
     /// <summary>
     /// Caches regenerables de TODOS los perfiles de un directorio "User Data".
@@ -25,9 +25,9 @@ public sealed class CleanupBrowserCodeCache : TempFileCleanupOptimization
     /// tambien las carpetas propias del navegador (Crashpad, ShaderCache,
     /// GraphiteDawnCache...) que no son perfiles.
     /// </summary>
-    internal static IReadOnlyList<(string Directory, string Pattern, int OlderThanDays)> CacheTargetsUnder(string userDataDirectory)
+    internal static IReadOnlyList<(string Directory, string Pattern, int OlderThanMinutes)> CacheTargetsUnder(string userDataDirectory)
     {
-        List<(string Directory, string Pattern, int OlderThanDays)> list = [];
+        List<(string Directory, string Pattern, int OlderThanMinutes)> list = [];
         if (!Directory.Exists(userDataDirectory))
             return list;
         foreach (var profile in Directory.GetDirectories(userDataDirectory))
@@ -36,15 +36,15 @@ public sealed class CleanupBrowserCodeCache : TempFileCleanupOptimization
             {
                 var dir = Path.Combine(profile, sub);
                 if (Directory.Exists(dir))
-                    list.Add((dir, "*.*", 1));
+                    list.Add((dir, "*.*", RealTempRetentionMinutes));
             }
         }
         return list;
     }
 
-    private static IReadOnlyList<(string Directory, string Pattern, int OlderThanDays)> BuildTargets()
+    private static IReadOnlyList<(string Directory, string Pattern, int OlderThanMinutes)> BuildTargets()
     {
-        List<(string Directory, string Pattern, int OlderThanDays)> list = [];
+        List<(string Directory, string Pattern, int OlderThanMinutes)> list = [];
         foreach (var userData in ProfileSubDirs("AppData", "Local", "Google", "Chrome", "User Data"))
             list.AddRange(CacheTargetsUnder(userData));
         foreach (var userData in ProfileSubDirs("AppData", "Local", "Microsoft", "Edge", "User Data"))
@@ -52,7 +52,7 @@ public sealed class CleanupBrowserCodeCache : TempFileCleanupOptimization
         foreach (var sub in TeamsSubdirs)
         {
             foreach (var dir in ProfileSubDirs("AppData", "Roaming", "Microsoft", "Teams", sub))
-                list.Add((dir, "*.*", 1));
+                list.Add((dir, "*.*", RealTempRetentionMinutes));
         }
         return list;
     }

@@ -6,9 +6,13 @@ namespace CAO.Core.Optimizations.Storage;
 /// maintenance only: Windows rebuilds prefetch, so this never speeds anything up.</summary>
 public sealed class CleanupPrefetchStale : TempFileCleanupOptimization
 {
-    protected override IReadOnlyList<(string Directory, string Pattern, int OlderThanDays)> Targets { get; } =
+    // CONSERVA 30 días (no entra en la retención de 10 minutos): aquí la edad
+    // ES el criterio de "obsoleto" (un .pf reciente acelera el arranque de su
+    // app). Vaciar todo el prefetch empeora el arranque; solo se retiran los
+    // rastros que Windows lleva un mes sin tocar. Solo libera espacio.
+    protected override IReadOnlyList<(string Directory, string Pattern, int OlderThanMinutes)> Targets { get; } =
     [
-        (@"%SystemRoot%\Prefetch", "*.pf", 30),
+        (@"%SystemRoot%\Prefetch", "*.pf", 30 * MinutesPerDay),
     ];
 
     protected override string FormatSize(long bytes) => bytes >= 1024 * 1024 ? $"{bytes / 1024 / 1024} MB" : $"{bytes / 1024} KB";

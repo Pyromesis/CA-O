@@ -29,6 +29,17 @@ public static class SafeFileEnumeration
         Directory.EnumerateFiles(directory, pattern, RecursiveOptions);
 
     /// <summary>
+    /// true si el fichero existe y su última escritura es anterior al corte
+    /// (ahora menos la retención). Un fichero que desaparece o cuya fecha no
+    /// se puede leer NO es candidato: se devuelve false y la limpieza lo deja.
+    /// </summary>
+    public static bool IsOlderThan(string path, TimeSpan retention)
+    {
+        try { return new FileInfo(path).LastWriteTimeUtc <= DateTime.UtcNow.Subtract(retention); }
+        catch { return false; }
+    }
+
+    /// <summary>
     /// Suma de bytes de los ficheros bajo <paramref name="directory"/>. Un
     /// fichero que desaparece o se bloquea a mitad del recorrido se omite en
     /// lugar de abortar la cuenta.

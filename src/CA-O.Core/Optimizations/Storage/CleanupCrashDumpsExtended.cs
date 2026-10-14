@@ -9,17 +9,20 @@ namespace CAO.Core.Optimizations.Storage;
 /// (ConfirmIfNeededAsync).</summary>
 public sealed class CleanupCrashDumpsExtended : TempFileCleanupOptimization
 {
-    protected override IReadOnlyList<(string Directory, string Pattern, int OlderThanDays)> Targets => BuildTargets();
+    protected override IReadOnlyList<(string Directory, string Pattern, int OlderThanMinutes)> Targets => BuildTargets();
 
-    private static IReadOnlyList<(string Directory, string Pattern, int OlderThanDays)> BuildTargets()
+    private static IReadOnlyList<(string Directory, string Pattern, int OlderThanMinutes)> BuildTargets()
     {
-        List<(string Directory, string Pattern, int OlderThanDays)> list =
+        // CONSERVA 30 días (no entra en la retención de 10 minutos): los
+        // volcados son evidencia forense/diagnóstica; borrarlos pronto
+        // impediría depurar fallos pasados. La UI pide confirmación.
+        List<(string Directory, string Pattern, int OlderThanMinutes)> list =
         [
-            (@"%SystemRoot%\Minidump", "*.dmp", 30),
-            (@"%SystemRoot%\LiveKernelReports", "*.dmp", 30),
-            (@"%SystemRoot%", "MEMORY.DMP", 30),
+            (@"%SystemRoot%\Minidump", "*.dmp", 30 * MinutesPerDay),
+            (@"%SystemRoot%\LiveKernelReports", "*.dmp", 30 * MinutesPerDay),
+            (@"%SystemRoot%", "MEMORY.DMP", 30 * MinutesPerDay),
         ];
-        foreach (var dir in ProfileSubDirs("AppData", "Local", "CrashDumps")) list.Add((dir, "*.dmp", 30));
+        foreach (var dir in ProfileSubDirs("AppData", "Local", "CrashDumps")) list.Add((dir, "*.dmp", 30 * MinutesPerDay));
         return list;
     }
 

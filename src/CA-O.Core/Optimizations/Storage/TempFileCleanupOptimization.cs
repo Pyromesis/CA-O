@@ -12,8 +12,18 @@ public abstract class TempFileCleanupOptimization : IOptimization
 {
     public abstract OptimizationDefinition Definition { get; }
 
-    /// <summary>Directorios, patrón y antigüedad mínima a limpiar.</summary>
-    protected abstract IReadOnlyList<(string Directory, string Pattern, int OlderThanDays)> Targets { get; }
+    /// <summary>Retención de temporales REALES: 10 minutos. Los temporales se
+    /// regeneran y se reescriben constantemente; el margen de 1 día dejaba
+    /// basura de ayer en disco. 10 minutos cubren el contenido en tránsito
+    /// (se está reescribiendo y queda fuera del corte) sin acumular días.
+    /// Solo para temporales de verdad; lo forense/diagnóstico conserva días.</summary>
+    internal const int RealTempRetentionMinutes = 10;
+
+    /// <summary>Minutos de un día, para expresar retenciones forenses en minutos.</summary>
+    internal const int MinutesPerDay = 1440;
+
+    /// <summary>Directorios, patrón y antigüedad mínima a limpiar (en minutos).</summary>
+    protected abstract IReadOnlyList<(string Directory, string Pattern, int OlderThanMinutes)> Targets { get; }
 
     private static string SystemRoot
     {
@@ -104,6 +114,12 @@ public abstract class TempFileCleanupOptimization : IOptimization
     internal static IReadOnlyList<string> InteractiveUserTempDirs() =>
         ProfileSubDirs("AppData", "Local", "Temp");
 
+    /// <summary>Formato de retención para el display: días exactos (>=1d) o minutos.</summary>
+    internal static string FormatRetention(int olderThanMinutes) =>
+        olderThanMinutes >= MinutesPerDay && olderThanMinutes % MinutesPerDay == 0
+            ? $">{olderThanMinutes / MinutesPerDay}d"
+            : $">{olderThanMinutes} min";
+
     /// <summary>Formato de tamaño para mensajes. Base = KB (mensajes históricos intactos).</summary>
     protected virtual string FormatSize(long bytes) => $"{bytes / 1024} KB";
 
@@ -114,7 +130,7 @@ public abstract class TempFileCleanupOptimization : IOptimization
         var found = new List<string>();
         var anyUnreadable = false;
         var seenDirs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var (directory, pattern, olderThanDays) in Targets)
+        foreach (var (directory, pattern, olderThanMinutes) in Targets)
         {
             string dir;
             try { dir = ExpandDir(directory); }
@@ -124,7 +140,7 @@ public abstract class TempFileCleanupOptimization : IOptimization
             try { info = new DirectoryInfo(dir); }
             catch { continue; }
             if (!info.Exists) continue;
-            var cutoff = DateTime.UtcNow.AddDays(-olderThanDays);
+            var cutoff = DateTime.UtcNow.AddMinutes(-olderThanMinutes);
             // Recursivo: %TEMP% acumula el grueso en subcarpetas (VS, Edge,
             // instaladores). TopDirectoryOnly dejaba casi todo sin tocar.
             List<string> candidates = new();
@@ -332,7 +348,7 @@ public abstract class TempFileCleanupOptimization : IOptimization
         var lines = Targets.Select(t => new PreviewLine
         {
             Kind = "Cleanup",
-            Target = $"{ExpandDir(t.Directory)}\\{t.Pattern} (>{t.OlderThanDays}d)",
+            Target = $"{ExpandDir(t.Directory)}\\{t.Pattern} ({FormatRetention(t.OlderThanMinutes)})",
             Before = $"{pending.Count} fichero(s) antiguos",
             After = "eliminados",
         }).ToList();

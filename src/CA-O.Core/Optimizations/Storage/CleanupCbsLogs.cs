@@ -6,9 +6,12 @@ namespace CAO.Core.Optimizations.Storage;
 /// maintenance only: Windows regenerates them, so this never speeds anything up.</summary>
 public sealed class CleanupCbsLogs : TempFileCleanupOptimization
 {
-    protected override IReadOnlyList<(string Directory, string Pattern, int OlderThanDays)> Targets { get; } =
+    // CONSERVA 30 días (no entra en la retención de 10 minutos): los CBS son
+    // registros de servicio forenses; con menos margen se pierde diagnóstico
+    // de actualizaciones fallidas. Solo libera espacio, nunca acelera.
+    protected override IReadOnlyList<(string Directory, string Pattern, int OlderThanMinutes)> Targets { get; } =
     [
-        (@"%SystemRoot%\Logs\CBS", "*.log", 30),
+        (@"%SystemRoot%\Logs\CBS", "*.log", 30 * MinutesPerDay),
     ];
 
     protected override string FormatSize(long bytes) => bytes >= 1024 * 1024 ? $"{bytes / 1024 / 1024} MB" : $"{bytes / 1024} KB";

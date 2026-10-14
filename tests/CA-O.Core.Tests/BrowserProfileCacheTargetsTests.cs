@@ -57,12 +57,12 @@ public sealed class BrowserProfileCacheTargetsTests : IDisposable
     }
 
     [Fact]
-    public void OnlyTargetsRegenerableCachesOlderThanOneDay()
+    public void OnlyTargetsRegenerableCachesOlderThanTenMinutes()
     {
         foreach (var target in CleanupBrowserCodeCache.CacheTargetsUnder(_userData))
         {
             Assert.Equal("*.*", target.Pattern);
-            Assert.Equal(1, target.OlderThanDays);
+            Assert.Equal(TempFileCleanupOptimization.RealTempRetentionMinutes, target.OlderThanMinutes);
         }
     }
 }

@@ -6,13 +6,16 @@ namespace CAO.Core.Optimizations.Storage;
 /// older than 7 days for every profile. Locked files are skipped.</summary>
 public sealed class CleanupOutlookCache : TempFileCleanupOptimization
 {
-    protected override IReadOnlyList<(string Directory, string Pattern, int OlderThanDays)> Targets => BuildTargets();
+    protected override IReadOnlyList<(string Directory, string Pattern, int OlderThanMinutes)> Targets => BuildTargets();
 
-    private static IReadOnlyList<(string Directory, string Pattern, int OlderThanDays)> BuildTargets()
+    private static IReadOnlyList<(string Directory, string Pattern, int OlderThanMinutes)> BuildTargets()
     {
-        List<(string Directory, string Pattern, int OlderThanDays)> list = [];
+        // CONSERVA 7 días (no entra en la retención de 10 minutos): son
+        // adjuntos que el usuario puede reabrir desde el correo durante días;
+        // borrarlos a los 10 minutos rompería el flujo de "abrir adjunto".
+        List<(string Directory, string Pattern, int OlderThanMinutes)> list = [];
         foreach (var dir in ProfileSubDirs("AppData", "Local", "Microsoft", "Windows", "INetCache", "Content.Outlook"))
-            list.Add((dir, "*.*", 7));
+            list.Add((dir, "*.*", 7 * MinutesPerDay));
         return list;
     }
 

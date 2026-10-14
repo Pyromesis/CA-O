@@ -12,6 +12,12 @@ namespace CAO.Core.Optimizations.Storage;
 /// </summary>
 public sealed class CleanupWindowsUpdateCache : IOptimization
 {
+    /// <summary>Retención de temporales reales (10 minutos): solo caen las
+    /// descargas que llevan más de 10 minutos sin tocarse; lo que Windows
+    /// Update esté escribiendo ahora queda fuera del corte.</summary>
+    internal static readonly TimeSpan Retention =
+        TimeSpan.FromMinutes(TempFileCleanupOptimization.RealTempRetentionMinutes);
+
     private int? _lastDeleted;
     private long _lastBytes;
 
@@ -20,8 +26,8 @@ public sealed class CleanupWindowsUpdateCache : IOptimization
         Id = "cleanup-windows-update-cache",
         NameEs = "Limpiar caché de Windows Update",
         NameEn = "Clean Windows Update cache",
-        DescriptionEs = "Vacía las descargas cacheadas de Windows Update (se re-descargan solas).",
-        DescriptionEn = "Empties cached Windows Update downloads (re-downloaded if needed).",
+        DescriptionEs = "Vacía las descargas cacheadas de Windows Update de más de 10 minutos (se re-descargan solas).",
+        DescriptionEn = "Empties cached Windows Update downloads older than 10 minutes (re-downloaded if needed).",
         TooltipEs = "Detiene wuauserv y BITS, borra la caché y los rearranca siempre. Mantenimiento no reversible.",
         Category = OptimizationCategory.Storage,
         ExpectedImpact = PerformanceImpact.Small,
@@ -52,7 +58,7 @@ public sealed class CleanupWindowsUpdateCache : IOptimization
                 // CAO-BUG-2026-10-06: la enumeracion cruda devolvia 0 en cuanto
                 // una subcarpeta denyaba el acceso, con lo que Detect informaba
                 // "ya aplicada" sin haber recorrido el arbol entero.
-                ? SafeFileEnumeration.Files(dir).Count()
+                ? SafeFileEnumeration.Files(dir).Count(p => SafeFileEnumeration.IsOlderThan(p, Retention))
                 : 0;
         }
         catch { return 0; }
@@ -98,6 +104,8 @@ public sealed class CleanupWindowsUpdateCache : IOptimization
             foreach (var path in SafeFileEnumeration.Files(CacheDirectory))
             {
                 ct.ThrowIfCancellationRequested();
+                if (!SafeFileEnumeration.IsOlderThan(path, Retention))
+                    continue; // reciente (en tránsito): se conserva, no es "omitido"
                 try
                 {
                     bytes += new FileInfo(path).Length;

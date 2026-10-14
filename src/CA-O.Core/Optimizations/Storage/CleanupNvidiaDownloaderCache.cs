@@ -21,8 +21,8 @@ public sealed class CleanupNvidiaDownloaderCache : IOptimization
         Id = "cleanup-nvidia-downloader-cache",
         NameEs = "Limpiar caché de descargas NVIDIA",
         NameEn = "Clean NVIDIA downloader cache",
-        DescriptionEs = "Borra instaladores viejos de GeForce Experience (re-descargables).",
-        DescriptionEn = "Deletes stale GeForce Experience installers (re-downloadable).",
+        DescriptionEs = "Borra instaladores viejos de GeForce Experience de más de 10 minutos (re-descargables).",
+        DescriptionEn = "Deletes stale GeForce Experience installers older than 10 minutes (re-downloadable).",
         TooltipEs = "Solo ficheros en la carpeta de descargas de NVIDIA (ProgramData). Nunca drivers instalados ni configuración. Mantenimiento no reversible.",
         Category = OptimizationCategory.Storage,
         ExpectedImpact = PerformanceImpact.Small,
@@ -46,9 +46,13 @@ public sealed class CleanupNvidiaDownloaderCache : IOptimization
         catch { return string.Empty; }
     }
 
-    internal static (int Files, long Bytes) Pending()
+    /// <summary>Retención de temporales reales (10 minutos): fuente única en
+    /// <see cref="TempFileCleanupOptimization.RealTempRetentionMinutes"/>.</summary>
+    internal static readonly TimeSpan Retention =
+        TimeSpan.FromMinutes(TempFileCleanupOptimization.RealTempRetentionMinutes);
+
+    internal static (int Files, long Bytes) PendingIn(string dir)
     {
-        var dir = DownloaderDir();
         if (string.IsNullOrWhiteSpace(dir) || !Directory.Exists(dir))
             return (0, 0);
         int files = 0;
@@ -57,11 +61,18 @@ public sealed class CleanupNvidiaDownloaderCache : IOptimization
         // subarbol sin acceso y por tanto contaba cero para toda la carpeta.
         foreach (var path in SafeFileEnumeration.Files(dir))
         {
-            try { bytes += new FileInfo(path).Length; files++; }
+            try
+            {
+                if (!SafeFileEnumeration.IsOlderThan(path, Retention))
+                    continue; // reciente: no es candidato, no cuenta
+                bytes += new FileInfo(path).Length; files++;
+            }
             catch { }
         }
         return (files, bytes);
     }
+
+    internal static (int Files, long Bytes) Pending() => PendingIn(DownloaderDir());
 
     public OptimizationState Detect(IRegistryAccessor registry) =>
         Pending().Files == 0 ? OptimizationState.AppliedByCao : OptimizationState.NotApplied;
@@ -89,6 +100,8 @@ public sealed class CleanupNvidiaDownloaderCache : IOptimization
         foreach (var path in SafeFileEnumeration.Files(dir))
         {
             ct.ThrowIfCancellationRequested();
+            if (!SafeFileEnumeration.IsOlderThan(path, Retention))
+                continue; // reciente (en tránsito): se conserva, no es "omitido"
             try
             {
                 var file = new FileInfo(path);
