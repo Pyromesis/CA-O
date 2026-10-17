@@ -55,7 +55,9 @@ public sealed class SystemXtuProbe(IRegistryAccessor registry) : IXtuProbe
 
     private static bool DetectLaptop() =>
         QueryFirstInt("SELECT PCSystemType FROM Win32_ComputerSystem", "PCSystemType") == 2 ||
-        ExistsWmiClass("SELECT InstanceName FROM Win32_Battery");
+        // Win32_Battery no tiene InstanceName: con esa consulta WMI respondía
+        // "Invalid query" y la batería nunca contaba para detectar un portátil.
+        ExistsWmiClass("SELECT DeviceID FROM Win32_Battery");
 
     private bool DetectInstalled()
     {

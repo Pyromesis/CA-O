@@ -200,7 +200,7 @@ public sealed class PageTourXamlTests
             .ThenBy(p => p.TargetName, StringComparer.Ordinal)
             .ToArray();
 
-        Assert.Equal(92, expected.Length); // 84 + 8 de la pagina Red gaming (2.2.19)
+        Assert.Equal(90, expected.Length); // 84 + 8 Red gaming (2.2.19) - 2 pasos sobre controles ocultos (2.2.20)
         Assert.All(expected, p => Assert.NotEqual("tutorial", p.Route));
     }
 }

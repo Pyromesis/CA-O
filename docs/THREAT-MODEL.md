@@ -31,7 +31,7 @@ CA-O manipula Registry, Services, Power, Network y Boot (vía optimizaciones tip
 | **Command injection / PATH hijacking** | `IPrivilegedCommandExecutor` | `ElevatedCommandCatalog` allowlist (powercfg/netsh exact tokens), `CommandPolicy.Resolve` rutas absolutas `%SystemRoot%\System32\*`, sin shell, sin `PATH` lookup; `bcdedit` no pasa por runner genérico; `SystemCommandGateway` valida timeout/auditoría. | `ElevatedCommandCatalogTests` |
 | **DoS: oversized/malformed/flood** | Pipe | Límites `MaxRequestBytes 64KB` / `MaxResponseBytes 256KB` (`IpcProtocol:11`), timeout por conexión 15s (`PrivilegedPipeService:27`), `JsonSerializer` con `PropertyNamingPolicy camelCase` y `CAO-IPC-002` malformed; `Task` aislado por conexión. | `PrivilegedIpcSecurityTests` (oversized, malformed, flood) |
 | **Rollback manipulation** | Snapshot colisión | Identidad primaria `TransactionId` GUID, nunca `OptimizationId`; `TX-A` y `TX-B` para misma optimization generan dirs distintos; `RollbackVerified` solo si `SnapshotComparison.ExactMatch`. | `RegistryExactRoundTripTests`, `OptimizationTransactionTests` |
-| **Downgrade / Protocol confusion** | Version | `ProtocolVersion` 2 exacto, `AppVersion.Semantic 2.2.3` en manifest, UI y Service rechazan mismatch `CAO-IPC-001`; `ApplicationVersion`/`SchemaVersion`/`CatalogVersion` futuros a extender. | `IpcRequestValidator` + `CAO.Integration.Tests/DocumentationCodeConsistencyTests` |
+| **Downgrade / Protocol confusion** | Version | `ProtocolVersion` 2 exacto, `AppVersion.Semantic` (`2.2.20`) en manifest, UI y Service rechazan mismatch `CAO-IPC-001`; `ApplicationVersion`/`SchemaVersion`/`CatalogVersion` futuros a extender. | `IpcRequestValidator` + `CAO.Integration.Tests/DocumentationCodeConsistencyTests` |
 | **Audit tampering** | `history.jsonl` | Hash chain + `RequestId`/`CallerSid`/`TimestampUtc` por entrada; corrupción → warning explícito, no `PASS`. | `HistoryHashChainTests` |
 | **Cancellation leaving half-state** | Apply atomicity | `CancellationToken.None` durante `APPLY`/`VERIFY`, checkpoints solo antes de snapshot; `CancellationDeferred` reportado. | `CancellationSafetyTests` |
 
@@ -43,7 +43,7 @@ CA-O manipula Registry, Services, Power, Network y Boot (vía optimizaciones tip
 
 ## Verification
 - `scripts/verify.ps1` gates build+test+contracts; `dotnet audit` 0 vulnerables; `CodeQL` en CI; `Dependabot` semanal (revisión disciplinada, no auto-merge ciego per Fase 64).
-- Instalador verifica `sc qc`/`qfailure` recovery `restart/5000/restart/15000`.
+- Instalador verifica `sc qc`/`qfailure` recovery `restart/5000/restart/10000/reboot/60000`.
 
 ## Response
 Reporte privado al mantenedor con repro + versión; no incluir `history.jsonl` con PII (no hay). Ver `SECURITY.md:55`.

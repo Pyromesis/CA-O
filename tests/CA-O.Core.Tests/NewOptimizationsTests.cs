@@ -198,7 +198,7 @@ public sealed class NewOptimizationsTests
             Assert.False(string.IsNullOrWhiteSpace(optimization.Definition.NameEs));
             Assert.False(string.IsNullOrWhiteSpace(optimization.Definition.TooltipEs));
         }
-        Assert.Equal(100, OptimizationCatalog.All.Count); // 92 −3 eliminadas −1 fusión gaming-power −1 fusión minidump −2 fusión Sense (3→1) +8 nuevas +1 Sense unificada = 93; 2.2.19: +4 input lag +3 red para juegos = 100
+        Assert.Equal(122, OptimizationCatalog.All.Count); // 92 −3 eliminadas −1 fusión gaming-power −1 fusión minidump −2 fusión Sense (3→1) +8 nuevas +1 Sense unificada = 93; 2.2.19: +4 input lag +3 red para juegos = 100; 2.2.20: +5 input lag/red +10 limpieza +8 solucionar -1 retirada (network-throttling) = 122
     }
 
     [Theory]

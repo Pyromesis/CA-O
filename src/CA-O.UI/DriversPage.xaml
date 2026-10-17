@@ -17,17 +17,22 @@
     </Page.Resources>
     <ScrollViewer Padding="{StaticResource CaoPagePadding}" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Background="{ThemeResource SolidBackgroundFillColorBaseBrush}">
         <StackPanel x:Name="PageContent" Style="{StaticResource CaoPageContainerStyle}">
-            <StackPanel Style="{StaticResource CaoPageHeaderStyle}">
-                <TextBlock Text="Controladores" TextAlignment="Center" Style="{StaticResource CaoPageTitleStyle}"/>
-                <TextBlock Text="Inventario total, conflictos, limpieza de fantasmas y actualización vía Windows Update." TextAlignment="Center" Style="{StaticResource CaoSubtitleStyle}"/>
-                <Border Style="{StaticResource CaoHeaderAccentBarStyle}"/>
-            </StackPanel>
-            <Button x:Name="PageTourButton"
-                    Click="OnPageTourClick"
-                    Style="{StaticResource CaoElevatedButtonStyle}"
-                    HorizontalAlignment="Right"
-                    FontSize="12"
-                    Margin="0,4,0,8" />
+            <Grid x:Name="PageHeader" Style="{StaticResource CaoPageHeaderGridStyle}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <Border Style="{StaticResource CaoPageHeaderIconStyle}">
+                    <FontIcon Glyph="&#xE950;" Style="{StaticResource CaoPageHeaderGlyphStyle}"/>
+                </Border>
+                <StackPanel Grid.Column="1" Style="{StaticResource CaoPageHeaderStyle}">
+                    <TextBlock Text="Controladores" Style="{StaticResource CaoPageTitleStyle}"/>
+                    <TextBlock Text="Inventario total, conflictos, limpieza de fantasmas y actualización vía Windows Update." Style="{StaticResource CaoSubtitleStyle}"/>
+                    <Border Style="{StaticResource CaoHeaderAccentBarStyle}"/>
+                </StackPanel>
+                <Button x:Name="PageTourButton" Grid.Column="2" VerticalAlignment="Center" Click="OnPageTourClick" Style="{StaticResource CaoElevatedButtonStyle}" FontSize="12"/>
+            </Grid>
             <InfoBar IsOpen="True" Severity="Informational" IsClosable="False"
                      Title="Diagnóstico + acción"
                      Message="Detecta TODOS los dispositivos (presentes y ocultos). Corregir, limpiar fantasmas o actualizar pide confirmación y se verifica; nada se hace solo."/>
@@ -81,7 +86,7 @@
                 </StackPanel>
             </Border>
 
-            <Border Style="{StaticResource CaoCardStyle}">
+            <Border x:Name="ConflictsCard" Style="{StaticResource CaoCardStyle}">
                 <StackPanel Spacing="12">
                     <StackPanel Orientation="Horizontal" Spacing="10">
                         <Border Style="{StaticResource CaoCardIconStyle}" Background="{StaticResource CaoGreenSoftBrush}">

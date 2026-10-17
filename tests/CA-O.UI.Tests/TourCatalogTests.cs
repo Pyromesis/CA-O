@@ -40,11 +40,11 @@ public sealed class TourCatalogTests
     }
 
     [Fact]
-    public void Catalog_has_seven_chapters_each_with_a_summary_and_points()
+    public void Catalog_has_one_chapter_per_page_each_with_a_summary_and_points()
     {
-        Assert.Equal(7, TourCatalog.Chapters.Count);
+        // 2.2.20: un capítulo por cada página de la navegación salvo el hub Tutorial.
         Assert.Equal(
-            new[] { "analyze", "optimize", "cleanup", "restore", "drivers", "history", "settings" },
+            RouteTable.Order.Where(r => r != "tutorial"),
             TourCatalog.Chapters.Select(c => c.Route));
         foreach (var chapter in TourCatalog.Chapters)
         {
@@ -63,20 +63,23 @@ public sealed class TourCatalogTests
     }
 
     /// <summary>
-    /// The tour opens on the Panel, which is a waypoint rather than a topic: the Tutorial
-    /// page documents the seven work/reference pages, so "dashboard" is the single step
-    /// route with no chapter. Asserted as an exact set difference instead of a loop, so a
-    /// NEW step pointing at a chapter-less route still fails here.
+    /// Cada paso del recorrido general apunta a una página que tiene capítulo: desde
+    /// el Tutorial siempre se puede leer el capítulo y lanzar el tour de esa sección.
     /// </summary>
     [Fact]
-    public void The_dashboard_step_is_the_only_tour_step_with_no_chapter()
+    public void Every_tour_step_has_a_chapter()
     {
         var chapters = TourCatalog.Chapters.Select(c => c.Route).ToHashSet();
-        var orphanSteps = TourCatalog.Steps
-            .Select(s => s.Route)
-            .Where(r => !chapters.Contains(r))
-            .OrderBy(r => r, StringComparer.Ordinal);
+        Assert.Empty(TourCatalog.Steps.Select(s => s.Route).Where(r => !chapters.Contains(r)));
+    }
 
-        Assert.Equal(new[] { "dashboard" }, orphanSteps);
+    [Fact]
+    public void Every_chapter_has_a_page_tour_and_an_icon()
+    {
+        foreach (var chapter in TourCatalog.Chapters)
+        {
+            Assert.NotEmpty(PageTourCatalog.ForRoute(chapter.Route));
+            Assert.False(string.IsNullOrWhiteSpace(chapter.Glyph));
+        }
     }
 }

@@ -135,7 +135,7 @@
                 </NavigationViewItem>
                 <NavigationViewItem Content="Overclock" Tag="overclock" ToolTipService.ToolTip="Overclock — tuning honesto de CPU, GPU y memoria">
                     <NavigationViewItem.Icon>
-                        <FontIcon Glyph="&#xE9D4;" />
+                        <FontIcon Glyph="&#xEC4A;" />
                     </NavigationViewItem.Icon>
                 </NavigationViewItem>
                 <NavigationViewItem Content="Restaurar" Tag="restore" Icon="Undo" ToolTipService.ToolTip="Restaurar — snapshots y recuperación"/>

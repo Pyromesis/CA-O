@@ -6,17 +6,22 @@
     <Grid>
     <ScrollViewer Padding="{StaticResource CaoPagePadding}" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Background="{ThemeResource SolidBackgroundFillColorBaseBrush}">
         <StackPanel Style="{StaticResource CaoPageContainerStyle}">
-            <StackPanel Style="{StaticResource CaoPageHeaderStyle}">
-                <TextBlock Text="Restaurar" TextAlignment="Center" Style="{StaticResource CaoPageTitleStyle}"/>
-                <TextBlock Text="Centro de restauración — snapshots por TransactionId, no por OptimizationId. Cada reversión se verifica exactamente." TextAlignment="Center" Style="{StaticResource CaoSubtitleStyle}"/>
-                <Border Style="{StaticResource CaoHeaderAccentBarStyle}"/>
-            </StackPanel>
-            <Button x:Name="PageTourButton"
-                    Click="OnPageTourClick"
-                    Style="{StaticResource CaoElevatedButtonStyle}"
-                    HorizontalAlignment="Right"
-                    FontSize="12"
-                    Margin="0,4,0,8" />
+            <Grid x:Name="PageHeader" Style="{StaticResource CaoPageHeaderGridStyle}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <Border Style="{StaticResource CaoPageHeaderIconStyle}">
+                    <FontIcon Glyph="&#xE777;" Style="{StaticResource CaoPageHeaderGlyphStyle}"/>
+                </Border>
+                <StackPanel Grid.Column="1" Style="{StaticResource CaoPageHeaderStyle}">
+                    <TextBlock Text="Restaurar" Style="{StaticResource CaoPageTitleStyle}"/>
+                    <TextBlock Text="Centro de restauración — snapshots por TransactionId, no por OptimizationId. Cada reversión se verifica exactamente." Style="{StaticResource CaoSubtitleStyle}"/>
+                    <Border Style="{StaticResource CaoHeaderAccentBarStyle}"/>
+                </StackPanel>
+                <Button x:Name="PageTourButton" Grid.Column="2" VerticalAlignment="Center" Click="OnPageTourClick" Style="{StaticResource CaoElevatedButtonStyle}" FontSize="12"/>
+            </Grid>
             <InfoBar x:Name="NoteBar" IsOpen="True" Severity="Informational" IsClosable="False"
                      Title="Reversibilidad garantizada"
                      Message="CA-O crea snapshots propios antes de cada cambio; el punto de restauración de Windows se solicita una vez por sesión cuando el sistema lo permite. Irreversibles se marcan explícitamente."/>
@@ -55,9 +60,10 @@
                             </Border>
                             <StackPanel Spacing="2" VerticalAlignment="Center">
                                 <TextBlock Text="Últimas operaciones" Style="{StaticResource CaoSectionTitleStyle}"/>
-                                <TextBlock Text="TX, riesgo y estado" Style="{StaticResource CaoSectionSubtitleStyle}"/>
+                                <TextBlock Text="Cambios que se pueden deshacer" Style="{StaticResource CaoSectionSubtitleStyle}"/>
                             </StackPanel>
                         </StackPanel>
+                        <TextBlock x:Name="LatestOpsText" TextWrapping="Wrap" Style="{StaticResource CaoSectionSubtitleStyle}" Text="Cargando…"/>
                     </StackPanel>
                 </Border>
                 <Border Grid.Column="1" Style="{StaticResource CaoCardStyle}">
@@ -113,53 +119,45 @@
                 </StackPanel>
             </Border>
 
-            <Border x:Name="EmptySnapshotsCard" Style="{StaticResource CaoCardStyle}" Visibility="Collapsed">
-                <StackPanel Spacing="6" HorizontalAlignment="Center" Padding="12">
-                    <FontIcon Glyph="&#xE777;" FontSize="22" Opacity="0.35" HorizontalAlignment="Center"/>
-                    <TextBlock Text="Sin snapshots aún" Style="{StaticResource CaoEmptyStateTitleStyle}"/>
-                    <TextBlock Text="Los snapshots aparecen aquí tras aplicar un cambio. Se guardan en %ProgramData%\CA-O\snapshots\{TX}\." Style="{StaticResource CaoSectionSubtitleStyle}" TextAlignment="Center"/>
-                </StackPanel>
-            </Border>
+            <StackPanel x:Name="SnapshotsArea" Spacing="12">
+                <Border x:Name="EmptySnapshotsCard" Style="{StaticResource CaoCardStyle}" Visibility="Collapsed">
+                    <StackPanel Spacing="6" HorizontalAlignment="Center" Padding="12">
+                        <FontIcon Glyph="&#xE777;" FontSize="22" Opacity="0.35" HorizontalAlignment="Center"/>
+                        <TextBlock Text="Sin snapshots aún" Style="{StaticResource CaoEmptyStateTitleStyle}"/>
+                        <TextBlock Text="Los snapshots aparecen aquí tras aplicar un cambio. Se guardan en %ProgramData%\CA-O\snapshots\{TX}\." Style="{StaticResource CaoSectionSubtitleStyle}" TextAlignment="Center"/>
+                    </StackPanel>
+                </Border>
 
-            <ListView x:Name="SnapshotsList" SelectionMode="None">
-                <ListView.ItemContainerStyle>
-                    <Style TargetType="ListViewItem">
-                        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-                        <Setter Property="Margin" Value="0,4"/>
-                    </Style>
-                </ListView.ItemContainerStyle>
-                <ListView.ItemTemplate>
-                    <DataTemplate>
-                        <Border Style="{StaticResource CaoCardStyle}" Padding="0">
-                            <Grid ColumnSpacing="0">
-                                <Grid.ColumnDefinitions><ColumnDefinition Width="5"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                                <Border Grid.Column="0" Style="{StaticResource CaoTimelineRailStyle}" Background="{StaticResource CaoSuccessBrush}" Opacity="0.9"/>
-                                <Grid ColumnSpacing="10" Grid.Column="1" Padding="14,12">
-                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                                <StackPanel Spacing="3">
-                                    <TextBlock FontSize="12" TextWrapping="Wrap" IsTextSelectionEnabled="True">
-                                        <Run Text="{Binding TimestampUtc}" />
-                                        <Run Text=" — " />
-                                        <Run Text="{Binding OptimizationId}" />
-                                        <Run Text=" — TX:" />
-                                        <Run Text="{Binding TransactionId}" />
-                                        <Run Text=" — " />
-                                        <Run Text="{Binding EntryCount}" />
-                                        <Run Text=" valores — build " />
-                                        <Run Text="{Binding WindowsBuild}" />
-                                    </TextBlock>
-                                    <TextBlock Text="TransactionId como identidad primaria — nunca se sobrescribe un snapshot." Style="{StaticResource CaoSectionSubtitleStyle}"/>
-                                </StackPanel>
-                                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                                    <Button Content="Inspeccionar" Tag="{Binding TransactionId}" Click="OnInspectClick" FontSize="12" MinHeight="32" Style="{StaticResource CaoElevatedButtonStyle}" AutomationProperties.Name="Inspeccionar snapshot"/>
-                                    <Button Content="Restaurar" Tag="{Binding TransactionId}" Click="OnRestoreClick" FontSize="12" MinHeight="32" MinWidth="110" Style="{StaticResource CaoPrimaryButtonStyle}" AutomationProperties.Name="Restaurar snapshot"/>
-                                </StackPanel>
-                            </Grid>
-                            </Grid>
-                        </Border>
-                    </DataTemplate>
-                </ListView.ItemTemplate>
-            </ListView>
+                <ListView x:Name="SnapshotsList" SelectionMode="None">
+                    <ListView.ItemContainerStyle>
+                        <Style TargetType="ListViewItem">
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                            <Setter Property="Margin" Value="0,4"/>
+                        </Style>
+                    </ListView.ItemContainerStyle>
+                    <ListView.ItemTemplate>
+                        <DataTemplate>
+                            <Border Style="{StaticResource CaoCardStyle}" Padding="0">
+                                <Grid ColumnSpacing="0">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="5"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                    <Border Grid.Column="0" Style="{StaticResource CaoTimelineRailStyle}" Background="{StaticResource CaoSuccessBrush}" Opacity="0.9"/>
+                                    <Grid ColumnSpacing="10" Grid.Column="1" Padding="14,12">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                    <StackPanel Spacing="3">
+                                        <TextBlock Text="{Binding Title}" Style="{StaticResource CaoListItemTitleStyle}" TextWrapping="Wrap"/>
+                                        <TextBlock Text="{Binding Detail}" Style="{StaticResource CaoListItemDetailStyle}" TextWrapping="Wrap" IsTextSelectionEnabled="True"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                        <Button Content="Inspeccionar" Tag="{Binding TransactionId}" Click="OnInspectClick" FontSize="12" MinHeight="32" Style="{StaticResource CaoElevatedButtonStyle}" AutomationProperties.Name="Inspeccionar snapshot"/>
+                                        <Button Content="Restaurar" Tag="{Binding TransactionId}" Click="OnRestoreClick" FontSize="12" MinHeight="32" MinWidth="110" Style="{StaticResource CaoPrimaryButtonStyle}" AutomationProperties.Name="Restaurar snapshot"/>
+                                    </StackPanel>
+                                </Grid>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ListView.ItemTemplate>
+                </ListView>
+            </StackPanel>
         </StackPanel>
     </ScrollViewer>
         <Grid x:Name="ApplyOverlay" Background="#99000000" Visibility="{Binding Visibility, ElementName=RestoreProgressCard}">

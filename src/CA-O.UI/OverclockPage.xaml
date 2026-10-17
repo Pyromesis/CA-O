@@ -78,13 +78,17 @@
         <StackPanel x:Name="PageContent" Style="{StaticResource CaoPageContainerStyle}">
 
             <!-- Encabezado: titulo, estado en vivo y acciones de pagina -->
-            <Grid ColumnSpacing="12">
+            <Grid x:Name="PageHeader" Style="{StaticResource CaoPageHeaderGridStyle}">
                 <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-                <StackPanel Grid.Column="0">
+                <Border Style="{StaticResource CaoPageHeaderIconStyle}">
+                    <FontIcon Glyph="&#xEC4A;" Style="{StaticResource CaoPageHeaderGlyphStyle}" />
+                </Border>
+                <StackPanel Grid.Column="1" Style="{StaticResource CaoPageHeaderStyle}">
                     <TextBlock x:Name="HeadlineText"
                                Style="{StaticResource CaoPageTitleStyle}"
                                Text="Overclock" />
@@ -92,8 +96,9 @@
                                Style="{StaticResource CaoSubtitleStyle}"
                                AutomationProperties.LiveSetting="Polite"
                                Text="{x:Bind ViewModel.StatusLine, Mode=OneWay}" />
+                    <Border Style="{StaticResource CaoHeaderAccentBarStyle}" />
                 </StackPanel>
-                <StackPanel Grid.Column="1"
+                <StackPanel Grid.Column="2"
                             Orientation="Horizontal"
                             Spacing="8"
                             VerticalAlignment="Center">
@@ -111,11 +116,10 @@
                             FontSize="12" />
                 </StackPanel>
                 <controls:CaoCat x:Name="OverclockCat"
-                                 Grid.Column="2"
+                                 Grid.Column="3"
                                  Width="64"
                                  ShowCaption="False" />
             </Grid>
-            <Border Style="{StaticResource CaoHeaderAccentBarStyle}" Margin="0,8,0,12" />
 
             <InfoBar x:Name="ReadOnlyNotice"
                      Severity="Informational"

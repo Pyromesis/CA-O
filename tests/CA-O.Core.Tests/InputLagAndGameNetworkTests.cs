@@ -4,6 +4,7 @@ using CAO.Core.GameNetwork;
 using CAO.Core.Optimizations.Gaming;
 using CAO.Core.Optimizations.Network;
 using CAO.Shared;
+using CAO.Shared.Security;
 using Xunit;
 
 namespace CAO.Core.Tests;
@@ -24,7 +25,6 @@ public sealed class InputLagAndGameNetworkTests
         "disable-accessibility-hotkeys",
         "keyboard-fast-repeat",
         "prioritize-game-traffic-qos",
-        "disable-network-throttling",
         "disable-energy-efficient-ethernet",
     };
 
@@ -46,7 +46,6 @@ public sealed class InputLagAndGameNetworkTests
     [InlineData("disable-accessibility-hotkeys")]
     [InlineData("keyboard-fast-repeat")]
     [InlineData("prioritize-game-traffic-qos")]
-    [InlineData("disable-network-throttling")]
     public async Task RegistryOptimizationsRoundTripExactly(string id)
     {
         var optimization = OptimizationCatalog.All.First(o => o.Definition.Id == id);
@@ -125,16 +124,18 @@ public sealed class InputLagAndGameNetworkTests
         Assert.Equal("1", registry.GetValue(RegistryHive2.LocalMachine, netClass + @"\0001", "*EEE"));
     }
 
+    /// <summary>
+    /// NetworkThrottlingIndex es el "network-throttling-index-hack" vetado (spec 75/100):
+    /// retirado del catálogo en 2.2.20, pero sigue en AllLegacy para que Restaurar
+    /// pueda deshacerlo en equipos que lo aplicaron con 2.2.19.
+    /// </summary>
     [Fact]
-    public async Task NetworkThrottlingDetectsTheUnsignedMaximumAsApplied()
+    public void NetworkThrottlingIsRetiredButStillRevertible()
     {
-        var registry = new MemoryRegistry();
-        // Windows devuelve REG_DWORD 0xFFFFFFFF como int -1.
-        registry.SetValue(RegistryHive2.LocalMachine,
-            @"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile",
-            "NetworkThrottlingIndex", -1, RegistryValueKind2.DWord);
-        Assert.Equal(OptimizationState.AppliedByCao, new DisableNetworkThrottling().Detect(registry));
-        await Task.CompletedTask;
+        Assert.DoesNotContain(OptimizationCatalog.All, o => o.Definition.Id == "disable-network-throttling");
+        Assert.Contains("disable-network-throttling", OptimizationCatalog.LegacyIds);
+        Assert.Contains(OptimizationCatalog.AllLegacy, o => o.Definition.Id == "disable-network-throttling");
+        Assert.False(OptimizationCatalog.RetiredAliases.ContainsKey("disable-network-throttling"));
     }
 
     // ---------- LatencyStats ----------
@@ -280,4 +281,154 @@ public sealed class InputLagAndGameNetworkTests
         RamGb = 32,
         MeasuredUtc = DateTime.UtcNow,
     };
+}
+
+/// <summary>2.2.20: Auto HDR verificable en 24H2+, QoS compartido y arreglos por comando.</summary>
+public sealed class Release2220OptimizationTests
+{
+    [Theory]
+    [InlineData(22631)]
+    [InlineData(26200)]
+    public async Task AutoHdrIsVerifiableOnEveryBuildAndKeepsOtherDirectXFlags(int build)
+    {
+        var previous = EnableAutoHdr.CurrentBuild;
+        EnableAutoHdr.CurrentBuild = () => build;
+        try
+        {
+            var registry = new MemoryRegistry();
+            registry.SetValue(RegistryHive2.CurrentUser, EnableAutoHdr.DxKey, EnableAutoHdr.DxValue,
+                "VRROptimizeEnable=1;GpuPreference=2;", RegistryValueKind2.String);
+            var hdr = new EnableAutoHdr();
+            var context = new OptimizationContext { Registry = registry };
+            var snapshot = hdr.Capture(registry);
+
+            Assert.Equal(OptimizationState.NotApplied, hdr.Detect(registry));
+            await hdr.ApplyAsync(context);
+            Assert.Equal(OptimizationState.AppliedByCao, hdr.Detect(registry));
+            var combined = (string)registry.GetValue(RegistryHive2.CurrentUser, EnableAutoHdr.DxKey, EnableAutoHdr.DxValue)!;
+            Assert.Contains("VRROptimizeEnable=1", combined);
+            Assert.Contains("GpuPreference=2", combined);
+            Assert.Contains("AutoHDREnable=1", combined);
+
+            await hdr.RevertAsync(context, snapshot);
+            Assert.Equal("VRROptimizeEnable=1;GpuPreference=2;",
+                registry.GetValue(RegistryHive2.CurrentUser, EnableAutoHdr.DxKey, EnableAutoHdr.DxValue));
+            Assert.Null(registry.GetValue(RegistryHive2.CurrentUser, EnableAutoHdr.GameBarKey, EnableAutoHdr.GameBarValue));
+        }
+        finally
+        {
+            EnableAutoHdr.CurrentBuild = previous;
+        }
+    }
+
+    [Fact]
+    public async Task RevertingVoiceQosKeepsNlaWhileGameQosIsActive()
+    {
+        var registry = new MemoryRegistry();
+        var context = new OptimizationContext { Registry = registry };
+        var game = new PrioritizeGameTrafficQos();
+        var voice = new PrioritizeVoiceChatQos();
+
+        var gameSnapshot = game.Capture(registry);
+        await game.ApplyAsync(context);
+        var voiceSnapshot = voice.Capture(registry);
+        await voice.ApplyAsync(context);
+
+        // Revertir el juego primero: su snapshot no tenía NLA, pero la voz lo necesita.
+        await game.RevertAsync(context, gameSnapshot);
+        Assert.Equal("1", registry.GetValue(RegistryHive2.LocalMachine, QosPolicyOptimization.NlaKey, QosPolicyOptimization.NlaValue));
+        Assert.Equal(OptimizationState.AppliedByCao, voice.Detect(registry));
+
+        await voice.RevertAsync(context, voiceSnapshot);
+        Assert.Empty(registry.Store);
+    }
+
+    [Theory]
+    [InlineData("renew-ip-address")]
+    [InlineData("clear-arp-cache")]
+    [InlineData("run-system-file-checker")]
+    [InlineData("repair-windows-image")]
+    [InlineData("restart-wlan-service")]
+    [InlineData("restart-xbox-services")]
+    [InlineData("restart-text-input-service")]
+    [InlineData("rebuild-font-cache")]
+    public void NewFixesLiveInSolucionarNotInTheBatch(string id)
+    {
+        Assert.Contains(CatalogProjections.RepairActions, o => o.Definition.Id == id);
+        Assert.DoesNotContain(CatalogProjections.BatchDefault, o => o.Definition.Id == id);
+        Assert.True(OptimizationCatalog.All.First(o => o.Definition.Id == id).Definition.Flags.HasFlag(OptimizationFlags.NotReversible));
+    }
+
+    [Theory]
+    [InlineData("cleanup-steam-web-cache")]
+    [InlineData("cleanup-epic-launcher-cache")]
+    [InlineData("cleanup-battlenet-cache")]
+    [InlineData("cleanup-game-launcher-logs")]
+    [InlineData("cleanup-gpu-driver-installer-leftovers")]
+    [InlineData("cleanup-windows-error-reports")]
+    [InlineData("cleanup-old-system-logs")]
+    [InlineData("cleanup-obs-logs")]
+    [InlineData("cleanup-vscode-cache")]
+    [InlineData("cleanup-developer-caches")]
+    public void NewCleanupsAreFileCleanupsThatNeverRevert(string id)
+    {
+        var optimization = OptimizationCatalog.All.First(o => o.Definition.Id == id);
+        Assert.IsAssignableFrom<CAO.Core.Optimizations.Storage.TempFileCleanupOptimization>(optimization);
+        Assert.True(optimization.Definition.Flags.HasFlag(OptimizationFlags.NotReversible));
+        Assert.Equal(OptimizationCategory.Storage, optimization.Definition.Category);
+    }
+
+    [Fact]
+    public async Task RenewIpContinuesWhenReleaseFailsOnStaticIp()
+    {
+        var calls = new List<SystemCommandKey>();
+        var executor = new ScriptedExecutor(key =>
+        {
+            calls.Add(key);
+            return key == SystemCommandKey.IpConfigRelease
+                ? new PrivilegedCommandResult(1, string.Empty, "no DHCP", false)
+                : new PrivilegedCommandResult(0, string.Empty, string.Empty, false);
+        });
+        var result = await new CAO.Core.Optimizations.Troubleshoot.RenewIpAddress()
+            .ApplyAsync(new OptimizationContext { Registry = new MemoryRegistry(), Executor = executor });
+        Assert.True(result.Success);
+        Assert.Equal([SystemCommandKey.IpConfigRelease, SystemCommandKey.IpConfigRenew, SystemCommandKey.IpConfigFlushDns], calls);
+    }
+
+    private sealed class ScriptedExecutor(Func<SystemCommandKey, PrivilegedCommandResult> script) : CAO.Core.Interfaces.IPrivilegedCommandExecutor
+    {
+        public Task<PrivilegedCommandResult> ExecuteAsync(SystemCommandKey key, IReadOnlyList<string> arguments, CancellationToken ct = default) =>
+            Task.FromResult(script(key));
+    }
+}
+
+/// <summary>CAO-BUG-2026-10-17: Restaurar un ajuste de energía AC tras reiniciar el servicio.</summary>
+public sealed class PowerAcRevertAfterRestartTests
+{
+    [Fact]
+    public async Task RevertWorksWithAFreshInstanceAfterApply()
+    {
+        var executor = new PowerCfgFake("0x00000001");
+        var context = new OptimizationContext { Registry = new MemoryRegistry(), Executor = executor };
+        var applied = await new CAO.Core.Optimizations.Power.DisableUsbSelectiveSuspendAc().ApplyAsync(context);
+        Assert.True(applied.Success);
+
+        // Instancia nueva = servicio reiniciado: no queda nada en memoria.
+        var fresh = new CAO.Core.Optimizations.Power.DisableUsbSelectiveSuspendAc();
+        var reverted = await fresh.RevertAsync(context, fresh.Capture(context.Registry));
+        Assert.True(reverted.Success, reverted.MessageEs);
+        Assert.Contains(executor.Calls, c => c.EndsWith(" 1", StringComparison.Ordinal) && c.StartsWith("/setacvalueindex", StringComparison.Ordinal));
+    }
+
+    private sealed class PowerCfgFake(string current) : CAO.Core.Interfaces.IPrivilegedCommandExecutor
+    {
+        public List<string> Calls { get; } = [];
+
+        public Task<PrivilegedCommandResult> ExecuteAsync(SystemCommandKey key, IReadOnlyList<string> arguments, CancellationToken ct = default)
+        {
+            Calls.Add(string.Join(' ', arguments));
+            var stdout = key == SystemCommandKey.PowerCfgQueryAcValueIndex ? $"Current AC Power Setting Index: {current}" : string.Empty;
+            return Task.FromResult(new PrivilegedCommandResult(0, stdout, string.Empty, false));
+        }
+    }
 }

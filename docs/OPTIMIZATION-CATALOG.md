@@ -1,14 +1,14 @@
 # CA-O Optimization Catalog
 
-Calidad sobre cantidad. **100 optimizaciones verificadas en producción. 12 optimizaciones históricas retiradas del catálogo de producción; no se incluyen en `OptimizationCatalog.All` y quedan en `AllLegacy` solo para trazabilidad.** Cada entrada responde qué cambia, por qué, con qué evidencia, qué riesgo y seguridad afecta, si es reversible y cómo se verifica.
+Calidad sobre cantidad. **122 optimizaciones verificadas en producción. 13 optimizaciones históricas retiradas del catálogo de producción; no se incluyen en `OptimizationCatalog.All` y quedan en `AllLegacy` solo para trazabilidad.** Cada entrada responde qué cambia, por qué, con qué evidencia, qué riesgo y seguridad afecta, si es reversible y cómo se verifica.
 
 ## Summary
 
 Existing optimizations: 18 (histórico)
 New optimizations: 50 (histórico)
 Total histórico: 68
-**Producción verificada: 100** (ninguna entrada parcial; 12 históricas retiradas y excluidas)
-**Históricas retiradas: 12** (permanecen en `AllLegacy` solo para trazabilidad)
+**Producción verificada: 122** (ninguna entrada parcial; 13 históricas retiradas y excluidas)
+**Históricas retiradas: 13** (permanecen en `AllLegacy` solo para trazabilidad)
 
 ## Evidence model
 
@@ -31,7 +31,7 @@ Total histórico: 68
 
 Nunca se deshabilita silenciosamente Secure Boot/TPM/VBS/HVCI/Defender/firewall. VBS/HVCI requiere Expert + confirmacion.
 
-## Catalogo Overclock (separado del de 100)
+## Catalogo Overclock (separado del de 122)
 
 Los ajustes de overclock NO son entradas de `OptimizationCatalog` y no aparecen en la tabla de arriba: viven en su propio catalogo declarativo (`src/CA-O.Core/Overclock/Catalog/OverclockCatalog.cs`), con 11 knobs servidos por 4 backends (`src/CA-O.Infrastructure/Overclock/`):
 
@@ -52,9 +52,9 @@ Reglas que comparte con este catalogo: ninguna entrada con evidencia `Unknown`, 
 - `SecuritySensitive` — `SecurityTradeoff`/`ReducedProtection` (p. ej. `disable-vbs` con anticheat activo).
 - `NotApplicable` — precondiciones no cumplidas (p. ej. Gaming sin Windows 11) o ids legacy.
 
-La columna `Batch` indica si la optimización entra en `CatalogProjections.BatchDefault` (72 de 100): los sets `Repair` (15), `Diagnostic` (4) y `Restore` (9) se excluyen del lote automático y viven en sus propias vistas (Solucionar, diagnósticos, restauración).
+La columna `Batch` indica si la optimización entra en `CatalogProjections.BatchDefault` (86 de 122): los sets `Repair` (23), `Diagnostic` (4) y `Restore` (9) se excluyen del lote automático y viven en sus propias vistas (Solucionar, diagnósticos, restauración).
 
-## Optimization registry — Producción verificada (100)
+## Optimization registry — Producción verificada (122)
 
 | Id | Categoria | Impacto | Evidencia | Riesgo | Compatibilidad | Reversible | Flags | Batch |
 |---|---|---|---|---|---|---|---|---|
@@ -92,7 +92,6 @@ La columna `Batch` indica si la optimización entra en `CatalogProjections.Batch
 | disable-game-bar-dvr | Gaming | WorkloadDependent | Vendor | Low | Compatible | Sí | — | Sí |
 | disable-heavy-startup-apps | Performance | Small | Empirical | Moderate | Compatible | Sí | — | Sí |
 | disable-hibernate | Storage | None | Official | Moderate | Compatible | Sí | — | Sí |
-| disable-network-throttling | Network | Small | Empirical | Low | Compatible | Sí | — | Sí |
 | disable-nagle-tcp-acks | Network | Small | Official | Moderate | Conditional | Sí | RequiresReboot | Sí |
 | disable-nic-power-saving-ac | Network | Small | Empirical | Low | Conditional | Sí | — | Sí |
 | disable-onedrive-autostart | PrivacySecurity | Tiny | Official | Low | Conditional | Sí | ExpertOnly | Sí |
@@ -161,7 +160,30 @@ La columna `Batch` indica si la optimización entra en `CatalogProjections.Batch
 | windows-component-store-resetbase | Storage | Moderate | Official | High | Compatible | No | NotReversible, ExpertOnly, OneShot **[Gated: ExpertOnly+RestorePoint]** | Sí |
 | zero-menu-delay | Performance | Tiny | Heuristic | Safe | Compatible | Sí | — | Sí |
 
-*12 optimizaciones históricas retiradas del catálogo de producción; permanecen en `AllLegacy` solo para trazabilidad. Ver `OptimizationCatalog.AllLegacy`.*
+| ensure-foreground-priority-separation | Gaming | Small | Official | Low | Compatible | Sí | — | Sí |
+| disable-receive-segment-coalescing | Network | Small | Vendor | Low | Conditional | Sí | RequiresReboot | Sí |
+| prioritize-voice-chat-qos | Network | WorkloadDependent | Official | Low | Conditional | Sí | RequiresReboot | Sí |
+| limit-update-background-bandwidth | Network | WorkloadDependent | Official | Low | Compatible | Sí | — | Sí |
+| reduce-wifi-roaming-aggressiveness | Network | WorkloadDependent | Vendor | Low | Conditional | Sí | — | Sí |
+| cleanup-steam-web-cache | Storage | Small | Vendor | Low | Compatible | No | NotReversible | Sí |
+| cleanup-epic-launcher-cache | Storage | Small | Vendor | Low | Compatible | No | NotReversible | Sí |
+| cleanup-battlenet-cache | Storage | Small | Vendor | Low | Compatible | No | NotReversible | Sí |
+| cleanup-game-launcher-logs | Storage | Small | Empirical | Low | Compatible | No | NotReversible | Sí |
+| cleanup-gpu-driver-installer-leftovers | Storage | Small | Vendor | Low | Compatible | No | NotReversible | Sí |
+| cleanup-windows-error-reports | Storage | Small | Official | Low | Compatible | No | NotReversible | Sí |
+| cleanup-old-system-logs | Storage | Small | Empirical | Low | Compatible | No | NotReversible | Sí |
+| cleanup-obs-logs | Storage | Small | Empirical | Low | Compatible | No | NotReversible | Sí |
+| cleanup-vscode-cache | Storage | Small | Empirical | Low | Compatible | No | NotReversible | Sí |
+| cleanup-developer-caches | Storage | Small | Vendor | Low | Compatible | No | NotReversible | Sí |
+| renew-ip-address | Network | Small | Official | Low | Compatible | No | NotReversible | No |
+| clear-arp-cache | Network | Small | Official | Low | Compatible | No | NotReversible | No |
+| restart-wlan-service | Network | Small | Official | Low | Compatible | No | NotReversible | No |
+| restart-xbox-services | Gaming | Small | Official | Low | Compatible | No | NotReversible | No |
+| restart-text-input-service | Performance | Tiny | Official | Low | Compatible | No | NotReversible | No |
+| rebuild-font-cache | Performance | Tiny | Official | Low | Compatible | No | NotReversible | No |
+| run-system-file-checker | Performance | Small | Official | Low | Compatible | No | NotReversible | No |
+| repair-windows-image | Performance | Small | Official | Low | Compatible | No | NotReversible | No |
+*13 optimizaciones históricas retiradas del catálogo de producción; permanecen en `AllLegacy` solo para trazabilidad. Ver `OptimizationCatalog.AllLegacy`.*
 
 ## Optimizaciones retiradas (históricas; no forman parte del catálogo activo)
 
@@ -177,17 +199,32 @@ La columna `Batch` indica si la optimización entra en `CatalogProjections.Batch
 - `enable-storage-sense` (fusionada en `configure-storage-sense`; alias en `RetiredAliases`)
 - `storage-sense-temp-cleanup` (fusionada en `configure-storage-sense`; alias en `RetiredAliases`)
 - `storage-sense-recycle-bin-policy` (fusionada en `configure-storage-sense`; alias en `RetiredAliases`)
+- `disable-network-throttling` (retirada 2.2.20: es el `network-throttling-index-hack` vetado por spec 75/100 con otro nombre; el límite de MMCSS ronda 10 000 paquetes/s y un juego usa del orden de 100. Sin alias; sigue en `AllLegacy` y Restaurar puede deshacerla)
 
 ## Detailed definitions
+
+### Auto HDR en 24H2+ (`enable-auto-hdr`)
+Hasta 23H2 el interruptor es `GameBar\AutoHdrToggleState`; desde la build 26100 Windows lo guarda como `AutoHDREnable=1` dentro de `DirectXUserGlobalSettings`. Antes el Detect se rendía a `Unknown` en 24H2+ y la optimización no se podía verificar nunca. Ahora escribe ambas ubicaciones (la combinada sin pisar VRR, GPU preferida ni juegos en ventana) y verifica la de la build actual.
+
+### Input lag y red 2.2.20
+- `ensure-foreground-priority-separation`: `PriorityControl\Win32PrioritySeparation=0x26` (la opción "Programas"). Corrige equipos configurados como servidor.
+- `disable-receive-segment-coalescing`: `*RscIPv4/*RscIPv6=0` en NICs físicas que lo exponen.
+- `prioritize-voice-chat-qos`: DSCP 46 para Discord, TeamSpeak y Mumble. Comparte `Do not use NLA` con la QoS de juegos: `QosPolicyOptimization` no lo restaura mientras otra política de CA-O siga activa y lo borra al revertir la última si lo había puesto CA-O.
+- `limit-update-background-bandwidth`: política `DOPercentageMaxBackgroundBandwidth=20`.
+- `reduce-wifi-roaming-aggressiveness`: `RoamAggressiveness=0` en adaptadores Wi-Fi Intel que lo exponen.
+- `disable-power-throttling` no se añadió: está vetado por spec 75/100.
+
+### Limpieza 2.2.20
+Diez limpiezas nuevas sobre `TempFileCleanupOptimization` (recursivas, omiten lo que está en uso, informan espacio liberado): caché web de Steam, Epic y Battle.net; registros de launchers (+7 d); restos de instaladores de NVIDIA/AMD en `C:\NVIDIA` y `C:\AMD` (+1 d, con confirmación); informes WER (+7 d); registros de DISM/WindowsUpdate/NetSetup/SIH/waasmedic (+30 d); OBS Studio (+7 d); VS Code; npm/pip/Yarn (+1 d, con confirmación). `D3DSCache` e `INetCache` no tienen entrada propia: ya las cubre `cleanup-windows-temp`.
+
+### Solucionar 2.2.20
+Ocho arreglos nuevos en `RepairIds` (fuera del lote): renovar IP (`ipconfig /release` opcional + `/renew` + `/flushdns`), vaciar ARP, reiniciar WLAN AutoConfig, servicios Xbox (cinco servicios, omite los que no existen), entrada de texto, reconstruir caché de fuentes, SFC `/scannow` y DISM `/RestoreHealth` (timeout Heavy). Los comandos nuevos tienen forma fija en `CommandPolicy`.
 
 ### enable-global-timer-resolution
 Desde Windows 10 2004 la petición de timer de un proceso solo le afecta a él, y Windows 11 la ignora si el proceso no tiene ventana visible: el timer que mantiene el servicio no llegaba a los juegos. `GlobalTimerResolutionRequests=1` (build 20348+) devuelve el comportamiento global. El servicio persiste la resolución elegida en `%ProgramData%\CA-O\timer-resolution.txt` y la re-aplica al arrancar; "Predeterminado" la libera (`NtSetTimerResolution(..., FALSE)`) y borra el fichero.
 
 ### prioritize-game-traffic-qos
 Policy-based QoS (`HKLM\SOFTWARE\Policies\Microsoft\Windows\QoS\CA-O Game <exe>`): DSCP 46 sin límite (`Throttle Rate=-1`) para 15 ejecutables de juego online, más `Tcpip\QoS\Do not use NLA=1` para que aplique fuera de dominio. En Wi-Fi, WMM mapea DSCP 46 a la cola de voz; un router con QoS/SQM también lo respeta. No toca el juego ni su anti-cheat. Revert borra los valores (una política sin `Version` se ignora).
-
-### disable-network-throttling
-`SystemProfile\NetworkThrottlingIndex=0xFFFFFFFF`: quita el límite de 10 paquetes/ms que MMCSS aplica al tráfico no multimedia mientras suena audio.
 
 ### disable-energy-efficient-ethernet
 `*EEE`, `EEE`, `AdvancedEEE`, `EnableGreenEthernet`, `GreenEthernet`, `EEELinkAdvertisement` = 0 solo en adaptadores físicos que ya exponen la propiedad (base `NicAdvancedPropertyOptimization`).

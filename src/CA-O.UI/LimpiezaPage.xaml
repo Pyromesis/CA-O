@@ -29,32 +29,38 @@
                             <Setter Target="CardTemp.(Grid.Column)" Value="0"/>
                             <Setter Target="CardDisk.(Grid.Row)" Value="1"/>
                             <Setter Target="CardDisk.(Grid.Column)" Value="0"/>
-                            <Setter Target="CardWinSxS.(Grid.Row)" Value="2"/>
-                            <Setter Target="CardWinSxS.(Grid.Column)" Value="0"/>
+                            <Setter Target="CardGames.(Grid.Row)" Value="2"/>
+                            <Setter Target="CardGames.(Grid.Column)" Value="0"/>
                             <Setter Target="CardTimer.(Grid.Row)" Value="3"/>
                             <Setter Target="CardTimer.(Grid.Column)" Value="0"/>
-                            <Setter Target="CardSense.(Grid.Row)" Value="4"/>
-                            <Setter Target="CardSense.(Grid.Column)" Value="0"/>
+                            <Setter Target="CardWinSxS.(Grid.Row)" Value="4"/>
+                            <Setter Target="CardWinSxS.(Grid.Column)" Value="0"/>
                             <Setter Target="MiniStack.(Grid.Row)" Value="5"/>
                             <Setter Target="MiniStack.(Grid.Column)" Value="0"/>
                             <Setter Target="CardDeep.(Grid.Row)" Value="6"/>
                             <Setter Target="CardDeep.(Grid.Column)" Value="0"/>
+                            <Setter Target="CardDeep.(Grid.ColumnSpan)" Value="1"/>
                         </VisualState.Setters>
                     </VisualState>
                 </VisualStateGroup>
             </VisualStateManager.VisualStateGroups>
 
-            <StackPanel Style="{StaticResource CaoPageHeaderStyle}">
-                <TextBlock Text="Limpieza" TextAlignment="Center" Style="{StaticResource CaoPageTitleStyle}"/>
-                <TextBlock Text="Acciones rápidas y seguras: temporales, papelera, DNS y timer. Cada limpieza usa snapshots donde aplica." TextAlignment="Center" Style="{StaticResource CaoSubtitleStyle}"/>
-                <Border Style="{StaticResource CaoHeaderAccentBarStyle}"/>
-            </StackPanel>
-            <Button x:Name="PageTourButton"
-                    Click="OnPageTourClick"
-                    Style="{StaticResource CaoElevatedButtonStyle}"
-                    HorizontalAlignment="Right"
-                    FontSize="12"
-                    Margin="0,4,0,8" />
+            <Grid x:Name="PageHeader" Style="{StaticResource CaoPageHeaderGridStyle}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <Border Style="{StaticResource CaoPageHeaderIconStyle}">
+                    <FontIcon Glyph="&#xE74D;" Style="{StaticResource CaoPageHeaderGlyphStyle}"/>
+                </Border>
+                <StackPanel Grid.Column="1" Style="{StaticResource CaoPageHeaderStyle}">
+                    <TextBlock Text="Limpieza" Style="{StaticResource CaoPageTitleStyle}"/>
+                    <TextBlock Text="Temporales, cachés de juegos y apps, mantenimiento oficial de Windows y timer. Solo se borra lo que se regenera; cada limpieza informa lo liberado." Style="{StaticResource CaoSubtitleStyle}"/>
+                    <Border Style="{StaticResource CaoHeaderAccentBarStyle}"/>
+                </StackPanel>
+                <Button x:Name="PageTourButton" Grid.Column="2" VerticalAlignment="Center" Click="OnPageTourClick" Style="{StaticResource CaoElevatedButtonStyle}" FontSize="12"/>
+            </Grid>
 
             <!-- Progreso movido al overlay ApplyOverlay (centrado + bloqueante) -->
 
@@ -64,7 +70,7 @@
                     <ColumnDefinition x:Name="Col2" Width="*"/>
                 </Grid.ColumnDefinitions>
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
                 <!-- Archivos temporales -->
@@ -204,38 +210,70 @@
                     </Grid>
                 </Border>
 
-                <!-- Mantenimiento del sistema (WinSxS) -->
-                <Border x:Name="CardWinSxS" Grid.Row="1" Grid.Column="0" Style="{StaticResource CaoCardStyle}" VerticalAlignment="Stretch" helpers:UiAnimations.CardHover="True">
+                <!-- Juegos y launchers -->
+                <Border x:Name="CardGames" Grid.Row="1" Grid.Column="0" Style="{StaticResource CaoCardStyle}" VerticalAlignment="Stretch" helpers:UiAnimations.CardHover="True">
                     <Grid RowSpacing="4">
                         <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
                         <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="10" Margin="0,0,0,6">
-                            <Border Style="{StaticResource CaoCardIconStyle}" Background="{StaticResource CaoAmberSoftBrush}">
-                                <FontIcon Glyph="&#xE9D9;" FontSize="16" Foreground="{StaticResource CaoAmberSolidBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            <Border Style="{StaticResource CaoCardIconStyle}" Background="{StaticResource CaoPurpleSoftBrush}">
+                                <FontIcon Glyph="&#xE7FC;" FontSize="16" Foreground="{StaticResource CaoPurpleSolidBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Border>
                             <StackPanel Spacing="2" VerticalAlignment="Center">
-                                <TextBlock Text="Mantenimiento del sistema" Style="{StaticResource CaoCardTitleStyle}"/>
-                                <TextBlock Text="WinSxS con DISM real · no cancelable a la mitad" Style="{StaticResource CaoSectionSubtitleStyle}"/>
+                                <TextBlock Text="Juegos y launchers" Style="{StaticResource CaoCardTitleStyle}"/>
+                                <TextBlock Text="Cachés y restos que se regeneran · nunca juegos" Style="{StaticResource CaoSectionSubtitleStyle}"/>
                             </StackPanel>
                         </StackPanel>
                         <StackPanel Grid.Row="1" Spacing="0">
                             <Grid ColumnSpacing="12" Padding="0,8,0,8">
                                 <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                                 <StackPanel Spacing="2" VerticalAlignment="Center">
-                                    <TextBlock Text="Limpiar WinSxS" Style="{StaticResource CaoListItemTitleStyle}"/>
-                                    <TextBlock Text="DISM /StartComponentCleanup. Seguro, tarda minutos." Style="{StaticResource CaoListItemDetailStyle}"/>
+                                    <TextBlock Text="Caché web de Steam" Style="{StaticResource CaoListItemTitleStyle}"/>
+                                    <TextBlock Text="Tienda y biblioteca. Nunca juegos." Style="{StaticResource CaoListItemDetailStyle}"/>
                                 </StackPanel>
-                                <Button Grid.Column="1" Content="Limpiar" Tag="windows-component-store-cleanup" Click="OnCleanClick" Style="{StaticResource LimpiezaActionButtonStyle}" VerticalAlignment="Center" AutomationProperties.Name="Limpiar almacén de componentes DISM" ToolTipService.ToolTip="DISM /StartComponentCleanup: elimina componentes sustituidos de WinSxS. Seguro pero tarda minutos; no cancelable a la mitad."/>
+                                <Button Grid.Column="1" Content="Limpiar" Tag="cleanup-steam-web-cache" Click="OnCleanClick" Style="{StaticResource LimpiezaActionButtonStyle}" VerticalAlignment="Center" AutomationProperties.Name="Limpiar caché web de Steam" ToolTipService.ToolTip="Solo htmlcache y appcache\httpcache. Arregla una tienda que no carga. Cierra Steam antes."/>
                             </Grid>
                             <Grid ColumnSpacing="12" Padding="0,8,0,8">
                                 <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                                 <StackPanel Spacing="2" VerticalAlignment="Center">
-                                    <TextBlock Text="ResetBase" Style="{StaticResource CaoListItemTitleStyle}"/>
-                                    <TextBlock Text="IRREVERSIBLE: impide desinstalar updates. Solo Expert." Style="{StaticResource CaoListItemDetailStyle}"/>
+                                    <TextBlock Text="Caché de Epic Games" Style="{StaticResource CaoListItemTitleStyle}"/>
+                                    <TextBlock Text="Launcher en blanco o lento." Style="{StaticResource CaoListItemDetailStyle}"/>
                                 </StackPanel>
-                                <Button Grid.Column="1" Content="Ejecutar" Tag="windows-component-store-resetbase" Click="OnCleanClick" Style="{StaticResource LimpiezaActionButtonStyle}" VerticalAlignment="Center" AutomationProperties.Name="ResetBase irreversible solo expertos" ToolTipService.ToolTip="DISM /ResetBase: máxima liberación pero IRREVERSIBLE, impide desinstalar actualizaciones. Solo Modo Expert con copia de seguridad."/>
+                                <Button Grid.Column="1" Content="Limpiar" Tag="cleanup-epic-launcher-cache" Click="OnCleanClick" Style="{StaticResource LimpiezaActionButtonStyle}" VerticalAlignment="Center" AutomationProperties.Name="Limpiar caché de Epic Games Launcher" ToolTipService.ToolTip="Solo carpetas webcache del launcher. Nunca juegos instalados. Cierra Epic antes."/>
+                            </Grid>
+                            <Grid ColumnSpacing="12" Padding="0,8,0,8">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                <StackPanel Spacing="2" VerticalAlignment="Center">
+                                    <TextBlock Text="Caché de Battle.net" Style="{StaticResource CaoListItemTitleStyle}"/>
+                                    <TextBlock Text="Cliente que no carga o va lento." Style="{StaticResource CaoListItemDetailStyle}"/>
+                                </StackPanel>
+                                <Button Grid.Column="1" Content="Limpiar" Tag="cleanup-battlenet-cache" Click="OnCleanClick" Style="{StaticResource LimpiezaActionButtonStyle}" VerticalAlignment="Center" AutomationProperties.Name="Limpiar caché de Battle.net" ToolTipService.ToolTip="Solo Cache y BrowserCache del cliente. Nunca juegos. Cierra Battle.net antes."/>
+                            </Grid>
+                            <Grid ColumnSpacing="12" Padding="0,8,0,8">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                <StackPanel Spacing="2" VerticalAlignment="Center">
+                                    <TextBlock Text="Registros de launchers" Style="{StaticResource CaoListItemTitleStyle}"/>
+                                    <TextBlock Text="Riot, EA, Epic y Ubisoft. Más de 7 días." Style="{StaticResource CaoListItemDetailStyle}"/>
+                                </StackPanel>
+                                <Button Grid.Column="1" Content="Limpiar" Tag="cleanup-game-launcher-logs" Click="OnCleanClick" Style="{StaticResource LimpiezaActionButtonStyle}" VerticalAlignment="Center" AutomationProperties.Name="Limpiar registros de launchers" ToolTipService.ToolTip="Borra registros de launchers con más de 7 días. Los recientes se conservan para reportar fallos."/>
+                            </Grid>
+                            <Grid ColumnSpacing="12" Padding="0,8,0,8">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                <StackPanel Spacing="2" VerticalAlignment="Center">
+                                    <TextBlock Text="Restos de instaladores GPU" Style="{StaticResource CaoListItemTitleStyle}"/>
+                                    <TextBlock Text="C:\NVIDIA y C:\AMD. Cientos de MB." Style="{StaticResource CaoListItemDetailStyle}"/>
+                                </StackPanel>
+                                <Button Grid.Column="1" Content="Limpiar" Tag="cleanup-gpu-driver-installer-leftovers" Click="OnCleanClick" Style="{StaticResource LimpiezaActionButtonStyle}" VerticalAlignment="Center" AutomationProperties.Name="Limpiar restos de instaladores de drivers GPU" ToolTipService.ToolTip="Copias extraídas de instalaciones anteriores. El driver instalado no se toca. Pide confirmación."/>
+                            </Grid>
+                            <Grid ColumnSpacing="12" Padding="0,8,0,8">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                <StackPanel Spacing="2" VerticalAlignment="Center">
+                                    <TextBlock Text="Registros de OBS Studio" Style="{StaticResource CaoListItemTitleStyle}"/>
+                                    <TextBlock Text="Logs y crashes de más de 7 días." Style="{StaticResource CaoListItemDetailStyle}"/>
+                                </StackPanel>
+                                <Button Grid.Column="1" Content="Limpiar" Tag="cleanup-obs-logs" Click="OnCleanClick" Style="{StaticResource LimpiezaActionButtonStyle}" VerticalAlignment="Center" AutomationProperties.Name="Limpiar registros de OBS Studio" ToolTipService.ToolTip="Solo logs y crashes. Nunca escenas, perfiles ni grabaciones."/>
                             </Grid>
                         </StackPanel>
-                        <TextBlock Grid.Row="2" x:Name="MaintenanceStatusText" Style="{StaticResource CaoSectionSubtitleStyle}" VerticalAlignment="Bottom" AutomationProperties.LiveSetting="Polite"/>
+                        <TextBlock Grid.Row="2" x:Name="GamesStatusText" Style="{StaticResource CaoSectionSubtitleStyle}" VerticalAlignment="Bottom" AutomationProperties.LiveSetting="Polite"/>
                     </Grid>
                 </Border>
 
@@ -288,30 +326,65 @@
                     </Grid>
                 </Border>
 
-                <!-- Storage Sense -->
-                <Border x:Name="CardSense" Grid.Row="2" Grid.Column="0" Style="{StaticResource CaoCardStyle}" VerticalAlignment="Stretch" helpers:UiAnimations.CardHover="True">
+                <!-- Mantenimiento del sistema (WinSxS) -->
+                <Border x:Name="CardWinSxS" Grid.Row="2" Grid.Column="0" Style="{StaticResource CaoCardStyle}" VerticalAlignment="Stretch" helpers:UiAnimations.CardHover="True">
                     <Grid RowSpacing="4">
                         <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
                         <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="10" Margin="0,0,0,6">
-                            <Border Style="{StaticResource CaoCardIconStyle}" Background="{StaticResource CaoGreenSoftBrush}">
-                                <FontIcon Glyph="&#xE90F;" FontSize="16" Foreground="{StaticResource CaoGreenSolidBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            <Border Style="{StaticResource CaoCardIconStyle}" Background="{StaticResource CaoAmberSoftBrush}">
+                                <FontIcon Glyph="&#xE9D9;" FontSize="16" Foreground="{StaticResource CaoAmberSolidBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Border>
                             <StackPanel Spacing="2" VerticalAlignment="Center">
-                                <TextBlock Text="Storage Sense (automático)" Style="{StaticResource CaoCardTitleStyle}"/>
-                                <TextBlock Text="Limpieza automática · reversible" Style="{StaticResource CaoSectionSubtitleStyle}"/>
+                                <TextBlock Text="Mantenimiento del sistema" Style="{StaticResource CaoCardTitleStyle}"/>
+                                <TextBlock Text="DISM, informes de error, registros y Storage Sense" Style="{StaticResource CaoSectionSubtitleStyle}"/>
                             </StackPanel>
                         </StackPanel>
                         <StackPanel Grid.Row="1" Spacing="0">
                             <Grid ColumnSpacing="12" Padding="0,8,0,8">
                                 <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                                 <StackPanel Spacing="2" VerticalAlignment="Center">
-                                    <TextBlock Text="Configuración completa" Style="{StaticResource CaoListItemTitleStyle}"/>
+                                    <TextBlock Text="Limpiar WinSxS" Style="{StaticResource CaoListItemTitleStyle}"/>
+                                    <TextBlock Text="DISM /StartComponentCleanup. Seguro, tarda minutos." Style="{StaticResource CaoListItemDetailStyle}"/>
+                                </StackPanel>
+                                <Button Grid.Column="1" Content="Limpiar" Tag="windows-component-store-cleanup" Click="OnCleanClick" Style="{StaticResource LimpiezaActionButtonStyle}" VerticalAlignment="Center" AutomationProperties.Name="Limpiar almacén de componentes DISM" ToolTipService.ToolTip="DISM /StartComponentCleanup: elimina componentes sustituidos de WinSxS. Seguro pero tarda minutos; no cancelable a la mitad."/>
+                            </Grid>
+                            <Grid ColumnSpacing="12" Padding="0,8,0,8">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                <StackPanel Spacing="2" VerticalAlignment="Center">
+                                    <TextBlock Text="ResetBase" Style="{StaticResource CaoListItemTitleStyle}"/>
+                                    <TextBlock Text="IRREVERSIBLE: impide desinstalar updates. Solo Expert." Style="{StaticResource CaoListItemDetailStyle}"/>
+                                </StackPanel>
+                                <Button Grid.Column="1" Content="Ejecutar" Tag="windows-component-store-resetbase" Click="OnCleanClick" Style="{StaticResource LimpiezaActionButtonStyle}" VerticalAlignment="Center" AutomationProperties.Name="ResetBase irreversible solo expertos" ToolTipService.ToolTip="DISM /ResetBase: máxima liberación pero IRREVERSIBLE, impide desinstalar actualizaciones. Solo Modo Expert con copia de seguridad."/>
+                            </Grid>
+                            <Grid ColumnSpacing="12" Padding="0,8,0,8">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                <StackPanel Spacing="2" VerticalAlignment="Center">
+                                    <TextBlock Text="Informes de errores (WER)" Style="{StaticResource CaoListItemTitleStyle}"/>
+                                    <TextBlock Text="Archivados y en cola de más de 7 días." Style="{StaticResource CaoListItemDetailStyle}"/>
+                                </StackPanel>
+                                <Button Grid.Column="1" Content="Limpiar" Tag="cleanup-windows-error-reports" Click="OnCleanClick" Style="{StaticResource LimpiezaActionButtonStyle}" VerticalAlignment="Center" AutomationProperties.Name="Limpiar informes de errores de Windows" ToolTipService.ToolTip="Borra informes de Windows Error Reporting de más de 7 días. Es la misma opción del Liberador de espacio."/>
+                            </Grid>
+                            <Grid ColumnSpacing="12" Padding="0,8,0,8">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                <StackPanel Spacing="2" VerticalAlignment="Center">
+                                    <TextBlock Text="Registros antiguos del sistema" Style="{StaticResource CaoListItemTitleStyle}"/>
+                                    <TextBlock Text="DISM, Windows Update y red. Más de 30 días." Style="{StaticResource CaoListItemDetailStyle}"/>
+                                </StackPanel>
+                                <Button Grid.Column="1" Content="Limpiar" Tag="cleanup-old-system-logs" Click="OnCleanClick" Style="{StaticResource LimpiezaActionButtonStyle}" VerticalAlignment="Center" AutomationProperties.Name="Limpiar registros antiguos del sistema" ToolTipService.ToolTip="Solo Windows\Logs\DISM, WindowsUpdate, NetSetup, SIH y waasmedic con más de 30 días. Nunca CBS ni Measured Boot."/>
+                            </Grid>
+                            <Grid x:Name="CardSense" ColumnSpacing="12" Padding="0,8,0,8">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                <StackPanel Spacing="2" VerticalAlignment="Center">
+                                    <TextBlock Text="Storage Sense automático" Style="{StaticResource CaoListItemTitleStyle}"/>
                                     <TextBlock Text="Sensor + temporales 30 d + papelera 30 d." Style="{StaticResource CaoListItemDetailStyle}"/>
                                 </StackPanel>
                                 <Button Grid.Column="1" Content="Activar" Tag="configure-storage-sense" Click="OnCleanClick" Style="{StaticResource LimpiezaActionButtonStyle}" VerticalAlignment="Center" AutomationProperties.Name="Configurar Storage Sense" ToolTipService.ToolTip="Activa Storage Sense con limpieza diaria, temporales de 30 días y papelera de 30 días, todo de una vez. Reversible desde aquí u Optimizar."/>
                             </Grid>
                         </StackPanel>
-                        <TextBlock Grid.Row="2" x:Name="SenseStatusText" Style="{StaticResource CaoSectionSubtitleStyle}" VerticalAlignment="Bottom" AutomationProperties.LiveSetting="Polite"/>
+                        <StackPanel Grid.Row="2" Spacing="2">
+                            <TextBlock x:Name="MaintenanceStatusText" Style="{StaticResource CaoSectionSubtitleStyle}" VerticalAlignment="Bottom" AutomationProperties.LiveSetting="Polite"/>
+                            <TextBlock x:Name="SenseStatusText" Style="{StaticResource CaoSectionSubtitleStyle}" AutomationProperties.LiveSetting="Polite"/>
+                        </StackPanel>
                     </Grid>
                 </Border>
 
@@ -397,72 +470,93 @@
                                 <TextBlock Text="Nuevas rutas seguras · informa archivos y MB" Style="{StaticResource CaoSectionSubtitleStyle}"/>
                             </StackPanel>
                         </StackPanel>
-                        <StackPanel Grid.Row="1" Spacing="0">
-                            <Grid ColumnSpacing="12" Padding="0,8,0,8">
-                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                                <StackPanel Spacing="2" VerticalAlignment="Center">
-                                    <TextBlock Text="Prefetch antiguo" Style="{StaticResource CaoListItemTitleStyle}"/>
-                                    <TextBlock Text="*.pf de +30 días. Solo espacio, no acelera." Style="{StaticResource CaoListItemDetailStyle}"/>
-                                </StackPanel>
-                                <Button Grid.Column="1" Content="Limpiar" Tag="cleanup-prefetch-stale" Click="OnCleanClick" Style="{StaticResource LimpiezaActionButtonStyle}" VerticalAlignment="Center" AutomationProperties.Name="Limpiar prefetch antiguo" ToolTipService.ToolTip="Borra rastros prefetch (*.pf) de más de 30 días. Solo libera espacio; Windows lo reconstruye."/>
-                            </Grid>
-                            <Grid ColumnSpacing="12" Padding="0,8,0,8">
-                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                                <StackPanel Spacing="2" VerticalAlignment="Center">
-                                    <TextBlock Text="Registros CBS" Style="{StaticResource CaoListItemTitleStyle}"/>
-                                    <TextBlock Text="*.log de +30 días en Windows\Logs\CBS." Style="{StaticResource CaoListItemDetailStyle}"/>
-                                </StackPanel>
-                                <Button Grid.Column="1" Content="Limpiar" Tag="cleanup-cbs-logs" Click="OnCleanClick" Style="{StaticResource LimpiezaActionButtonStyle}" VerticalAlignment="Center" AutomationProperties.Name="Limpiar registros CBS" ToolTipService.ToolTip="Borra registros CBS (*.log) de más de 30 días. Solo libera espacio."/>
-                            </Grid>
-                            <Grid ColumnSpacing="12" Padding="0,8,0,8">
-                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                                <StackPanel Spacing="2" VerticalAlignment="Center">
-                                    <TextBlock Text="Volcados extendidos" Style="{StaticResource CaoListItemTitleStyle}"/>
-                                    <TextBlock Text="Minidump, LiveKernelReports, MEMORY.DMP +30 días. Pide confirmación." Style="{StaticResource CaoListItemDetailStyle}"/>
-                                </StackPanel>
-                                <Button Grid.Column="1" Content="Limpiar" Tag="cleanup-crash-dumps-extended" Click="OnCleanClick" Style="{StaticResource LimpiezaActionButtonStyle}" VerticalAlignment="Center" AutomationProperties.Name="Limpiar volcados extendidos" ToolTipService.ToolTip="Borra Minidump, LiveKernelReports, MEMORY.DMP y CrashDumps de usuario de más de 30 días. Pide confirmación: dificulta depurar fallos viejos."/>
-                            </Grid>
-                            <Grid ColumnSpacing="12" Padding="0,8,0,8">
-                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                                <StackPanel Spacing="2" VerticalAlignment="Center">
-                                    <TextBlock Text="Caché de Outlook" Style="{StaticResource CaoListItemTitleStyle}"/>
-                                    <TextBlock Text="Adjuntos temporales +7 días, todos los usuarios." Style="{StaticResource CaoListItemDetailStyle}"/>
-                                </StackPanel>
-                                <Button Grid.Column="1" Content="Limpiar" Tag="cleanup-outlook-cache" Click="OnCleanClick" Style="{StaticResource LimpiezaActionButtonStyle}" VerticalAlignment="Center" AutomationProperties.Name="Limpiar caché de Outlook" ToolTipService.ToolTip="Borra adjuntos temporales de Outlook (Content.Outlook) de más de 7 días. Se regeneran solos."/>
-                            </Grid>
-                            <Grid ColumnSpacing="12" Padding="0,8,0,8">
-                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                                <StackPanel Spacing="2" VerticalAlignment="Center">
-                                    <TextBlock Text="Cachés de navegadores" Style="{StaticResource CaoListItemTitleStyle}"/>
-                                    <TextBlock Text="Chrome, Edge y Teams. Cierra cada app antes." Style="{StaticResource CaoListItemDetailStyle}"/>
-                                </StackPanel>
-                                <Button Grid.Column="1" Content="Limpiar" Tag="cleanup-browser-code-cache" Click="OnCleanClick" Style="{StaticResource LimpiezaActionButtonStyle}" VerticalAlignment="Center" AutomationProperties.Name="Limpiar cachés de navegadores" ToolTipService.ToolTip="Vacía cachés regenerables de Chrome, Edge y Teams (nunca sesiones ni contraseñas). Cierra cada app primero o se omite lo en uso."/>
-                            </Grid>
-                            <Grid ColumnSpacing="12" Padding="0,8,0,8">
-                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                                <StackPanel Spacing="2" VerticalAlignment="Center">
-                                    <TextBlock Text="Descargas NVIDIA" Style="{StaticResource CaoListItemTitleStyle}"/>
-                                    <TextBlock Text="Instaladores viejos de GeForce Experience." Style="{StaticResource CaoListItemDetailStyle}"/>
-                                </StackPanel>
-                                <Button Grid.Column="1" Content="Limpiar" Tag="cleanup-nvidia-downloader-cache" Click="OnCleanClick" Style="{StaticResource LimpiezaActionButtonStyle}" VerticalAlignment="Center" AutomationProperties.Name="Limpiar descargas NVIDIA" ToolTipService.ToolTip="Borra instaladores viejos que GeForce Experience deja en ProgramData. Nunca drivers instalados ni configuración."/>
-                            </Grid>
-                            <Grid ColumnSpacing="12" Padding="0,8,0,8">
-                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                                <StackPanel Spacing="2" VerticalAlignment="Center">
-                                    <TextBlock Text="Cola de impresión atascada" Style="{StaticResource CaoListItemTitleStyle}"/>
-                                    <TextBlock Text="Vacía trabajos *.SPL/*.SHD. Pide confirmación." Style="{StaticResource CaoListItemDetailStyle}"/>
-                                </StackPanel>
-                                <Button Grid.Column="1" Content="Vaciar" Tag="cleanup-print-spooler-jobs" Click="OnCleanClick" Style="{StaticResource LimpiezaActionButtonStyle}" VerticalAlignment="Center" AutomationProperties.Name="Vaciar cola de impresión atascada" ToolTipService.ToolTip="Detiene el Spooler, borra trabajos atascados y lo rearranca. Los documentos en cola se pierden: pide confirmación."/>
-                            </Grid>
-                            <Grid ColumnSpacing="12" Padding="0,8,0,8">
-                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                                <StackPanel Spacing="2" VerticalAlignment="Center">
-                                    <TextBlock Text="Analizar almacén WinSxS" Style="{StaticResource CaoListItemTitleStyle}"/>
-                                    <TextBlock Text="DISM: tamaño y recomendación. Solo informa." Style="{StaticResource CaoListItemDetailStyle}"/>
-                                </StackPanel>
-                                <Button Grid.Column="1" Content="Analizar" Tag="analyze-component-store" Click="OnCleanClick" Style="{StaticResource LimpiezaActionButtonStyle}" VerticalAlignment="Center" AutomationProperties.Name="Analizar almacén de componentes" ToolTipService.ToolTip="Ejecuta DISM /AnalyzeComponentStore: informa del tamaño de WinSxS y si conviene limpiar. No borra nada."/>
-                            </Grid>
-                        </StackPanel>
+                        <Grid Grid.Row="1" ColumnSpacing="24">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" Spacing="0">
+                                <Grid ColumnSpacing="12" Padding="0,8,0,8">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                    <StackPanel Spacing="2" VerticalAlignment="Center">
+                                        <TextBlock Text="Prefetch antiguo" Style="{StaticResource CaoListItemTitleStyle}"/>
+                                        <TextBlock Text="*.pf de +30 días. Solo espacio, no acelera." Style="{StaticResource CaoListItemDetailStyle}"/>
+                                    </StackPanel>
+                                    <Button Grid.Column="1" Content="Limpiar" Tag="cleanup-prefetch-stale" Click="OnCleanClick" Style="{StaticResource LimpiezaActionButtonStyle}" VerticalAlignment="Center" AutomationProperties.Name="Limpiar prefetch antiguo" ToolTipService.ToolTip="Borra rastros prefetch (*.pf) de más de 30 días. Solo libera espacio; Windows lo reconstruye."/>
+                                </Grid>
+                                <Grid ColumnSpacing="12" Padding="0,8,0,8">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                    <StackPanel Spacing="2" VerticalAlignment="Center">
+                                        <TextBlock Text="Registros CBS" Style="{StaticResource CaoListItemTitleStyle}"/>
+                                        <TextBlock Text="*.log de +30 días en Windows\Logs\CBS." Style="{StaticResource CaoListItemDetailStyle}"/>
+                                    </StackPanel>
+                                    <Button Grid.Column="1" Content="Limpiar" Tag="cleanup-cbs-logs" Click="OnCleanClick" Style="{StaticResource LimpiezaActionButtonStyle}" VerticalAlignment="Center" AutomationProperties.Name="Limpiar registros CBS" ToolTipService.ToolTip="Borra registros CBS (*.log) de más de 30 días. Solo libera espacio."/>
+                                </Grid>
+                                <Grid ColumnSpacing="12" Padding="0,8,0,8">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                    <StackPanel Spacing="2" VerticalAlignment="Center">
+                                        <TextBlock Text="Volcados extendidos" Style="{StaticResource CaoListItemTitleStyle}"/>
+                                        <TextBlock Text="Minidump, LiveKernelReports, MEMORY.DMP +30 días. Pide confirmación." Style="{StaticResource CaoListItemDetailStyle}"/>
+                                    </StackPanel>
+                                    <Button Grid.Column="1" Content="Limpiar" Tag="cleanup-crash-dumps-extended" Click="OnCleanClick" Style="{StaticResource LimpiezaActionButtonStyle}" VerticalAlignment="Center" AutomationProperties.Name="Limpiar volcados extendidos" ToolTipService.ToolTip="Borra Minidump, LiveKernelReports, MEMORY.DMP y CrashDumps de usuario de más de 30 días. Pide confirmación: dificulta depurar fallos viejos."/>
+                                </Grid>
+                                <Grid ColumnSpacing="12" Padding="0,8,0,8">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                    <StackPanel Spacing="2" VerticalAlignment="Center">
+                                        <TextBlock Text="Caché de Outlook" Style="{StaticResource CaoListItemTitleStyle}"/>
+                                        <TextBlock Text="Adjuntos temporales +7 días, todos los usuarios." Style="{StaticResource CaoListItemDetailStyle}"/>
+                                    </StackPanel>
+                                    <Button Grid.Column="1" Content="Limpiar" Tag="cleanup-outlook-cache" Click="OnCleanClick" Style="{StaticResource LimpiezaActionButtonStyle}" VerticalAlignment="Center" AutomationProperties.Name="Limpiar caché de Outlook" ToolTipService.ToolTip="Borra adjuntos temporales de Outlook (Content.Outlook) de más de 7 días. Se regeneran solos."/>
+                                </Grid>
+                                <Grid ColumnSpacing="12" Padding="0,8,0,8">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                    <StackPanel Spacing="2" VerticalAlignment="Center">
+                                        <TextBlock Text="Cachés de navegadores" Style="{StaticResource CaoListItemTitleStyle}"/>
+                                        <TextBlock Text="Chrome, Edge y Teams. Cierra cada app antes." Style="{StaticResource CaoListItemDetailStyle}"/>
+                                    </StackPanel>
+                                    <Button Grid.Column="1" Content="Limpiar" Tag="cleanup-browser-code-cache" Click="OnCleanClick" Style="{StaticResource LimpiezaActionButtonStyle}" VerticalAlignment="Center" AutomationProperties.Name="Limpiar cachés de navegadores" ToolTipService.ToolTip="Vacía cachés regenerables de Chrome, Edge y Teams (nunca sesiones ni contraseñas). Cierra cada app primero o se omite lo en uso."/>
+                                </Grid>
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Spacing="0">
+                                <Grid ColumnSpacing="12" Padding="0,8,0,8">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                    <StackPanel Spacing="2" VerticalAlignment="Center">
+                                        <TextBlock Text="Descargas NVIDIA" Style="{StaticResource CaoListItemTitleStyle}"/>
+                                        <TextBlock Text="Instaladores viejos de GeForce Experience." Style="{StaticResource CaoListItemDetailStyle}"/>
+                                    </StackPanel>
+                                    <Button Grid.Column="1" Content="Limpiar" Tag="cleanup-nvidia-downloader-cache" Click="OnCleanClick" Style="{StaticResource LimpiezaActionButtonStyle}" VerticalAlignment="Center" AutomationProperties.Name="Limpiar descargas NVIDIA" ToolTipService.ToolTip="Borra instaladores viejos que GeForce Experience deja en ProgramData. Nunca drivers instalados ni configuración."/>
+                                </Grid>
+                                <Grid ColumnSpacing="12" Padding="0,8,0,8">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                    <StackPanel Spacing="2" VerticalAlignment="Center">
+                                        <TextBlock Text="Cola de impresión atascada" Style="{StaticResource CaoListItemTitleStyle}"/>
+                                        <TextBlock Text="Vacía trabajos *.SPL/*.SHD. Pide confirmación." Style="{StaticResource CaoListItemDetailStyle}"/>
+                                    </StackPanel>
+                                    <Button Grid.Column="1" Content="Vaciar" Tag="cleanup-print-spooler-jobs" Click="OnCleanClick" Style="{StaticResource LimpiezaActionButtonStyle}" VerticalAlignment="Center" AutomationProperties.Name="Vaciar cola de impresión atascada" ToolTipService.ToolTip="Detiene el Spooler, borra trabajos atascados y lo rearranca. Los documentos en cola se pierden: pide confirmación."/>
+                                </Grid>
+                                <Grid ColumnSpacing="12" Padding="0,8,0,8">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                    <StackPanel Spacing="2" VerticalAlignment="Center">
+                                        <TextBlock Text="Analizar almacén WinSxS" Style="{StaticResource CaoListItemTitleStyle}"/>
+                                        <TextBlock Text="DISM: tamaño y recomendación. Solo informa." Style="{StaticResource CaoListItemDetailStyle}"/>
+                                    </StackPanel>
+                                    <Button Grid.Column="1" Content="Analizar" Tag="analyze-component-store" Click="OnCleanClick" Style="{StaticResource LimpiezaActionButtonStyle}" VerticalAlignment="Center" AutomationProperties.Name="Analizar almacén de componentes" ToolTipService.ToolTip="Ejecuta DISM /AnalyzeComponentStore: informa del tamaño de WinSxS y si conviene limpiar. No borra nada."/>
+                                </Grid>
+                                <Grid ColumnSpacing="12" Padding="0,8,0,8">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                    <StackPanel Spacing="2" VerticalAlignment="Center">
+                                        <TextBlock Text="Cachés de VS Code" Style="{StaticResource CaoListItemTitleStyle}"/>
+                                        <TextBlock Text="Cache, CachedData y GPUCache. Cierra VS Code." Style="{StaticResource CaoListItemDetailStyle}"/>
+                                    </StackPanel>
+                                    <Button Grid.Column="1" Content="Limpiar" Tag="cleanup-vscode-cache" Click="OnCleanClick" Style="{StaticResource LimpiezaActionButtonStyle}" VerticalAlignment="Center" AutomationProperties.Name="Limpiar cachés de Visual Studio Code" ToolTipService.ToolTip="Solo cachés regenerables y logs de más de 7 días. Nunca extensiones, ajustes ni proyectos."/>
+                                </Grid>
+                                <Grid ColumnSpacing="12" Padding="0,8,0,8">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                    <StackPanel Spacing="2" VerticalAlignment="Center">
+                                        <TextBlock Text="Cachés de npm, pip y Yarn" Style="{StaticResource CaoListItemTitleStyle}"/>
+                                        <TextBlock Text="Se vuelven a descargar al instalar." Style="{StaticResource CaoListItemDetailStyle}"/>
+                                    </StackPanel>
+                                    <Button Grid.Column="1" Content="Limpiar" Tag="cleanup-developer-caches" Click="OnCleanClick" Style="{StaticResource LimpiezaActionButtonStyle}" VerticalAlignment="Center" AutomationProperties.Name="Limpiar cachés de desarrollo" ToolTipService.ToolTip="Solo cachés de descarga, nunca proyectos ni node_modules. Pueden ser varios GB. Pide confirmación."/>
+                                </Grid>
+                            </StackPanel>
+                        </Grid>
                         <TextBlock Grid.Row="2" x:Name="DeepStatusText" Style="{StaticResource CaoSectionSubtitleStyle}" VerticalAlignment="Bottom" AutomationProperties.LiveSetting="Polite"/>
                     </Grid>
                 </Border>

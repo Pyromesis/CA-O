@@ -27,14 +27,35 @@ public sealed partial class TourOverlay : UserControl
     public double WaitBudgetMilliseconds => 2000;
     public int MaxWaitAttempts => 20;
 
+    /// <summary>Margen del foco alrededor del control: el borde no pisa el contenido.</summary>
+    public const double SpotlightPadding = 6;
+
     public void Show(TourStep step, Rect? targetRect)
     {
-        LastTargetRect = targetRect;
         TitleText.Text = step.Title;
         BodyText.Text = step.Body;
         Visibility = Visibility.Visible;
+        Reposition(targetRect);
+        ApplyMood(step.Mood);
+    }
 
-        if (targetRect is Rect rect && rect.Width > 0 && rect.Height > 0)
+    /// <summary>
+    /// Recoloca foco y tarjeta sin tocar textos ni mascota. El coordinador lo llama
+    /// en cada repintado: el control se mueve con el scroll, las animaciones de
+    /// entrada y los cambios de tamaño, y el foco tiene que seguirlo.
+    /// </summary>
+    public void Reposition(Rect? targetRect) => Reposition(targetRect, force: false);
+
+    private void Reposition(Rect? targetRect, bool force)
+    {
+        _rawTarget = targetRect;
+        Rect? padded = targetRect is Rect r && r.Width > 0 && r.Height > 0
+            ? new Rect(r.X - SpotlightPadding, r.Y - SpotlightPadding, r.Width + 2 * SpotlightPadding, r.Height + 2 * SpotlightPadding)
+            : null;
+        if (!force && Nullable.Equals(padded, LastTargetRect) && Card.ActualWidth > 0) return;
+        LastTargetRect = padded;
+
+        if (padded is Rect rect)
         {
             ApplySpotlight(rect);
         }
@@ -44,13 +65,31 @@ public sealed partial class TourOverlay : UserControl
             ClearSpotlight();
         }
 
-        ApplyMood(step.Mood);
+        PlaceCard(padded);
+    }
+
+    private void PlaceCard(Rect? target)
+    {
+        var host = new Size(Root.ActualWidth, Root.ActualHeight);
+        if (host.Width <= 0 || host.Height <= 0) return;
+        Card.Measure(new Size(Card.Width, double.PositiveInfinity));
+        var size = new Size(Card.Width, Card.DesiredSize.Height);
+        var point = TourCardPlacement.Place(target, size, host);
+        Card.Margin = new Thickness(point.X, point.Y, 0, 0);
+    }
+
+    private Rect? _rawTarget;
+
+    private void OnRootSizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        if (Visibility == Visibility.Visible) Reposition(_rawTarget, force: true);
     }
 
     public void Hide()
     {
         Visibility = Visibility.Collapsed;
         LastTargetRect = null;
+        _rawTarget = null;
         ClearSpotlight();
         Mascot.Set("Idle");
     }
@@ -125,7 +164,8 @@ public sealed partial class TourOverlay : UserControl
 
     public void SetStepPosition(int index, int total)
     {
-        StepIndexText.Text = $"Paso {index} de {total}";
+        StepIndexText.Text = $"PASO {index} DE {total}";
+        StepProgress.Value = total <= 0 ? 0 : index * 100.0 / total;
     }
 
     // These two are plain CLR properties, not DependencyProperties: the setters write straight

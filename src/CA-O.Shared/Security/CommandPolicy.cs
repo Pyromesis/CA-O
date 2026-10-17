@@ -72,6 +72,11 @@ public enum SystemCommandKey
     BcdEditDynamicTickDelete,
     BcdEditEnum,
     BcdEditSetTimeout,
+    IpConfigRelease,
+    IpConfigRenew,
+    NetShDeleteArpCache,
+    SfcScanNow,
+    DismRestoreHealth,
 }
 
 /// <summary>Normalized result captured by the gateway.</summary>
@@ -317,6 +322,27 @@ public static partial class CommandPolicy
 
             SystemCommandKey.IpConfigFlushDns when Eq(arguments, "/flushdns") =>
                 Path.Combine(system32, "ipconfig.exe"),
+
+            // Solucionar: renovar la concesión DHCP de todos los adaptadores
+            // (sin nombre de interfaz: forma fija, nada que inyectar).
+            SystemCommandKey.IpConfigRelease when Eq(arguments, "/release") =>
+                Path.Combine(system32, "ipconfig.exe"),
+
+            SystemCommandKey.IpConfigRenew when Eq(arguments, "/renew") =>
+                Path.Combine(system32, "ipconfig.exe"),
+
+            SystemCommandKey.NetShDeleteArpCache when Eq(arguments,
+                "interface", "ip", "delete", "arpcache") =>
+                Path.Combine(system32, "netsh.exe"),
+
+            // Reparación de ficheros del sistema y de la imagen: herramientas
+            // oficiales con forma fija; tardan minutos (timeout Heavy).
+            SystemCommandKey.SfcScanNow when Eq(arguments, "/scannow") =>
+                Path.Combine(system32, "sfc.exe"),
+
+            SystemCommandKey.DismRestoreHealth when Eq(arguments,
+                "/Online", "/Cleanup-Image", "/RestoreHealth") =>
+                Path.Combine(system32, "dism.exe"),
 
             SystemCommandKey.DefragC when Eq(arguments, "C:", "/O") =>
                 Path.Combine(system32, "defrag.exe"),

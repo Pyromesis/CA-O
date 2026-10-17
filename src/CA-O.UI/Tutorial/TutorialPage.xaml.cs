@@ -29,9 +29,20 @@ public sealed partial class TutorialPage : Page
         }
     }
 
+    /// <summary>Abre la sección y lanza su tour cuando la página ya está en pantalla.</summary>
+    private void OnChapterTourClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: string route } || TourCoordinator.IsActive) return;
+        var window = MainWindow.Current;
+        if (window is null) return;
+        window.SelectRoute(route);
+        DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () => window.StartPageTour(route));
+    }
+
     protected override void OnNavigatedTo(NavigationEventArgs e)
     {
         base.OnNavigatedTo(e);
         ChaptersList.ItemsSource = TourCatalog.Chapters;
+        Helpers.UiAnimations.PlayEntrance(PageContent);
     }
 }

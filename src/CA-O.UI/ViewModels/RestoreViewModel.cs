@@ -4,6 +4,9 @@ using CAO.Shared;
 
 namespace CAO.UI.ViewModels;
 
+/// <summary>Fila de Restaurar: nombre legible del cambio, cuándo y su transacción.</summary>
+public sealed record RestoreRow(string TransactionId, string Title, string Detail);
+
 /// <summary>ViewModel para RestorePage — snapshots y recuperación.</summary>
 public sealed partial class RestoreViewModel : ObservableObject
 {
@@ -22,6 +25,35 @@ public sealed partial class RestoreViewModel : ObservableObject
     [ObservableProperty] private IReadOnlyList<Infrastructure.Persistence.SnapshotRepository.SnapshotInfo> _snapshotInfos = Array.Empty<Infrastructure.Persistence.SnapshotRepository.SnapshotInfo>();
     [ObservableProperty] private string _recoveryHint = string.Empty;
     [ObservableProperty] private bool _isEmpty;
+    [ObservableProperty] private IReadOnlyList<RestoreRow> _rows = Array.Empty<RestoreRow>();
+    [ObservableProperty] private string _summary = string.Empty;
+
+    /// <summary>
+    /// Las limpiezas y reinicios dejan snapshot de auditoría (0 valores) pero no se
+    /// pueden deshacer: los ficheros ya no existen. Antes salían con un botón
+    /// Restaurar que no hacía nada. Ahora solo se listan los cambios reversibles.
+    /// </summary>
+    internal static bool IsRevertible(string optimizationId)
+    {
+        var id = CAO.Core.Catalog.OptimizationCatalog.CanonicalIdFor(optimizationId);
+        var definition = CAO.Core.Catalog.OptimizationCatalog.All
+            .Concat(CAO.Core.Catalog.OptimizationCatalog.AllLegacy)
+            .Select(o => o.Definition)
+            .FirstOrDefault(d => d.Id.Equals(id, StringComparison.OrdinalIgnoreCase));
+        // Las reparaciones (vaciar DNS, reiniciar servicios...) dejan snapshot de
+        // auditoría pero no hay estado anterior que devolver.
+        if (CAO.Core.Catalog.CatalogProjections.RepairIds.Contains(id)) return false;
+        return definition is null || !definition.Flags.HasFlag(CAO.Shared.OptimizationFlags.NotReversible);
+    }
+
+    internal static string DisplayName(string optimizationId)
+    {
+        var id = CAO.Core.Catalog.OptimizationCatalog.CanonicalIdFor(optimizationId);
+        return CAO.Core.Catalog.OptimizationCatalog.All
+            .Concat(CAO.Core.Catalog.OptimizationCatalog.AllLegacy)
+            .Select(o => o.Definition)
+            .FirstOrDefault(d => d.Id.Equals(id, StringComparison.OrdinalIgnoreCase))?.NameEs ?? optimizationId;
+    }
 
     /// <summary>
     /// Operaciones pendientes de recuperacion. CAO-BUG-2026-10-06 (N-1): antes solo
@@ -39,7 +71,17 @@ public sealed partial class RestoreViewModel : ObservableObject
             var infos = await _repository.GetSnapshotInfosAsync(ct);
             SnapshotInfos = infos;
             Snapshots = infos.Select(i => $"{i.TimestampUtc:yyyy-MM-dd HH:mm} — {i.OptimizationId} — TX:{i.TransactionId.ToString()[..8]} — {i.EntryCount} valores — build {i.WindowsBuild}").ToList();
-            IsEmpty = infos.Count == 0;
+            var revertible = infos.Where(i => IsRevertible(i.OptimizationId)).ToList();
+            Rows = revertible.Select(i => new RestoreRow(
+                i.TransactionId.ToString(),
+                DisplayName(i.OptimizationId),
+                $"{i.TimestampUtc.ToLocalTime():g} · {i.OptimizationId} · {i.EntryCount} valor(es) guardado(s) · build {i.WindowsBuild}")).ToList();
+            var hidden = infos.Count - revertible.Count;
+            Summary = revertible.Count == 0
+                ? "Aún no hay cambios reversibles. Aparecen aquí al aplicar una optimización."
+                : $"{revertible.Count} cambio(s) reversibles. Último: {DisplayName(revertible[0].OptimizationId)} ({revertible[0].TimestampUtc.ToLocalTime():g})."
+                  + (hidden > 0 ? $" {hidden} limpieza(s) o reparación(es) no se listan: no se pueden deshacer." : string.Empty);
+            IsEmpty = revertible.Count == 0;
         }
         catch (Exception ex)
         {

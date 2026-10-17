@@ -6,17 +6,22 @@
     xmlns:controls="using:CAO.UI.Controls">
     <ScrollViewer Padding="{StaticResource CaoPagePadding}" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Background="{ThemeResource SolidBackgroundFillColorBaseBrush}">
         <StackPanel x:Name="PageContent" Style="{StaticResource CaoPageContainerStyle}">
-            <StackPanel Style="{StaticResource CaoPageHeaderStyle}">
-                <TextBlock Text="Benchmark" TextAlignment="Center" Style="{StaticResource CaoPageTitleStyle}"/>
-                <TextBlock Text="Metodología honesta: cargas fijas y reproducibles (CPU/memoria/disco). Veredicto con suelo de ruido 3%." TextAlignment="Center" Style="{StaticResource CaoSubtitleStyle}"/>
-                <Border Style="{StaticResource CaoHeaderAccentBarStyle}"/>
-            </StackPanel>
-            <Button x:Name="PageTourButton"
-                    Click="OnPageTourClick"
-                    Style="{StaticResource CaoElevatedButtonStyle}"
-                    HorizontalAlignment="Right"
-                    FontSize="12"
-                    Margin="0,4,0,8" />
+            <Grid x:Name="PageHeader" Style="{StaticResource CaoPageHeaderGridStyle}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <Border Style="{StaticResource CaoPageHeaderIconStyle}">
+                    <FontIcon Glyph="&#xE9D2;" Style="{StaticResource CaoPageHeaderGlyphStyle}"/>
+                </Border>
+                <StackPanel Grid.Column="1" Style="{StaticResource CaoPageHeaderStyle}">
+                    <TextBlock Text="Benchmark" Style="{StaticResource CaoPageTitleStyle}"/>
+                    <TextBlock Text="Metodología honesta: cargas fijas y reproducibles (CPU/memoria/disco). Veredicto con suelo de ruido 3%." Style="{StaticResource CaoSubtitleStyle}"/>
+                    <Border Style="{StaticResource CaoHeaderAccentBarStyle}"/>
+                </StackPanel>
+                <Button x:Name="PageTourButton" Grid.Column="2" VerticalAlignment="Center" Click="OnPageTourClick" Style="{StaticResource CaoElevatedButtonStyle}" FontSize="12"/>
+            </Grid>
             <InfoBar IsOpen="True" Severity="Informational" IsClosable="False"
                      Title="Metodología honesta"
                      Message="3 trials con warmup y mediana: un pico aislado no fabrica mejoras. Suelo de ruido 3%: sin diferencia medible no hay mejora. El benchmark nunca muta el estado transaccional."/>

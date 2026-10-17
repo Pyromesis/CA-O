@@ -15,12 +15,9 @@ namespace CAO.Core.Optimizations.Network;
 /// Revert borra los valores: una política sin "Version" se ignora. Requiere
 /// reinicio para que la pila QoS relea las políticas.
 /// </summary>
-public sealed class PrioritizeGameTrafficQos : RegistryOptimizationBase
+public sealed class PrioritizeGameTrafficQos : QosPolicyOptimization
 {
-    internal const string PoliciesKey = @"SOFTWARE\Policies\Microsoft\Windows\QoS";
-    internal const string NlaKey = @"SYSTEM\CurrentControlSet\Services\Tcpip\QoS";
     internal const string PolicyPrefix = "CA-O Game ";
-    internal const string DscpExpeditedForwarding = "46";
 
     /// <summary>Ejecutables de juego online (el proceso que abre los sockets, no el launcher).</summary>
     internal static readonly IReadOnlyList<string> GameExecutables =
@@ -42,33 +39,9 @@ public sealed class PrioritizeGameTrafficQos : RegistryOptimizationBase
         "GTA5.exe",
     ];
 
-    protected override IReadOnlyList<ValueTarget> Targets { get; } = BuildTargets();
+    protected override string PolicyNamePrefix => PolicyPrefix;
 
-    private static List<ValueTarget> BuildTargets()
-    {
-        var targets = new List<ValueTarget>
-        {
-            new(RegistryHive2.LocalMachine, NlaKey, "Do not use NLA", "1", RegistryValueKind2.String),
-        };
-        foreach (var exe in GameExecutables)
-        {
-            var key = PoliciesKey + @"\" + PolicyPrefix + Path.GetFileNameWithoutExtension(exe);
-            void Add(string name, string value) =>
-                targets.Add(new(RegistryHive2.LocalMachine, key, name, value, RegistryValueKind2.String));
-            Add("Version", "1.0");
-            Add("Application Name", exe);
-            Add("Protocol", "*");
-            Add("Local Port", "*");
-            Add("Local IP", "*");
-            Add("Local IP Prefix Length", "*");
-            Add("Remote Port", "*");
-            Add("Remote IP", "*");
-            Add("Remote IP Prefix Length", "*");
-            Add("DSCP Value", DscpExpeditedForwarding);
-            Add("Throttle Rate", "-1");
-        }
-        return targets;
-    }
+    protected override IReadOnlyList<string> Executables => GameExecutables;
 
     public override OptimizationDefinition Definition => new()
     {

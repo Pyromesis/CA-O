@@ -6,26 +6,33 @@
     <Page.Resources>
         <Style x:Key="NetworkActionButtonStyle" TargetType="Button" BasedOn="{StaticResource CaoActionButtonStyle}">
             <Setter Property="MinWidth" Value="180"/>
+            <Setter Property="HorizontalAlignment" Value="Left"/>
         </Style>
         <Style x:Key="NetworkStatValueStyle" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="22"/>
+            <Setter Property="FontSize" Value="24"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
         </Style>
     </Page.Resources>
     <Grid>
     <ScrollViewer Padding="{StaticResource CaoPagePadding}" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Background="{ThemeResource SolidBackgroundFillColorBaseBrush}">
         <StackPanel x:Name="PageContent" Style="{StaticResource CaoPageContainerStyle}">
-            <StackPanel Style="{StaticResource CaoPageHeaderStyle}">
-                <TextBlock Text="Red gaming" TextAlignment="Center" Style="{StaticResource CaoPageTitleStyle}"/>
-                <TextBlock Text="Mide tu ruta real a los servidores de juego, vigila el ping en vivo y prioriza el tráfico del juego. Todo medido, nada inventado." TextAlignment="Center" TextWrapping="Wrap" Style="{StaticResource CaoSubtitleStyle}"/>
-                <Border Style="{StaticResource CaoHeaderAccentBarStyle}"/>
-            </StackPanel>
-            <Button x:Name="PageTourButton"
-                    Click="OnPageTourClick"
-                    Style="{StaticResource CaoElevatedButtonStyle}"
-                    HorizontalAlignment="Right"
-                    FontSize="12"
-                    Margin="0,4,0,8" />
+            <Grid x:Name="PageHeader" Style="{StaticResource CaoPageHeaderGridStyle}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <Border Style="{StaticResource CaoPageHeaderIconStyle}">
+                    <FontIcon Glyph="&#xE774;" Style="{StaticResource CaoPageHeaderGlyphStyle}"/>
+                </Border>
+                <StackPanel Grid.Column="1" Style="{StaticResource CaoPageHeaderStyle}">
+                    <TextBlock Text="Red gaming" Style="{StaticResource CaoPageTitleStyle}"/>
+                    <TextBlock Text="Mide tu ruta real a los servidores de juego, vigila el ping en vivo y prioriza el tráfico del juego. Todo medido, nada inventado." Style="{StaticResource CaoSubtitleStyle}"/>
+                    <Border Style="{StaticResource CaoHeaderAccentBarStyle}"/>
+                </StackPanel>
+                <Button x:Name="PageTourButton" Grid.Column="2" VerticalAlignment="Center" Click="OnPageTourClick" Style="{StaticResource CaoElevatedButtonStyle}" FontSize="12"/>
+            </Grid>
 
             <!-- Conexión activa -->
             <Border x:Name="ConnectionCard" Style="{StaticResource CaoCardStyle}">
@@ -213,7 +220,10 @@
                     <Border Style="{StaticResource CaoDividerStyle}"/>
                     <StackPanel x:Name="BoostOptionsPanel" Spacing="2">
                         <CheckBox Tag="prioritize-game-traffic-qos" IsChecked="True" Content="Prioridad QoS (DSCP 46) para el tráfico de los juegos" ToolTipService.ToolTip="Valorant, CS2, Fortnite, Apex, LoL, R6, CoD, PUBG, Dota 2, Rocket League… salen antes que descargas y streams. Requiere reinicio."/>
-                        <CheckBox Tag="disable-network-throttling" IsChecked="True" Content="Sin límite de red con audio de fondo (Discord, música)"/>
+                        <CheckBox Tag="prioritize-voice-chat-qos" IsChecked="True" Content="Prioridad QoS para el chat de voz (Discord, TeamSpeak, Mumble)" ToolTipService.ToolTip="La voz no se corta con descargas. Requiere reinicio."/>
+                        <CheckBox Tag="limit-update-background-bandwidth" IsChecked="True" Content="Windows Update no satura tu conexión en segundo plano"/>
+                        <CheckBox Tag="disable-receive-segment-coalescing" IsChecked="True" Content="Paquetes sin agrupar al recibir (RSC)" ToolTipService.ToolTip="Requiere reiniciar el adaptador o el equipo."/>
+                        <CheckBox Tag="reduce-wifi-roaming-aggressiveness" IsChecked="False" Content="Wi-Fi: menos búsquedas de roaming durante la partida" ToolTipService.ToolTip="Solo adaptadores Intel. En casas grandes con varios puntos de acceso, el portátil tardará más en cambiar al más cercano."/>
                         <CheckBox Tag="disable-nagle-tcp-acks" IsChecked="True" Content="Desactivar Nagle / ACK retardado (TCP inmediato)" ToolTipService.ToolTip="Requiere reinicio."/>
                         <CheckBox Tag="disable-energy-efficient-ethernet" IsChecked="True" Content="Ethernet sin ahorro de energía (EEE / Green Ethernet)"/>
                         <CheckBox Tag="disable-nic-power-saving-ac" IsChecked="True" Content="Tarjeta de red sin suspensión en AC"/>
@@ -232,16 +242,7 @@
                     <TextBlock x:Name="BoostStatusText" TextWrapping="Wrap" Style="{StaticResource CaoSectionSubtitleStyle}" AutomationProperties.LiveSetting="Polite"/>
                 </StackPanel>
             </Border>
-
-            <!-- Honestidad: qué no se hace -->
-            <Border x:Name="HonestyCard" Style="{StaticResource CaoCardStyle}">
-                <StackPanel Spacing="6">
-                    <TextBlock Text="¿Y la ruta alternativa tipo ExitLag?" Style="{StaticResource CaoCardTitleStyle}"/>
-                    <TextBlock TextWrapping="Wrap" Style="{StaticResource CaoListItemDetailStyle}"
-                               Text="ExitLag y similares desvían tu tráfico por su propia red de servidores (multipath) y cobran por ello. Eso solo funciona con servidores intermedios repartidos por el mundo, que CA-O no tiene: prometerlo sería mentir. Lo que sí hace CA-O es lo que se puede medir y cambiar en tu PC: ver qué región y qué ruta te van mejor, decir dónde nace el lag, priorizar el tráfico del juego y quitar latencia local. Si el análisis de ruta culpa a tu proveedor o a la distancia, ahí es donde un servicio de ese tipo podría ayudar."/>
-                </StackPanel>
-            </Border>
-        </StackPanel>
+</StackPanel>
     </ScrollViewer>
     </Grid>
 </Page>

@@ -68,7 +68,8 @@ public sealed partial class RestorePage : Page
     {
         EmptySnapshotsCard.Visibility = _vm.IsEmpty ? Visibility.Visible : Visibility.Collapsed;
         SnapshotsList.Visibility = _vm.IsEmpty ? Visibility.Collapsed : Visibility.Visible;
-        SnapshotsList.ItemsSource = _vm.SnapshotInfos;
+        SnapshotsList.ItemsSource = _vm.Rows;
+        LatestOpsText.Text = _vm.Summary;
         RecoveryHintText.Text = _vm.RecoveryHint;
         // CAO-BUG-2026-10-06 (N-1): la tarjeta solo aparece si hay una operacion
         // pendiente y es la unica via para desbloquear el equipo cuando el

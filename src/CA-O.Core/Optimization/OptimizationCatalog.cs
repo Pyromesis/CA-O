@@ -38,6 +38,11 @@ public static class OptimizationCatalog
         "enable-storage-sense",
         "storage-sense-temp-cleanup",
         "storage-sense-recycle-bin-policy",
+        // 2.2.20: NetworkThrottlingIndex solo frena por encima de ~10 000
+        // paquetes/s con audio sonando; un juego usa del orden de 100. Es el
+        // "network-throttling-index-hack" vetado (spec 75/100) con otro nombre:
+        // retirado sin alias. Sigue en AllLegacy para poder revertirlo.
+        "disable-network-throttling",
     };
 
     public static bool IsProductionId(string id) => !LegacyIds.Contains(id);
@@ -179,6 +184,35 @@ public static class OptimizationCatalog
     public static readonly DisableNetworkThrottling DisableNetworkThrottling = new();
     public static readonly DisableEnergyEfficientEthernet DisableEnergyEfficientEthernet = new();
 
+    // 2.2.20: input lag + red
+    public static readonly ReduceWifiRoamingAggressiveness ReduceWifiRoamingAggressiveness = new();
+    public static readonly EnsureForegroundPrioritySeparation EnsureForegroundPrioritySeparation = new();
+    public static readonly DisableReceiveSegmentCoalescing DisableReceiveSegmentCoalescing = new();
+    public static readonly PrioritizeVoiceChatQos PrioritizeVoiceChatQos = new();
+    public static readonly LimitUpdateBackgroundBandwidth LimitUpdateBackgroundBandwidth = new();
+
+    // 2.2.20: limpieza
+    public static readonly CleanupObsLogs CleanupObsLogs = new();
+    public static readonly CleanupSteamWebCache CleanupSteamWebCache = new();
+    public static readonly CleanupEpicLauncherCache CleanupEpicLauncherCache = new();
+    public static readonly CleanupBattleNetCache CleanupBattleNetCache = new();
+    public static readonly CleanupGameLauncherLogs CleanupGameLauncherLogs = new();
+    public static readonly CleanupGpuDriverInstallerLeftovers CleanupGpuDriverInstallerLeftovers = new();
+    public static readonly CleanupWindowsErrorReports CleanupWindowsErrorReports = new();
+    public static readonly CleanupOldSystemLogs CleanupOldSystemLogs = new();
+    public static readonly CleanupVsCodeCache CleanupVsCodeCache = new();
+    public static readonly CleanupDeveloperCaches CleanupDeveloperCaches = new();
+
+    // 2.2.20: solucionar
+    public static readonly RenewIpAddress RenewIpAddress = new();
+    public static readonly ClearArpCache ClearArpCache = new();
+    public static readonly RestartWlanService RestartWlanService = new();
+    public static readonly RestartXboxServices RestartXboxServices = new();
+    public static readonly RestartTextInputService RestartTextInputService = new();
+    public static readonly RebuildFontCache RebuildFontCache = new();
+    public static readonly RunSystemFileChecker RunSystemFileChecker = new();
+    public static readonly RepairWindowsImage RepairWindowsImage = new();
+
     // Startup (new)
     public static readonly DisableUnnecessaryStartupApps DisableUnnecessaryStartupApps = new();
     public static readonly DisableHeavyStartupApps DisableHeavyStartupApps = new();
@@ -209,7 +243,7 @@ public static class OptimizationCatalog
     public static readonly RestartWindowsExplorer RestartWindowsExplorer = new();
     public static readonly RecoverWindowsExplorer RecoverWindowsExplorer = new();
 
-    /// <summary>Production catalog: 100 verified optimizations. All optimizations are now in production.</summary>
+    /// <summary>Production catalog: 122 verified optimizations. All optimizations are now in production.</summary>
     public static IReadOnlyList<IOptimization> All { get; } = new IOptimization[]
     {
         DisableBackgroundApps,
@@ -292,8 +326,23 @@ public static class OptimizationCatalog
         DisableAccessibilityHotkeys,
         KeyboardFastRepeat,
         PrioritizeGameTrafficQos,
-        DisableNetworkThrottling,
         DisableEnergyEfficientEthernet,
+        // 2.2.20: input lag + red, limpieza
+        ReduceWifiRoamingAggressiveness,
+        EnsureForegroundPrioritySeparation,
+        DisableReceiveSegmentCoalescing,
+        PrioritizeVoiceChatQos,
+        LimitUpdateBackgroundBandwidth,
+        CleanupObsLogs,
+        CleanupSteamWebCache,
+        CleanupEpicLauncherCache,
+        CleanupBattleNetCache,
+        CleanupGameLauncherLogs,
+        CleanupGpuDriverInstallerLeftovers,
+        CleanupWindowsErrorReports,
+        CleanupOldSystemLogs,
+        CleanupVsCodeCache,
+        CleanupDeveloperCaches,
         // Startup Phase 5: promoted from legacy
         DisableUnnecessaryStartupApps,
         DisableHeavyStartupApps,
@@ -320,6 +369,15 @@ public static class OptimizationCatalog
         RestartWindowsSearch,
         RestartWindowsExplorer,
         RecoverWindowsExplorer,
+        // 2.2.20: solucionar
+        RenewIpAddress,
+        ClearArpCache,
+        RestartWlanService,
+        RestartXboxServices,
+        RestartTextInputService,
+        RebuildFontCache,
+        RunSystemFileChecker,
+        RepairWindowsImage,
     };
 
     /// <summary>Catálogo completo histórico (67) - solo para tests de trazabilidad docs ↔ código. No usar en producción.</summary>
@@ -357,5 +415,6 @@ public static class OptimizationCatalog
         RestoreSysmainDefault, RestoreWindowsSearchDefault,
         CreateRestorePointBeforeOptimizationBatch, PendingRebootMaintenance,
         StaleCrashDumpCleanup, OptimizeStartupRecoveryState,
+        DisableNetworkThrottling,
     };
 }

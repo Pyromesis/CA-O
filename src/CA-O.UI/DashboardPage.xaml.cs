@@ -208,7 +208,7 @@ public sealed partial class DashboardPage : Page
             ScoreDetailText.Text = recCount > 0
                 ? $"{recCount} optimizaciones recomendadas con evidencia."
                 : "Sin recomendaciones pendientes.";
-            MeasuredNoteText.Text = $"{measured.Count} dimensiones medidas · {string.Join(" · ", measured.Select(s => $"{Localizer.GetDimensionLabel(s.Dimension)}: {s.Score}"))}";
+            MeasuredNoteText.Text = $"{measured.Count} {(measured.Count == 1 ? "dimensión medida" : "dimensiones medidas")} · {string.Join(" · ", measured.Select(s => $"{Localizer.GetDimensionLabel(s.Dimension)}: {s.Score}"))}";
             // Nota: el enum es DiagnosticSeverity (Critical/Warning); "Error" nunca coincidía y los críticos no se contaban.
             var crit = report!.Findings.Count(f => f.Severity == DiagnosticSeverity.Critical);
             var warn = report.Findings.Count(f => f.Severity == DiagnosticSeverity.Warning);

@@ -6,126 +6,327 @@
     <Page.Resources>
         <!-- Botón de acción de esta página: estilo compartido + ancho mínimo único -->
         <Style x:Key="SolucionarActionButtonStyle" TargetType="Button" BasedOn="{StaticResource CaoActionButtonStyle}">
-            <Setter Property="MinWidth" Value="320"/>
+            <Setter Property="MinWidth" Value="128"/>
         </Style>
     </Page.Resources>
     <Grid>
     <ScrollViewer Padding="{StaticResource CaoPagePadding}" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Background="{ThemeResource SolidBackgroundFillColorBaseBrush}">
         <StackPanel x:Name="PageContent" Style="{StaticResource CaoPageContainerStyle}">
-            <StackPanel Style="{StaticResource CaoPageHeaderStyle}">
-                <TextBlock Text="Solucionar problemas" TextAlignment="Center" Style="{StaticResource CaoPageTitleStyle}"/>
-                <TextBlock Text="Soluciones directas para fallos comunes. Cada una actúa de verdad y confirma antes de cambios delicados." TextAlignment="Center" Style="{StaticResource CaoSubtitleStyle}"/>
-                <Border Style="{StaticResource CaoHeaderAccentBarStyle}"/>
-            </StackPanel>
-            <Button x:Name="PageTourButton"
-                    Click="OnPageTourClick"
-                    Style="{StaticResource CaoElevatedButtonStyle}"
-                    HorizontalAlignment="Right"
-                    FontSize="12"
-                    Margin="0,4,0,8" />
-
-            <!-- Progreso movido al overlay ApplyOverlay (centrado + bloqueante) -->
-
-            <!-- Audio -->
-            <Border Style="{StaticResource CaoCardStyle}">
-                <StackPanel Spacing="12">
-                    <StackPanel Orientation="Horizontal" Spacing="10">
-                        <controls:CaoCat x:Name="SolucionarCat" Width="48" ShowCaption="False" VerticalAlignment="Center"
-                                         AutomationProperties.Name="Mascota de CA-O"/>
-                        <Border Style="{StaticResource CaoCardIconStyle}" Background="{StaticResource CaoBlueSoftBrush}">
-                            <FontIcon Glyph="&#xE995;" FontSize="16" Foreground="{StaticResource CaoBlueSolidBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
-                        <StackPanel Spacing="2" VerticalAlignment="Center">
-                            <TextBlock Text="Audio" Style="{StaticResource CaoCardTitleStyle}"/>
-                            <TextBlock Text="Servicios, micro y Bluetooth" Style="{StaticResource CaoSectionSubtitleStyle}"/>
-                        </StackPanel>
-                    </StackPanel>
-                    <Border Style="{StaticResource CaoDividerStyle}"/>
-                    <Button Content="Reiniciar servicios de audio" Tag="restart-windows-audio-services" Click="OnFixClick" Style="{StaticResource SolucionarActionButtonStyle}" AutomationProperties.Name="Reiniciar servicios de audio" ToolTipService.ToolTip="Reinicia Audiosrv y AudioEndpointBuilder. Solución habitual cuando no hay sonido. Unos segundos sin audio."/>
-                    <Button Content="Permitir acceso al micrófono" Tag="fix-microphone-access" Click="OnFixClick" Style="{StaticResource SolucionarActionButtonStyle}" AutomationProperties.Name="Permitir acceso al micrófono" ToolTipService.ToolTip="Pone el acceso al micrófono en Permitir (registro). Para apps que no captan audio."/>
-                    <Button Content="Volumen independiente en Bluetooth" Tag="disable-bluetooth-absolute-volume" Click="OnFixClick" Style="{StaticResource SolucionarActionButtonStyle}" AutomationProperties.Name="Volumen independiente en Bluetooth" ToolTipService.ToolTip="Separa el volumen de Windows y del dispositivo Bluetooth. Útil si el volumen va a saltos."/>
-                    <Button Content="Reiniciar Bluetooth (no empareja)" Tag="restart-bluetooth-service" Click="OnFixConfirmClick" Style="{StaticResource SolucionarActionButtonStyle}" AutomationProperties.Name="Reiniciar servicio Bluetooth" ToolTipService.ToolTip="Reinicia bthserv. Para Bluetooth que no empareja o desaparece. Se conservan los emparejados."/>
-                    <TextBlock x:Name="AudioStatusText" Style="{StaticResource CaoSectionSubtitleStyle}" AutomationProperties.LiveSetting="Polite"/>
+            <VisualStateManager.VisualStateGroups>
+                <VisualStateGroup x:Name="FixLayoutStates">
+                    <VisualState x:Name="FixWide">
+                        <VisualState.StateTriggers><AdaptiveTrigger MinWindowWidth="1100"/></VisualState.StateTriggers>
+                    </VisualState>
+                    <VisualState x:Name="FixNarrow">
+                        <VisualState.StateTriggers><AdaptiveTrigger MinWindowWidth="0"/></VisualState.StateTriggers>
+                        <VisualState.Setters>
+                            <Setter Target="FixCol2.Width" Value="0"/>
+                            <Setter Target="CardAudio.(Grid.Row)" Value="0"/>
+                            <Setter Target="CardAudio.(Grid.Column)" Value="0"/>
+                            <Setter Target="CardNetwork.(Grid.Row)" Value="1"/>
+                            <Setter Target="CardNetwork.(Grid.Column)" Value="0"/>
+                            <Setter Target="CardVideo.(Grid.Row)" Value="2"/>
+                            <Setter Target="CardVideo.(Grid.Column)" Value="0"/>
+                            <Setter Target="CardGamesFix.(Grid.Row)" Value="3"/>
+                            <Setter Target="CardGamesFix.(Grid.Column)" Value="0"/>
+                            <Setter Target="CardSystem.(Grid.Row)" Value="4"/>
+                            <Setter Target="CardSystem.(Grid.Column)" Value="0"/>
+                            <Setter Target="CardPrint.(Grid.Row)" Value="5"/>
+                            <Setter Target="CardPrint.(Grid.Column)" Value="0"/>
+                        </VisualState.Setters>
+                    </VisualState>
+                </VisualStateGroup>
+            </VisualStateManager.VisualStateGroups>
+            <Grid x:Name="PageHeader" Style="{StaticResource CaoPageHeaderGridStyle}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <Border Style="{StaticResource CaoPageHeaderIconStyle}">
+                    <FontIcon Glyph="&#xE897;" Style="{StaticResource CaoPageHeaderGlyphStyle}"/>
+                </Border>
+                <StackPanel Grid.Column="1" Style="{StaticResource CaoPageHeaderStyle}">
+                    <TextBlock Text="Solucionar problemas" Style="{StaticResource CaoPageTitleStyle}"/>
+                    <TextBlock Text="Busca tu síntoma y pulsa su arreglo. Cada uno actúa de verdad; los que interrumpen algo piden confirmación." Style="{StaticResource CaoSubtitleStyle}"/>
+                    <Border Style="{StaticResource CaoHeaderAccentBarStyle}"/>
                 </StackPanel>
-            </Border>
+                <Button x:Name="PageTourButton" Grid.Column="2" VerticalAlignment="Center" Click="OnPageTourClick" Style="{StaticResource CaoElevatedButtonStyle}" FontSize="12"/>
+            </Grid>
 
-            <!-- Video y pantalla -->
-            <Border Style="{StaticResource CaoCardStyle}">
-                <StackPanel Spacing="12">
-                    <StackPanel Orientation="Horizontal" Spacing="10">
-                        <Border Style="{StaticResource CaoCardIconStyle}" Background="{StaticResource CaoPurpleSoftBrush}">
-                            <FontIcon Glyph="&#xE7F4;" FontSize="16" Foreground="{StaticResource CaoPurpleSolidBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
-                        <StackPanel Spacing="2" VerticalAlignment="Center">
-                            <TextBlock Text="Video y pantalla" Style="{StaticResource CaoCardTitleStyle}"/>
-                            <TextBlock Text="Compositor e iconos" Style="{StaticResource CaoSectionSubtitleStyle}"/>
+            <Grid x:Name="FixGrid" ColumnSpacing="16" RowSpacing="16">
+                <Grid.ColumnDefinitions><ColumnDefinition x:Name="FixCol1" Width="*"/><ColumnDefinition x:Name="FixCol2" Width="*"/></Grid.ColumnDefinitions>
+                <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                <Border x:Name="CardAudio" Grid.Row="0" Grid.Column="0" Style="{StaticResource CaoCardStyle}" VerticalAlignment="Stretch">
+                    <StackPanel Spacing="2">
+                        <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,0,0,8">
+                            <controls:CaoCat x:Name="SolucionarCat" Width="44" ShowCaption="False" VerticalAlignment="Center" AutomationProperties.Name="Mascota de CA-O"/>
+                            <Border Style="{StaticResource CaoCardIconStyle}" Background="{StaticResource CaoBlueSoftBrush}">
+                                <FontIcon Glyph="&#xE995;" FontSize="16" Foreground="{StaticResource CaoBlueSolidBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Text="Audio" Style="{StaticResource CaoCardTitleStyle}"/>
+                                <TextBlock Text="Sin sonido, micro y Bluetooth" Style="{StaticResource CaoSectionSubtitleStyle}"/>
+                            </StackPanel>
                         </StackPanel>
+                        <Grid ColumnSpacing="12" Padding="0,7,0,7">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Text="Sin sonido" Style="{StaticResource CaoListItemTitleStyle}"/>
+                                <TextBlock Text="Reinicia los servicios de audio de Windows." TextWrapping="Wrap" Style="{StaticResource CaoListItemDetailStyle}"/>
+                            </StackPanel>
+                            <Button Grid.Column="1" Content="Reiniciar" Tag="restart-windows-audio-services" Click="OnFixClick" Style="{StaticResource SolucionarActionButtonStyle}" VerticalAlignment="Center" AutomationProperties.Name="Sin sonido: Reiniciar" ToolTipService.ToolTip="Reinicia Audiosrv y AudioEndpointBuilder. Solución habitual cuando no hay sonido. Unos segundos sin audio."/>
+                        </Grid>
+                        <Grid ColumnSpacing="12" Padding="0,7,0,7">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Text="Las apps no oyen el micro" Style="{StaticResource CaoListItemTitleStyle}"/>
+                                <TextBlock Text="Permite el acceso al micrófono." TextWrapping="Wrap" Style="{StaticResource CaoListItemDetailStyle}"/>
+                            </StackPanel>
+                            <Button Grid.Column="1" Content="Permitir" Tag="fix-microphone-access" Click="OnFixClick" Style="{StaticResource SolucionarActionButtonStyle}" VerticalAlignment="Center" AutomationProperties.Name="Las apps no oyen el micro: Permitir" ToolTipService.ToolTip="Pone el acceso al micrófono en Permitir (registro). Para apps que no captan audio."/>
+                        </Grid>
+                        <Grid ColumnSpacing="12" Padding="0,7,0,7">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Text="Volumen Bluetooth a saltos" Style="{StaticResource CaoListItemTitleStyle}"/>
+                                <TextBlock Text="Separa el volumen de Windows y del auricular." TextWrapping="Wrap" Style="{StaticResource CaoListItemDetailStyle}"/>
+                            </StackPanel>
+                            <Button Grid.Column="1" Content="Separar" Tag="disable-bluetooth-absolute-volume" Click="OnFixClick" Style="{StaticResource SolucionarActionButtonStyle}" VerticalAlignment="Center" AutomationProperties.Name="Volumen Bluetooth a saltos: Separar" ToolTipService.ToolTip="Separa el volumen de Windows y del dispositivo Bluetooth. Útil si el volumen va a saltos."/>
+                        </Grid>
+                        <Grid ColumnSpacing="12" Padding="0,7,0,7">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Text="Bluetooth no empareja" Style="{StaticResource CaoListItemTitleStyle}"/>
+                                <TextBlock Text="Reinicia el servicio. Conserva los emparejados." TextWrapping="Wrap" Style="{StaticResource CaoListItemDetailStyle}"/>
+                            </StackPanel>
+                            <Button Grid.Column="1" Content="Reiniciar" Tag="restart-bluetooth-service" Click="OnFixConfirmClick" Style="{StaticResource SolucionarActionButtonStyle}" VerticalAlignment="Center" AutomationProperties.Name="Bluetooth no empareja: Reiniciar" ToolTipService.ToolTip="Reinicia bthserv. Para Bluetooth que no empareja o desaparece. Se conservan los emparejados."/>
+                        </Grid>
+                        <TextBlock x:Name="AudioStatusText" TextWrapping="Wrap" Margin="0,6,0,0" Style="{StaticResource CaoSectionSubtitleStyle}" AutomationProperties.LiveSetting="Polite"/>
                     </StackPanel>
-                    <Border Style="{StaticResource CaoDividerStyle}"/>
-                    <Button Content="Reiniciar compositor (parpadeos)" Tag="restart-desktop-compositor" Click="OnFixConfirmClick" Style="{StaticResource SolucionarActionButtonStyle}" AutomationProperties.Name="Reiniciar compositor de escritorio" ToolTipService.ToolTip="Reinicia DWM: la pantalla parpadea unos segundos. Para parpadeos o negro. Vuelve solo."/>
-                    <Button Content="Limpiar caché de iconos" Tag="clear-icon-thumbnail-cache" Click="OnFixClick" Style="{StaticResource SolucionarActionButtonStyle}" AutomationProperties.Name="Limpiar caché de iconos" ToolTipService.ToolTip="Borra cachés de iconos y miniaturas dañadas. El sistema las regenera solo."/>
-                    <TextBlock x:Name="VideoStatusText" Style="{StaticResource CaoSectionSubtitleStyle}" AutomationProperties.LiveSetting="Polite"/>
-                </StackPanel>
-            </Border>
-
-            <!-- Red -->
-            <Border Style="{StaticResource CaoCardStyle}">
-                <StackPanel Spacing="12">
-                    <StackPanel Orientation="Horizontal" Spacing="10">
-                        <Border Style="{StaticResource CaoCardIconStyle}" Background="{StaticResource CaoCyanSoftBrush}">
-                            <FontIcon Glyph="&#xE774;" FontSize="16" Foreground="{StaticResource CaoCyanSolidBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
-                        <StackPanel Spacing="2" VerticalAlignment="Center">
-                            <TextBlock Text="Red" Style="{StaticResource CaoCardTitleStyle}"/>
-                            <TextBlock Text="DNS y conectividad" Style="{StaticResource CaoSectionSubtitleStyle}"/>
+                </Border>
+                <Border x:Name="CardNetwork" Grid.Row="0" Grid.Column="1" Style="{StaticResource CaoCardStyle}" VerticalAlignment="Stretch">
+                    <StackPanel Spacing="2">
+                        <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,0,0,8">
+                            <Border Style="{StaticResource CaoCardIconStyle}" Background="{StaticResource CaoCyanSoftBrush}">
+                                <FontIcon Glyph="&#xE774;" FontSize="16" Foreground="{StaticResource CaoCyanSolidBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Text="Red" Style="{StaticResource CaoCardTitleStyle}"/>
+                                <TextBlock Text="Sin internet, DNS y Wi-Fi" Style="{StaticResource CaoSectionSubtitleStyle}"/>
+                            </StackPanel>
                         </StackPanel>
+                        <Grid ColumnSpacing="12" Padding="0,7,0,7">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Text="Webs que no cargan" Style="{StaticResource CaoListItemTitleStyle}"/>
+                                <TextBlock Text="Vacía la caché DNS." TextWrapping="Wrap" Style="{StaticResource CaoListItemDetailStyle}"/>
+                            </StackPanel>
+                            <Button Grid.Column="1" Content="Vaciar" Tag="flush-dns-cache" Click="OnFixClick" Style="{StaticResource SolucionarActionButtonStyle}" VerticalAlignment="Center" AutomationProperties.Name="Webs que no cargan: Vaciar" ToolTipService.ToolTip="Ejecuta ipconfig /flushdns. Arregla webs que no cargan tras cambiar de red. Inmediato y repetible."/>
+                        </Grid>
+                        <Grid ColumnSpacing="12" Padding="0,7,0,7">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Text="Errores de DNS persistentes" Style="{StaticResource CaoListItemTitleStyle}"/>
+                                <TextBlock Text="Reinicia el cliente DNS de Windows." TextWrapping="Wrap" Style="{StaticResource CaoListItemDetailStyle}"/>
+                            </StackPanel>
+                            <Button Grid.Column="1" Content="Reiniciar" Tag="restart-dns-client" Click="OnFixClick" Style="{StaticResource SolucionarActionButtonStyle}" VerticalAlignment="Center" AutomationProperties.Name="Errores de DNS persistentes: Reiniciar" ToolTipService.ToolTip="Reinicia Dnscache. Para errores de resolución que no se van vaciando la caché."/>
+                        </Grid>
+                        <Grid ColumnSpacing="12" Padding="0,7,0,7">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Text="Sin internet tras cambiar de router" Style="{StaticResource CaoListItemTitleStyle}"/>
+                                <TextBlock Text="Pide una IP nueva al router." TextWrapping="Wrap" Style="{StaticResource CaoListItemDetailStyle}"/>
+                            </StackPanel>
+                            <Button Grid.Column="1" Content="Renovar" Tag="renew-ip-address" Click="OnFixConfirmClick" Style="{StaticResource SolucionarActionButtonStyle}" VerticalAlignment="Center" AutomationProperties.Name="Sin internet tras cambiar de router: Renovar" ToolTipService.ToolTip="ipconfig /release y /renew en todos los adaptadores. La red se corta unos segundos."/>
+                        </Grid>
+                        <Grid ColumnSpacing="12" Padding="0,7,0,7">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Text="No llega al router" Style="{StaticResource CaoListItemTitleStyle}"/>
+                                <TextBlock Text="Vacía la caché ARP de la red local." TextWrapping="Wrap" Style="{StaticResource CaoListItemDetailStyle}"/>
+                            </StackPanel>
+                            <Button Grid.Column="1" Content="Vaciar" Tag="clear-arp-cache" Click="OnFixClick" Style="{StaticResource SolucionarActionButtonStyle}" VerticalAlignment="Center" AutomationProperties.Name="No llega al router: Vaciar" ToolTipService.ToolTip="netsh interface ip delete arpcache. Inmediato y seguro; Windows la vuelve a llenar sola."/>
+                        </Grid>
+                        <Grid ColumnSpacing="12" Padding="0,7,0,7">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Text="Wi-Fi que se cae o no ve redes" Style="{StaticResource CaoListItemTitleStyle}"/>
+                                <TextBlock Text="Reinicia el servicio Wi-Fi." TextWrapping="Wrap" Style="{StaticResource CaoListItemDetailStyle}"/>
+                            </StackPanel>
+                            <Button Grid.Column="1" Content="Reiniciar" Tag="restart-wlan-service" Click="OnFixConfirmClick" Style="{StaticResource SolucionarActionButtonStyle}" VerticalAlignment="Center" AutomationProperties.Name="Wi-Fi que se cae o no ve redes: Reiniciar" ToolTipService.ToolTip="Reinicia WlanSvc. El Wi-Fi se corta unos segundos y se reconecta solo; las redes guardadas se conservan."/>
+                        </Grid>
+                        <Grid ColumnSpacing="12" Padding="0,7,0,7">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Text="Nada de lo anterior funciona" Style="{StaticResource CaoListItemTitleStyle}"/>
+                                <TextBlock Text="Restablece Winsock y TCP/IP. Requiere reiniciar." TextWrapping="Wrap" Style="{StaticResource CaoListItemDetailStyle}"/>
+                            </StackPanel>
+                            <Button Grid.Column="1" Content="Restablecer" Tag="reset-network-stack-repair" Click="OnFixConfirmClick" Style="{StaticResource SolucionarActionButtonStyle}" VerticalAlignment="Center" AutomationProperties.Name="Nada de lo anterior funciona: Restablecer" ToolTipService.ToolTip="netsh winsock reset + int ip reset. Último recurso: borra configuraciones de red personalizadas y requiere reiniciar."/>
+                        </Grid>
+                        <TextBlock x:Name="NetworkStatusText" TextWrapping="Wrap" Margin="0,6,0,0" Style="{StaticResource CaoSectionSubtitleStyle}" AutomationProperties.LiveSetting="Polite"/>
                     </StackPanel>
-                    <Border Style="{StaticResource CaoDividerStyle}"/>
-                    <Button Content="Vaciar caché DNS" Tag="flush-dns-cache" Click="OnFixClick" Style="{StaticResource SolucionarActionButtonStyle}" AutomationProperties.Name="Vaciar caché DNS" ToolTipService.ToolTip="Ejecuta ipconfig /flushdns. Arregla webs que no cargan tras cambiar de red. Inmediato y repetible."/>
-                    <Button Content="Reiniciar cliente DNS" Tag="restart-dns-client" Click="OnFixClick" Style="{StaticResource SolucionarActionButtonStyle}" AutomationProperties.Name="Reiniciar cliente DNS" ToolTipService.ToolTip="Reinicia el cliente DNS (Dnscache). Para errores de resolución persistentes. Complementa vaciar la caché."/>
-                    <TextBlock x:Name="NetworkStatusText" Style="{StaticResource CaoSectionSubtitleStyle}" AutomationProperties.LiveSetting="Polite"/>
-                </StackPanel>
-            </Border>
-
-            <!-- Impresión -->
-            <Border Style="{StaticResource CaoCardStyle}">
-                <StackPanel Spacing="12">
-                    <StackPanel Orientation="Horizontal" Spacing="10">
-                        <Border Style="{StaticResource CaoCardIconStyle}" Background="{StaticResource CaoSlateSoftBrush}">
-                            <FontIcon Glyph="&#xE749;" FontSize="16" Foreground="{ThemeResource TextFillColorSecondaryBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
-                        <StackPanel Spacing="2" VerticalAlignment="Center">
-                            <TextBlock Text="Impresión" Style="{StaticResource CaoCardTitleStyle}"/>
-                            <TextBlock Text="Cola atascada" Style="{StaticResource CaoSectionSubtitleStyle}"/>
+                </Border>
+                <Border x:Name="CardVideo" Grid.Row="1" Grid.Column="0" Style="{StaticResource CaoCardStyle}" VerticalAlignment="Stretch">
+                    <StackPanel Spacing="2">
+                        <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,0,0,8">
+                            <Border Style="{StaticResource CaoCardIconStyle}" Background="{StaticResource CaoPurpleSoftBrush}">
+                                <FontIcon Glyph="&#xE7F4;" FontSize="16" Foreground="{StaticResource CaoPurpleSolidBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Text="Pantalla y texto" Style="{StaticResource CaoCardTitleStyle}"/>
+                                <TextBlock Text="Parpadeos, iconos y fuentes" Style="{StaticResource CaoSectionSubtitleStyle}"/>
+                            </StackPanel>
                         </StackPanel>
+                        <Grid ColumnSpacing="12" Padding="0,7,0,7">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Text="Parpadeos o pantalla negra" Style="{StaticResource CaoListItemTitleStyle}"/>
+                                <TextBlock Text="Reinicia el compositor (DWM)." TextWrapping="Wrap" Style="{StaticResource CaoListItemDetailStyle}"/>
+                            </StackPanel>
+                            <Button Grid.Column="1" Content="Reiniciar" Tag="restart-desktop-compositor" Click="OnFixConfirmClick" Style="{StaticResource SolucionarActionButtonStyle}" VerticalAlignment="Center" AutomationProperties.Name="Parpadeos o pantalla negra: Reiniciar" ToolTipService.ToolTip="Reinicia DWM: la pantalla parpadea unos segundos. Para parpadeos o negro. Vuelve solo."/>
+                        </Grid>
+                        <Grid ColumnSpacing="12" Padding="0,7,0,7">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Text="Iconos o miniaturas rotos" Style="{StaticResource CaoListItemTitleStyle}"/>
+                                <TextBlock Text="Borra la caché de iconos y miniaturas." TextWrapping="Wrap" Style="{StaticResource CaoListItemDetailStyle}"/>
+                            </StackPanel>
+                            <Button Grid.Column="1" Content="Limpiar" Tag="clear-icon-thumbnail-cache" Click="OnFixClick" Style="{StaticResource SolucionarActionButtonStyle}" VerticalAlignment="Center" AutomationProperties.Name="Iconos o miniaturas rotos: Limpiar" ToolTipService.ToolTip="Borra cachés de iconos y miniaturas dañadas. El sistema las regenera solo."/>
+                        </Grid>
+                        <Grid ColumnSpacing="12" Padding="0,7,0,7">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Text="Letras como cuadros" Style="{StaticResource CaoListItemTitleStyle}"/>
+                                <TextBlock Text="Reconstruye la caché de fuentes." TextWrapping="Wrap" Style="{StaticResource CaoListItemDetailStyle}"/>
+                            </StackPanel>
+                            <Button Grid.Column="1" Content="Reconstruir" Tag="rebuild-font-cache" Click="OnFixConfirmClick" Style="{StaticResource SolucionarActionButtonStyle}" VerticalAlignment="Center" AutomationProperties.Name="Letras como cuadros: Reconstruir" ToolTipService.ToolTip="Detiene FontCache, borra su caché y lo vuelve a iniciar. Las fuentes instaladas no se tocan."/>
+                        </Grid>
+                        <TextBlock x:Name="VideoStatusText" TextWrapping="Wrap" Margin="0,6,0,0" Style="{StaticResource CaoSectionSubtitleStyle}" AutomationProperties.LiveSetting="Polite"/>
                     </StackPanel>
-                    <Border Style="{StaticResource CaoDividerStyle}"/>
-                    <Button Content="Reiniciar cola de impresión" Tag="restart-print-spooler" Click="OnFixClick" Style="{StaticResource SolucionarActionButtonStyle}" AutomationProperties.Name="Reiniciar cola de impresión" ToolTipService.ToolTip="Reinicia la cola de impresión (Spooler). Para trabajos atascados que no salen ni cancelando."/>
-                    <TextBlock x:Name="PrintStatusText" Style="{StaticResource CaoSectionSubtitleStyle}" AutomationProperties.LiveSetting="Polite"/>
-                </StackPanel>
-            </Border>
-
-            <!-- Sistema -->
-            <Border Style="{StaticResource CaoCardStyle}">
-                <StackPanel Spacing="12">
-                    <StackPanel Orientation="Horizontal" Spacing="10">
-                        <Border Style="{StaticResource CaoCardIconStyle}" Background="{StaticResource CaoGreenSoftBrush}">
-                            <FontIcon Glyph="&#xE930;" FontSize="16" Foreground="{StaticResource CaoGreenSolidBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
-                        <StackPanel Spacing="2" VerticalAlignment="Center">
-                            <TextBlock Text="Sistema" Style="{StaticResource CaoCardTitleStyle}"/>
-                            <TextBlock Text="Update y reloj" Style="{StaticResource CaoSectionSubtitleStyle}"/>
+                </Border>
+                <Border x:Name="CardGamesFix" Grid.Row="1" Grid.Column="1" Style="{StaticResource CaoCardStyle}" VerticalAlignment="Stretch">
+                    <StackPanel Spacing="2">
+                        <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,0,0,8">
+                            <Border Style="{StaticResource CaoCardIconStyle}" Background="{StaticResource CaoGreenSoftBrush}">
+                                <FontIcon Glyph="&#xE7FC;" FontSize="16" Foreground="{StaticResource CaoGreenSolidBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Text="Juegos y entrada" Style="{StaticResource CaoCardTitleStyle}"/>
+                                <TextBlock Text="Game Pass, Xbox, emojis e IME" Style="{StaticResource CaoSectionSubtitleStyle}"/>
+                            </StackPanel>
                         </StackPanel>
+                        <Grid ColumnSpacing="12" Padding="0,7,0,7">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Text="Game Pass no inicia sesión" Style="{StaticResource CaoListItemTitleStyle}"/>
+                                <TextBlock Text="Reinicia los servicios de Xbox." TextWrapping="Wrap" Style="{StaticResource CaoListItemDetailStyle}"/>
+                            </StackPanel>
+                            <Button Grid.Column="1" Content="Reiniciar" Tag="restart-xbox-services" Click="OnFixConfirmClick" Style="{StaticResource SolucionarActionButtonStyle}" VerticalAlignment="Center" AutomationProperties.Name="Game Pass no inicia sesión: Reiniciar" ToolTipService.ToolTip="Reinicia Gaming Services, Xbox Live Auth Manager, Game Save y Xbox Networking. Cierra los juegos de Xbox antes."/>
+                        </Grid>
+                        <Grid ColumnSpacing="12" Padding="0,7,0,7">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Text="Emojis o IME que no abren" Style="{StaticResource CaoListItemTitleStyle}"/>
+                                <TextBlock Text="Reinicia la entrada de texto." TextWrapping="Wrap" Style="{StaticResource CaoListItemDetailStyle}"/>
+                            </StackPanel>
+                            <Button Grid.Column="1" Content="Reiniciar" Tag="restart-text-input-service" Click="OnFixClick" Style="{StaticResource SolucionarActionButtonStyle}" VerticalAlignment="Center" AutomationProperties.Name="Emojis o IME que no abren: Reiniciar" ToolTipService.ToolTip="Reinicia TextInputManagementService. Para Win+. (emojis), teclado táctil o IME. No cambia la distribución del teclado."/>
+                        </Grid>
+                        <TextBlock x:Name="GamesFixStatusText" TextWrapping="Wrap" Margin="0,6,0,0" Style="{StaticResource CaoSectionSubtitleStyle}" AutomationProperties.LiveSetting="Polite"/>
                     </StackPanel>
-                    <Border Style="{StaticResource CaoDividerStyle}"/>
-                    <Button Content="Reparar Windows Update" Tag="repair-windows-update" Click="OnFixConfirmClick" Style="{StaticResource SolucionarActionButtonStyle}" AutomationProperties.Name="Reparar Windows Update" ToolTipService.ToolTip="Renueva SoftwareDistribution y catroot2, reanuda servicios. Para updates atascados con error. Tarda minutos."/>
-                    <Button Content="Resincronizar reloj" Tag="resync-system-clock" Click="OnFixClick" Style="{StaticResource SolucionarActionButtonStyle}" AutomationProperties.Name="Resincronizar reloj del sistema" ToolTipService.ToolTip="Sincroniza el reloj con el servidor horario (w32tm). Corrige desfases de hora."/>
-                    <Button Content="Reiniciar Explorador (congelado)" Tag="restart-windows-explorer" Click="OnFixConfirmClick" Style="{StaticResource SolucionarActionButtonStyle}" AutomationProperties.Name="Reiniciar Explorador de Windows" ToolTipService.ToolTip="Reinicia explorer.exe cuando la barra o el escritorio se congelan. La pantalla parpadea; vuelve solo."/>
-                    <Button Content="Recuperar Explorador (sin barra/escritorio)" Tag="recover-windows-explorer" Click="OnFixClick" Style="{StaticResource SolucionarActionButtonStyle}" AutomationProperties.Name="Recuperar Explorador de Windows" ToolTipService.ToolTip="Trae de vuelta la barra y el escritorio si desaparecieron. No mata nada: solo lanza el shell si falta. Funciona incluso sin el servicio."/>
-                    <Button Content="Reiniciar búsqueda Windows" Tag="restart-windows-search" Click="OnFixClick" Style="{StaticResource SolucionarActionButtonStyle}" AutomationProperties.Name="Reiniciar búsqueda de Windows" ToolTipService.ToolTip="Reinicia la búsqueda de Windows (WSearch). Para buscador sin resultados. No cambia la indexación."/>
-                    <TextBlock x:Name="SystemStatusText" Style="{StaticResource CaoSectionSubtitleStyle}" AutomationProperties.LiveSetting="Polite"/>
-                </StackPanel>
-            </Border>
+                </Border>
+                <Border x:Name="CardSystem" Grid.Row="2" Grid.Column="0" Style="{StaticResource CaoCardStyle}" VerticalAlignment="Stretch">
+                    <StackPanel Spacing="2">
+                        <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,0,0,8">
+                            <Border Style="{StaticResource CaoCardIconStyle}" Background="{StaticResource CaoGreenSoftBrush}">
+                                <FontIcon Glyph="&#xE930;" FontSize="16" Foreground="{StaticResource CaoGreenSolidBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Text="Sistema" Style="{StaticResource CaoCardTitleStyle}"/>
+                                <TextBlock Text="Windows Update, Explorador y archivos del sistema" Style="{StaticResource CaoSectionSubtitleStyle}"/>
+                            </StackPanel>
+                        </StackPanel>
+                        <Grid ColumnSpacing="12" Padding="0,7,0,7">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Text="Windows Update atascado" Style="{StaticResource CaoListItemTitleStyle}"/>
+                                <TextBlock Text="Renueva SoftwareDistribution y catroot2." TextWrapping="Wrap" Style="{StaticResource CaoListItemDetailStyle}"/>
+                            </StackPanel>
+                            <Button Grid.Column="1" Content="Reparar" Tag="repair-windows-update" Click="OnFixConfirmClick" Style="{StaticResource SolucionarActionButtonStyle}" VerticalAlignment="Center" AutomationProperties.Name="Windows Update atascado: Reparar" ToolTipService.ToolTip="Renueva SoftwareDistribution y catroot2 y reanuda los servicios. Para updates atascados con error. Tarda minutos."/>
+                        </Grid>
+                        <Grid ColumnSpacing="12" Padding="0,7,0,7">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Text="Hora desfasada" Style="{StaticResource CaoListItemTitleStyle}"/>
+                                <TextBlock Text="Sincroniza el reloj con el servidor horario." TextWrapping="Wrap" Style="{StaticResource CaoListItemDetailStyle}"/>
+                            </StackPanel>
+                            <Button Grid.Column="1" Content="Sincronizar" Tag="resync-system-clock" Click="OnFixClick" Style="{StaticResource SolucionarActionButtonStyle}" VerticalAlignment="Center" AutomationProperties.Name="Hora desfasada: Sincronizar" ToolTipService.ToolTip="Sincroniza el reloj con el servidor horario (w32tm). Corrige desfases de hora."/>
+                        </Grid>
+                        <Grid ColumnSpacing="12" Padding="0,7,0,7">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Text="Barra o escritorio congelados" Style="{StaticResource CaoListItemTitleStyle}"/>
+                                <TextBlock Text="Reinicia el Explorador." TextWrapping="Wrap" Style="{StaticResource CaoListItemDetailStyle}"/>
+                            </StackPanel>
+                            <Button Grid.Column="1" Content="Reiniciar" Tag="restart-windows-explorer" Click="OnFixConfirmClick" Style="{StaticResource SolucionarActionButtonStyle}" VerticalAlignment="Center" AutomationProperties.Name="Barra o escritorio congelados: Reiniciar" ToolTipService.ToolTip="Reinicia explorer.exe cuando la barra o el escritorio se congelan. La pantalla parpadea; vuelve solo."/>
+                        </Grid>
+                        <Grid ColumnSpacing="12" Padding="0,7,0,7">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Text="Sin barra ni escritorio" Style="{StaticResource CaoListItemTitleStyle}"/>
+                                <TextBlock Text="Vuelve a lanzar el shell si falta." TextWrapping="Wrap" Style="{StaticResource CaoListItemDetailStyle}"/>
+                            </StackPanel>
+                            <Button Grid.Column="1" Content="Recuperar" Tag="recover-windows-explorer" Click="OnFixClick" Style="{StaticResource SolucionarActionButtonStyle}" VerticalAlignment="Center" AutomationProperties.Name="Sin barra ni escritorio: Recuperar" ToolTipService.ToolTip="Trae de vuelta la barra y el escritorio si desaparecieron. No mata nada: solo lanza el shell si falta. Funciona sin el servicio."/>
+                        </Grid>
+                        <Grid ColumnSpacing="12" Padding="0,7,0,7">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Text="El buscador no encuentra nada" Style="{StaticResource CaoListItemTitleStyle}"/>
+                                <TextBlock Text="Reinicia la búsqueda de Windows." TextWrapping="Wrap" Style="{StaticResource CaoListItemDetailStyle}"/>
+                            </StackPanel>
+                            <Button Grid.Column="1" Content="Reiniciar" Tag="restart-windows-search" Click="OnFixClick" Style="{StaticResource SolucionarActionButtonStyle}" VerticalAlignment="Center" AutomationProperties.Name="El buscador no encuentra nada: Reiniciar" ToolTipService.ToolTip="Reinicia WSearch. Para un buscador sin resultados. No cambia la indexación."/>
+                        </Grid>
+                        <Grid ColumnSpacing="12" Padding="0,7,0,7">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Text="Errores raros o cierres" Style="{StaticResource CaoListItemTitleStyle}"/>
+                                <TextBlock Text="Repara archivos del sistema (SFC)." TextWrapping="Wrap" Style="{StaticResource CaoListItemDetailStyle}"/>
+                            </StackPanel>
+                            <Button Grid.Column="1" Content="Reparar" Tag="run-system-file-checker" Click="OnFixConfirmClick" Style="{StaticResource SolucionarActionButtonStyle}" VerticalAlignment="Center" AutomationProperties.Name="Errores raros o cierres: Reparar" ToolTipService.ToolTip="sfc /scannow, la herramienta oficial. Tarda de 5 a 20 minutos; no apagues el equipo."/>
+                        </Grid>
+                        <Grid ColumnSpacing="12" Padding="0,7,0,7">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Text="SFC no puede reparar" Style="{StaticResource CaoListItemTitleStyle}"/>
+                                <TextBlock Text="Repara la imagen de Windows (DISM)." TextWrapping="Wrap" Style="{StaticResource CaoListItemDetailStyle}"/>
+                            </StackPanel>
+                            <Button Grid.Column="1" Content="Reparar" Tag="repair-windows-image" Click="OnFixConfirmClick" Style="{StaticResource SolucionarActionButtonStyle}" VerticalAlignment="Center" AutomationProperties.Name="SFC no puede reparar: Reparar" ToolTipService.ToolTip="DISM /Online /Cleanup-Image /RestoreHealth. Necesita internet y tarda de 10 a 30 minutos. Después repite SFC."/>
+                        </Grid>
+                        <TextBlock x:Name="SystemStatusText" TextWrapping="Wrap" Margin="0,6,0,0" Style="{StaticResource CaoSectionSubtitleStyle}" AutomationProperties.LiveSetting="Polite"/>
+                    </StackPanel>
+                </Border>
+                <Border x:Name="CardPrint" Grid.Row="2" Grid.Column="1" Style="{StaticResource CaoCardStyle}" VerticalAlignment="Stretch">
+                    <StackPanel Spacing="2">
+                        <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,0,0,8">
+                            <Border Style="{StaticResource CaoCardIconStyle}" Background="{StaticResource CaoSlateSoftBrush}">
+                                <FontIcon Glyph="&#xE749;" FontSize="16" Foreground="{ThemeResource TextFillColorSecondaryBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Text="Impresión" Style="{StaticResource CaoCardTitleStyle}"/>
+                                <TextBlock Text="Cola atascada" Style="{StaticResource CaoSectionSubtitleStyle}"/>
+                            </StackPanel>
+                        </StackPanel>
+                        <Grid ColumnSpacing="12" Padding="0,7,0,7">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Text="Trabajos que no salen" Style="{StaticResource CaoListItemTitleStyle}"/>
+                                <TextBlock Text="Reinicia la cola de impresión." TextWrapping="Wrap" Style="{StaticResource CaoListItemDetailStyle}"/>
+                            </StackPanel>
+                            <Button Grid.Column="1" Content="Reiniciar" Tag="restart-print-spooler" Click="OnFixClick" Style="{StaticResource SolucionarActionButtonStyle}" VerticalAlignment="Center" AutomationProperties.Name="Trabajos que no salen: Reiniciar" ToolTipService.ToolTip="Reinicia el Spooler. Para trabajos atascados que no salen ni cancelando."/>
+                        </Grid>
+                        <TextBlock x:Name="PrintStatusText" TextWrapping="Wrap" Margin="0,6,0,0" Style="{StaticResource CaoSectionSubtitleStyle}" AutomationProperties.LiveSetting="Polite"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
         </StackPanel>
     </ScrollViewer>
         <Grid x:Name="ApplyOverlay" Background="#99000000" Visibility="{Binding Visibility, ElementName=FixProgressCard}">

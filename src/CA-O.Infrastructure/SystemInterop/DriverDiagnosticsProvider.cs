@@ -75,7 +75,18 @@ public sealed class DriverDiagnosticsProvider
             dev.InstanceId, hwId, inf, provider, dev.IsPresent);
     }
 
-    private static Dictionary<string, WmiDriverInfo> ReadWmi(CancellationToken ct)
+    /// <summary>
+    /// CAO-BUG-2026-10-17: la consulta pedía ConfigManagerErrorCode, que es de
+    /// Win32_PnPEntity y NO existe en Win32_PnPSignedDriver. WMI contestaba
+    /// "Invalid query", el catch lo tragaba y el inventario perdía firma,
+    /// versión, fecha, INF y proveedor de todos los drivers ("Firma
+    /// desconocida" en todo, contador "Sin firmar" siempre a 0). El código de
+    /// problema ya lo da SetupAPI en vivo.
+    /// </summary>
+    internal const string SignedDriverQuery =
+        "SELECT DeviceName, DeviceClass, Manufacturer, DriverVersion, DriverDate, IsSigned, Status, DeviceID, HardWareID, InfName, DriverProviderName FROM Win32_PnPSignedDriver";
+
+    internal static Dictionary<string, WmiDriverInfo> ReadWmi(CancellationToken ct)
     {
         var map = new Dictionary<string, WmiDriverInfo>(StringComparer.OrdinalIgnoreCase);
         try
@@ -83,7 +94,7 @@ public sealed class DriverDiagnosticsProvider
             var opts = new System.Management.EnumerationOptions { Timeout = WmiTimeout, BlockSize = 20, Rewindable = false };
             using var searcher = new ManagementObjectSearcher(
                 new System.Management.ManagementScope(@"root\cimv2"),
-                new System.Management.ObjectQuery("SELECT DeviceName, DeviceClass, Manufacturer, DriverVersion, DriverDate, IsSigned, Status, ConfigManagerErrorCode, DeviceID, HardwareID, InfName, DriverProviderName FROM Win32_PnPSignedDriver"),
+                new System.Management.ObjectQuery(SignedDriverQuery),
                 opts);
             foreach (var device in searcher.Get().Cast<ManagementObject>())
             {
@@ -99,8 +110,15 @@ public sealed class DriverDiagnosticsProvider
                     device["DriverDate"]?.ToString() ?? string.Empty,
                     device["IsSigned"] is bool signed ? signed : null,
                     device["Status"]?.ToString() ?? string.Empty,
-                    Convert.ToInt32(device["ConfigManagerErrorCode"] ?? 0),
-                    (device["HardwareID"] as string[])?.FirstOrDefault() ?? string.Empty,
+                    0,
+                    // HardWareID es string en esta clase (no string[]): con el cast a
+                    // array siempre salía vacío.
+                    device["HardWareID"] switch
+                    {
+                        string single => single,
+                        string[] many => many.FirstOrDefault() ?? string.Empty,
+                        _ => string.Empty,
+                    },
                     device["InfName"]?.ToString() ?? string.Empty,
                     device["DriverProviderName"]?.ToString() ?? string.Empty);
             }

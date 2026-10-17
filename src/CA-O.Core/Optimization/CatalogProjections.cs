@@ -16,6 +16,9 @@ public static class CatalogProjections
         "fix-microphone-access", "restart-desktop-compositor", "recover-windows-explorer",
         "disable-bluetooth-absolute-volume", "restart-windows-explorer", "resync-system-clock",
         "flush-dns-cache", "reset-network-stack-repair",
+        // 2.2.20
+        "renew-ip-address", "clear-arp-cache", "restart-wlan-service", "restart-xbox-services",
+        "restart-text-input-service", "rebuild-font-cache", "run-system-file-checker", "repair-windows-image",
     };
 
     public static readonly IReadOnlySet<string> DiagnosticIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase)

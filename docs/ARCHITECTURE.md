@@ -1,4 +1,4 @@
-# Arquitectura CA-O 2.1
+# Arquitectura CA-O 2.2
 
 ## Principio rector
 
@@ -114,14 +114,14 @@ Nunca se registran secretos, credenciales ni contenido de entrada del usuario (s
 - **i18n**: diccionario tipado es-ES/en-US (`Localizer`); migración a `.resw` planificada sin cambiar llamadas (`Localizer.Get(key)`).
 - **HAGS/VBS/MPO/etc.**: nunca tratados como ganancias universales; HAGS es WorkloadDependent+Conditional+RequiresReboot, VBS es Critical+SecurityTradeoff+ExpertOnly.
 
-## Pruebas (1986 passed, 0 failed — Release)
+## Pruebas (2559 passed, 0 failed — Release)
 
 | Suite | Cubre | Count |
 |---|---|---|
-| `CA-O.Core.Tests` | Contratos catálogo 100, `AnalysisStateStore` (save/load/corrupt), `GameCompatibility` (VBS bloqueado), transacciones, scoring, health, ledger one-shot, temporales a 10 min, puerta anti-cheat por mecanismo, input-lag + red gaming (7 optimizaciones, Batch 72) | 1030 |
+| `CA-O.Core.Tests` | Contratos catálogo 122, `AnalysisStateStore` (save/load/corrupt), `GameCompatibility` (VBS bloqueado), transacciones, scoring, health, ledger one-shot, temporales a 10 min, puerta anti-cheat por mecanismo, input-lag + red gaming (12 optimizaciones, Batch 86), auditoría funcional del catálogo (apply/verify/revert contra registro en memoria y allowlist real) | 1507 |
 | `CA-O.Security.Tests` | IPC validator (`Ping`/`Apply` cross-check), `IpcPingTests`, inyección | 274 |
 | `CA-O.Integration.Tests` | `E2EFlowsTests` 9 pruebas (8 casos numerados + benchmark: Abrir→Analizar→Persistir→Vanguard→Restore→Benchmark) + `TransactionJournalRecovery` + contrato docs + `PrivilegedServicePackagingTests` (payload self-contained) | 60 |
-| `CA-O.Infrastructure.Tests` | `HistoryRobustness` (malformed), `SnapshotRepository` (TX identity), `SystemContextCache` dual-TTL | 215 |
+| `CA-O.Infrastructure.Tests` | `HistoryRobustness` (malformed), `SnapshotRepository` (TX identity), `SystemContextCache` dual-TTL, `DriverWmiQueryTests` (WMI real) | 217 |
 | `CA-O.Benchmark.Tests` | `SystemBenchmarkRunner` (suelo 3%, mediana) | 17 |
-| `CA-O.UI.Tests` | `ViewModelTests` (Analyze/Dashboard con `SystemAnalysisService` + `Correlation`), Overclock (filas visuales + mood de tuning), tours por pagina (83 pasos, destinos verificados), auto-tuning con propuesta, puerta de restore point, aviso recovery con nombres, filtro anti-cheat solo-kernel, TestLogIsolation | 390 |
-| **Total** | **Gates 1-5 `verify.ps1` + `build-release` con `gui-installer`** | **1986** |
+| `CA-O.UI.Tests` | `ViewModelTests` (Analyze/Dashboard con `SystemAnalysisService` + `Correlation`), Overclock (filas visuales + mood de tuning), tours por pagina (90 pasos, destinos verificados, colocacion de tarjeta), auto-tuning con propuesta, puerta de restore point, aviso recovery con nombres, filtro anti-cheat solo-kernel, TestLogIsolation | 484 |
+| **Total** | **Gates 1-5 `verify.ps1` + `build-release` con `gui-installer`** | **2559** |

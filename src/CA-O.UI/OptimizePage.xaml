@@ -8,17 +8,22 @@
     <Grid>
     <ScrollViewer Padding="{StaticResource CaoPagePadding}" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Background="{ThemeResource SolidBackgroundFillColorBaseBrush}">
         <StackPanel x:Name="PageContent" Style="{StaticResource CaoPageContainerStyle}">
-            <StackPanel Style="{StaticResource CaoPageHeaderStyle}">
-                <TextBlock Text="Optimizar" TextAlignment="Center" Style="{StaticResource CaoPageTitleStyle}"/>
-                <TextBlock Text="Cada tarjeta muestra diff real, riesgo, seguridad, compatibilidad y reversibilidad. Solo Recomendadas se aplican sin Modo Expert." TextAlignment="Center" Style="{StaticResource CaoSubtitleStyle}"/>
-                <Border Style="{StaticResource CaoHeaderAccentBarStyle}"/>
-            </StackPanel>
-            <Button x:Name="PageTourButton"
-                    Click="OnPageTourClick"
-                    Style="{StaticResource CaoElevatedButtonStyle}"
-                    HorizontalAlignment="Right"
-                    FontSize="12"
-                    Margin="0,4,0,8" />
+            <Grid x:Name="PageHeader" Style="{StaticResource CaoPageHeaderGridStyle}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <Border Style="{StaticResource CaoPageHeaderIconStyle}">
+                    <FontIcon Glyph="&#xE90F;" Style="{StaticResource CaoPageHeaderGlyphStyle}"/>
+                </Border>
+                <StackPanel Grid.Column="1" Style="{StaticResource CaoPageHeaderStyle}">
+                    <TextBlock Text="Optimizar" Style="{StaticResource CaoPageTitleStyle}"/>
+                    <TextBlock Text="Cada tarjeta muestra diff real, riesgo, seguridad, compatibilidad y reversibilidad. Solo Recomendadas se aplican sin Modo Expert." Style="{StaticResource CaoSubtitleStyle}"/>
+                    <Border Style="{StaticResource CaoHeaderAccentBarStyle}"/>
+                </StackPanel>
+                <Button x:Name="PageTourButton" Grid.Column="2" VerticalAlignment="Center" Click="OnPageTourClick" Style="{StaticResource CaoElevatedButtonStyle}" FontSize="12"/>
+            </Grid>
 
             <Border Style="{StaticResource CaoActionCardStyle}">
                 <Grid ColumnSpacing="14">
@@ -64,96 +69,98 @@
             <InfoBar x:Name="FilterInfoBar" IsOpen="False" Severity="Informational" IsClosable="False"/>
             <TextBlock Text="Recomendaciones" Style="{StaticResource CaoListItemTitleStyle}"/>
 
-            <Border x:Name="EmptyStateCard" Style="{StaticResource CaoCardStyle}" Visibility="Collapsed">
-                <StackPanel Spacing="8" HorizontalAlignment="Center" Padding="12">
-                    <FontIcon Glyph="&#xE946;" FontSize="24" Opacity="0.35" HorizontalAlignment="Center"/>
-                    <TextBlock Text="Sin recomendaciones" Style="{StaticResource CaoEmptyStateTitleStyle}"/>
-                    <TextBlock Text="Ejecute primero Analizar sistema en el Panel. No hay nada para optimizar hasta generar un contexto medido." Style="{StaticResource CaoSectionSubtitleStyle}" TextAlignment="Center"/>
-                </StackPanel>
-            </Border>
+            <StackPanel x:Name="RecommendationsArea" Spacing="12">
+                <Border x:Name="EmptyStateCard" Style="{StaticResource CaoCardStyle}" Visibility="Collapsed">
+                    <StackPanel Spacing="8" HorizontalAlignment="Center" Padding="12">
+                        <FontIcon Glyph="&#xE946;" FontSize="24" Opacity="0.35" HorizontalAlignment="Center"/>
+                        <TextBlock Text="Sin recomendaciones" Style="{StaticResource CaoEmptyStateTitleStyle}"/>
+                        <TextBlock Text="Ejecute primero Analizar sistema en el Panel. No hay nada para optimizar hasta generar un contexto medido." Style="{StaticResource CaoSectionSubtitleStyle}" TextAlignment="Center"/>
+                    </StackPanel>
+                </Border>
 
-            <ListView x:Name="RecommendationsList" SelectionMode="None" Padding="0,4">
-                <ListView.ItemContainerStyle>
-                    <Style TargetType="ListViewItem">
-                        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-                        <Setter Property="Padding" Value="0"/>
-                        <Setter Property="Margin" Value="0,6"/>
-                    </Style>
-                </ListView.ItemContainerStyle>
-                <ListView.ItemTemplate>
-                    <DataTemplate>
-                        <Border Style="{StaticResource CaoCardStyle}" ToolTipService.ToolTip="{Binding TooltipDetail}" helpers:UiAnimations.CardHover="True">
-                            <StackPanel Spacing="10">
-                                <!-- Header -->
-                                <Grid ColumnSpacing="10">
-                                    <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                                    <Border Style="{StaticResource CaoCardIconStyle}" Background="{StaticResource CaoGreenSoftBrush}" VerticalAlignment="Top">
-                                        <FontIcon Glyph="&#xE8EE;" FontSize="18" Foreground="{StaticResource CaoGreenSolidBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                    </Border>
-                                    <StackPanel Grid.Column="1" Spacing="3">
-                                        <StackPanel Orientation="Horizontal" Spacing="8">
-                                            <TextBlock Text="{Binding NameEs}" Style="{StaticResource CaoCardTitleStyle}" TextWrapping="Wrap"/>
-                                            <Border Background="{ThemeResource AccentFillColorDefaultBrush}" Style="{StaticResource CaoBadgeStyle}" VerticalAlignment="Center">
-                                                <TextBlock Text="{Binding BucketLabel}" FontSize="10" Foreground="{ThemeResource TextOnAccentFillColorSelectedTextBrush}" FontWeight="SemiBold"/>
-                                            </Border>
-                                            <Border Background="{StaticResource CaoSuccessBrush}" Style="{StaticResource CaoBadgeStyle}" VerticalAlignment="Center" Visibility="{Binding AppliedVisibility}">
-                                                <TextBlock Text="✓ ACTIVO" FontSize="10" Foreground="{ThemeResource TextOnAccentFillColorSelectedTextBrush}" FontWeight="Bold"/>
-                                            </Border>
-                                            <FontIcon Glyph="&#xE72E;" FontSize="12" Foreground="{ThemeResource SystemFillColorCriticalBrush}" Visibility="{Binding LockVisibility}" ToolTipService.ToolTip="{Binding LockReason}"/>
-                                            <TextBlock Text="{Binding RebootLabel}" Style="{StaticResource CaoSectionSubtitleStyle}" VerticalAlignment="Center"/>
-                                        </StackPanel>
-                                        <TextBlock Text="{Binding DescriptionEs}" TextWrapping="Wrap" Style="{StaticResource CaoListItemDetailStyle}"/>
-                                        <TextBlock Text="{Binding BenefitDetail}" TextWrapping="Wrap" FontSize="11" Foreground="{ThemeResource AccentFillColorDefaultBrush}" Opacity="0.9"/>
-                                        <TextBlock Text="{Binding ReasonMessage}" Style="{StaticResource CaoSectionSubtitleStyle}" FontStyle="Italic"/>
-                                        <TextBlock Text="{Binding LockReason}" FontSize="11" Foreground="{ThemeResource SystemFillColorCautionBrush}" TextWrapping="Wrap" Visibility="{Binding LockVisibility}"/>
-                                    </StackPanel>
-                                    <StackPanel Grid.Column="2" Spacing="4" HorizontalAlignment="Right">
-                                        <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="8,4">
-                                            <TextBlock Text="{Binding ScoreLabel}" Style="{StaticResource CaoListItemTitleStyle}"/>
+                <ListView x:Name="RecommendationsList" SelectionMode="None" Padding="0,4">
+                    <ListView.ItemContainerStyle>
+                        <Style TargetType="ListViewItem">
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                            <Setter Property="Padding" Value="0"/>
+                            <Setter Property="Margin" Value="0,6"/>
+                        </Style>
+                    </ListView.ItemContainerStyle>
+                    <ListView.ItemTemplate>
+                        <DataTemplate>
+                            <Border Style="{StaticResource CaoCardStyle}" ToolTipService.ToolTip="{Binding TooltipDetail}" helpers:UiAnimations.CardHover="True">
+                                <StackPanel Spacing="10">
+                                    <!-- Header -->
+                                    <Grid ColumnSpacing="10">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                        <Border Style="{StaticResource CaoCardIconStyle}" Background="{StaticResource CaoGreenSoftBrush}" VerticalAlignment="Top">
+                                            <FontIcon Glyph="&#xE8EE;" FontSize="18" Foreground="{StaticResource CaoGreenSolidBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                         </Border>
+                                        <StackPanel Grid.Column="1" Spacing="3">
+                                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                                <TextBlock Text="{Binding NameEs}" Style="{StaticResource CaoCardTitleStyle}" TextWrapping="Wrap"/>
+                                                <Border Background="{ThemeResource AccentFillColorDefaultBrush}" Style="{StaticResource CaoBadgeStyle}" VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding BucketLabel}" FontSize="10" Foreground="{ThemeResource TextOnAccentFillColorSelectedTextBrush}" FontWeight="SemiBold"/>
+                                                </Border>
+                                                <Border Background="{StaticResource CaoSuccessBrush}" Style="{StaticResource CaoBadgeStyle}" VerticalAlignment="Center" Visibility="{Binding AppliedVisibility}">
+                                                    <TextBlock Text="✓ ACTIVO" FontSize="10" Foreground="{ThemeResource TextOnAccentFillColorSelectedTextBrush}" FontWeight="Bold"/>
+                                                </Border>
+                                                <FontIcon Glyph="&#xE72E;" FontSize="12" Foreground="{ThemeResource SystemFillColorCriticalBrush}" Visibility="{Binding LockVisibility}" ToolTipService.ToolTip="{Binding LockReason}"/>
+                                                <TextBlock Text="{Binding RebootLabel}" Style="{StaticResource CaoSectionSubtitleStyle}" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                            <TextBlock Text="{Binding DescriptionEs}" TextWrapping="Wrap" Style="{StaticResource CaoListItemDetailStyle}"/>
+                                            <TextBlock Text="{Binding BenefitDetail}" TextWrapping="Wrap" FontSize="11" Foreground="{ThemeResource AccentFillColorDefaultBrush}" Opacity="0.9"/>
+                                            <TextBlock Text="{Binding ReasonMessage}" Style="{StaticResource CaoSectionSubtitleStyle}" FontStyle="Italic"/>
+                                            <TextBlock Text="{Binding LockReason}" FontSize="11" Foreground="{ThemeResource SystemFillColorCautionBrush}" TextWrapping="Wrap" Visibility="{Binding LockVisibility}"/>
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="2" Spacing="4" HorizontalAlignment="Right">
+                                            <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="8,4">
+                                                <TextBlock Text="{Binding ScoreLabel}" Style="{StaticResource CaoListItemTitleStyle}"/>
+                                            </Border>
+                                        </StackPanel>
+                                    </Grid>
+
+                                    <!-- Evidence / Risk / Security / Compatibility (Fase 10) -->
+                                    <Grid ColumnSpacing="10" RowSpacing="6">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Border Grid.Column="0" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="8">
+                                            <StackPanel Spacing="2">
+                                                <TextBlock Text="POR QUÉ" Style="{StaticResource CaoEyebrowStyle}"/>
+                                                <TextBlock FontSize="11" TextWrapping="Wrap"><Run Text="Evidencia: "/><Run Text="{Binding Evidence}" FontWeight="SemiBold"/><Run Text=" · Confianza: "/><Run Text="{Binding ScoreLabel}"/></TextBlock>
+                                                <TextBlock FontSize="11" Opacity="0.7"><Run Text="Estado actual: "/><Run Text="{Binding CurrentState}"/></TextBlock>
+                                            </StackPanel>
+                                        </Border>
+                                        <Border Grid.Column="1" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="8">
+                                            <StackPanel Spacing="2">
+                                                <TextBlock Text="IMPACTO" Style="{StaticResource CaoEyebrowStyle}"/>
+                                                <TextBlock FontSize="11"><Run Text="Riesgo: "/><Run Text="{Binding Risk}"/></TextBlock>
+                                                <TextBlock FontSize="11"><Run Text="Seguridad: "/><Run Text="{Binding SecurityImpact}"/></TextBlock>
+                                            </StackPanel>
+                                        </Border>
+                                        <Border Grid.Column="2" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="8">
+                                            <StackPanel Spacing="2">
+                                                <TextBlock Text="REVERSIBILIDAD" Style="{StaticResource CaoEyebrowStyle}"/>
+                                                <TextBlock FontSize="11"><Run Text="Compatibilidad: "/><Run Text="{Binding Compatibility}"/></TextBlock>
+                                                <TextBlock FontSize="11" Opacity="0.7">Rollback: disponible (snapshot por TX)</TextBlock>
+                                            </StackPanel>
+                                        </Border>
+                                    </Grid>
+
+                                    <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,2,0,0">
+                                        <Button Content="Detalles" Tag="{Binding OptimizationId}" Click="OnPreviewClick" FontSize="12" Style="{StaticResource CaoElevatedButtonStyle}" AutomationProperties.Name="Ver diff antes/después" AutomationProperties.HelpText="Muestra registry/valor antes y después"/>
+                                        <Button Content="{Binding ApplyLabel}" Tag="{Binding OptimizationId}" Click="OnApplyClick" Style="{StaticResource CaoPrimaryButtonStyle}" FontSize="12" MinWidth="110" IsEnabled="{Binding IsApplyEnabled}" AutomationProperties.Name="Aplicar optimización" AutomationProperties.HelpText="Crea snapshot por TransactionId, aplica y verifica"/>
+                                        <Button Content="Revertir" Tag="{Binding OptimizationId}" Click="OnRevertClick" FontSize="12" Opacity="0.9" Style="{StaticResource CaoElevatedButtonStyle}" AutomationProperties.Name="Revertir cambio" AutomationProperties.HelpText="Restaura snapshot exacto verificado"/>
+                                        <Button Content="{Binding MeasureLabel}" Tag="{Binding OptimizationId}" Click="OnMeasureImpactClick" FontSize="12" Opacity="0.9" Style="{StaticResource CaoElevatedButtonStyle}" AutomationProperties.Name="Medir antes y después" AutomationProperties.HelpText="Mide el impacto de esta optimización en Benchmark"/>
+                                        <FontIcon Glyph="&#xE72E;" FontSize="14" Foreground="{ThemeResource SystemFillColorCriticalBrush}" Visibility="{Binding LockVisibility}" ToolTipService.ToolTip="Bloqueado — requiere Modo Expert o anti-cheat"/>
                                     </StackPanel>
-                                </Grid>
-
-                                <!-- Evidence / Risk / Security / Compatibility (Fase 10) -->
-                                <Grid ColumnSpacing="10" RowSpacing="6">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
-                                    <Border Grid.Column="0" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="8">
-                                        <StackPanel Spacing="2">
-                                            <TextBlock Text="POR QUÉ" Style="{StaticResource CaoEyebrowStyle}"/>
-                                            <TextBlock FontSize="11" TextWrapping="Wrap"><Run Text="Evidencia: "/><Run Text="{Binding Evidence}" FontWeight="SemiBold"/><Run Text=" · Confianza: "/><Run Text="{Binding ScoreLabel}"/></TextBlock>
-                                            <TextBlock FontSize="11" Opacity="0.7"><Run Text="Estado actual: "/><Run Text="{Binding CurrentState}"/></TextBlock>
-                                        </StackPanel>
-                                    </Border>
-                                    <Border Grid.Column="1" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="8">
-                                        <StackPanel Spacing="2">
-                                            <TextBlock Text="IMPACTO" Style="{StaticResource CaoEyebrowStyle}"/>
-                                            <TextBlock FontSize="11"><Run Text="Riesgo: "/><Run Text="{Binding Risk}"/></TextBlock>
-                                            <TextBlock FontSize="11"><Run Text="Seguridad: "/><Run Text="{Binding SecurityImpact}"/></TextBlock>
-                                        </StackPanel>
-                                    </Border>
-                                    <Border Grid.Column="2" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="8">
-                                        <StackPanel Spacing="2">
-                                            <TextBlock Text="REVERSIBILIDAD" Style="{StaticResource CaoEyebrowStyle}"/>
-                                            <TextBlock FontSize="11"><Run Text="Compatibilidad: "/><Run Text="{Binding Compatibility}"/></TextBlock>
-                                            <TextBlock FontSize="11" Opacity="0.7">Rollback: disponible (snapshot por TX)</TextBlock>
-                                        </StackPanel>
-                                    </Border>
-                                </Grid>
-
-                                <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,2,0,0">
-                                    <Button Content="Detalles" Tag="{Binding OptimizationId}" Click="OnPreviewClick" FontSize="12" Style="{StaticResource CaoElevatedButtonStyle}" AutomationProperties.Name="Ver diff antes/después" AutomationProperties.HelpText="Muestra registry/valor antes y después"/>
-                                    <Button Content="{Binding ApplyLabel}" Tag="{Binding OptimizationId}" Click="OnApplyClick" Style="{StaticResource CaoPrimaryButtonStyle}" FontSize="12" MinWidth="110" IsEnabled="{Binding IsApplyEnabled}" AutomationProperties.Name="Aplicar optimización" AutomationProperties.HelpText="Crea snapshot por TransactionId, aplica y verifica"/>
-                                    <Button Content="Revertir" Tag="{Binding OptimizationId}" Click="OnRevertClick" FontSize="12" Opacity="0.9" Style="{StaticResource CaoElevatedButtonStyle}" AutomationProperties.Name="Revertir cambio" AutomationProperties.HelpText="Restaura snapshot exacto verificado"/>
-                                    <Button Content="{Binding MeasureLabel}" Tag="{Binding OptimizationId}" Click="OnMeasureImpactClick" FontSize="12" Opacity="0.9" Style="{StaticResource CaoElevatedButtonStyle}" AutomationProperties.Name="Medir antes y después" AutomationProperties.HelpText="Mide el impacto de esta optimización en Benchmark"/>
-                                    <FontIcon Glyph="&#xE72E;" FontSize="14" Foreground="{ThemeResource SystemFillColorCriticalBrush}" Visibility="{Binding LockVisibility}" ToolTipService.ToolTip="Bloqueado — requiere Modo Expert o anti-cheat"/>
                                 </StackPanel>
-                            </StackPanel>
-                        </Border>
-                    </DataTemplate>
-                </ListView.ItemTemplate>
-            </ListView>
+                            </Border>
+                        </DataTemplate>
+                    </ListView.ItemTemplate>
+                </ListView>
+            </StackPanel>
 
             <TextBlock Text="Cada aplicación crea un snapshot previo por TransactionId, verifica exactamente y permite reversión precisa." Style="{StaticResource CaoSectionSubtitleStyle}"/>
         </StackPanel>

@@ -215,12 +215,22 @@ public sealed class TourCoordinator
             var sw = System.Diagnostics.Stopwatch.StartNew();
             for (var attempt = 0; attempt < overlay.MaxWaitAttempts; attempt++)
             {
-                if (!_state.IsRunning) return;
-                var rect = ResolveRect(step);
-                if (rect is Rect found)
+                if (!_state.IsRunning || !ReferenceEquals(_state.Current, step)) return;
+                if (ResolveTarget(step) is FrameworkElement target)
                 {
-                    if (!_state.IsRunning) return;
-                    overlay.Show(step, found);
+                    // CAO-BUG tour: los objetivos bajo el pliegue (tarjetas de abajo de
+                    // Limpieza, Red gaming...) quedaban fuera de pantalla: todo oscuro y
+                    // nada resaltado. Primero se trae el control a la vista y se espera a
+                    // que el scroll y las animaciones de entrada asienten.
+                    target.StartBringIntoView(new BringIntoViewOptions
+                    {
+                        AnimationDesired = false,
+                        VerticalAlignmentRatio = 0.3,
+                    });
+                    await Task.Delay(260);
+                    if (!_state.IsRunning || !ReferenceEquals(_state.Current, step)) return;
+                    overlay.Show(step, RectOf(target));
+                    StartTracking(step);
                     return;
                 }
 
@@ -228,7 +238,7 @@ public sealed class TourCoordinator
                 await Task.Delay(100);
             }
 
-            if (!_state.IsRunning) return;
+            if (!_state.IsRunning || !ReferenceEquals(_state.Current, step)) return;
             overlay.Show(step, null);
         }
         catch (Exception ex)
@@ -238,26 +248,95 @@ public sealed class TourCoordinator
         }
     }
 
-    private Rect? ResolveRect(TourStep step)
+    private Microsoft.UI.Dispatching.DispatcherQueueTimer? _tracker;
+
+    /// <summary>
+    /// Mientras el paso está en pantalla el foco sigue al control: el usuario puede
+    /// hacer scroll, la ventana cambiar de tamaño o la página terminar su animación
+    /// de entrada (antes el foco se calculaba a mitad de la animación y quedaba
+    /// desplazado respecto al botón).
+    /// </summary>
+    private void StartTracking(TourStep step)
+    {
+        StopTracking();
+        try
+        {
+            _tracker = _window.DispatcherQueue.CreateTimer();
+            _tracker.Interval = TimeSpan.FromMilliseconds(200);
+            _tracker.Tick += (_, _) =>
+            {
+                try
+                {
+                    if (!_state.IsRunning || !ReferenceEquals(_state.Current, step))
+                    {
+                        StopTracking();
+                        return;
+                    }
+                    _window.TourOverlay.Reposition(ResolveRect(step));
+                }
+                catch (Exception ex)
+                {
+                    App.WriteCrashLog(ex);
+                    StopTracking();
+                }
+            };
+            _tracker.Start();
+        }
+        catch (Exception ex)
+        {
+            App.WriteCrashLog(ex);
+        }
+    }
+
+    private void StopTracking()
+    {
+        try { _tracker?.Stop(); } catch { }
+        _tracker = null;
+    }
+
+    private FrameworkElement? ResolveTarget(TourStep step)
     {
         if (_window.ContentFrame.Content is not FrameworkElement page) return null;
         if (page.FindName(step.TargetName) is not FrameworkElement target) return null;
-        if (target.ActualWidth <= 0 || target.ActualHeight <= 0) return null;
+        if (HasArea(target)) return target;
+        // Textos de resultado vacíos (aún no se ha ejecutado nada) o controles
+        // ocultos miden 0: antes el paso salía sin foco. Se resalta la tarjeta
+        // que los contiene, que es lo que el texto del paso describe.
+        DependencyObject? current = Microsoft.UI.Xaml.Media.VisualTreeHelper.GetParent(target);
+        while (current is not null && !ReferenceEquals(current, page))
+        {
+            if (current is Border border && HasArea(border)) return border;
+            current = Microsoft.UI.Xaml.Media.VisualTreeHelper.GetParent(current);
+        }
+        return null;
+    }
+
+    private static bool HasArea(FrameworkElement element) =>
+        element.Visibility == Visibility.Visible && element.ActualWidth > 0 && element.ActualHeight > 0;
+
+    private Rect? RectOf(FrameworkElement target)
+    {
         var origin = target.TransformToVisual(_window.TourOverlay).TransformPoint(new Point(0, 0));
         return new Rect(origin.X, origin.Y, target.ActualWidth, target.ActualHeight);
     }
+
+    private Rect? ResolveRect(TourStep step) =>
+        ResolveTarget(step) is FrameworkElement target ? RectOf(target) : null;
 
     private void PaintCurrent()
     {
         if (!_state.IsRunning) return;
         var step = _state.Current;
         if (step is null) return;
-        _window.TourOverlay.Show(step, ResolveRect(step));
+        // Tras navegar la página aún no tiene layout: pintar sin objetivo hacía
+        // parpadear la tarjeta centrada. PaintWhenReadyAsync ya está esperando el control.
+        if (ResolveRect(step) is Rect rect) _window.TourOverlay.Show(step, rect);
     }
 
     private void Finish(bool dismissed)
     {
         IsActive = false;
+        StopTracking();
         _expectedRoute = null;
         var wasPageTour = _isPageTour;
         _isPageTour = false;

@@ -37,6 +37,8 @@ public sealed class SystemCommandGateway : IPrivilegedCommandExecutor
         SystemCommandKey.DefragAnalyze => HeavyTimeout,
         SystemCommandKey.PnPUtilAddDriver => HeavyTimeout,
         SystemCommandKey.ExpandCab => HeavyTimeout,
+        SystemCommandKey.SfcScanNow => HeavyTimeout,
+        SystemCommandKey.DismRestoreHealth => HeavyTimeout,
         _ => DefaultTimeout,
     };
 

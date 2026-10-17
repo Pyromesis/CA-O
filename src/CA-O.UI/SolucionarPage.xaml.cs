@@ -50,7 +50,7 @@ public sealed partial class SolucionarPage : Page
         var dialog = new ContentDialog
         {
             Title = "Confirmar solución",
-            Content = $"Se ejecutará '{id}'. Es seguro pero interrumpe unos segundos (pantalla o red según el caso). ¿Continuar?",
+            Content = ConfirmTextFor(id),
             PrimaryButtonText = "Ejecutar",
             CloseButtonText = "Cancelar",
             DefaultButton = ContentDialogButton.Close,
@@ -60,6 +60,23 @@ public sealed partial class SolucionarPage : Page
         await RunFixAsync(id, StatusBoxFor(id), confirm: false);
     }
 
+    private static string ConfirmTextFor(string id) => id switch
+    {
+        "renew-ip-address" or "restart-wlan-service" =>
+            "La conexión se corta unos segundos y vuelve sola. ¿Continuar?",
+        "reset-network-stack-repair" =>
+            "Restablece Winsock y TCP/IP: se pierden configuraciones de red personalizadas (IP fija, proxies de sistema) y hay que reiniciar el equipo. Úsalo solo si lo demás no funcionó. ¿Continuar?",
+        "run-system-file-checker" =>
+            "SFC revisa todos los archivos de Windows y tarda de 5 a 20 minutos. Puedes seguir usando el equipo, pero no lo apagues. ¿Continuar?",
+        "repair-windows-image" =>
+            "DISM descarga de Windows Update lo necesario y tarda de 10 a 30 minutos. Necesita internet. ¿Continuar?",
+        "restart-xbox-services" =>
+            "Cierra antes los juegos de Xbox o Game Pass abiertos. ¿Continuar?",
+        "rebuild-font-cache" =>
+            "Algunas apps abiertas pueden mostrar texto raro hasta reiniciarlas. ¿Continuar?",
+        _ => "Es seguro pero interrumpe unos segundos (pantalla o red según el caso). ¿Continuar?",
+    };
+
     private TextBlock? StatusBoxFor(string id) => id switch
     {
         "restart-windows-audio-services" => AudioStatusText,
@@ -68,8 +85,10 @@ public sealed partial class SolucionarPage : Page
         "restart-bluetooth-service" => AudioStatusText,
         "restart-desktop-compositor" => VideoStatusText,
         "clear-icon-thumbnail-cache" => VideoStatusText,
-        "flush-dns-cache" => NetworkStatusText,
-        "restart-dns-client" => NetworkStatusText,
+        "rebuild-font-cache" => VideoStatusText,
+        "flush-dns-cache" or "restart-dns-client" or "renew-ip-address" or "clear-arp-cache"
+            or "restart-wlan-service" or "reset-network-stack-repair" => NetworkStatusText,
+        "restart-xbox-services" or "restart-text-input-service" => GamesFixStatusText,
         "restart-print-spooler" => PrintStatusText,
         _ => SystemStatusText,
     };
@@ -98,7 +117,11 @@ public sealed partial class SolucionarPage : Page
         ShowFixProgress($"Aplicando {optimizationId}…");
         try
         {
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(120));
+            // SFC y DISM tardan hasta 30 min: con 120 s la UI abandonaba mientras el
+            // servicio seguía reparando y el usuario veía un error falso.
+            using var cts = new CancellationTokenSource(CAO.Shared.TimeoutProfile.HeavyOptimizationIds.Contains(optimizationId)
+                ? CAO.Shared.TimeoutProfile.DispatchHeavy
+                : TimeSpan.FromSeconds(120));
             var pipe = AppHost.Resolve<PrivilegedPipeClient>();
             var response = await pipe.ApplyAsync(optimizationId, cts.Token);
             if (response is { Accepted: true })

@@ -79,6 +79,7 @@ public abstract class PowerAcSettingOptimization : IOptimization
             return OperationResult.Fail("No se pudo activar el plan tras el ajuste.", activate.StdErr);
 
         _lastPrevious = previous;
+        PersistPrevious(previous);
         return OperationResult.Ok($"Ajuste de energía aplicado (índice {TargetIndex}).");
     }
 
@@ -89,7 +90,8 @@ public abstract class PowerAcSettingOptimization : IOptimization
 
         var previous = snapshot.RawNotes
             .FirstOrDefault(n => n.StartsWith("power-index=", StringComparison.Ordinal))?["power-index=".Length..]
-            ?? _lastPrevious;
+            ?? _lastPrevious
+            ?? ReadPersistedPrevious();
         if (previous is null)
         {
             // Sin índice previo registrado (snapshot antiguo o Apply en otro
@@ -156,4 +158,42 @@ public abstract class PowerAcSettingOptimization : IOptimization
     }
 
     private string? _lastPrevious;
+
+    /// <summary>
+    /// CAO-BUG-2026-10-17: el índice previo solo vivía en memoria (_lastPrevious) y
+    /// el snapshot no puede leerlo (Capture no tiene ejecutor). Tras reiniciar el
+    /// equipo o el servicio, Restaurar fallaba siempre con no-previous-index. Se
+    /// guarda junto a los datos de CA-O (ProgramData, ACL del servicio) al aplicar.
+    /// </summary>
+    internal static string PreviousIndexDirectory { get; set; } = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "CA-O", "power-previous");
+
+    private string PreviousIndexPath => Path.Combine(PreviousIndexDirectory, Definition.Id + ".txt");
+
+    private void PersistPrevious(string previous)
+    {
+        try
+        {
+            Directory.CreateDirectory(PreviousIndexDirectory);
+            File.WriteAllText(PreviousIndexPath, previous);
+        }
+        catch
+        {
+            // Sin disco se mantiene el comportamiento anterior (memoria de esta sesión).
+        }
+    }
+
+    private string? ReadPersistedPrevious()
+    {
+        try
+        {
+            if (!File.Exists(PreviousIndexPath)) return null;
+            var text = File.ReadAllText(PreviousIndexPath).Trim();
+            return Regex.IsMatch(text, "^[0-9a-fA-F]{1,8}$") ? text : null;
+        }
+        catch
+        {
+            return null;
+        }
+    }
 }

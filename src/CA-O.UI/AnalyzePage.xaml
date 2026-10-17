@@ -16,17 +16,22 @@
         </VisualStateManager.VisualStateGroups>
         <ScrollViewer Padding="{StaticResource CaoPagePadding}" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalAlignment="Stretch">
         <StackPanel x:Name="PageContent" Style="{StaticResource CaoPageContainerStyle}">
-            <StackPanel Style="{StaticResource CaoPageHeaderStyle}">
-                <TextBlock Text="Analizar sistema" TextAlignment="Center" Style="{StaticResource CaoPageTitleStyle}"/>
-                <TextBlock Text="Escaneo completo: CPU, GPU, memoria, disco, velocidades, red, seguridad, drivers, térmica e input. Nada aquí modifica el sistema." TextAlignment="Center" Style="{StaticResource CaoSubtitleStyle}"/>
-                <Border Style="{StaticResource CaoHeaderAccentBarStyle}"/>
-            </StackPanel>
-            <Button x:Name="PageTourButton"
-                    Click="OnPageTourClick"
-                    Style="{StaticResource CaoElevatedButtonStyle}"
-                    HorizontalAlignment="Right"
-                    FontSize="12"
-                    Margin="0,4,0,8" />
+            <Grid x:Name="PageHeader" Style="{StaticResource CaoPageHeaderGridStyle}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <Border Style="{StaticResource CaoPageHeaderIconStyle}">
+                    <FontIcon Glyph="&#xE721;" Style="{StaticResource CaoPageHeaderGlyphStyle}"/>
+                </Border>
+                <StackPanel Grid.Column="1" Style="{StaticResource CaoPageHeaderStyle}">
+                    <TextBlock Text="Analizar sistema" Style="{StaticResource CaoPageTitleStyle}"/>
+                    <TextBlock Text="Escaneo completo: CPU, GPU, memoria, disco, velocidades, red, seguridad, drivers, térmica e input. Nada aquí modifica el sistema." Style="{StaticResource CaoSubtitleStyle}"/>
+                    <Border Style="{StaticResource CaoHeaderAccentBarStyle}"/>
+                </StackPanel>
+                <Button x:Name="PageTourButton" Grid.Column="2" VerticalAlignment="Center" Click="OnPageTourClick" Style="{StaticResource CaoElevatedButtonStyle}" FontSize="12"/>
+            </Grid>
 
             <Border Style="{StaticResource CaoActionCardStyle}">
                 <Grid ColumnSpacing="14">
@@ -283,31 +288,33 @@
                 <TextBlock x:Name="FindingsHeader" Text="Hallazgos del diagnóstico" Style="{StaticResource CaoSectionTitleStyle}"/>
                 <TextBlock x:Name="FindingsCountText" Text="Cada hallazgo sale de una medición real con su severidad." Style="{StaticResource CaoSectionSubtitleStyle}"/>
             </StackPanel>
-            <Border x:Name="EmptyFindingsState" Style="{StaticResource CaoCardStyle}" Visibility="Collapsed">
-                <StackPanel Spacing="6" HorizontalAlignment="Center" Padding="12">
-                    <FontIcon Glyph="&#xE930;" FontSize="24" Opacity="0.4" HorizontalAlignment="Center"/>
-                    <TextBlock Text="Sin hallazgos" Style="{StaticResource CaoEmptyStateTitleStyle}"/>
-                    <TextBlock Text="No se detectaron problemas. Ejecute un análisis completo para refrescar." Style="{StaticResource CaoSectionSubtitleStyle}" TextWrapping="Wrap" TextAlignment="Center"/>
-                </StackPanel>
-            </Border>
-            <ListView x:Name="FindingsList" SelectionMode="None" IsItemClickEnabled="False">
-                <ListView.ItemTemplate>
-                    <DataTemplate>
-                        <Border Padding="10,8" CornerRadius="{StaticResource CaoRadiusSmall}" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" Margin="0,3">
-                            <Grid ColumnSpacing="10">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-                                <Border Width="4" CornerRadius="2" Background="{Binding SeverityBrush}"/>
-                                <StackPanel Grid.Column="1" Spacing="2">
-                                    <TextBlock Text="{Binding SeverityLabel}" FontSize="11" Opacity="0.65" FontWeight="SemiBold"/>
-                                    <TextBlock Text="{Binding MessageEs}" TextWrapping="Wrap" FontSize="12"/>
-                                </StackPanel>
-                            </Grid>
-                        </Border>
-                    </DataTemplate>
-                </ListView.ItemTemplate>
-            </ListView>
+            <StackPanel x:Name="FindingsArea" Spacing="12">
+                <Border x:Name="EmptyFindingsState" Style="{StaticResource CaoCardStyle}" Visibility="Collapsed">
+                    <StackPanel Spacing="6" HorizontalAlignment="Center" Padding="12">
+                        <FontIcon Glyph="&#xE930;" FontSize="24" Opacity="0.4" HorizontalAlignment="Center"/>
+                        <TextBlock Text="Sin hallazgos" Style="{StaticResource CaoEmptyStateTitleStyle}"/>
+                        <TextBlock Text="No se detectaron problemas. Ejecute un análisis completo para refrescar." Style="{StaticResource CaoSectionSubtitleStyle}" TextWrapping="Wrap" TextAlignment="Center"/>
+                    </StackPanel>
+                </Border>
+                <ListView x:Name="FindingsList" SelectionMode="None" IsItemClickEnabled="False">
+                    <ListView.ItemTemplate>
+                        <DataTemplate>
+                            <Border Padding="10,8" CornerRadius="{StaticResource CaoRadiusSmall}" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" Margin="0,3">
+                                <Grid ColumnSpacing="10">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Border Width="4" CornerRadius="2" Background="{Binding SeverityBrush}"/>
+                                    <StackPanel Grid.Column="1" Spacing="2">
+                                        <TextBlock Text="{Binding SeverityLabel}" FontSize="11" Opacity="0.65" FontWeight="SemiBold"/>
+                                        <TextBlock Text="{Binding MessageEs}" TextWrapping="Wrap" FontSize="12"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ListView.ItemTemplate>
+                </ListView>
+            </StackPanel>
 
             <!-- Pie: resumen del último análisis -->
             <Border Style="{StaticResource CaoCardStyle}" Padding="12,10,12,10">

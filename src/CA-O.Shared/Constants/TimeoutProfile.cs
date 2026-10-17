@@ -57,6 +57,12 @@ public static class TimeoutProfile
         "cleanup-browser-code-cache",
         "cleanup-gpu-shader-cache",
         "cleanup-nvidia-downloader-cache",
+        // 2.2.20: reparaciones oficiales de minutos y limpiezas recursivas grandes.
+        "run-system-file-checker",
+        "repair-windows-image",
+        "cleanup-developer-caches",
+        "cleanup-gpu-driver-installer-leftovers",
+        "cleanup-vscode-cache",
         // Overclock tuning: bisection stability runs, up to DispatchHeavy.
         "overclock-tune",
     };

@@ -36,8 +36,12 @@ public partial class App : Application
 
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
+#if !CAO_PREVIEW
+        // CAO_PREVIEW solo existe en builds de revisión visual (capturas con la
+        // app instalada abierta); el producto siempre es instancia única.
         if (!EnsureSingleInstance())
             return;
+#endif
         try
         {
             AppHost.Initialize();

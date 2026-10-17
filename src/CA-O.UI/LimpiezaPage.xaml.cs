@@ -155,7 +155,11 @@ public sealed partial class LimpiezaPage : Page
     private TextBlock? TargetFor(string id) => id switch
     {
         "flush-dns-cache" => NetworkStatusText,
-        "windows-component-store-cleanup" or "windows-component-store-resetbase" => MaintenanceStatusText,
+        "windows-component-store-cleanup" or "windows-component-store-resetbase"
+            or "cleanup-windows-error-reports" or "cleanup-old-system-logs" => MaintenanceStatusText,
+        "cleanup-steam-web-cache" or "cleanup-epic-launcher-cache" or "cleanup-battlenet-cache"
+            or "cleanup-game-launcher-logs" or "cleanup-gpu-driver-installer-leftovers"
+            or "cleanup-obs-logs" => GamesStatusText,
         "ensure-trim-enabled" or "retrim-system-ssd" or "optimize-system-drive"
             or "restore-system-managed-pagefile"
             or "disable-hibernate" => DiskStatusText,
@@ -165,6 +169,7 @@ public sealed partial class LimpiezaPage : Page
         "cleanup-prefetch-stale" or "cleanup-cbs-logs" or "cleanup-crash-dumps-extended"
             or "cleanup-outlook-cache" or "cleanup-browser-code-cache"
             or "cleanup-gpu-shader-cache" or "cleanup-nvidia-downloader-cache"
+            or "cleanup-vscode-cache" or "cleanup-developer-caches"
             or "analyze-component-store" => DeepStatusText,
         _ => CleanupStatusText,
     };
@@ -183,6 +188,10 @@ public sealed partial class LimpiezaPage : Page
                 "Libera varios GB (hiberfil.sys) pero desactiva hibernación e inicio rápido. Reversible. ¿Continuar?"),
             "cleanup-crash-dumps-extended" => ("Volcados extendidos",
                 "Borra Minidump, LiveKernelReports, MEMORY.DMP y CrashDumps de usuario de más de 30 días. Dificulta depurar fallos antiguos y no se puede deshacer. ¿Continuar?"),
+            "cleanup-gpu-driver-installer-leftovers" => ("Restos de instaladores de GPU",
+                @"Borra los instaladores ya extraídos en C:\NVIDIA y C:\AMD (copias de instalaciones anteriores). El driver instalado no se toca. Si guardas tus propios archivos en esas carpetas, muévelos antes. ¿Continuar?"),
+            "cleanup-developer-caches" => ("Cachés de desarrollo",
+                "Vacía las cachés de npm, pip y Yarn. Tus proyectos no se tocan, pero la próxima instalación volverá a descargar los paquetes. ¿Continuar?"),
             "cleanup-print-spooler-jobs" => ("Vaciar cola de impresión",
                 "Detiene el Spooler y borra los trabajos atascados (*.SPL/*.SHD). Los documentos en cola se pierden y no se puede deshacer. ¿Continuar?"),
             _ => (null, null),

@@ -249,7 +249,7 @@ public sealed class OptimizationEngine
             record = byOpt;
         }
 
-        var optimization = Resolve(resolvedId);
+        var optimization = ResolveForRestore(resolvedId);
         PrepareServiceAwareOptimization(optimization);
 
         // Serializa contra Apply concurrentes del mismo recurso (singletons
@@ -361,7 +361,7 @@ public sealed class OptimizationEngine
         IOptimization optimization;
         try
         {
-            optimization = Resolve(candidate.OptimizationId);
+            optimization = ResolveForRestore(candidate.OptimizationId);
         }
         catch (Exception ex)
         {
@@ -1027,6 +1027,19 @@ public sealed class OptimizationEngine
         var found = OptimizationCatalog.All.FirstOrDefault(o =>
             o.Definition.Id.Equals(canonicalId, StringComparison.OrdinalIgnoreCase));
         return found ?? throw new InvalidOperationException($"Unknown optimization '{optimizationId}'");
+    }
+
+    /// <summary>
+    /// Revertir y recuperar también aceptan optimizaciones retiradas: quien la
+    /// aplicó antes de retirarla tiene que poder deshacerla desde su snapshot.
+    /// Aplicar sigue limitado al catálogo de producción (Resolve).
+    /// </summary>
+    private IOptimization ResolveForRestore(string optimizationId)
+    {
+        var canonicalId = OptimizationCatalog.CanonicalIdFor(optimizationId);
+        return OptimizationCatalog.All.FirstOrDefault(o => o.Definition.Id.Equals(canonicalId, StringComparison.OrdinalIgnoreCase))
+            ?? OptimizationCatalog.AllLegacy.FirstOrDefault(o => o.Definition.Id.Equals(canonicalId, StringComparison.OrdinalIgnoreCase))
+            ?? throw new InvalidOperationException($"Unknown optimization '{optimizationId}'");
     }
 
     private void PrepareServiceAwareOptimization(IOptimization optimization)

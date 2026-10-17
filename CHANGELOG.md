@@ -2,6 +2,27 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
+## [2.2.20] - 2026-10-17
+### Cambiado
+- **Toda la app con la misma estructura.** Cada página tenía su propio ancho (unas encogían a su contenido, otras se salían por la derecha) y su propia cabecera; el botón de tour flotaba suelto. Ahora todas comparten un ancho fijo centrado (`PageLayout.FillViewport`) y la misma cabecera: icono con el degradado de la marca, título, subtítulo y tour a la derecha. Tarjetas con esquinas de 12 px.
+- **Limpieza reorganizada.** Storage Sense ocupaba una tarjeta del alto de tres casi vacía; la limpieza profunda era una lista de toda la anchura. Nueva tarjeta "Juegos y launchers", mantenimiento agrupado y limpieza profunda en dos columnas. El modo estrecho ya no apila tarjetas una encima de otra.
+- **Solucionar rediseñado por síntomas.** Antes eran botones centrados en tarjetas anchísimas; ahora rejilla de dos columnas con el síntoma, qué hace y el botón.
+- **Tutorial con el estilo del resto y un capítulo por página** (12 en vez de 7), cada uno con "Ir a la sección" y "Ver su tour".
+- **Restaurar solo lista lo que se puede deshacer**, con el nombre legible del cambio. Las limpiezas y reparaciones (sin estado previo) ya no muestran un "Restaurar" que no hacía nada. Historial: filtro, búsqueda y actualizar en una sola barra.
+- **Red gaming:** quitada la tarjeta sobre ExitLag.
+### Añadido
+- **5 optimizaciones de input lag y red:** prioridad al programa en primer plano, RSC desactivado en la NIC, QoS para el chat de voz, Windows Update sin saturar la conexión en segundo plano y menos roaming en Wi-Fi Intel.
+- **10 limpiezas nuevas:** Steam, Epic, Battle.net, registros de launchers, restos de instaladores de NVIDIA/AMD, informes de errores de Windows, registros antiguos del sistema, OBS Studio, VS Code y cachés de npm/pip/Yarn.
+- **8 arreglos nuevos en Solucionar:** renovar IP, vaciar ARP, reiniciar Wi-Fi, servicios de Xbox/Game Pass, entrada de texto (emojis/IME), reconstruir caché de fuentes, SFC y DISM RestoreHealth. "Restablecer pila de red" visible por fin en la página.
+- **Auditoría funcional del catálogo:** cada una de las 122 optimizaciones se ejecuta en la suite contra un registro en memoria y un ejecutor que valida cada comando con la lista blanca real; las de registro se aplican, verifican y revierten de forma exacta.
+### Corregido
+- **El tour resaltaba lo que no era.** No hacía scroll hasta el control (fuera de pantalla: todo oscuro y nada resaltado), calculaba el foco a mitad de la animación de entrada (desplazado del botón), no seguía al control al hacer scroll y la tarjeta tapaba siempre la esquina inferior izquierda. Ahora trae el control a la vista, lo sigue mientras dura el paso, coloca la tarjeta al lado sin taparlo y, si el objetivo es un texto vacío, resalta su tarjeta. 8 pasos apuntaban a controles normalmente ocultos y se reasignaron; un test nuevo lo vigila. Textos del tour con tildes.
+- **Drivers sin firma, versión ni proveedor.** La consulta WMI pedía `ConfigManagerErrorCode`, que no existe en `Win32_PnPSignedDriver`; WMI respondía "Invalid query" y todos los drivers salían "Firma desconocida". Corregida y con test contra WMI real.
+- **Detección de portátil del Overclock:** la consulta de batería pedía `InstanceName`, que `Win32_Battery` no tiene.
+- **Auto HDR no se podía verificar en Windows 11 24H2+.** Ahora usa `AutoHDREnable` dentro de `DirectXUserGlobalSettings` en build 26100+.
+- **Restaurar un ajuste de energía AC fallaba tras reiniciar** (`no-previous-index`): el índice previo solo vivía en memoria. Ahora se guarda en `ProgramData\CA-O\power-previous`.
+- **SFC/DISM desde Solucionar** usaban un tiempo de espera de 120 s; ahora el largo (Heavy).
+- **`disable-network-throttling` retirada:** era el ajuste NetworkThrottlingIndex vetado por la spec 75/100 con otro nombre y no tiene efecto real en juegos. Revertir y Recuperar aceptan ids retirados para que quien la aplicó pueda deshacerla.
 ## [2.2.19] - 2026-10-14
 ### Añadido
 - **Página Red gaming.** Ping, jitter y pérdida reales a 21 regiones de AWS (donde alojan Fortnite, PUBG y muchos más), medidos por conexión TCP para que funcione aunque el destino bloquee ping; monitor en vivo una vez por segundo con gráfica, mediana, p95 y picos (acepta la IP:puerto del servidor del juego); traceroute con diagnóstico que dice si el lag nace en tu Wi-Fi/router, en tu proveedor o en la distancia, sin culpar a routers que solo limitan ICMP; y botón para aplicar los ajustes de red seleccionados. Sin promesas: la página explica que las rutas por servidores propios tipo ExitLag necesitan una red de servidores que CA-O no tiene.

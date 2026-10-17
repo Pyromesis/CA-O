@@ -11,9 +11,12 @@ namespace CAO.Core.Tests;
 /// salvo allowlist explícita con justificación. Impide futuros WU-dups en CI.</summary>
 public sealed class NoDuplicateTargetsTests
 {
-    /// <summary>Pares declarados que comparten objetivo a propósito (vacío hoy).</summary>
+    /// <summary>Pares declarados que comparten objetivo a propósito.</summary>
     private static readonly HashSet<string> AllowlistedSharedTargets = new(StringComparer.OrdinalIgnoreCase)
     {
+        // "Do not use NLA" es común a todas las políticas QoS de CA-O: QosPolicyOptimization
+        // no lo restaura al revertir una mientras otra siga activa.
+        "prioritize-game-traffic-qos|prioritize-voice-chat-qos",
     };
 
     [Fact]

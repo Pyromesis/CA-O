@@ -50,14 +50,14 @@ public sealed class OptimizationCatalogContractTests
     public void IdsAreUnique()
     {
         var ids = OptimizationCatalog.All.Select(o => o.Definition.Id).ToList();
-        Assert.Equal(100, ids.Count); // 92 −3 eliminadas −1 fusión gaming-power −1 fusión minidump −2 fusión Sense (3→1) +8 nuevas +1 Sense unificada = 93; 2.2.19: +4 input lag +3 red para juegos = 100
+        Assert.Equal(122, ids.Count); // 92 −3 eliminadas −1 fusión gaming-power −1 fusión minidump −2 fusión Sense (3→1) +8 nuevas +1 Sense unificada = 93; 2.2.19: +4 input lag +3 red para juegos = 100; 2.2.20: +5 input lag/red +10 limpieza +8 solucionar -1 retirada (network-throttling) = 122
         Assert.Equal(ids.Count, ids.Distinct(StringComparer.Ordinal).Count());
     }
 
     [Fact]
-    public void LegacyCatalogKeeps67ForTraceability()
+    public void LegacyCatalogKeeps68ForTraceability()
     {
-        Assert.Equal(67, OptimizationCatalog.AllLegacy.Count);
+        Assert.Equal(68, OptimizationCatalog.AllLegacy.Count); // +disable-network-throttling (2.2.20)
         foreach (var legacyId in OptimizationCatalog.LegacyIds)
         {
             Assert.Contains(OptimizationCatalog.AllLegacy, o => o.Definition.Id.Equals(legacyId, StringComparison.OrdinalIgnoreCase));
