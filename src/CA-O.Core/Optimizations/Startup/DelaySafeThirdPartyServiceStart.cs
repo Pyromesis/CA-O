@@ -1,5 +1,6 @@
 using System.ServiceProcess;
 using CAO.Core.Abstractions;
+using CAO.Core.Security;
 using CAO.Shared;
 
 namespace CAO.Core.Optimizations.Startup;
@@ -8,10 +9,27 @@ namespace CAO.Core.Optimizations.Startup;
 /// Moves safe third-party automatic services to delayed start: only services
 /// whose binary lives outside SystemRoot, with no dependents and no
 /// security/backup/VPN role. Exact prior state captured per service.
+/// El servicio privilegiado de CA-O queda siempre excluido: retrasarlo
+/// dejaría la app sin su canal SYSTEM al arrancar.
 /// </summary>
 public sealed class DelaySafeThirdPartyServiceStart : IOptimization
 {
     private const string ServicesKey = @"SYSTEM\CurrentControlSet\Services";
+
+    internal sealed record ServiceProbe(
+        string ServiceName,
+        string DisplayName,
+        ServiceStartMode StartType,
+        int DependentServices);
+
+    private readonly Func<IReadOnlyList<ServiceProbe>> _enumerateServices;
+
+    public DelaySafeThirdPartyServiceStart() : this(EnumerateLiveServices) { }
+
+    internal DelaySafeThirdPartyServiceStart(Func<IReadOnlyList<ServiceProbe>> enumerateServices)
+    {
+        _enumerateServices = enumerateServices;
+    }
 
     private static readonly string[] ExactExcludes =
     [
@@ -46,37 +64,64 @@ public sealed class DelaySafeThirdPartyServiceStart : IOptimization
         Impact = ImpactLevel.Low,
     };
 
-    private IReadOnlyList<string> Candidates(IRegistryAccessor registry)
+    private static IReadOnlyList<ServiceProbe> EnumerateLiveServices()
     {
-        var found = new List<string>();
+        var found = new List<ServiceProbe>();
         ServiceController[] services;
         try { services = ServiceController.GetServices(); }
-        catch { return found; }
-
-        string systemRoot;
-        try { systemRoot = Environment.GetFolderPath(Environment.SpecialFolder.System); }
         catch { return found; }
 
         foreach (var service in services)
         {
             try
             {
+                found.Add(new ServiceProbe(
+                    service.ServiceName,
+                    service.DisplayName ?? string.Empty,
+                    service.StartType,
+                    service.ServicesDependedOn.Length));
+            }
+            catch { /* un servicio problemático no bloquea al resto */ }
+            finally { service.Dispose(); }
+        }
+        return found;
+    }
+
+    private IReadOnlyList<string> Candidates(IRegistryAccessor registry)
+    {
+        var found = new List<string>();
+
+        string systemRoot;
+        try { systemRoot = Environment.GetFolderPath(Environment.SpecialFolder.System); }
+        catch { return found; }
+
+        foreach (var service in _enumerateServices())
+        {
+            try
+            {
                 if (service.StartType != ServiceStartMode.Automatic) continue;
+                // El servicio propio se comprueba antes de leer nada más:
+                // aunque su imagen o sus dependencias cambien, nunca es
+                // candidato a retrasarse.
+                if (CaoSelfProtection.IsOwnService(
+                        service.ServiceName, imagePath: null, displayName: service.DisplayName)) continue;
                 if (ExactExcludes.Any(x => x.Equals(service.ServiceName, StringComparison.OrdinalIgnoreCase))) continue;
                 var display = service.DisplayName ?? string.Empty;
                 if (ProtectedKeywords.Any(k =>
                         service.ServiceName.Contains(k, StringComparison.OrdinalIgnoreCase) ||
                         display.Contains(k, StringComparison.OrdinalIgnoreCase))) continue;
-                if (service.ServicesDependedOn.Length > 0) continue;
+                if (service.DependentServices > 0) continue;
                 var imagePath = registry.GetValue(
                     RegistryHive2.LocalMachine, $@"{ServicesKey}\{service.ServiceName}", "ImagePath") as string;
                 if (string.IsNullOrWhiteSpace(imagePath)) continue;
+                // También por procedencia: cualquier servicio cuyo binario
+                // viva en la instalación de CA-O es nuestro.
+                if (CaoSelfProtection.IsOwnService(service.ServiceName, imagePath, display)) continue;
                 var expanded = Environment.ExpandEnvironmentVariables(imagePath).Trim('"').ToLowerInvariant();
                 if (expanded.StartsWith(systemRoot.ToLowerInvariant(), StringComparison.Ordinal)) continue;
                 found.Add(service.ServiceName);
             }
             catch { /* un servicio problemático no bloquea al resto */ }
-            finally { service.Dispose(); }
         }
         return found;
     }

@@ -1,6 +1,7 @@
 using System.ServiceProcess;
 using Microsoft.Win32;
 using CAO.Core.Abstractions;
+using CAO.Shared.Constants;
 
 namespace CAO.Infrastructure.Windows.Services;
 
@@ -63,6 +64,12 @@ public sealed class ServiceManager : IServiceManager
         ValidateServiceName(serviceName);
         if (startType is "Boot" or "System")
             throw new ArgumentException("Start type 'Boot/System' no permitido via CA-O (solo Automatic/Manual/Disabled).", nameof(startType));
+        // El servicio privilegiado es el canal SYSTEM de la app: ninguna
+        // optimización puede degradarlo a Manual/Disabled. Se permite
+        // "Automatic"/"Automatic (Delayed)" para reparaciones.
+        if (serviceName.Equals(BuildConstants.ServiceName, StringComparison.OrdinalIgnoreCase) &&
+            !startType.StartsWith("Automatic", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("CA-O no permite desactivar su propio servicio privilegiado.");
         using var key = Registry.LocalMachine.OpenSubKey($@"{ServicesKeyPath}\{serviceName}", writable: true)
             ?? throw new InvalidOperationException($"Service '{serviceName}' not found in registry.");
 
@@ -92,6 +99,10 @@ public sealed class ServiceManager : IServiceManager
 
     public async Task StopAsync(string serviceName, CancellationToken ct = default)
     {
+        // Detener el propio servicio desde una optimización mataría el canal
+        // SYSTEM en mitad de la operación (y podría impedir su rollback).
+        if (serviceName.Equals(BuildConstants.ServiceName, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("CA-O no permite detener su propio servicio privilegiado.");
         using var sc = new ServiceController(serviceName);
         if (sc.Status == ServiceControllerStatus.Running)
         {

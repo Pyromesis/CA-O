@@ -1,4 +1,4 @@
-# CA-O 2.2.20 — Plataforma nativa de rendimiento, diagnóstico y optimización para Windows 11
+# CA-O 2.2.21 — Plataforma nativa de rendimiento, diagnóstico y optimización para Windows 11
 
 > **Principio operativo:** diagnosticar primero → recomendar con evidencia → aplicar en transacción → verificar → revertir si falla. Sin promesas numéricas falsas, solo hechos medibles.
 
@@ -6,8 +6,8 @@
 [![.NET 10](https://img.shields.io/badge/.NET%2010-512BD4?style=flat-square&logo=dotnet&logoColor=white)](global.json)
 [![WinUI 3](https://img.shields.io/badge/WinUI%203-00B7C3?style=flat-square&logo=windows&logoColor=white)](https://microsoft.github.io/microsoft-ui-xaml/)
 [![Build](https://img.shields.io/badge/build-passing-brightgreen?style=flat-square)](https://github.com/Pyromesis/CA-O/actions)
-[![Tests](https://img.shields.io/badge/tests-2559%20passed-brightgreen?style=flat-square)](#-pruebas)
-[![Release](https://img.shields.io/badge/release-v2.2.20-blue?style=flat-square)](https://github.com/Pyromesis/CA-O/releases/tag/v2.2.20)
+[![Tests](https://img.shields.io/badge/tests-2582%20passed-brightgreen?style=flat-square)](#-pruebas)
+[![Release](https://img.shields.io/badge/release-v2.2.21-blue?style=flat-square)](https://github.com/Pyromesis/CA-O/releases/tag/v2.2.21)
 [![License](https://img.shields.io/badge/license-privado-lightgrey?style=flat-square)](#licencia)
 
 Descarga desde el Release de esta versión. Actualiza con el instalador de siempre: app, servicio y atajos quedan regenerados.
@@ -45,14 +45,14 @@ Descarga desde el Release de esta versión. Actualiza con el instalador de siemp
 
 ## Resumen ejecutivo
 
-**CA-O 2.2.20** es una aplicación **100% nativa Windows** escrita en **.NET 10 + WinUI 3 (Windows App SDK 2.4)**. No es una colección de tweaks: **mide** hardware, térmicas, red, almacenamiento, drivers y postura de seguridad **antes** de recomendar. Cada cambio pertenece a un **bucket analizado-primero** (`Recommended` / `Optional` / `Experimental` / `SecuritySensitive` / `NotApplicable` / `Blocked`) y se ejecuta bajo el flujo transaccional `PRECHECK → SNAPSHOT → APPLY → VERIFY → COMMIT` con **rollback automático y verificación post-reversión**.
+**CA-O 2.2.21** es una aplicación **100% nativa Windows** escrita en **.NET 10 + WinUI 3 (Windows App SDK 2.4)**. No es una colección de tweaks: **mide** hardware, térmicas, red, almacenamiento, drivers y postura de seguridad **antes** de recomendar. Cada cambio pertenece a un **bucket analizado-primero** (`Recommended` / `Optional` / `Experimental` / `SecuritySensitive` / `NotApplicable` / `Blocked`) y se ejecuta bajo el flujo transaccional `PRECHECK → SNAPSHOT → APPLY → VERIFY → COMMIT` con **rollback automático y verificación post-reversión**.
 
 La UI **siempre eleva** (`app.manifest` `requireAdministrator` → UAC en cada inicio) pero **toda mutación privilegiada cruza** al servicio Windows `CAO.Privileged` (SYSTEM) vía **Named Pipe autenticado** con ACL restrictiva, validación de esquema tipado, ventana de 30 s, nonce y protección anti-replay. Sin el servicio, la app opera en **modo solo lectura** (diagnóstico + benchmark disponibles). El servicio es `start= delayed-auto` por diseño: tras un reinicio arranca solo con retardo; si la app lo encuentra aún detenido, lo levanta (`sc start` + espera de readiness con ping al pipe hasta 8 s) al comprobar, o lo re-registra con `Ajustes → Instalar ahora` sin necesitar el repositorio.
 
 **En números:**
 - **122 optimizaciones** con efecto real verificado (transaccionales) + `AllLegacy` para trazabilidad
 - **13 páginas** WinUI 3 con Mica, `NavigationView`, animaciones de entrada, i18n `es-ES`/`en-US` instantáneo — ahora con la misma estructura y cabecera en todas
-- **2559 tests** en 6 suites (todos en verde)
+- **2582 tests** en 6 suites (todos en verde)
 - **0 telemetría externa**, 0 dependencias web, 0 comandos arbitrarios
 
 ---
@@ -82,8 +82,8 @@ La UI **siempre eleva** (`app.manifest` `requireAdministrator` → UAC en cada i
 | **WMI** | System.Management | **10.0.0** | Lectura hardware/termal/batería |
 | **Perf** | System.Diagnostics.PerformanceCounter | **10.0.0** | `% DPC Time` / `% Interrupt Time` |
 | **Servicios** | System.ServiceProcess.ServiceController | **8.0.1** | `CAO.Privileged` como `BackgroundService` |
-| **Build** | `Directory.Packages.props` + `Directory.Build.props` + `Version.props` (single source `2.2.20`) | Centralizado | Un lugar para bump de versión/paquetes |
-| **Tests** | xUnit 2.9.2 + Microsoft.NET.Test.Sdk 17.11.1 | — | 2559 tests en Release |
+| **Build** | `Directory.Packages.props` + `Directory.Build.props` + `Version.props` (single source `2.2.21`) | Centralizado | Un lugar para bump de versión/paquetes |
+| **Tests** | xUnit 2.9.2 + Microsoft.NET.Test.Sdk 17.11.1 | — | 2582 tests en Release |
 | **Seguridad** | CodeQL + `dotnet audit` + Dependabot + CycloneDX SBOM | CI | Cadena de suministro auditada |
 
 > **Self-contained:** los artefactos de release no requieren runtime instalado. El instalador es `self-contained` sin `single-file` (requisito WinUI 3).
@@ -119,7 +119,7 @@ La UI **siempre eleva** (`app.manifest` `requireAdministrator` → UAC en cada i
 
 | Proyecto | Responsabilidad | Depende de |
 |---|---|---|
-| `CA-O.Shared` | DTOs, contratos IPC v2 (`IpcProtocol` v2, `Ping`, `GetServiceStatus`), `CaOPaths`, `ErrorCodes CAO-XXX-nnn`, `AppVersion 2.2.20`, `BuildConstants`, `Constants/IpcConstants`, `TimeoutProfile` | — |
+| `CA-O.Shared` | DTOs, contratos IPC v2 (`IpcProtocol` v2, `Ping`, `GetServiceStatus`), `CaOPaths`, `ErrorCodes CAO-XXX-nnn`, `AppVersion 2.2.21`, `BuildConstants`, `Constants/IpcConstants`, `TimeoutProfile` | — |
 | `CA-O.Core` | `OptimizationCatalog` (122), `OptimizationEngine` transaccional, `RecommendationEngine` + `OptimizationScoreCalculator` (0-100), `GameCompatibilityPolicy` (matriz SAFE/CAUTION/BLOCKED `CAO-GAME-001`), `HealthEngine`, `KnownIssueMatcher`, `CrashRecoveryService`, `Rollback/*` | Shared |
 | `CA-O.Infrastructure` | WMI 5 s timeout + `SystemAnalysisService` + `AnalysisStateStore` (atómico, 24 h TTL) + `SnapshotRepository`/`FileSnapshotStore` (TX identity + SHA-256) + `JsonHistoryLogger` (hash-chain) + `SystemBenchmarkRunner` + `Gaming/*` + `Networking/*` + `Storage/*` + `Security/*` + `Windows/*` | Core, Shared |
 | `CA-O.Privileged` | Servicio `SYSTEM` + `PrivilegedPipeService` (Named Pipe `CA-O.Privileged.v1`, ACL + `ReplayCache` 30 s, timeout 15 s/conn) + `OptimizationEngine` hosteado + `AdministratorsOnlyAuthorizer` | Core, Infrastructure, Shared |
@@ -158,7 +158,7 @@ BENCHMARK → post-commit, fallo no invalida commit   // eventos separados
 CA-O.sln  (.NET 10 · LangVersion 13 · WinUI 3)
 ├── src/
 │   ├── CA-O.Shared/                 # Contratos puros, sin IO
-│   │   ├── Constants/               # AppVersion (2.2.20), BuildConstants, CaOPaths, IpcConstants, TimeoutProfile
+│   │   ├── Constants/               # AppVersion (2.2.21), BuildConstants, CaOPaths, IpcConstants, TimeoutProfile
 │   │   ├── IPC/                     # IpcProtocol v2, IpcRequest/Response, Payloads (17 ops)
 │   │   ├── Security/                # CommandPolicy, ErrorCodes, CallerIdentity
 │   │   ├── Enums/                   # RecommendationBucket, RiskLevel, EvidenceLevel, etc.
@@ -208,11 +208,11 @@ CA-O.sln  (.NET 10 · LangVersion 13 · WinUI 3)
 │   ├── CA-O.InstallerGui/           # 680×620 GUI installer (WinUI 3, requireAdministrator)
 │   ├── CA-O.Setup/                  # Consola fallback (sc.exe create/start)
 │   └── CA-O.Uninstaller/            # ARP uninstaller (sc stop/delete + rmdir)
-├── tests/                           # 2559 tests, Release
-│   ├── CA-O.Core.Tests/             # 1507: catálogo (122), AnalysisStateStore, GameCompatibility, transacciones
+├── tests/                           # 2582 tests, Release
+│   ├── CA-O.Core.Tests/             # 1527: catálogo (122), AnalysisStateStore, GameCompatibility, transacciones
 │   ├── CA-O.Integration.Tests/      # 60: E2E 9 pruebas (8 casos + benchmark) + TransactionJournalRecovery + ArchitectureDependency
 │   ├── CA-O.Security.Tests/         # 274: IpcValidator (+timer/nonce), ReplayCache, CommandPolicy (incl. `@` ACPI)
-│   ├── CA-O.Infrastructure.Tests/   # 217: HistoryRobustness, SnapshotRepository, PhantomBatchValidation, WMI drivers
+│   ├── CA-O.Infrastructure.Tests/   # 220: HistoryRobustness, SnapshotRepository, PhantomBatchValidation, WMI drivers
 │   ├── CA-O.Benchmark.Tests/        # 17: suelo 3%, mediana
 │   ├── CA-O.UI.Tests/               # 484: ViewModels, Localizer, AppUpdater (Zip-Slip), DriverConflicts, tours
 │   └── CA-O.Benchmark.Tests/
@@ -221,7 +221,7 @@ CA-O.sln  (.NET 10 · LangVersion 13 · WinUI 3)
 ├── .github/workflows/ci.yml         # build + test + CodeQL + dotnet audit
 ├── Directory.Packages.props         # Versiones centralizadas
 ├── Directory.Build.props            # Propiedades MSBuild comunes
-├── Version.props                    # Single source 2.2.20
+├── Version.props                    # Single source 2.2.21
 ├── global.json                      # SDK 10.0.400
 └── CA-O.sln
 ```
@@ -798,7 +798,7 @@ powershell -ExecutionPolicy Bypass -File scripts/build-release.ps1
 
 # Empaquetar (scripts/package.ps1, FullPackageName `CA-O-{versión}-win-x64.zip`)
 powershell -ExecutionPolicy Bypass -File scripts/package.ps1
-# → artifacts/CA-O-2.2.20-win-x64.zip + .sha256
+# → artifacts/CA-O-2.2.21-win-x64.zip + .sha256
 
 # Endurecer ACLs de datos
 powershell -ExecutionPolicy Bypass -File scripts/harden-data-acls.ps1
@@ -812,17 +812,17 @@ powershell -ExecutionPolicy Bypass -File scripts/harden-data-acls.ps1
 
 ## Pruebas
 
-**2559 pruebas en 6 suites, todas en Release:**
+**2582 pruebas en 6 suites, todas en Release:**
 
 | Suite | Cubre | Cant. |
 |---|---|---|
-| `CA-O.Core.Tests` | Contratos catálogo (122), `AnalysisStateStore` (save/load/corrupt/schema), `GameCompatibility` (VBS bloqueado), `OptimizationTransaction` (snapshot/apply/verify/rollback), `RecommendationEngine`, `KnownIssueMatcher`, `HealthEngine`, 122 definiciones `IOptimization` + `FixDriver`/`InstallDriver` motor, one-shots (`OneShotLedger`, regla `one-shot`), overclock F0-F7 (tuning/estabilidad/recovery/delta/juego/AMD/perfiles/filas/mood/auto/restore-point), puerta anti-cheat por mecanismo, temporales a 10 min, input-lag + red gaming (12 optimizaciones, Batch 86), auditoría funcional del catálogo (aplicar/verificar/revertir con registro en memoria y allowlist real) y aislamiento de datos de test | **1507** |
+| `CA-O.Core.Tests` | Contratos catálogo (122), `AnalysisStateStore` (save/load/corrupt/schema), `GameCompatibility` (VBS bloqueado), `OptimizationTransaction` (snapshot/apply/verify/rollback), `RecommendationEngine`, `KnownIssueMatcher`, `HealthEngine`, 122 definiciones `IOptimization` + `FixDriver`/`InstallDriver` motor, one-shots (`OneShotLedger`, regla `one-shot`), overclock F0-F7 (tuning/estabilidad/recovery/delta/juego/AMD/perfiles/filas/mood/auto/restore-point), puerta anti-cheat por mecanismo, temporales a 10 min, input-lag + red gaming (12 optimizaciones, Batch 86), auditoría funcional del catálogo (aplicar/verificar/revertir con registro en memoria y allowlist real) y aislamiento de datos de test | **1527** |
 | `CA-O.Security.Tests` | `IpcRequestValidator` (version/nonce mín. 16/freshness/size/schema, timer, SetDns 1–2 IPs, FixDriver/InstallDriver), `ReplayCache` (TTL, single-use atómico), `CommandPolicy` (allowlist, PATH-hijacking, injection, pnputil, `@` ACPI), `WindowsCallerInspector` (SID/SessionId/elevación), `PrivilegedIpcSecurityTests` (oversized/malformed/flood) | **274** |
 | `CA-O.Integration.Tests` | `E2EFlowsTests` 9 pruebas (8 casos numerados + benchmark), `TransactionJournalRecovery` (Incomplete→RollbackRequired), `ArchitectureDependencyTests`, `DocumentationCodeConsistencyTests` (docs↔código), `PrivilegedServicePackagingTests` (contrato self-contained del servicio) | **60** |
-| `CA-O.Infrastructure.Tests` | `HistoryRobustness` (líneas malformadas), `SnapshotRepository` (TX identity), `SystemContextCache` dual-TTL, `DnsBenchmark`, `PhantomBatchValidation` (IDs reales + barrido vivo), `DriverWmiQueryTests` (WMI real de drivers), backends overclock (NVML/ADLX/policy) + recovery + ceilings + juego) | **217** |
+| `CA-O.Infrastructure.Tests` | `HistoryRobustness` (líneas malformadas), `SnapshotRepository` (TX identity), `SystemContextCache` dual-TTL, `DnsBenchmark`, `PhantomBatchValidation` (IDs reales + barrido vivo), `DriverWmiQueryTests` (WMI real de drivers), backends overclock (NVML/ADLX/policy) + recovery + ceilings + juego) | **220** |
 | `CA-O.Benchmark.Tests` | `SystemBenchmarkRunner` (suelo 3 %, mediana, trials) | **17** |
 | `CA-O.UI.Tests` | `ViewModelTests` (Analyze/Dashboard con `SystemAnalysisService` + `CorrelationId`), `LocalizerTests`, `AppUpdater` (extracción con progreso + Zip-Slip), `DriverConflicts`, `VendorDriverSupport`, `UnblockTree`, `MascotFlipbookTests`, `MascotMoodTests`, Overclock (tuning/delta/recovery/juego/perfiles/filas/mood/auto/restore-point/puerta anti-cheat) + tours por pagina (90 pasos, colocacion de tarjeta sin tapar el objetivo, destinos visibles) + TestLogIsolation | **484** |
-| **Total** | **Gates 1-5 `verify.ps1` + `build-release` con `gui-installer`** | **2559** |
+| **Total** | **Gates 1-5 `verify.ps1` + `build-release` con `gui-installer`** | **2582** |
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts/test.ps1
@@ -838,7 +838,7 @@ dotnet test --filter "FullyQualifiedName~GameCompatibility"
 
 ## Release y verificación
 
-- **Versión actual:** **2.2.20** — [Releases](https://github.com/Pyromesis/CA-O/releases/latest) (solo se conserva el último release)
+- **Versión actual:** **2.2.21** — [Releases](https://github.com/Pyromesis/CA-O/releases/latest) (solo se conserva el último release)
 - **Artefactos:**
   - `CA-O.Setup.exe` (135 MB, descargador single-file con handoff al GUI)
   - `CA-O-Setup-GUI-x64.zip` (88 MB, paquete completo offline con `ui/`, `service/`, `gui-installer/`, `setup/`, `uninstall/`)
@@ -849,7 +849,7 @@ dotnet test --filter "FullyQualifiedName~GameCompatibility"
 - **Empaquetado:** `scripts/package.ps1` genera ZIP versionado `CA-O-{versión}-win-x64.zip` + hash SHA-256. `scripts/build-release.ps1` publica `ui` y `service` como self-contained y `gui-installer` como self-contained **sin single-file** (requisito WinUI 3)
 
 ```powershell
-Get-FileHash artifacts/CA-O-2.2.20-win-x64.zip -Algorithm SHA256
+Get-FileHash artifacts/CA-O-2.2.21-win-x64.zip -Algorithm SHA256
 Get-Content artifacts/release/SHA256SUMS.txt
 cat artifacts/sbom/bom.json | ConvertFrom-Json | select -ExpandProperty components | measure
 ```
@@ -911,7 +911,7 @@ Consulta [CONTRIBUTING.md](CONTRIBUTING.md).
 2. Tests que **fallen sin el parche** (TDD)
 3. Toda optimización nueva implementa `IOptimization` con `Definition` completa + reversibilidad exacta + `PreviewAsync`
 4. Si usa comando externo → patrón exacto en `CommandPolicy` + test en `CommandPolicyTests` (anti-inyección)
-5. `scripts/verify.ps1` en verde (5 gates + 2559 tests)
+5. `scripts/verify.ps1` en verde (5 gates + 2582 tests)
 6. PR con evidencia, impacto seguridad/compatibilidad, captura `OptimizePage` Before/After
 
 ---
@@ -928,4 +928,4 @@ Proyecto privado: no se concede licencia de uso, copia, modificación ni distrib
 
 ---
 
-<p align="center"><i>CA-O 2.2.20 — Diagnóstico primero, evidencia después, transacción siempre. Sin promesas, solo hechos medibles.</i></p>
+<p align="center"><i>CA-O 2.2.21 — Diagnóstico primero, evidencia después, transacción siempre. Sin promesas, solo hechos medibles.</i></p>

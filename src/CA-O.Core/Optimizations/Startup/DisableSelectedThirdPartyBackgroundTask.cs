@@ -1,5 +1,6 @@
 using System.Text;
 using CAO.Core.Abstractions;
+using CAO.Core.Security;
 using CAO.Shared;
 using CAO.Shared.Security;
 
@@ -55,7 +56,7 @@ public sealed class DisableSelectedThirdPartyBackgroundTask : IOptimization
         return snapshot;
     }
 
-    private static IReadOnlyList<string> EnabledThirdPartyTasks(string csv)
+    private static IReadOnlyList<(string Name, string TaskToRun)> EnabledThirdPartyTasks(string csv)
     {
         var rows = ParseCsv(csv);
         if (rows.Count < 2) return [];
@@ -63,9 +64,10 @@ public sealed class DisableSelectedThirdPartyBackgroundTask : IOptimization
         var nameIdx = IndexOf(header, "TaskName");
         var stateIdx = IndexOf(header, "Scheduled Task State");
         var statusIdx = IndexOf(header, "Status");
+        var runIdx = IndexOf(header, "Task To Run");
         if (nameIdx < 0) return [];
 
-        var found = new List<string>();
+        var found = new List<(string Name, string TaskToRun)>();
         foreach (var row in rows.Skip(1))
         {
             if (nameIdx >= row.Count) continue;
@@ -73,12 +75,16 @@ public sealed class DisableSelectedThirdPartyBackgroundTask : IOptimization
             if (string.IsNullOrWhiteSpace(name)) continue;
             if (name.StartsWith(@"\Microsoft", StringComparison.OrdinalIgnoreCase)) continue;
             if (ExcludedKeywords.Any(k => name.Contains(k, StringComparison.OrdinalIgnoreCase))) continue;
+            var taskToRun = runIdx >= 0 && runIdx < row.Count ? row[runIdx].Trim() : string.Empty;
+            // Nunca desactivar tareas propias de CA-O (o que ejecuten sus
+            // binarios): podrían ser el arranque del servicio o de la UI.
+            if (CaoSelfProtection.IsOwnScheduledTask(name, taskToRun)) continue;
             var enabled = stateIdx >= 0 && stateIdx < row.Count
                 ? row[stateIdx].Trim().Equals("Enabled", StringComparison.OrdinalIgnoreCase)
                 : statusIdx >= 0 && statusIdx < row.Count &&
                   (row[statusIdx].Trim().Equals("Ready", StringComparison.OrdinalIgnoreCase) ||
                    row[statusIdx].Trim().Equals("Running", StringComparison.OrdinalIgnoreCase));
-            if (enabled) found.Add(name);
+            if (enabled) found.Add((name, taskToRun));
         }
         return found;
     }
@@ -130,8 +136,8 @@ public sealed class DisableSelectedThirdPartyBackgroundTask : IOptimization
         foreach (var task in targets)
         {
             var result = await context.Executor.ExecuteAsync(
-                SystemCommandKey.SchTasksDisable, ["/Change", "/TN", task, "/DISABLE"], ct);
-            if (result.Success) disabled.Add(task);
+                SystemCommandKey.SchTasksDisable, ["/Change", "/TN", task.Name, "/DISABLE"], ct);
+            if (result.Success) disabled.Add(task.Name);
         }
 
         foreach (var task in disabled)

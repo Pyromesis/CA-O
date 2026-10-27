@@ -2,6 +2,13 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
+## [2.2.21] - 2026-10-27
+### Corregido
+- **Aplicar una optimización ya no puede retirar el servicio privilegiado de CA-O.** `delay-safe-third-party-service-start` enumeraba todos los servicios automáticos y podía marcar `CAO.Privileged` como inicio retrasado. Ahora el servicio propio se excluye siempre, por nombre canónico, por nombre visible y por procedencia del binario (cualquier ejecutable bajo `Program Files\CA-O`, `ProgramData\CA-O` o el directorio de la app), aunque esté renombrado o instalado en una ruta de desarrollo. `Capture`, `Apply`, `Detect` y `Preview` comparten el mismo filtro, así que tampoco se captura ni se revierte nada del servicio propio.
+- **Las optimizaciones de inicio y de tareas programadas también protegen los recursos de CA-O.** `disable-unnecessary-startup-apps` y `disable-heavy-startup-apps` no borran entradas Run de CA-O (por nombre, por ejecutable o por fabricante), y `disable-selected-third-party-background-task` no desactiva tareas propias ni tareas que ejecuten binarios de CA-O.
+- **Defensa en profundidad en `ServiceManager`:** las optimizaciones ya no pueden degradar `CAO.Privileged` a Manual/Disabled ni detenerlo; solo se permite mantenerlo automático (normal o retrasado) para reparaciones.
+- **"Instalar ahora" ya no borra un servicio sano por tardar en arrancar.** El wrapper de reparación espera hasta 12 s a que `delayed-auto` llegue a RUNNING, repara la configuración en sitio con `sc config` y solo recurre a `stop/delete/create` si la clave está corrupta; la recreación se reintenta y se espera a que termine el borrado marcado por `sc delete`.
+
 ## [2.2.20] - 2026-10-17
 ### Cambiado
 - **Toda la app con la misma estructura.** Cada página tenía su propio ancho (unas encogían a su contenido, otras se salían por la derecha) y su propia cabecera; el botón de tour flotaba suelto. Ahora todas comparten un ancho fijo centrado (`PageLayout.FillViewport`) y la misma cabecera: icono con el degradado de la marca, título, subtítulo y tour a la derecha. Tarjetas con esquinas de 12 px.

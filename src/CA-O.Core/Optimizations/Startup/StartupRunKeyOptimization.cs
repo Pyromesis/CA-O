@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using CAO.Core.Abstractions;
+using CAO.Core.Security;
 using CAO.Shared;
 
 namespace CAO.Core.Optimizations.Startup;
@@ -32,6 +33,9 @@ public abstract class StartupRunKeyOptimization : IOptimization
 
     protected static bool IsProtected(string name, string command, string? company)
     {
+        // Los recursos de CA-O son intocables: el servicio privilegiado y la
+        // propia UI no pueden desaparecer por una optimización de inicio.
+        if (CaoSelfProtection.IsOwnStartupEntry(name, command, company)) return true;
         var lowerName = name.ToLowerInvariant();
         if (ProtectedNameKeywords.Any(k => lowerName.Contains(k))) return true;
         if (!string.IsNullOrWhiteSpace(company) &&

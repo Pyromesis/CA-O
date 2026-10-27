@@ -1,4 +1,5 @@
 using CAO.Infrastructure.Windows.Services;
+using CAO.Shared.Constants;
 using Xunit;
 
 namespace CAO.Infrastructure.Tests;
@@ -32,5 +33,21 @@ public sealed class ServiceManagerValidationTests
     public void BootAndSystemStartTypesAreRejected(string startType)
     {
         Assert.Throws<System.ArgumentException>(() => _sut.SetStartType("WSearch", startType));
+    }
+
+    [Theory]
+    [InlineData("Manual")]
+    [InlineData("Disabled")]
+    public void OwnServiceCannotBeDegraded(string startType)
+    {
+        Assert.Throws<System.InvalidOperationException>(
+            () => _sut.SetStartType(BuildConstants.ServiceName, startType));
+    }
+
+    [Fact]
+    public async Task OwnServiceCannotBeStopped()
+    {
+        await Assert.ThrowsAsync<System.InvalidOperationException>(
+            () => _sut.StopAsync(BuildConstants.ServiceName));
     }
 }

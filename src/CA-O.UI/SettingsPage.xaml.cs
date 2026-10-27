@@ -922,11 +922,12 @@ exit 0
     }
 
     /// <summary>
-    /// Wrapper que recrea CAO.Privileged con sc.exe (stop/delete/create/failure/start)
-    /// sin necesitar install-privileged-service.ps1. Sobrevive a reinicios porque el
-    /// binario vive en Program Files y el servicio se re-registra si fue borrado.
-    /// El servicio es start=demand por diseño: aquí además se arranca (sc start) para
-    /// que tras un reinicio (servicio detenido) "Instalar ahora" lo levante de nuevo.
+    /// Wrapper que repara CAO.Privileged con sc.exe (start/config/failure;
+    /// delete/create solo como último recurso si la clave está corrupta)
+    /// sin necesitar install-privileged-service.ps1. Sobrevive a reinicios
+    /// porque el binario vive en Program Files y el servicio se re-registra
+    /// si fue borrado. Primero intenta arrancarlo y espera a que delayed-auto
+    /// termine: no se borra un servicio sano solo porque tarde en arrancar.
     /// </summary>
     private static async Task<string> CreateDirectInstallWrapperAsync(string svcExe)
     {
@@ -954,34 +955,75 @@ if (-not (Test-Path $svcExe)) {{
 }}
 
 # Si el servicio existe pero está detenido (caso típico tras reinicio si aún arranca: delayed-auto),
-# basta con arrancarlo.
+# basta con arrancarlo. Nunca se borra por el simple hecho de tardar: delayed-auto
+# puede necesitar más de dos segundos y borrarlo dejaba la app sin su canal SYSTEM.
 $qc = sc.exe query $serviceName 2>&1 | Out-String
 $exists = $LASTEXITCODE -eq 0 -or ($qc -notmatch 'does not exist' -and $qc -match 'CAO')
 if ($exists) {{
     Write-Host '[*] Servicio existente: intentando arranque...' -ForegroundColor Cyan
     sc.exe start $serviceName 2>&1 | Out-Host
-    Start-Sleep -Seconds 2
-    $q2 = sc.exe query $serviceName 2>&1 | Out-String
-    if ($q2 -match 'RUNNING') {{
+    $running = $false
+    for ($i = 0; $i -lt 12; $i++) {{
+        Start-Sleep -Seconds 1
+        $q2 = sc.exe query $serviceName 2>&1 | Out-String
+        if ($q2 -match 'RUNNING') {{ $running = $true; break }}
+    }}
+    if ($running) {{
         Write-Host '[OK] Servicio arrancado.' -ForegroundColor Green
         exit 0
     }}
-    Write-Host '[*] Re-creando servicio (estaba corrupto o detenido)...' -ForegroundColor Yellow
+
+    # Reparación en sitio: sc config no borra el servicio ni su clave. Si la
+    # configuración está corrupta, fallará y solo entonces se recrea.
+    Write-Host '[*] Servicio detenido: reparando configuración sin borrarlo...' -ForegroundColor Cyan
+    sc.exe config $serviceName binPath= ""$svcExe"" start= delayed-auto DisplayName= ""CA-O Privileged Service"" 2>&1 | Out-Host
+    if ($LASTEXITCODE -eq 0) {{
+        sc.exe failure $serviceName reset= 86400 actions= restart/5000/restart/10000/reboot/60000 | Out-Null
+        sc.exe description $serviceName ""CA-O {version} servicio privilegiado"" | Out-Null
+        sc.exe start $serviceName 2>&1 | Out-Host
+        $repaired = $false
+        for ($i = 0; $i -lt 12; $i++) {{
+            Start-Sleep -Seconds 1
+            $q3 = sc.exe query $serviceName 2>&1 | Out-String
+            if ($q3 -match 'RUNNING') {{ $repaired = $true; break }}
+        }}
+        if ($repaired) {{
+            Write-Host '[OK] Servicio reparado y arrancado.' -ForegroundColor Green
+            exit 0
+        }}
+    }}
+
+    Write-Host '[*] sc config no bastó; recreando el servicio como último recurso...' -ForegroundColor Yellow
     sc.exe stop $serviceName 2>&1 | Out-Null
     Start-Sleep -Seconds 1
     sc.exe delete $serviceName 2>&1 | Out-Null
-    Start-Sleep -Seconds 1
+    # sc delete marca la clave para borrado; hay que esperar antes de crear.
+    for ($i = 0; $i -lt 10; $i++) {{
+        Start-Sleep -Seconds 1
+        sc.exe query $serviceName 2>&1 | Out-Null
+        if ($LASTEXITCODE -ne 0) {{ break }}
+    }}
 }}
 
-sc.exe create $serviceName binPath= ""$svcExe"" start= delayed-auto DisplayName= ""CA-O Privileged Service"" | Out-Host
-if ($LASTEXITCODE -ne 0) {{ throw 'sc create falló' }}
+$created = $false
+for ($i = 0; $i -lt 5; $i++) {{
+    sc.exe create $serviceName binPath= ""$svcExe"" start= delayed-auto DisplayName= ""CA-O Privileged Service"" | Out-Host
+    if ($LASTEXITCODE -eq 0) {{ $created = $true; break }}
+    Start-Sleep -Seconds 2
+}}
+if (-not $created) {{ throw 'sc create falló' }}
 sc.exe failure $serviceName reset= 86400 actions= restart/5000/restart/10000/reboot/60000 | Out-Host
 sc.exe description $serviceName ""CA-O {version} servicio privilegiado"" | Out-Host
 sc.exe start $serviceName | Out-Host
-Start-Sleep -Seconds 2
-$q = sc.exe query $serviceName 2>&1 | Out-String
+$q = ''
+$running = $false
+for ($i = 0; $i -lt 12; $i++) {{
+    Start-Sleep -Seconds 1
+    $q = sc.exe query $serviceName 2>&1 | Out-String
+    if ($q -match 'RUNNING') {{ $running = $true; break }}
+}}
 Write-Host $q
-if ($q -notmatch 'RUNNING') {{
+if (-not $running) {{
     Write-Host '[!] El servicio se registró pero no está en RUNNING. Revisa el Visor de eventos.' -ForegroundColor Yellow
 }} else {{
     Write-Host '[OK] Servicio instalado e iniciado.' -ForegroundColor Green
