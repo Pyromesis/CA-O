@@ -26,6 +26,9 @@ Thumbs.db
 *.swp
 *~
 
+# Capturas de trabajo (originales sin censurar; solo se publica capturas/readme)
+capturas/new/
+
 # CA-O runtime data (never commit)
 history.jsonl
 snapshots/
