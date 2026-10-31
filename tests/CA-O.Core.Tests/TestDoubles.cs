@@ -133,6 +133,12 @@ public sealed class StubOptimization(OptimizationDefinition definition) : IOptim
 
     public Func<MemoryRegistry, OperationResult>? ApplyScript { get; set; }
 
+    /// <summary>
+    /// Scripts the revert. Lets tests simulate a revert that reports success
+    /// without actually restoring the captured state (P1).
+    /// </summary>
+    public Func<MemoryRegistry, OperationResult>? RevertScript { get; set; }
+
     /// <summary>When true, VerifyAsync observes real registry state.</summary>
     public bool HonestVerification { get; set; } = true;
 
@@ -181,6 +187,12 @@ public sealed class StubOptimization(OptimizationDefinition definition) : IOptim
         OptimizationContext context, OptimizationSnapshot snapshot, CancellationToken ct = default)
     {
         RevertCalls++;
+        if (RevertScript is not null && context.Registry is MemoryRegistry memory)
+        {
+            await Task.CompletedTask;
+            return RevertScript(memory);
+        }
+
         foreach (var entry in snapshot.Registry)
         {
             if (entry.Existed && entry.Value is not null)

@@ -280,12 +280,25 @@ public sealed class OptimizationEngine
 
         if (result.Success)
         {
-            _snapshots.Delete(record.Manifest.TransactionId);
-            if (optimization.Definition.Flags.HasFlag(OptimizationFlags.OneShot))
+            var matchLevel = SnapshotComparison.CaptureAndCompare(optimization, _registry, record.State);
+            if (matchLevel == SnapshotMatchLevel.ExactMatch)
             {
-                // The change is gone: the one-shot may be offered again.
-                try { OneShotLedger.Remove(optimization.Definition.Id); }
-                catch { }
+                _snapshots.Delete(record.Manifest.TransactionId);
+                if (optimization.Definition.Flags.HasFlag(OptimizationFlags.OneShot))
+                {
+                    // The change is gone: the one-shot may be offered again.
+                    try { OneShotLedger.Remove(optimization.Definition.Id); }
+                    catch { }
+                }
+            }
+            else
+            {
+                // P1: el "ok" de la optimización no prueba que el estado haya
+                // vuelto. Se conserva el snapshot y se informa del fallo real.
+                result = OperationResult.Fail(
+                    $"La reversión informó éxito, pero el estado no coincide exactamente con el snapshot ({matchLevel}). " +
+                    "Se conserva el snapshot para reintentar.",
+                    "rollback-unverified");
             }
         }
 
@@ -402,11 +415,25 @@ public sealed class OptimizationEngine
             return result;
         }
 
+        // P1: recuperar exige la misma prueba que revertir. Si la optimizacion
+        // dice "ok" pero la captura nueva no coincide exactamente, la
+        // transaccion sigue pendiente y el snapshot se conserva.
+        var matchLevel = SnapshotComparison.CaptureAndCompare(optimization, _registry, record.State);
+        if (matchLevel != SnapshotMatchLevel.ExactMatch)
+        {
+            LogLegacy(candidate.OptimizationId, "recover", false, record.State,
+                error: "rollback-unverified", caller: caller);
+            return OperationResult.Fail(
+                $"La reversión informó éxito, pero el estado no coincide exactamente con el snapshot ({matchLevel}). " +
+                "La transacción sigue pendiente y el snapshot se conserva para reintentar.",
+                "rollback-unverified");
+        }
+
         _recovery.MarkRecovered(transactionId, candidate.OptimizationId, recovered: true);
         _snapshots.Delete(transactionId);
         LogLegacy(candidate.OptimizationId, "recover", true, record.State, caller: caller);
         return OperationResult.Ok(
-            $"Operación '{candidate.OptimizationId}' recuperada: los cambios se revirtieron y la transacción quedó cerrada.");
+            $"Operación '{candidate.OptimizationId}' recuperada: los cambios se revirtieron y se verificó el estado original exacto.");
     }
 
     /// <summary>Persists a fresh snapshot under a NEW transaction identity (P0-3).</summary>

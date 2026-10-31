@@ -70,6 +70,24 @@ public static class SnapshotComparison
     }
 
     /// <summary>
+    /// Captures the live state after a rollback and compares it with the
+    /// original snapshot. A capture/comparison failure is Unknown, never a
+    /// pass: callers may delete the snapshot ONLY on ExactMatch (P1).
+    /// </summary>
+    public static SnapshotMatchLevel CaptureAndCompare(
+        IOptimization optimization, IRegistryAccessor registry, OptimizationSnapshot original)
+    {
+        try
+        {
+            return Compare(original, optimization.Capture(registry));
+        }
+        catch
+        {
+            return SnapshotMatchLevel.Unknown;
+        }
+    }
+
+    /// <summary>
     /// Notas que son marcas temporales o contadores de ejecución, no estado
     /// del sistema: se excluyen de la comparación exacta.
     /// </summary>

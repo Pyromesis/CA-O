@@ -174,6 +174,111 @@ public sealed class OptimizationTransactionTests
         Assert.Equal(0, neverReached.ApplyCalls);
     }
 
+    [Fact]
+    public async Task RollbackCommittedKeepsSnapshotWhenRevertSucceedsButStateDiffers()
+    {
+        var registry = new MemoryRegistry();
+        var snapshots = new MemorySnapshotStore();
+        var history = new MemoryHistory();
+        var stub = new StubOptimization(Definition());
+
+        var commit = await RunAsync(stub, registry, history, snapshots);
+        Assert.True(commit.Success);
+        var saved = Assert.Single(snapshots.Saved.Values);
+
+        // P1: RollbackAsync devuelve éxito pero no restaura nada.
+        stub.RevertScript = _ => OperationResult.Ok("revertido (sin efecto)");
+
+        var rollback = new OptimizationTransaction(
+            stub, registry, Context, snapshots: snapshots, history: history);
+        var rolledBack = await rollback.RollbackCommittedAsync();
+
+        Assert.False(rolledBack);
+        Assert.True(snapshots.Saved.ContainsKey(saved.Manifest.TransactionId),
+            "El snapshot debe conservarse si el estado no coincide.");
+        Assert.DoesNotContain(saved.Manifest.TransactionId, snapshots.Deleted);
+        Assert.Equal(OptimizationState.AppliedByCao, stub.Detect(registry));
+        Assert.Contains(history.Entries, e => e.Operation == "revert" && !e.Success);
+    }
+
+    [Fact]
+    public async Task RollbackCommittedDeletesSnapshotOnlyAfterExactVerification()
+    {
+        var registry = new MemoryRegistry();
+        var snapshots = new MemorySnapshotStore();
+        var history = new MemoryHistory();
+        var stub = new StubOptimization(Definition());
+
+        var commit = await RunAsync(stub, registry, history, snapshots);
+        Assert.True(commit.Success);
+        var saved = Assert.Single(snapshots.Saved.Values);
+
+        var rollback = new OptimizationTransaction(
+            stub, registry, Context, snapshots: snapshots, history: history);
+        var rolledBack = await rollback.RollbackCommittedAsync();
+
+        Assert.True(rolledBack);
+        Assert.Empty(snapshots.Saved);
+        Assert.Contains(saved.Manifest.TransactionId, snapshots.Deleted);
+        Assert.Equal(OptimizationState.NotApplied, stub.Detect(registry));
+        Assert.Contains(history.Entries, e => e.Operation == "revert" && e.Success);
+    }
+
+    [Fact]
+    public async Task SafeRollbackKeepsSnapshotWhenRevertSucceedsButStateDiffers()
+    {
+        var registry = new MemoryRegistry();
+        var snapshots = new MemorySnapshotStore();
+        var stub = new StubOptimization(Definition())
+        {
+            ApplyScript = memory =>
+            {
+                memory.SetValue(RegistryHive2.CurrentUser, StubOptimization.TestKey,
+                    StubOptimization.TestValue, 1, RegistryValueKind2.DWord);
+                return OperationResult.Fail("falló a mitad del apply", "scripted");
+            },
+            RevertScript = _ => OperationResult.Ok("revertido (sin efecto)"),
+        };
+
+        var report = await RunAsync(stub, registry, new MemoryHistory(), snapshots);
+
+        Assert.False(report.Success);
+        Assert.Equal(TransactionPhase.Failed, report.FinalPhase);
+        Assert.True(report.RolledBack);
+        Assert.False(report.RollbackVerified);
+        Assert.Single(snapshots.Saved);
+    }
+
+    [Fact]
+    public async Task BatchKeepsSnapshotWhenRevertSucceedsButStateDiffers()
+    {
+        var registry = new MemoryRegistry();
+        var snapshots = new MemorySnapshotStore();
+
+        var good = new StubOptimization(Definition("batch-good-1")) { ValueName = "Good1" };
+        var failing = new StubOptimization(Definition("batch-failing"))
+        {
+            ValueName = "Failing",
+            ApplyScript = _ => OperationResult.Fail("crítico falló"),
+        };
+
+        // La reversión del elemento ya aplicado dice "ok" sin restaurar.
+        good.RevertScript = _ => OperationResult.Ok("revertido (sin efecto)");
+
+        var multi = new MultiOptimizationTransaction(
+            [good, failing], registry, Context, snapshots: snapshots);
+
+        var reports = await multi.RunAsync();
+
+        Assert.Equal(2, reports.Count);
+        Assert.True(reports[0].Success);
+        Assert.False(reports[1].Success);
+        Assert.Contains("Rollback automático fallido para: batch-good-1", reports[1].MessageEs);
+        var retained = Assert.Single(snapshots.Saved.Values);
+        Assert.Equal("batch-good-1", retained.Manifest.OptimizationId);
+        Assert.Equal(OptimizationState.AppliedByCao, good.Detect(registry));
+    }
+
     private static Task<TransactionReport> RunAsync(
         StubOptimization stub,
         MemoryRegistry registry,

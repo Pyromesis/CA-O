@@ -1,5 +1,6 @@
 using CAO.Core.Abstractions;
 using CAO.Core.Engine;
+using CAO.Core.Optimizations.Performance;
 using CAO.Core.Rollback;
 using CAO.Shared;
 using Xunit;
@@ -31,7 +32,8 @@ public sealed class RecoverTransactionTests
     private static TransactionEvent Event(Guid tx, string optimizationId, TransactionPhase phase) =>
         new(tx, optimizationId, DateTime.UtcNow, phase, TransactionEvent.IsTerminal(phase), null, "S-1-5-18", "tester");
 
-    private static void SaveSnapshot(MemorySnapshotStore store, Guid tx, string optimizationId)
+    private static void SaveSnapshot(
+        MemorySnapshotStore store, Guid tx, string optimizationId, OptimizationSnapshot? state = null)
     {
         store.Save(new TransactionSnapshotRecord
         {
@@ -45,7 +47,7 @@ public sealed class RecoverTransactionTests
                 WindowsBuild = 26200,
                 TimestampUtc = DateTime.UtcNow
             },
-            State = new OptimizationSnapshot()
+            State = state ?? new OptimizationSnapshot()
         });
     }
 
@@ -114,10 +116,12 @@ public sealed class RecoverTransactionTests
     {
         var tx = Guid.NewGuid();
         var journal = new InMemoryJournal();
-        journal.Append(Event(tx, "cleanup-windows-temp", TransactionPhase.Snapshot));
-        journal.Append(Event(tx, "cleanup-windows-temp", TransactionPhase.Apply));
+        journal.Append(Event(tx, "cleanup-memory-ram", TransactionPhase.Snapshot));
+        journal.Append(Event(tx, "cleanup-memory-ram", TransactionPhase.Apply));
         var store = new MemorySnapshotStore();
-        SaveSnapshot(store, tx, "cleanup-windows-temp");
+        // Snapshot real: la verificacion posterior exige coincidencia exacta.
+        var snapshot = new CleanupMemoryRam().Capture(new MemoryRegistry());
+        SaveSnapshot(store, tx, "cleanup-memory-ram", snapshot);
         var recovery = new CrashRecoveryService(journal, store, _ => OptimizationState.AppliedByCao);
 
         var result = await BuildEngine(recovery, store).RecoverAsync(tx);
@@ -130,6 +134,49 @@ public sealed class RecoverTransactionTests
         Assert.Null(last.ErrorCode);
         Assert.Contains(tx, store.Deleted);
         Assert.False(recovery.HasPendingRecovery());
+    }
+
+    [Fact]
+    public async Task Recover_LeavesTransactionOpen_WhenRevertSucceedsButStateDiffers()
+    {
+        var tx = Guid.NewGuid();
+        var journal = new InMemoryJournal();
+        journal.Append(Event(tx, "cleanup-memory-ram", TransactionPhase.Snapshot));
+        journal.Append(Event(tx, "cleanup-memory-ram", TransactionPhase.Apply));
+        var store = new MemorySnapshotStore();
+        var wrongState = new OptimizationSnapshot();
+        wrongState.RawNotes.Add("memory-ram=estado-que-no-es-el-real");
+        SaveSnapshot(store, tx, "cleanup-memory-ram", wrongState);
+        var recovery = new CrashRecoveryService(journal, store, _ => OptimizationState.AppliedByCao);
+
+        var result = await BuildEngine(recovery, store).RecoverAsync(tx);
+
+        Assert.False(result.Success);
+        Assert.Equal("rollback-unverified", result.Error);
+        Assert.True(store.Saved.ContainsKey(tx));
+        Assert.DoesNotContain(tx, store.Deleted);
+        Assert.DoesNotContain(journal.Events, e => e.Phase == TransactionPhase.RecoveryCompleted);
+        Assert.True(recovery.HasPendingRecovery());
+    }
+
+    [Fact]
+    public async Task Revert_KeepsSnapshotAndFails_WhenRevertSucceedsButStateDiffers()
+    {
+        var tx = Guid.NewGuid();
+        var store = new MemorySnapshotStore();
+        var wrongState = new OptimizationSnapshot();
+        wrongState.RawNotes.Add("memory-ram=estado-que-no-es-el-real");
+        SaveSnapshot(store, tx, "cleanup-memory-ram", wrongState);
+
+        var engine = new OptimizationEngine(
+            new MemoryRegistry(), null!, store, new MemoryHistory(), isRunningAsAdmin: () => true);
+
+        var result = await engine.RevertAsync("cleanup-memory-ram");
+
+        Assert.False(result.Success);
+        Assert.Equal("rollback-unverified", result.Error);
+        Assert.True(store.Saved.ContainsKey(tx));
+        Assert.DoesNotContain(tx, store.Deleted);
     }
 
     /// <summary>

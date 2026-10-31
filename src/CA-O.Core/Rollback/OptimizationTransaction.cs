@@ -388,8 +388,10 @@ public sealed class OptimizationTransaction
 
     /// <summary>
     /// Reverts a previously committed change by loading its persisted
-    /// snapshot (crash recovery / batch rollback path). Returns false when
-    /// no snapshot exists or the revert fails.
+    /// snapshot (crash recovery / batch rollback path). Returns true ONLY when
+    /// a fresh capture proves the original state was restored exactly; the
+    /// snapshot is deleted only then. A rollback that merely reports success
+    /// keeps the snapshot and returns false (P1).
     /// </summary>
     public async Task<bool> RollbackCommittedAsync(CancellationToken ct = default)
     {
@@ -401,19 +403,33 @@ public sealed class OptimizationTransaction
             return false;
         }
 
+        var snapshotId = snapshot.Manifest.TransactionId;
         var context = new OptimizationContext { Registry = _registry, Executor = _executor, Services = _services };
         try
         {
             var rollback = await _optimization.RollbackAsync(context, snapshot.State, ct);
-            if (rollback.Success)
+            if (!rollback.Success)
             {
-                _snapshots.Delete(snapshot.Manifest.TransactionId);
-                Log(id, "revert", true, null, rollbackAvailable: false);
+                Log(id, "revert", false, snapshotId.ToString(),
+                    error: rollback.Error ?? rollback.MessageEs, rollbackAvailable: true);
+                return false;
             }
-            return rollback.Success;
+
+            // P1: que RollbackAsync devuelva éxito no prueba que el estado haya
+            // vuelto. Solo una captura nueva idéntica al snapshot original lo
+            // prueba; sin ella se conserva el snapshot para reintentar.
+            var level = VerifyRestoredAndDelete(snapshotId, snapshot.State);
+            var exact = level == SnapshotMatchLevel.ExactMatch;
+            Log(id, "revert", exact,
+                exact ? null : snapshotId.ToString(),
+                error: exact ? null : $"La reversión devolvió éxito pero el estado no coincide exactamente ({level}).",
+                rollbackAvailable: !exact);
+            return exact;
         }
-        catch
+        catch (Exception ex)
         {
+            Log(id, "revert", false, snapshotId.ToString(),
+                error: ex.Message, rollbackAvailable: true);
             return false;
         }
     }
@@ -434,18 +450,27 @@ public sealed class OptimizationTransaction
                 return SnapshotMatchLevel.Mismatch;
             }
 
-            var fresh = _optimization.Capture(_registry);
-            var level = SnapshotComparison.Compare(original, fresh);
-            if (level == SnapshotMatchLevel.ExactMatch)
-            {
-                _snapshots?.Delete(TransactionId);
-            }
-            return level;
+            return VerifyRestoredAndDelete(TransactionId, original);
         }
         catch
         {
             return SnapshotMatchLevel.Mismatch;
         }
+    }
+
+    /// <summary>
+    /// Captures the live state and compares it with the original snapshot.
+    /// The stored snapshot is deleted ONLY on ExactMatch; any discrepancy
+    /// keeps it so the change can still be restored (P1).
+    /// </summary>
+    private SnapshotMatchLevel VerifyRestoredAndDelete(Guid snapshotId, OptimizationSnapshot original)
+    {
+        var level = SnapshotComparison.CaptureAndCompare(_optimization, _registry, original);
+        if (level == SnapshotMatchLevel.ExactMatch)
+        {
+            _snapshots?.Delete(snapshotId);
+        }
+        return level;
     }
 
 private TransactionSnapshotRecord BuildRecord(string optimizationId, OptimizationSnapshot snapshot) => new()

@@ -31,6 +31,8 @@ Tras revertir se recaptura el estado y se compara con el original mediante `Snap
 
 El snapshot persistido solo se elimina cuando la reversión fue ExactMatch. La comparación incluye las notas estables de `RawNotes` (se ignoran las volátiles: marcas temporales y contadores); un valor ausente en ambos lados (`Kind=None`/`None`) cuenta como coincidencia exacta.
 
+La misma garantía se impone en todas las rutas: reversión individual (`RevertAsync`), reversión por lotes (`RollbackCommittedAsync`) y recuperación (`RecoverAsync`). Que `RollbackAsync` devuelva éxito no basta: si la captura nueva no es ExactMatch, la operación se reporta como fallida y el snapshot se conserva para reintentar.
+
 ## Irreversibles (P0-5)
 
 Irreversible ≠ inverificable: se ejecuta VERIFY igualmente. Si falla → transacción Failed con CAO-VERIFY-nnn, sin rollback automático y con el snapshot conservado como evidencia. Si es Unknown tras reintentos → éxito con aviso honesto («verificación no concluyente»): el cambio se aplicó y no hay nada que revertir.
