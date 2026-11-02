@@ -613,7 +613,7 @@ public sealed partial class SettingsPage : Page
                     try { File.Delete(zipPath); } catch { }
                     throw new InvalidOperationException(DescribeReleaseVerificationFailure(verification));
                 }
-                UpdateDetailText.Text = "Paquete verificado (manifiesto firmado + SHA-256).";
+                UpdateDetailText.Text = "Paquete verificado con la firma de release de CA-O (RSA-3072 + SHA-256).";
                 // Quita Mark-of-the-Web del ZIP para que lo extraído no lo herede
                 // (SmartScreen frenaba el instalador auto-lanzado en silencio).
                 Helpers.AppUpdater.UnblockTree(zipPath);
@@ -673,9 +673,14 @@ public sealed partial class SettingsPage : Page
                 // compra un certificado comercial).
                 UpdateDetailText.Text = "Verificando instalador...";
                 var signatureOk = await Task.Run(() => Helpers.AppUpdater.HasValidAuthenticodeSignature(canonicalInstaller), cts.Token);
+                // Firma de release y Authenticode son mecanismos distintos:
+                // la primera prueba que el paquete lo emitio CA-O; la segunda
+                // es la firma de editor que Windows/SmartScreen reconocen.
+                // No tener Authenticode no invalida la procedencia, pero puede
+                // mantener el aviso de SmartScreen.
                 UpdateDetailText.Text = signatureOk
-                    ? "Instalador verificado (manifiesto firmado + SHA-256 + Authenticode)."
-                    : "Instalador verificado (manifiesto firmado + SHA-256; sin Authenticode, no es obligatorio).";
+                    ? "Verificado: firma de release CA-O (RSA-3072 + SHA-256) y Authenticode de Windows."
+                    : "Verificado: firma de release CA-O (RSA-3072 + SHA-256). Sin Authenticode: SmartScreen puede avisar.";
 
                 // Handoff con confirmación: antes la app se cerraba sola y si
                 // el instalador no aparecía (UAC cancelado, crash) el usuario

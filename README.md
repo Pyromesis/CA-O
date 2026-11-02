@@ -29,7 +29,7 @@
   <a href="global.json"><img src="https://img.shields.io/badge/.NET%2010-512BD4?style=flat-square&logo=dotnet&logoColor=white" alt=".NET 10"></a>
   <a href="https://microsoft.github.io/microsoft-ui-xaml/"><img src="https://img.shields.io/badge/WinUI%203-00B7C3?style=flat-square&logo=windows&logoColor=white" alt="WinUI 3"></a>
   <a href="https://github.com/Pyromesis/CA-O/releases/tag/v2.2.21"><img src="https://img.shields.io/badge/release-v2.2.21-blue?style=flat-square" alt="Release"></a>
-  <a href="#pruebas"><img src="https://img.shields.io/badge/tests-2598%20passed-brightgreen?style=flat-square" alt="Tests"></a>
+  <a href="#pruebas"><img src="https://img.shields.io/badge/tests-2600%20passed-brightgreen?style=flat-square" alt="Tests"></a>
   <a href="#pruebas"><img src="https://img.shields.io/badge/telemetr%C3%ADa-0-00C2A8?style=flat-square" alt="Sin telemetría"></a>
 </p>
 
@@ -45,7 +45,7 @@ Una aplicación **100 % nativa** para Windows, escrita en **.NET 10 + WinUI 3**.
 
 | | | | |
 |:---:|:---:|:---:|:---:|
-| **122**<br>optimizaciones transaccionales | **13**<br>páginas nativas | **2.598**<br>tests en verde | **0**<br>telemetría externa |
+| **122**<br>optimizaciones transaccionales | **13**<br>páginas nativas | **2.600**<br>tests en verde | **0**<br>telemetría externa |
 
 **La pregunta que guía el diseño:** *¿cuál es la mejor configuración para ESTE Windows, ESTE hardware, ESTE driver, ESTE juego y ESTE objetivo?* — no *¿qué tweaks tiene Internet?*
 
@@ -263,7 +263,7 @@ Ningún perfil es una lista fija: se calculan contra el `SystemContext` real. `E
 | **MVVM / DI** | CommunityToolkit.Mvvm **8.4.0** + Microsoft.Extensions.DependencyInjection **10.0.0** |
 | **Datos** | WMI, Registry API, SCM, `powercfg`, `netsh`, BCD y `fsutil` |
 | **Servicio** | `CA-O.Privileged` como `BackgroundService` en `LocalSystem` |
-| **Pruebas** | xUnit **2.9.2** · 2.598 tests en 6 suites |
+| **Pruebas** | xUnit **2.9.2** · 2.600 tests en 6 suites |
 | **CI** | CodeQL + `dotnet audit` + Dependabot + SBOM CycloneDX |
 
 Los artefactos de release son **self-contained**: no requieren runtime instalado.
@@ -327,8 +327,8 @@ powershell -ExecutionPolicy Bypass -File scripts/build-release.ps1 # release + S
 powershell -ExecutionPolicy Bypass -File scripts/package.ps1       # ZIP + SHA-256
 ```
 
-- **Firma de releases (obligatoria):** el ZIP estable se publica con `*.manifest.json` y `*.manifest.sig` (RSA-3072, PKCS#1/SHA-256). El updater y `CA-O.Setup` verifican la firma contra el certificado público clavado en `CAO.Shared.Updates.ReleaseTrust` y fallan cerrados si falta, no valida o el asset/tamaño/SHA-256 no coincide. No hace falta certificado comercial: la clave privada vive fuera del repo (`%USERPROFILE%\.cao\release-signing`) y se genera con `scripts/generate-release-key.ps1`; `package.ps1` firma y `verify-release.ps1` comprueba antes de publicar.
-- **Firma Authenticode (opcional):** define `CAO_SIGN_THUMBPRINT`; `scripts/sign.ps1` firma `ui/*.exe` y `service/*.exe` con timestamp. Es una señal extra para SmartScreen, no la base de confianza del updater.
+- **Firma de releases (obligatoria):** el ZIP estable se publica con `*.manifest.json` y `*.manifest.sig` (RSA-3072, PKCS#1/SHA-256). El updater y `CA-O.Setup` verifican la firma contra las dos anclas públicas clavadas en `CAO.Shared.Updates.ReleaseTrust` (`primary` y `recovery`) y fallan cerrados si falta, no valida o el asset/tamaño/SHA-256 no coincide. No hace falta certificado comercial: la clave privada vive fuera del repo, siempre protegida con contraseña, y la `recovery` debe guardarse offline. Se genera con `scripts/generate-release-key.ps1`; `package.ps1` firma y `verify-release.ps1` comprueba antes de publicar.
+- **Firma Authenticode (opcional y distinta):** define `CAO_SIGN_THUMBPRINT`; `scripts/sign.ps1` firma `ui/*.exe` y `service/*.exe` con timestamp. Es la firma de editor que Windows/SmartScreen evalúan, no la base de confianza del updater. Sin certificado comercial puede seguir habiendo aviso de SmartScreen aunque el paquete esté verificado por CA-O.
 - **Versionado:** una sola fuente en `Version.props`; el bump se propaga a todos los `csproj` y a `AppVersion`.
 - **Empaquetado:** `artifacts/release/` (ui, service, gui-installer, uninstall, setup) + `SHA256SUMS.txt` + `bom.json`; el ZIP distribuible añade `.sha256` y el manifiesto firmado.
 
@@ -341,10 +341,10 @@ powershell -ExecutionPolicy Bypass -File scripts/package.ps1       # ZIP + SHA-2
 | `CA-O.Core.Tests` | Catálogo, transacciones, scoring, health, gaming, overclock | **1535** |
 | `CA-O.Security.Tests` | IPC, replay, `CommandPolicy`, identidad y flood | **274** |
 | `CA-O.Infrastructure.Tests` | Historial, snapshots, WMI, DNS y backends de overclock | **220** |
-| `CA-O.UI.Tests` | ViewModels, localización, updater, tours y mascota | **492** |
+| `CA-O.UI.Tests` | ViewModels, localización, updater, tours y mascota | **494** |
 | `CA-O.Integration.Tests` | E2E, recuperación de journal, capas y docs↔código | **60** |
 | `CA-O.Benchmark.Tests` | Mediana, trials y suelo de ruido del 3 % | **17** |
-| **Total** | **6 suites en Release** | **2598** |
+| **Total** | **6 suites en Release** | **2600** |
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts/test.ps1

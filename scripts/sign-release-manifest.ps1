@@ -6,32 +6,52 @@
     sus bytes exactos con la clave privada del mantenedor (RSA-3072,
     PKCS#1 v1.5 + SHA-256). La firma va a <zip>.manifest.sig en base64.
 
-    El updater y CA-O.Setup verifican ambos ficheros contra el certificado
-    publico clavado en src\CA-O.Shared\Updates\ReleaseTrust.cs. Sin firma
-    valida no se instala nada.
+    El updater y CA-O.Setup verifican ambos ficheros contra los certificados
+    publicos clavados en src\CA-O.Shared\Updates\ReleaseTrust.cs (Primary y
+    Recovery). Sin firma valida no se instala nada.
 
     La clave privada vive FUERA del repositorio:
-      %USERPROFILE%\.cao\release-signing\cao-release-signing.pfx
-    y se genera una sola vez con scripts\generate-release-key.ps1.
+      %USERPROFILE%\.cao\release-signing\cao-release-signing.pfx  (Primary)
+      %USERPROFILE%\.cao\release-recovery\cao-release-recovery.pfx (Recovery)
+    y se genera con scripts\generate-release-key.ps1 -Role <rol>.
 
-    La contrasena del PFX se lee de CAO_RELEASE_PFX_PASSWORD (si esta
-    definida). No se pasa por linea de comandos para que no acabe en el
+    La contrasena se resuelve, por este orden:
+      1. -PfxPassword
+      2. CAO_RELEASE_PFX_PASSWORD / CAO_RELEASE_RECOVERY_PASSWORD
+      3. CAO_RELEASE_PFX_PASSWORD_FILE / CAO_RELEASE_RECOVERY_PASSWORD_FILE
+      4. fichero DPAPI junto al PFX (solo el usuario actual y este equipo)
+
+    No se pasa la contrasena por linea de comandos para que no acabe en el
     historial de PowerShell.
 
 .EXAMPLE
     powershell -ExecutionPolicy Bypass -File scripts\sign-release-manifest.ps1 `
         -ZipPath artifacts\CA-O-2.2.21-win-x64.zip
+.EXAMPLE
+    powershell -ExecutionPolicy Bypass -File scripts\sign-release-manifest.ps1 `
+        -ZipPath artifacts\CA-O-2.2.22-win-x64.zip -KeyRole Recovery
 #>
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)][string]$ZipPath,
     [string]$Version,
-    [string]$PfxPath = (Join-Path $env:USERPROFILE '.cao\release-signing\cao-release-signing.pfx'),
-    [string]$PfxPassword = $env:CAO_RELEASE_PFX_PASSWORD
+    [ValidateSet('Primary', 'Recovery')]
+    [string]$KeyRole = 'Primary',
+    [string]$PfxPath,
+    [string]$PfxPassword,
+    [string]$PfxPasswordFile
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+
+$scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+. (Join-Path $scriptRoot 'release-key-common.ps1')
+
+$cfg = Get-CaoReleaseRoleConfig -Role $KeyRole
+if ([string]::IsNullOrWhiteSpace($PfxPath)) {
+    $PfxPath = Join-Path (Join-Path $env:USERPROFILE $cfg.Directory) $cfg.PfxName
+}
 
 if (-not (Test-Path $ZipPath -PathType Leaf)) {
     throw "No existe el ZIP: $ZipPath"
@@ -55,7 +75,18 @@ if ($normalizedVersion -ne $assetVersion) {
 }
 
 if (-not (Test-Path $PfxPath -PathType Leaf)) {
-    throw "No existe la clave privada: $PfxPath. Generala con scripts\generate-release-key.ps1 (o define -PfxPath)."
+    throw "No existe la clave privada: $PfxPath. Generala con scripts\generate-release-key.ps1 -Role $KeyRole (o define -PfxPath)."
+}
+
+if ([string]::IsNullOrEmpty($PfxPassword)) {
+    $PfxPassword = Resolve-CaoReleasePassword `
+        -Config $cfg `
+        -PfxPath $PfxPath `
+        -ExplicitPassword $PfxPassword `
+        -PasswordFile $PfxPasswordFile
+}
+if ([string]::IsNullOrEmpty($PfxPassword)) {
+    throw "El PFX esta protegido con contrasena. Define $($cfg.PasswordEnv), $($cfg.PasswordFileEnv), pasa -PfxPasswordFile o genera el fichero DPAPI con scripts\protect-release-key.ps1."
 }
 
 $manifestPath = "$zip.manifest.json"
@@ -77,8 +108,9 @@ $utf8 = New-Object System.Text.UTF8Encoding($false)
 
 $cert = $null
 $privateKey = $null
+$publicKey = $null
 try {
-    $cert = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2(
+    $cert = [System.Security.Cryptography.X509Certificates.X509Certificate2]::new(
         $PfxPath,
         $PfxPassword,
         [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::DefaultKeySet)
@@ -109,14 +141,24 @@ try {
             throw "La firma recien creada no verifica con su propia clave publica."
         }
     }
-    finally { $publicKey.Dispose() }
+    finally {
+        $publicKey.Dispose()
+        $publicKey = $null
+    }
+
+    $thumbprint = $cert.Thumbprint
 }
 finally {
+    if ($null -ne $publicKey) { $publicKey.Dispose() }
     if ($null -ne $privateKey) { $privateKey.Dispose() }
     if ($null -ne $cert) { $cert.Dispose() }
 }
 
-Write-Host "Manifiesto firmado:" -ForegroundColor Green
+Write-Host "Manifiesto firmado ($KeyRole):" -ForegroundColor Green
 Write-Host "  $manifestPath"
 Write-Host "  $signaturePath"
 Write-Host "  version=$assetVersion size=$size sha256=$hash"
+Write-Host "  thumbprint=$thumbprint"
+if ($KeyRole -eq 'Recovery') {
+    Write-Host '  AVISO: firmado con la clave de RECUPERACION. Uso excepcional.' -ForegroundColor Yellow
+}

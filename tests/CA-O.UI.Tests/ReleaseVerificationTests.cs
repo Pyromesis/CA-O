@@ -128,7 +128,7 @@ public sealed class ReleaseVerificationTests
                 expectedVersion: "v2.2.22",
                 expectedBytes: package.Length,
                 http: http,
-                trustAnchor: certificate);
+                trustAnchors: [certificate]);
 
             Assert.True(result.IsValid, $"{result.Code}: {result.Detail}");
             Assert.Equal("ok", result.Code);
@@ -161,7 +161,7 @@ public sealed class ReleaseVerificationTests
                 packagePath,
                 "https://example.test/CA-O-2.2.22-win-x64.zip",
                 http: http,
-                trustAnchor: certificate);
+                trustAnchors: [certificate]);
 
             Assert.False(result.IsValid);
             Assert.Equal("hash-mismatch", result.Code);
@@ -193,7 +193,7 @@ public sealed class ReleaseVerificationTests
                 packagePath,
                 "https://example.test/CA-O-2.2.22-win-x64.zip",
                 http: http,
-                trustAnchor: certificate);
+                trustAnchors: [certificate]);
 
             Assert.False(result.IsValid);
             Assert.Equal("signature-unavailable", result.Code);
@@ -223,7 +223,7 @@ public sealed class ReleaseVerificationTests
                 packagePath,
                 "https://example.test/CA-O-2.2.22-win-x64.zip",
                 http: http,
-                trustAnchor: trustedCertificate);
+                trustAnchors: [trustedCertificate]);
 
             Assert.False(result.IsValid);
             Assert.Equal("signature-invalid", result.Code);
@@ -252,7 +252,7 @@ public sealed class ReleaseVerificationTests
                 packagePath,
                 "https://example.test/CA-O-2.2.23-win-x64.zip",
                 http: http,
-                trustAnchor: certificate);
+                trustAnchors: [certificate]);
 
             Assert.False(result.IsValid);
             Assert.Equal("asset-mismatch", result.Code);
@@ -282,7 +282,7 @@ public sealed class ReleaseVerificationTests
                 "https://example.test/CA-O-2.2.22-win-x64.zip",
                 expectedVersion: "v2.2.23",
                 http: http,
-                trustAnchor: certificate);
+                trustAnchors: [certificate]);
 
             Assert.False(result.IsValid);
             Assert.Equal("version-mismatch", result.Code);
@@ -316,17 +316,72 @@ public sealed class ReleaseVerificationTests
     }
 
     [Fact]
-    public void EmbeddedTrustAnchor_IsARealRsa3072Certificate()
+    public void SignedManifest_VerifiesWithTheRecoveryAnchor()
     {
-        // Si alguien deja el placeholder, o pega un certificado de 1024 bits,
-        // el updater quedaria sin ancla real. Esto lo detecta en CI.
-        using var certificate = ReleaseTrust.LoadSigningCertificate();
-        using var rsa = certificate.GetRSAPublicKey();
+        using var primaryKey = RSA.Create(3072);
+        using var primaryCertificate = CreateCertificate(primaryKey);
+        using var recoveryKey = RSA.Create(3072);
+        using var recoveryCertificate = CreateCertificate(recoveryKey);
+        var manifestBytes = CreateManifestBytes(new byte[] { 1, 2, 3, 4 }, "2.2.22");
+        var signature = recoveryKey.SignData(manifestBytes, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
 
-        Assert.NotNull(rsa);
-        Assert.True(rsa.KeySize >= ReleaseSignatureVerifier.MinimumKeySizeBits);
-        Assert.Contains("CA-O Release Signing", certificate.Subject, StringComparison.Ordinal);
+        Assert.True(ReleaseSignatureVerifier.VerifyDetachedAny(
+            manifestBytes, signature, [primaryCertificate, recoveryCertificate], out var matched));
+        Assert.Equal(recoveryCertificate.Thumbprint, matched);
+    }
+
+    [Fact]
+    public async Task VerifyDownload_AcceptsASignatureFromTheRecoveryAnchor()
+    {
+        var dir = CreateTempDir();
+        try
+        {
+            var package = new byte[] { 1, 2, 3, 4 };
+            var packagePath = Path.Combine(dir, "CA-O-2.2.22-win-x64.zip");
+            await File.WriteAllBytesAsync(packagePath, package);
+
+            using var primaryKey = RSA.Create(3072);
+            using var primaryCertificate = CreateCertificate(primaryKey);
+            using var recoveryKey = RSA.Create(3072);
+            using var recoveryCertificate = CreateCertificate(recoveryKey);
+            using var http = CreateHttpForSignedFixture(package, "2.2.22", recoveryKey);
+
+            var result = await ReleaseUpdateVerifier.VerifyDownloadAsync(
+                packagePath,
+                "https://example.test/CA-O-2.2.22-win-x64.zip",
+                http: http,
+                trustAnchors: [primaryCertificate, recoveryCertificate]);
+
+            Assert.True(result.IsValid, $"{result.Code}: {result.Detail}");
+            Assert.Equal(recoveryCertificate.Thumbprint, result.KeyThumbprint);
+        }
+        finally
+        {
+            TryDeleteDirectory(dir);
+        }
+    }
+
+    [Fact]
+    public void EmbeddedTrustAnchors_AreTwoDistinctRsa3072Certificates()
+    {
+        // Si alguien deja el placeholder, pega un certificado de 1024 bits o
+        // duplica la misma clave como "recuperacion", el updater quedaria sin
+        // una segunda raiz real. Esto lo detecta en CI.
+        using var primary = ReleaseTrust.LoadSigningCertificate();
+        using var recovery = ReleaseTrust.LoadRecoveryCertificate();
+        using var primaryRsa = primary.GetRSAPublicKey();
+        using var recoveryRsa = recovery.GetRSAPublicKey();
+
+        Assert.NotNull(primaryRsa);
+        Assert.NotNull(recoveryRsa);
+        Assert.True(primaryRsa.KeySize >= ReleaseSignatureVerifier.MinimumKeySizeBits);
+        Assert.True(recoveryRsa.KeySize >= ReleaseSignatureVerifier.MinimumKeySizeBits);
+        Assert.Contains("CA-O Release Signing", primary.Subject, StringComparison.Ordinal);
+        Assert.Contains("CA-O Release Recovery", recovery.Subject, StringComparison.Ordinal);
+        Assert.NotEqual(primary.Thumbprint, recovery.Thumbprint);
+        Assert.Equal(2, ReleaseTrust.Anchors.Count);
         Assert.False(string.IsNullOrWhiteSpace(ReleaseTrust.GetSigningCertificateSha256()));
+        Assert.False(string.IsNullOrWhiteSpace(ReleaseTrust.GetRecoveryCertificateSha256()));
     }
 
     private static HttpClient CreateHttpForSignedFixture(

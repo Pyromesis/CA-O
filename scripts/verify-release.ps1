@@ -31,8 +31,7 @@ $productVersion = $versionMatch.Groups[1].Value
 
 $trustPath = Join-Path $repository 'src\CA-O.Shared\Updates\ReleaseTrust.cs'
 if (-not (Test-Path $trustPath)) { throw "Trust anchor not found: $trustPath" }
-$trustMatch = [regex]::Match((Get-Content $trustPath -Raw), 'SigningCertificateBase64\s*=\s*"([^"]+)"')
-if (-not $trustMatch.Success) { throw "SigningCertificateBase64 not found in ReleaseTrust.cs" }
+$trustSource = Get-Content $trustPath -Raw
 
 $zip = Join-Path $repository "artifacts\CA-O-$productVersion-win-x64.zip"
 $manifestPath = "$zip.manifest.json"
@@ -42,27 +41,48 @@ if (-not (Test-Path $zip)) { throw "Missing distributable ZIP: $zip" }
 if (-not (Test-Path $manifestPath)) { throw "Missing signed manifest: $manifestPath" }
 if (-not (Test-Path $signaturePath)) { throw "Missing manifest signature: $signaturePath" }
 
-$certificate = $null
-$publicKey = $null
-try {
-    $certificate = [System.Security.Cryptography.X509Certificates.X509Certificate2]::new(
-        [byte[]][Convert]::FromBase64String($trustMatch.Groups[1].Value))
-    $publicKey = [System.Security.Cryptography.X509Certificates.RSACertificateExtensions]::GetRSAPublicKey($certificate)
-    if ($null -eq $publicKey) { throw "Trust anchor is not an RSA certificate." }
-    if ($publicKey.KeySize -lt 3072) { throw "Trust anchor key is $($publicKey.KeySize) bits; expected >= 3072." }
+$manifestBytes = [IO.File]::ReadAllBytes($manifestPath)
+$signatureBytes = [Convert]::FromBase64String(([IO.File]::ReadAllText($signaturePath)).Trim())
 
-    $manifestBytes = [IO.File]::ReadAllBytes($manifestPath)
-    $signatureBytes = [Convert]::FromBase64String(([IO.File]::ReadAllText($signaturePath)).Trim())
-    $signatureOk = $publicKey.VerifyData(
-        $manifestBytes,
-        $signatureBytes,
-        [System.Security.Cryptography.HashAlgorithmName]::SHA256,
-        [System.Security.Cryptography.RSASignaturePadding]::Pkcs1)
-    if (-not $signatureOk) { throw "Manifest signature does not verify against the embedded trust anchor." }
+# Las dos anclas son validas: Primary para el dia a dia, Recovery para una
+# transicion si la primera se pierde o se compromete.
+$trustAnchors = @(
+    @{ Role = 'primary';  Pattern = 'SigningCertificateBase64\s*=\s*"([^"]+)"' },
+    @{ Role = 'recovery'; Pattern = 'RecoveryCertificateBase64\s*=\s*"([^"]+)"' }
+)
+
+$matchedRole = $null
+foreach ($anchor in $trustAnchors) {
+    $match = [regex]::Match($trustSource, $anchor.Pattern)
+    if (-not $match.Success) { throw "$($anchor.Role) trust anchor not found in ReleaseTrust.cs" }
+
+    $certificate = $null
+    $publicKey = $null
+    try {
+        $certificate = [System.Security.Cryptography.X509Certificates.X509Certificate2]::new(
+            [byte[]][Convert]::FromBase64String($match.Groups[1].Value))
+        $publicKey = [System.Security.Cryptography.X509Certificates.RSACertificateExtensions]::GetRSAPublicKey($certificate)
+        if ($null -eq $publicKey) { throw "$($anchor.Role) trust anchor is not an RSA certificate." }
+        if ($publicKey.KeySize -lt 3072) { throw "$($anchor.Role) trust anchor key is $($publicKey.KeySize) bits; expected >= 3072." }
+
+        $signatureOk = $publicKey.VerifyData(
+            $manifestBytes,
+            $signatureBytes,
+            [System.Security.Cryptography.HashAlgorithmName]::SHA256,
+            [System.Security.Cryptography.RSASignaturePadding]::Pkcs1)
+        if ($signatureOk) {
+            $matchedRole = $anchor.Role
+            break
+        }
+    }
+    finally {
+        if ($null -ne $publicKey) { $publicKey.Dispose() }
+        if ($null -ne $certificate) { $certificate.Dispose() }
+    }
 }
-finally {
-    if ($null -ne $publicKey) { $publicKey.Dispose() }
-    if ($null -ne $certificate) { $certificate.Dispose() }
+
+if ($null -eq $matchedRole) {
+    throw "Manifest signature does not verify against the primary or recovery anchor."
 }
 
 $manifest = [IO.File]::ReadAllText($manifestPath) | ConvertFrom-Json
@@ -74,4 +94,4 @@ if ($manifest.version -ne $productVersion) { throw "Manifest version mismatch: $
 $zipHash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant()
 if ($manifest.sha256 -ne $zipHash) { throw "Manifest SHA-256 mismatch." }
 
-Write-Host "Signed manifest verified for CA-O $productVersion." -ForegroundColor Green
+Write-Host "Signed manifest verified for CA-O $productVersion (key: $matchedRole)." -ForegroundColor Green

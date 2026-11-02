@@ -6,9 +6,16 @@ using System.Text;
 namespace CAO.Shared.Updates;
 
 /// <summary>Resultado de verificar un paquete contra su manifiesto firmado.</summary>
-public sealed record ReleaseVerificationResult(bool IsValid, string Code, string? Detail = null)
+public sealed record ReleaseVerificationResult(
+    bool IsValid,
+    string Code,
+    string? Detail = null,
+    string? KeyThumbprint = null)
 {
     public static ReleaseVerificationResult Valid { get; } = new(true, "ok");
+
+    public static ReleaseVerificationResult ValidWith(string keyThumbprint) =>
+        new(true, "ok", null, keyThumbprint);
 
     public static ReleaseVerificationResult Fail(string code, string? detail = null) =>
         new(false, code, detail);
@@ -16,9 +23,10 @@ public sealed record ReleaseVerificationResult(bool IsValid, string Code, string
 
 /// <summary>
 /// Verificacion fail-closed de un update: descarga el manifiesto y su firma
-/// desde el mismo release que el ZIP, valida la firma contra el ancla clavada,
-/// comprueba que el manifiesto corresponde al asset/version pedidos y solo
-/// entonces compara tamano y SHA-256 del fichero descargado.
+/// desde el mismo release que el ZIP, valida la firma contra las anclas
+/// clavadas (Primary o Recovery), comprueba que el manifiesto corresponde al
+/// asset/version pedidos y solo entonces compara tamano y SHA-256 del fichero
+/// descargado.
 ///
 /// El orden importa: nada del manifiesto se usa como dato de confianza antes
 /// de verificar la firma. Y si cualquier paso falla, no se instala.
@@ -31,7 +39,7 @@ public static class ReleaseUpdateVerifier
         string? expectedVersion = null,
         long? expectedBytes = null,
         HttpClient? http = null,
-        X509Certificate2? trustAnchor = null,
+        IReadOnlyList<X509Certificate2>? trustAnchors = null,
         CancellationToken cancellationToken = default)
     {
         if (!Uri.TryCreate(packageUrl, UriKind.Absolute, out var uri) ||
@@ -96,17 +104,29 @@ public static class ReleaseUpdateVerifier
             return ReleaseVerificationResult.Fail("signature-invalid");
         }
 
-        if (trustAnchor is not null)
+        if (trustAnchors is { Count: > 0 })
         {
             return await VerifyCoreAsync(
                 packagePath, manifestBytes, signature, assetName, expectedVersion, expectedBytes,
-                trustAnchor, cancellationToken).ConfigureAwait(false);
+                trustAnchors, cancellationToken).ConfigureAwait(false);
         }
 
-        using var pinned = ReleaseTrust.LoadSigningCertificate();
-        return await VerifyCoreAsync(
-            packagePath, manifestBytes, signature, assetName, expectedVersion, expectedBytes,
-            pinned, cancellationToken).ConfigureAwait(false);
+        // Produccion: Primary o Recovery. Cualquiera de las dos es una raiz
+        // valida; la Recovery existe para no quedarse sin poder firmar.
+        var pinned = ReleaseTrust.LoadTrustAnchors();
+        try
+        {
+            return await VerifyCoreAsync(
+                packagePath, manifestBytes, signature, assetName, expectedVersion, expectedBytes,
+                pinned, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            foreach (var certificate in pinned)
+            {
+                certificate.Dispose();
+            }
+        }
     }
 
     private static async Task<ReleaseVerificationResult> VerifyCoreAsync(
@@ -116,7 +136,7 @@ public static class ReleaseUpdateVerifier
         string assetName,
         string? expectedVersion,
         long? expectedBytes,
-        X509Certificate2 trustAnchor,
+        IReadOnlyList<X509Certificate2> trustAnchors,
         CancellationToken cancellationToken)
     {
         if (!ReleaseManifest.TryParse(manifestBytes, out var manifest, out var parseFailure))
@@ -124,7 +144,8 @@ public static class ReleaseUpdateVerifier
             return ReleaseVerificationResult.Fail(parseFailure);
         }
 
-        if (!ReleaseSignatureVerifier.VerifyDetached(manifestBytes, signature, trustAnchor))
+        if (!ReleaseSignatureVerifier.VerifyDetachedAny(
+                manifestBytes, signature, trustAnchors, out var matchedThumbprint))
         {
             return ReleaseVerificationResult.Fail("signature-invalid");
         }
@@ -162,7 +183,7 @@ public static class ReleaseUpdateVerifier
             return ReleaseVerificationResult.Fail("hash-mismatch");
         }
 
-        return ReleaseVerificationResult.Valid;
+        return ReleaseVerificationResult.ValidWith(matchedThumbprint!);
     }
 
     private static async Task<byte[]?> FetchAsync(

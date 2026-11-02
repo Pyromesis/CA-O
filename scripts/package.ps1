@@ -9,7 +9,9 @@
 #>
 
 param(
-    [switch]$SkipSigning
+    [switch]$SkipSigning,
+    [ValidateSet('Primary', 'Recovery')]
+    [string]$KeyRole = 'Primary'
 )
 
 Set-StrictMode -Version Latest
@@ -69,8 +71,8 @@ if ($SkipSigning) {
     Write-Warning "-SkipSigning: el paquete NO lleva manifiesto firmado y NO debe publicarse."
 } else {
     if (-not (Test-Path $signScript)) { throw "No existe $signScript" }
-    & $signScript -ZipPath $stableZip
-    Write-Host "== Manifiesto firmado: $stableName.manifest.json ==" -ForegroundColor Green
+    & $signScript -ZipPath $stableZip -KeyRole $KeyRole
+    Write-Host "== Manifiesto firmado ($KeyRole): $stableName.manifest.json ==" -ForegroundColor Green
 }
 
 # Retencion: cada release sellaba un zip con timestamp + copia estable sin

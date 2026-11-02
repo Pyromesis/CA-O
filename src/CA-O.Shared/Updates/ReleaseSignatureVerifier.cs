@@ -47,4 +47,39 @@ public static class ReleaseSignatureVerifier
 
         return rsa.VerifyData(data, signature, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
     }
+
+    /// <summary>
+    /// Prueba la firma contra varias anclas (Primary y Recovery). Devuelve el
+    /// thumbprint del certificado que valido; <c>null</c> si ninguna.
+    /// </summary>
+    public static bool VerifyDetachedAny(
+        ReadOnlySpan<byte> data,
+        ReadOnlySpan<byte> signature,
+        IReadOnlyList<X509Certificate2> certificates,
+        out string? matchedThumbprint) =>
+        VerifyDetachedAny(data, signature, certificates, DateTimeOffset.UtcNow, out matchedThumbprint);
+
+    /// <summary>
+    /// Prueba la firma contra varias anclas con un instante explicito, para
+    /// tests de validez temporal.
+    /// </summary>
+    public static bool VerifyDetachedAny(
+        ReadOnlySpan<byte> data,
+        ReadOnlySpan<byte> signature,
+        IReadOnlyList<X509Certificate2> certificates,
+        DateTimeOffset now,
+        out string? matchedThumbprint)
+    {
+        foreach (var certificate in certificates)
+        {
+            if (VerifyDetached(data, signature, certificate, now))
+            {
+                matchedThumbprint = certificate.Thumbprint;
+                return true;
+            }
+        }
+
+        matchedThumbprint = null;
+        return false;
+    }
 }
