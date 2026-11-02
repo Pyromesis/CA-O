@@ -58,7 +58,10 @@ La cancelación solo se atiende antes de SNAPSHOT/APPLY; durante APPLY es atómi
 
 ### Cadena de suministro
 - CodeQL + NuGet audit en CI (`.github/workflows/ci.yml`), Dependabot semanal.
-- Release `v2.1.34` firma Authenticode con timestamp cuando existe certificado (`CAO_SIGN_THUMBPRINT`) y genera `SHA256SUMS.txt` + **SBOM CycloneDX 1.7 `bom.json` 67 packages** (`artifacts/sbom/bom.json`). El auto-updater no exige firma (sin certificado disponible): verifica el SHA-256 del ZIP contra el sidecar `.sha256` del release; la firma solo se comprueba de forma informativa.
+- **Actualizaciones con firma obligatoria**: cada ZIP distribuible publica `*.manifest.json` (schema, versión, asset, tamaño y SHA-256) y `*.manifest.sig` (RSA-3072, PKCS#1 v1.5/SHA-256 sobre los bytes exactos del manifiesto). La app y `CA-O.Setup` verifican la firma contra el certificado público autofirmado compilado en `CAO.Shared.Updates.ReleaseTrust` y **fallan cerrados** si falta el manifiesto, la firma no valida, el asset/versión no coincide o el SHA-256 difiere. El SHA-256 aislado ya no se acepta: quien puede reemplazar el ZIP puede reemplazar también su sidecar `.sha256`.
+- La clave privada no entra nunca en el repositorio: vive en `%USERPROFILE%\.cao\release-signing` y se genera con `scripts/generate-release-key.ps1`. `scripts/package.ps1` firma el paquete estable y falla si no encuentra la clave (salvo `-SkipSigning` para builds locales no publicables). `scripts/verify-release.ps1` verifica el manifiesto firmado antes de publicar.
+- No se exige certificado comercial: el ancla es el certificado autofirmado clavado en el binario. Authenticode (`CAO_SIGN_THUMBPRINT`) sigue siendo opcional e informativo, no la base de confianza.
+- Release `v2.1.34` firma Authenticode con timestamp cuando existe certificado (`CAO_SIGN_THUMBPRINT`) y genera `SHA256SUMS.txt` + **SBOM CycloneDX 1.7 `bom.json` 67 packages** (`artifacts/sbom/bom.json`). El updater usa `SHA256SUMS.txt`/`.sha256` solo como verificación manual; la puerta de instalación es el manifiesto firmado.
 
 ## Reporte de vulnerabilidades
 

@@ -57,39 +57,6 @@ public sealed class AppUpdaterTests
         Assert.Null(AppUpdater.SelectFullPackageAsset(assets));
     }
 
-    [Theory]
-    [InlineData("ABCDEF0123456789abcdef0123456789ABCDEF0123456789abcdef0123456789  CA-O-2.1.6-win-x64.zip\n", "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789")]
-    [InlineData("abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789", "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789")]
-    [InlineData("", null)]
-    [InlineData("not-a-hash  file.zip", null)]
-    [InlineData("xyz  file.zip", null)]
-    [InlineData("abc", null)]
-    public void TryParseSha256Sidecar_ParsesOrRejects(string content, string? expected)
-    {
-        Assert.Equal(expected, AppUpdater.TryParseSha256Sidecar(content));
-    }
-
-    [Fact]
-    public void VerifyFileHash_MatchesAndRejectsTampered()
-    {
-        var path = Path.Combine(Path.GetTempPath(), "CA-O-Test-" + Guid.NewGuid().ToString("N") + ".bin");
-        try
-        {
-            File.WriteAllBytes(path, new byte[] { 1, 2, 3, 4 });
-            var hex = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(new byte[] { 1, 2, 3, 4 }));
-            Assert.True(AppUpdater.VerifyFileHash(path, hex));
-            Assert.True(AppUpdater.VerifyFileHash(path, hex.ToLowerInvariant()));
-            Assert.False(AppUpdater.VerifyFileHash(path, new string('0', 64)));
-            Assert.False(AppUpdater.VerifyFileHash(path, ""));
-            File.WriteAllBytes(path, new byte[] { 9 });
-            Assert.False(AppUpdater.VerifyFileHash(path, hex));
-        }
-        finally
-        {
-            try { File.Delete(path); } catch { }
-        }
-    }
-
     [Fact]
     public async Task DownloadAsync_AbortsOverCapAndDeletesPartial()
     {

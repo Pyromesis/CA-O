@@ -2,6 +2,12 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
+## [Sin publicar]
+### Seguridad
+- **El updater ya no confía en el SHA-256 suelto.** Cada ZIP distribuible publica un manifiesto (`schema`, versión, asset, tamaño y SHA-256) firmado con RSA-3072/PKCS#1-SHA-256. La app y `CA-O.Setup` verifican la firma contra un certificado público autofirmado compilado en `CAO.Shared.Updates.ReleaseTrust` y fallan cerrados si falta el manifiesto o la firma, si no validan, o si el asset/versión/tamaño/hash no coinciden. El sidecar `.sha256` queda para verificación manual, no autoriza instalar. No se exige certificado comercial: la clave privada vive fuera del repositorio.
+### Corregido
+- **Presets de overclock fuera de su propio rango.** `nvidia.gpu.powerLimit` y `amd.gpu.powerLimit` declaraban 0–100 % mientras sus perfiles pedían 120 %. Ahora el rango de catálogo es 50–150 % (100 = stock; el backend recorta contra el mínimo/máximo real del driver) y `CatalogValidator` rechaza cualquier preset que no quepa en el rango declarado, con tests que recorren todo el catálogo.
+
 ## [2.2.21] - 2026-10-27
 ### Corregido
 - **Aplicar una optimización ya no puede retirar el servicio privilegiado de CA-O.** `delay-safe-third-party-service-start` enumeraba todos los servicios automáticos y podía marcar `CAO.Privileged` como inicio retrasado. Ahora el servicio propio se excluye siempre, por nombre canónico, por nombre visible y por procedencia del binario (cualquier ejecutable bajo `Program Files\CA-O`, `ProgramData\CA-O` o el directorio de la app), aunque esté renombrado o instalado en una ruta de desarrollo. `Capture`, `Apply`, `Detect` y `Preview` comparten el mismo filtro, así que tampoco se captura ni se revierte nada del servicio propio.

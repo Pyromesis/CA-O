@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using CAO.Shared.Updates;
 using Microsoft.Win32;
 using System.Windows.Forms;
 
@@ -107,6 +108,22 @@ static async Task<int> RunInstallAsync(SetupForm ui, string productVersion, stri
                         "Descargando paquete (~450 MB)...",
                         total > 0 ? $"{mb} / {total} MB" : $"{mb} MB descargados"), ct);
                 Log($"Descargado {tmpZip} ({new FileInfo(tmpZip).Length / 1024 / 1024} MB)");
+
+                // Fail-closed: sin manifiesto firmado valido no se extrae ni se
+                // instala nada. El SHA-256 del sidecar .sha256 ya no se usa como
+                // unica prueba: quien puede reemplazar el ZIP puede reemplazar
+                // tambien el sidecar.
+                ui.Report(56, "Verificando firma del paquete...", "Comprobando manifiesto firmado y SHA-256...");
+                var verification = await ReleaseUpdateVerifier.VerifyDownloadAsync(
+                    tmpZip, url, cancellationToken: ct);
+                if (!verification.IsValid)
+                {
+                    try { File.Delete(tmpZip); } catch { }
+                    throw new InvalidOperationException(
+                        $"El paquete no supera la verificacion de firma ({verification.Code}). " +
+                        "Descarga manual: https://github.com/Pyromesis/CA-O/releases/latest");
+                }
+                Log("Firma del paquete verificada (manifiesto RSA-3072 + SHA-256).");
                 downloaded = true;
                 break;
             }
@@ -339,7 +356,8 @@ static async Task<string?> GetLatestFullAssetUrlAsync(Action<string> log, Cancel
             var dl = asset.TryGetProperty("browser_download_url", out var u) ? u.GetString() ?? "" : "";
             if (name.EndsWith("-win-x64.zip", StringComparison.OrdinalIgnoreCase) &&
                 !name.StartsWith("CA-O-Setup-GUI", StringComparison.OrdinalIgnoreCase) &&
-                Uri.TryCreate(dl, UriKind.Absolute, out _))
+                Uri.TryCreate(dl, UriKind.Absolute, out var uri) &&
+                uri.Scheme.Equals("https", StringComparison.OrdinalIgnoreCase))
                 return dl;
         }
         return null;

@@ -3,6 +3,7 @@ using System.IO;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using CAO.Shared;
+using CAO.Shared.Updates;
 using CAO.UI.Helpers;
 
 namespace CAO.UI.Pages;
@@ -594,32 +595,25 @@ public sealed partial class SettingsPage : Page
                     : 2L * 1024 * 1024 * 1024;
                 await Task.Run(() => Helpers.AppUpdater.DownloadAsync(downloadUrl, zipPath, progress, cts.Token, maxBytes), cts.Token);
 
-                // Verifica integridad: el tamaño debe coincidir con el anunciado por el release.
-                var expectedBytes = _uiState.LatestAssetBytes;
-                var actualBytes = new FileInfo(zipPath).Length;
-                if (expectedBytes > 0 && actualBytes != expectedBytes)
+                // Verificación fail-closed: el ZIP debe coincidir con el
+                // manifiesto firmado del release (RSA-3072, ancla clavada en
+                // CA-O). El SHA-256 solo ya no basta: un atacante con acceso
+                // al release podía sustituir ZIP y sidecar a la vez. Sin
+                // manifiesto, sin firma válida o con hash distinto no se
+                // instala nada y el paquete se borra.
+                UpdateDetailText.Text = "Verificando firma del release...";
+                var verification = await ReleaseUpdateVerifier.VerifyDownloadAsync(
+                    zipPath,
+                    downloadUrl,
+                    _uiState.LatestVersion,
+                    _uiState.LatestAssetBytes > 0 ? _uiState.LatestAssetBytes : null,
+                    cancellationToken: cts.Token);
+                if (!verification.IsValid)
                 {
                     try { File.Delete(zipPath); } catch { }
-                    throw new InvalidOperationException($"Descarga incompleta ({actualBytes} de {expectedBytes} bytes). Reintenta.");
+                    throw new InvalidOperationException(DescribeReleaseVerificationFailure(verification));
                 }
-                // Verifica hash SHA-256 contra el sidecar publicado junto al
-                // asset (detecta corrupción o sustitución en tránsito).
-                // FAIL-CLOSED: sin sidecar no se instala nada (antes se
-                // seguía con "solo tamaño + aviso": un release comprometido
-                // colaba cualquier binario). Borra y manda a descarga manual.
-                UpdateDetailText.Text = "Verificando hash SHA-256...";
-                var expectedHash = await Task.Run(() => Helpers.AppUpdater.TryFetchExpectedHashAsync(downloadUrl, cts.Token), cts.Token);
-                if (string.IsNullOrWhiteSpace(expectedHash))
-                {
-                    try { File.Delete(zipPath); } catch { }
-                    throw new InvalidOperationException("Esta versión no publica hash SHA-256: no se puede verificar la descarga. Borrada por seguridad — descarga el ZIP a mano desde GitHub.");
-                }
-                var hashOk = await Task.Run(() => Helpers.AppUpdater.VerifyFileHash(zipPath, expectedHash), cts.Token);
-                if (!hashOk)
-                {
-                    try { File.Delete(zipPath); } catch { }
-                    throw new InvalidOperationException("El hash SHA-256 no coincide: descarga corrupta o manipulada. Borrada por seguridad, reintenta.");
-                }
+                UpdateDetailText.Text = "Paquete verificado (manifiesto firmado + SHA-256).";
                 // Quita Mark-of-the-Web del ZIP para que lo extraído no lo herede
                 // (SmartScreen frenaba el instalador auto-lanzado en silencio).
                 Helpers.AppUpdater.UnblockTree(zipPath);
@@ -673,16 +667,15 @@ public sealed partial class SettingsPage : Page
                     UpdateDetailText.Text = "Ruta del instalador no válida. Abortado por seguridad.";
                     return;
                 }
-                // El instalador se lanza elevado. El proyecto no firma Authenticode
-                // (sin certificado: sign.ps1 omite la firma): la confianza viene
-                // del hash SHA-256 del ZIP ya verificado contra el sidecar del
-                // release. Si el binario trae firma válida se informa; su
-                // ausencia ya no bloquea la instalación.
+                // El instalador se lanza elevado. La confianza ya está tomada:
+                // manifiesto firmado + SHA-256 del ZIP. Authenticode se informa
+                // como señal extra, pero no es obligatorio (el proyecto no
+                // compra un certificado comercial).
                 UpdateDetailText.Text = "Verificando instalador...";
                 var signatureOk = await Task.Run(() => Helpers.AppUpdater.HasValidAuthenticodeSignature(canonicalInstaller), cts.Token);
                 UpdateDetailText.Text = signatureOk
-                    ? "Instalador verificado (firma Authenticode válida + hash SHA-256 del paquete)."
-                    : "Instalador verificado por hash SHA-256 del paquete (proyecto sin certificado Authenticode).";
+                    ? "Instalador verificado (manifiesto firmado + SHA-256 + Authenticode)."
+                    : "Instalador verificado (manifiesto firmado + SHA-256; sin Authenticode, no es obligatorio).";
 
                 // Handoff con confirmación: antes la app se cerraba sola y si
                 // el instalador no aparecía (UAC cancelado, crash) el usuario
@@ -781,6 +774,33 @@ public sealed partial class SettingsPage : Page
         }
         catch { return true; }
     }
+
+    private static string DescribeReleaseVerificationFailure(ReleaseVerificationResult result) =>
+        result.Code switch
+        {
+            "manifest-unavailable" =>
+                "Este release no publica un manifiesto firmado: no se puede verificar la descarga. Borrada por seguridad — descarga el ZIP a mano desde GitHub.",
+            "signature-unavailable" =>
+                "El manifiesto del release no trae firma: no se puede verificar la descarga. Borrada por seguridad — descarga el ZIP a mano desde GitHub.",
+            "manifest-invalid" =>
+                "El manifiesto del release no es válido. Descarga abortada por seguridad.",
+            "signature-invalid" =>
+                "La firma del manifiesto no es válida: el paquete no procede de CA-O. Descarga borrada por seguridad.",
+            "asset-mismatch" =>
+                "El manifiesto firmado corresponde a otro archivo. Descarga abortada por seguridad.",
+            "version-mismatch" =>
+                "El manifiesto firmado corresponde a otra versión. Descarga abortada por seguridad.",
+            "size-mismatch" =>
+                "El tamaño del paquete no coincide con el manifiesto firmado. Descarga borrada; reintenta.",
+            "hash-mismatch" =>
+                "El hash SHA-256 no coincide con el manifiesto firmado: descarga corrupta o manipulada. Borrada por seguridad.",
+            "package-missing" =>
+                "No se encontró el paquete descargado. Reintenta.",
+            "url-insecure" =>
+                "La URL de descarga no es HTTPS. Actualización abortada.",
+            _ =>
+                $"No se pudo verificar el release ({result.Code}). Descarga abortada por seguridad.",
+        };
 
     /// <summary>
     /// Tag de release confiable: forma de versión (v2.1.32, 2.1.32, con

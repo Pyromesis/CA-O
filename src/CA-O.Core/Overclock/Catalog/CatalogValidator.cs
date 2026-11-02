@@ -37,6 +37,7 @@ public static class CatalogValidator
         foreach (var knob in knobs)
         {
             ValidateRange(knob, violations);
+            ValidatePresets(knob, violations);
             ValidateEvidence(knob, violations);
             ValidateDependenciesExist(knob, knobs, violations);
         }
@@ -69,6 +70,20 @@ public static class CatalogValidator
         if (knob.Range.Allowed is not { Count: > 0 })
         {
             violations.Add(new CatalogViolation(knob.Id, "empty-discrete-range", "catalog_knob_range_empty"));
+        }
+    }
+
+    /// <summary>
+    /// Un preset fuera de <see cref="OverclockKnob.Range"/> es un catalogo que se
+    /// contradice: la UI muestra un rango y el perfil escribe otro valor. El
+    /// backend puede recortar contra el driver, pero eso no arregla el contrato.
+    /// </summary>
+    private static void ValidatePresets(OverclockKnob knob, ICollection<CatalogViolation> violations)
+    {
+        foreach (var preset in knob.Presets.Where(p => !knob.Range.Accepts(p.Value)))
+        {
+            violations.Add(new CatalogViolation(knob.Id, "preset-out-of-range",
+                "catalog_knob_preset_out_of_range"));
         }
     }
 

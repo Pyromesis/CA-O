@@ -34,12 +34,14 @@ CA-O manipula Registry, Services, Power, Network y Boot (vía optimizaciones tip
 | **Downgrade / Protocol confusion** | Version | `ProtocolVersion` 2 exacto, `AppVersion.Semantic` (`2.2.21`) en manifest, UI y Service rechazan mismatch `CAO-IPC-001`; `ApplicationVersion`/`SchemaVersion`/`CatalogVersion` futuros a extender. | `IpcRequestValidator` + `CAO.Integration.Tests/DocumentationCodeConsistencyTests` |
 | **Audit tampering** | `history.jsonl` | Hash chain + `RequestId`/`CallerSid`/`TimestampUtc` por entrada; corrupción → warning explícito, no `PASS`. | `HistoryHashChainTests` |
 | **Cancellation leaving half-state** | Apply atomicity | `CancellationToken.None` durante `APPLY`/`VERIFY`, checkpoints solo antes de snapshot; `CancellationDeferred` reportado. | `CancellationSafetyTests` |
+| **Update substitution / malicious release** | GitHub Release assets | Manifiesto `*.manifest.json` firmado (RSA-3072, PKCS#1/SHA-256) + `*.manifest.sig`; ancla pública autofirmada en `CAO.Shared.Updates.ReleaseTrust`. Updater y `CA-O.Setup` verifican firma → asset/versión → tamaño → SHA-256 y fallan cerrados. El sidecar `.sha256` suelto ya no autoriza una instalación. | `ReleaseVerificationTests`, `scripts/verify-release.ps1` |
 
 ## Residual Risks & Acceptance
 - **ETW attribution por driver**: muestreo %DPC/`%Interrupt` por contadores, no por traza kernel — documentado como limitación, no se presenta como `Confirmed root cause` sino `Observed contributor` (Fase 40).
 - **WPR ETW collector**: requiere trazas kernel futuras; no se finge precisión.
-- **Instalador sin certificado**: sin `CAO_SIGN_THUMBPRINT` artefactos quedan sin Authenticode (warning explícito en `sign.ps1`). El auto-updater acepta paquetes sin firma verificando el SHA-256 del ZIP contra el sidecar del release (riesgo aceptado y documentado: un atacante con escritura en el release podría sustituir ambos; mitigado por firma de commits y control de acceso al repo).
-- **DLL search order / Binary replacement**: mitigado por ruta absoluta y servicio ` Demand start`, pero sin firma obligatoria en dev; aceptado hasta firma en release.
+- **Compromiso de la clave de firma de releases**: si el `.pfx` se filtra, un atacante puede firmar manifiestos que CA-O aceptaría. Mitigación: clave fuera del repositorio, ACL restringida al usuario y backup offline; rotación = publicar una versión nueva con el ancla actualizada en `ReleaseTrust`. Las versiones ya instaladas siguen confiando en el ancla vieja, así que la rotación requiere descarga manual o una transición firmada con ambas claves. Riesgo aceptado y documentado.
+- **Releases anteriores al manifiesto firmado**: no se auto-instalan con el updater nuevo; se descargan a mano desde GitHub. Es el precio de no aceptar paquetes sin procedencia verificable.
+- **DLL search order / Binary replacement**: mitigado por ruta absoluta y servicio `Demand start`; en release la procedencia del paquete está firmada. En builds de desarrollo (`-SkipSigning`) no hay firma y el paquete no debe publicarse.
 
 ## Verification
 - `scripts/verify.ps1` gates build+test+contracts; `dotnet audit` 0 vulnerables; `CodeQL` en CI; `Dependabot` semanal (revisión disciplinada, no auto-merge ciego per Fase 64).

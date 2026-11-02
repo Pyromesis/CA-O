@@ -644,6 +644,7 @@ public sealed class OverclockCatalogTests
 {
     private static IReadOnlyList<OverclockKnob> DefaultKnobs() =>
         OverclockCatalog.NvidiaGpuKnobs
+            .Concat(OverclockCatalog.AmdGpuKnobs)
             .Concat(OverclockCatalog.CpuPolicyKnobs)
             .Concat(OverclockCatalog.MemoryKnobs)
             .ToArray();
@@ -694,6 +695,35 @@ public sealed class OverclockCatalogTests
 
         Assert.False(validation.IsValid);
         Assert.Contains(validation.Violations, v => v.Rule == "duplicate-id");
+    }
+
+    [Fact]
+    public void Catalog_Validate_RejectsPresetsOutsideTheirRange()
+    {
+        var knob = OverclockTestKnobs.Scalar("a", min: 0, max: 100) with
+        {
+            Presets = [new KnobPreset(OverclockProfile.Performance, 120d, "preset_performance")],
+        };
+
+        var validation = CatalogValidator.Validate([knob]);
+
+        Assert.False(validation.IsValid);
+        Assert.Contains(validation.Violations, v => v.Rule == "preset-out-of-range");
+    }
+
+    [Fact]
+    public void Catalog_EveryPreset_IsInsideItsDeclaredRange()
+    {
+        // Un perfil no puede pedir un valor que el propio knob declara imposible.
+        // El backend recorta contra el driver, pero el catalogo es el contrato que
+        // ve la UI: si se contradice, el preset miente antes de llegar al hardware.
+        var offenders = DefaultKnobs()
+            .SelectMany(knob => knob.Presets.Select(preset => (knob, preset)))
+            .Where(pair => !pair.knob.Range.Accepts(pair.preset.Value))
+            .Select(pair => $"{pair.knob.Id.Value}/{pair.preset.Profile}={pair.preset.Value.Scalar}")
+            .ToArray();
+
+        Assert.Empty(offenders);
     }
 
     [Fact]
@@ -758,8 +788,9 @@ public sealed class OverclockCatalogTests
         // Trampa real del lenguaje: (Performance, 120) con literal int cae en
         // implicit operator KnobValue(int) => FromIndex, no FromScalar. Un preset
         // escalar guardado como indice es Scalar=0 y el tuning creeria que el techo
-        // ya esta alcanzado. Los presets pueden superar el rango (el backend recorta
-        // contra los limites del driver), pero nunca pueden ser indices.
+        // ya esta alcanzado. Ademas, todo preset tiene que caber en su rango
+        // declarado (CatalogValidator lo exige); lo unico que queda fuera de
+        // discusion es que pueda ser un indice.
         var knobs = OverclockCatalog.NvidiaGpuKnobs
             .Concat(OverclockCatalog.AmdGpuKnobs)
             .Concat(OverclockCatalog.CpuPolicyKnobs)

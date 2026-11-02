@@ -276,53 +276,6 @@ public static class AppUpdater
     }
 
     /// <summary>
-    /// Parsea un sidecar "<hex64>  <nombre>" (formato .sha256 de releases).
-    /// null si no hay un hash válido.
-    /// </summary>
-    public static string? TryParseSha256Sidecar(string? content)
-    {
-        if (string.IsNullOrWhiteSpace(content)) return null;
-        var firstLine = content.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
-        var token = firstLine?.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
-        if (token is not null && token.Length == 64 &&
-            token.All(c => (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')))
-            return token.ToLowerInvariant();
-        return null;
-    }
-
-    /// <summary>SHA-256 de un fichero comparado con el esperado. Puro.</summary>
-    public static bool VerifyFileHash(string path, string expectedHex)
-    {
-        if (string.IsNullOrWhiteSpace(expectedHex)) return false;
-        using var sha = System.Security.Cryptography.SHA256.Create();
-        using var stream = File.OpenRead(path);
-        var actual = Convert.ToHexString(sha.ComputeHash(stream));
-        return actual.Equals(expectedHex.Trim(), StringComparison.OrdinalIgnoreCase);
-    }
-
-    /// <summary>
-    /// Descarga el sidecar "<zipUrl>.sha256" publicado junto al asset.
-    /// null si no existe (releases antiguos) o falla la red: el llamante
-    /// decide (verificar tamaño + aviso, nunca instalar a ciegas sin avisar).
-    /// </summary>
-    public static async Task<string?> TryFetchExpectedHashAsync(string zipUrl, CancellationToken ct = default)
-    {
-        try
-        {
-            using var http = CreateClient(TimeSpan.FromSeconds(30));
-            using var response = await http.GetAsync(zipUrl + ".sha256", ct).ConfigureAwait(false);
-            if (!response.IsSuccessStatusCode) return null;
-            var content = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
-            if (content.Length > 4096) return null;
-            return TryParseSha256Sidecar(content);
-        }
-        catch
-        {
-            return null;
-        }
-    }
-
-    /// <summary>
     /// Verifica la firma Authenticode del fichero con WinVerifyTrust (la
     /// validación del propio Windows: cadena a raíz confiable + timestamp).
     /// true solo si el sistema la da por válida. Sin firma, corrupta o con

@@ -20,8 +20,13 @@ public static class OverclockCatalog
     /// <summary>Knobs for NVIDIA GPUs, served by nvapi64.dll.</summary>
     public static IReadOnlyList<OverclockKnob> NvidiaGpuKnobs { get; } =
     [
+        // El rango es el sobre del catalogo, no el limite final del hardware:
+        // 100 = potencia de fabrica y el perfil Performance pide 120. El backend
+        // recorta contra el min/max que reporta el driver, asi que 150 solo se
+        // escribe en tarjetas que de verdad lo admiten. Un rango 0-100 dejaba a
+        // los presets fuera de su propio contrato.
         Build(new KnobId("nvidia.gpu.powerLimit"), OverclockComponent.Gpu,
-            KnobRange.Scalar(0, 100), 1, KnobUnit.Percent, RiskLevel.Moderate, EvidenceLevel.Vendor,
+            KnobRange.Scalar(50, 150), 1, KnobUnit.Percent, RiskLevel.Moderate, EvidenceLevel.Vendor,
             "knob_nvidia_power_limit", "knob_nvidia_power_limit_desc", requiresReboot: false,
             presets:
             [
@@ -97,8 +102,10 @@ public static class OverclockCatalog
     /// </summary>
     public static IReadOnlyList<OverclockKnob> AmdGpuKnobs { get; } =
     [
+        // Mismo sobre que NVIDIA: 100 = stock, Performance 120; ADLX recorta
+        // contra el rango que reporta la tarjeta antes de escribir nada.
         Build(new KnobId("amd.gpu.powerLimit"), OverclockComponent.Gpu,
-            KnobRange.Scalar(0, 100), 1, KnobUnit.Percent, RiskLevel.Moderate, EvidenceLevel.Vendor,
+            KnobRange.Scalar(50, 150), 1, KnobUnit.Percent, RiskLevel.Moderate, EvidenceLevel.Vendor,
             "knob_amd_power_limit", "knob_amd_power_limit_desc", requiresReboot: false,
             presets:
             [

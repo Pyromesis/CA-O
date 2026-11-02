@@ -12,4 +12,7 @@
     <SelfContained>true</SelfContained>
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
   </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\CA-O.Shared\CA-O.Shared.csproj" />
+  </ItemGroup>
 </Project>

@@ -1,9 +1,16 @@
 ﻿<# 
 .SYNOPSIS
-    CA-O Package Release Output + SHA-256 Checksums
+    CA-O Package Release Output + SHA-256 Checksums + Signed Manifest
 .DESCRIPTION
-    Creates versioned zip from release artifacts + SBOM.
+    Creates versioned zip from release artifacts + SBOM. The stable ZIP that
+    the updater downloads gets a detached RSA-3072 signature over its manifest
+    (.manifest.json + .manifest.sig). Packaging fails if the signing key is
+    missing unless -SkipSigning is used for a local, non-publishable build.
 #>
+
+param(
+    [switch]$SkipSigning
+)
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -54,6 +61,18 @@ $stableHash = (Get-FileHash $stableZip -Algorithm SHA256).Hash
 "$stableHash  $stableName" | Set-Content "$stableZip.sha256"
 Write-Host "== Estable: $stableName + .sha256 ==" -ForegroundColor Green
 
+# Firma del manifiesto: es lo que el updater y CA-O.Setup exigen de verdad.
+# El .sha256 se conserva para verificacion manual y herramientas antiguas,
+# pero ya no es la unica prueba de procedencia.
+$signScript = Join-Path $scriptRoot 'sign-release-manifest.ps1'
+if ($SkipSigning) {
+    Write-Warning "-SkipSigning: el paquete NO lleva manifiesto firmado y NO debe publicarse."
+} else {
+    if (-not (Test-Path $signScript)) { throw "No existe $signScript" }
+    & $signScript -ZipPath $stableZip
+    Write-Host "== Manifiesto firmado: $stableName.manifest.json ==" -ForegroundColor Green
+}
+
 # Retencion: cada release sellaba un zip con timestamp + copia estable sin
 # borrar nunca nada (17 GB acumulados hasta la 2.2.7). Se conservan solo los
 # ficheros de la version en curso; los antiguos ya estan publicados en
@@ -63,6 +82,12 @@ Get-ChildItem "artifacts" -Filter "CA-O-*-win-x64*.zip" -File |
     Where-Object { $_.Name -notlike $keepVersionPattern } |
     Remove-Item -Force
 Get-ChildItem "artifacts" -Filter "CA-O-*-win-x64*.zip.sha256" -File |
+    Where-Object { $_.Name -notlike $keepVersionPattern } |
+    Remove-Item -Force
+Get-ChildItem "artifacts" -Filter "CA-O-*-win-x64*.zip.manifest.json" -File |
+    Where-Object { $_.Name -notlike $keepVersionPattern } |
+    Remove-Item -Force
+Get-ChildItem "artifacts" -Filter "CA-O-*-win-x64*.zip.manifest.sig" -File |
     Where-Object { $_.Name -notlike $keepVersionPattern } |
     Remove-Item -Force
 Write-Host "== Retencion: en artifacts solo queda $ProductVersion ==" -ForegroundColor Green
