@@ -26,7 +26,7 @@
 
 .EXAMPLE
     powershell -ExecutionPolicy Bypass -File scripts\sign-release-manifest.ps1 `
-        -ZipPath artifacts\CA-O-2.2.21-win-x64.zip
+        -ZipPath artifacts\CA-O-2.2.22-win-x64.zip
 .EXAMPLE
     powershell -ExecutionPolicy Bypass -File scripts\sign-release-manifest.ps1 `
         -ZipPath artifacts\CA-O-2.2.22-win-x64.zip -KeyRole Recovery

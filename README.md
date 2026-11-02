@@ -28,7 +28,7 @@
   <a href="https://www.microsoft.com/windows"><img src="https://img.shields.io/badge/Windows%2011-0078D4?style=flat-square&logo=windows&logoColor=white" alt="Windows 11"></a>
   <a href="global.json"><img src="https://img.shields.io/badge/.NET%2010-512BD4?style=flat-square&logo=dotnet&logoColor=white" alt=".NET 10"></a>
   <a href="https://microsoft.github.io/microsoft-ui-xaml/"><img src="https://img.shields.io/badge/WinUI%203-00B7C3?style=flat-square&logo=windows&logoColor=white" alt="WinUI 3"></a>
-  <a href="https://github.com/Pyromesis/CA-O/releases/tag/v2.2.21"><img src="https://img.shields.io/badge/release-v2.2.21-blue?style=flat-square" alt="Release"></a>
+  <a href="https://github.com/Pyromesis/CA-O/releases/tag/v2.2.22"><img src="https://img.shields.io/badge/release-v2.2.22-blue?style=flat-square" alt="Release"></a>
   <a href="#pruebas"><img src="https://img.shields.io/badge/tests-2600%20passed-brightgreen?style=flat-square" alt="Tests"></a>
   <a href="#pruebas"><img src="https://img.shields.io/badge/telemetr%C3%ADa-0-00C2A8?style=flat-square" alt="Sin telemetría"></a>
 </p>
@@ -434,4 +434,4 @@ Proyecto privado: no se concede licencia de uso, copia, modificación ni distrib
 
 ---
 
-<p align="center"><i>CA-O 2.2.21 — Diagnóstico primero, evidencia después, transacción siempre.<br>Sin promesas, solo hechos medibles.</i></p>
+<p align="center"><i>CA-O 2.2.22 — Diagnóstico primero, evidencia después, transacción siempre.<br>Sin promesas, solo hechos medibles.</i></p>

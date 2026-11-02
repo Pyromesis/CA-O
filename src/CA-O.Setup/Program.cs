@@ -6,7 +6,7 @@ using System.Windows.Forms;
 // Instalador CA-O de un solo exe: ventana con progreso (sin consola).
 // Descarga el paquete, deriva al setup gráfico bonito y sale; si no hay
 // GUI, instala por aquí con la misma ventana de progreso.
-var productVersion = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "2.2.21";
+var productVersion = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "2.2.22";
 var logFile = Path.Combine(Path.GetTempPath(), "CA-O-Setup.log");
 try { File.AppendAllText(logFile, $"\n[{DateTime.Now:O}] Setup iniciado\n"); } catch { }
 

@@ -2,13 +2,14 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
-## [Sin publicar]
+## [2.2.22] - 2026-11-02
 ### Seguridad
 - **El updater ya no confía en el SHA-256 suelto.** Cada ZIP distribuible publica un manifiesto (`schema`, versión, asset, tamaño y SHA-256) firmado con RSA-3072/PKCS#1-SHA-256. La app y `CA-O.Setup` verifican la firma contra las dos anclas públicas autofirmadas compiladas en `CAO.Shared.Updates.ReleaseTrust` (`primary` y `recovery`) y fallan cerrados si falta el manifiesto o la firma, si no validan, o si el asset/versión/tamaño/hash no coinciden. El sidecar `.sha256` queda para verificación manual, no autoriza instalar.
-- **Clave de firma protegida y con recuperación.** El PFX se reexportó con contraseña robusta sin cambiar su thumbprint; la contraseña se guarda cifrada con DPAPI y la ACL se aplica con `/T` a todos los ficheros. Se añadió una segunda raíz `recovery` (RSA-3072) cuya clave privada debe mantenerse offline, para poder publicar una versión de transición si la primaria se pierde o se compromete. `protect-release-key.ps1` reexporta sin rotar la identidad, `show-release-key-password.ps1` recupera la contraseña localmente y `sign-release-manifest.ps1 -KeyRole Recovery` firma con la clave de recuperación.
+- **Clave de firma protegida y con recuperación.** El PFX se reexportó con contraseña robusta sin cambiar su thumbprint; la contraseña se guarda cifrada con DPAPI y la ACL se aplica con `F` a cada fichero y herencia en la carpeta. Se añadió una segunda raíz `recovery` (RSA-3072) cuya clave privada debe mantenerse offline, para poder publicar una versión de transición si la primaria se pierde o se compromete. `protect-release-key.ps1` reexporta sin rotar la identidad, `show-release-key-password.ps1` recupera la contraseña localmente y `sign-release-manifest.ps1 -KeyRole Recovery` firma con la clave de recuperación.
 - **Firma de release y Authenticode se documentan como mecanismos distintos.** La firma RSA del manifiesto prueba procedencia e integridad para CA-O; Authenticode es la firma de editor que Windows/SmartScreen evalúan. Sin certificado comercial puede seguir apareciendo el aviso de SmartScreen: la firma propia no se presenta como sustituto.
 ### Corregido
 - **Presets de overclock fuera de su propio rango.** `nvidia.gpu.powerLimit` y `amd.gpu.powerLimit` declaraban 0–100 % mientras sus perfiles pedían 120 %. Ahora el rango de catálogo es 50–150 % (100 = stock; el backend recorta contra el mínimo/máximo real del driver) y `CatalogValidator` rechaza cualquier preset que no quepa en el rango declarado, con tests que recorren todo el catálogo.
+- **Los certificados públicos del backup se quedaban sin permiso efectivo.** `icacls /T` con flags de carpeta `(OI)(CI)F` no concede acceso a los ficheros existentes; los `.cer` y `.cert.base64` podían quedar ilegibles incluso para su dueño. El barrido de ACL usa ahora `F` por fichero y deja `(OI)(CI)F` solo en la carpeta para los ficheros futuros.
 
 ## [2.2.21] - 2026-10-27
 ### Corregido

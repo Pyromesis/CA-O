@@ -176,7 +176,7 @@ if (-not $hasTool) {
     Write-Error "Release CANNOT be published without SBOM."
     exit 1
 }
-dotnet CycloneDX $solution --output $sbomDir --filename $SbomFileName
+dotnet CycloneDX $solution --output $sbomDir --filename $SbomFileName --disable-package-restore
 if ($LASTEXITCODE -ne 0) { throw "CycloneDX failed" }
 Write-Host "SBOM generated at $sbomDir\$SbomFileName" -ForegroundColor Green
 

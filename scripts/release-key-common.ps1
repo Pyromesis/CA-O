@@ -106,10 +106,17 @@ function Set-CaoReleaseKeyAcl {
 
     # /T aplica la misma ACL a los ficheros y subdirectorios que ya existen:
     # sin /T, un PFX creado antes de endurecer la carpeta conserva su ACL
-    # heredada. Luego se fija tambien el fichero de forma explicita.
-    & icacls.exe $Directory /inheritance:r /grant:r "$($me):(OI)(CI)F" /T | Out-Null
+    # heredada. OJO: sobre un fichero, "(OI)(CI)F" son flags de herencia y no
+    # conceden acceso efectivo; por eso el barrido usa "F" y despues se deja
+    # la carpeta con herencia para los ficheros futuros.
+    & icacls.exe $Directory /inheritance:r /grant:r "$($me):F" /T | Out-Null
     if ($LASTEXITCODE -ne 0) { throw "icacls fallo en $Directory" }
 
+    & icacls.exe $Directory /grant:r "$($me):(OI)(CI)F" | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "icacls fallo en $Directory" }
+
+    # Los ficheros que se acaban de crear pueden no existir aun cuando se
+    # llama a la funcion; se fijan tambien de forma explicita.
     foreach ($file in $Files) {
         if (Test-Path $file) {
             & icacls.exe $file /inheritance:r /grant:r "$($me):F" | Out-Null

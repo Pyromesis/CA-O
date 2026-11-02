@@ -102,7 +102,7 @@ if (-not $hasTool) {
     Write-Warning "  dotnet tool install --global CycloneDX"
     Write-Warning "y regenere el SBOM antes de publicar."
 } else {
-    dotnet CycloneDX CA-O.sln --output $SbomDir --filename $SbomFileName
+    dotnet CycloneDX CA-O.sln --output $SbomDir --filename $SbomFileName --disable-package-restore
     if ($LASTEXITCODE -ne 0) { throw "CycloneDX fallo" }
     Write-Host "SBOM CycloneDX generado en $SbomDir\$SbomFileName" -ForegroundColor Green
 }
